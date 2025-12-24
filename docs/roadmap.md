@@ -20,8 +20,8 @@ Establish the project structure, build tooling, and core middleware skeleton.
   - [x] Configure ruff for linting and formatting.
   - [x] Configure ty for type checking.
   - [x] Update Makefile with test, lint, and typecheck targets.
-- [ ] 1.1.3. Set up continuous integration
-  - [ ] Add GitHub Actions workflow for test, lint, and typecheck.
+- [x] 1.1.3. Set up continuous integration
+  - [x] Add GitHub Actions workflow for test, lint, and typecheck.
   - [ ] Configure matrix testing for Python 3.10, 3.11, 3.12, and 3.13.
 
 ### 1.2. Core middleware class (WSGI)
