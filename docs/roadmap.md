@@ -11,15 +11,15 @@ Establish the project structure, build tooling, and core middleware skeleton.
 
 ### 1.1. Project structure and tooling
 
-- [ ] 1.1.1. Initialise package structure
-  - [ ] Create `src/falcon_correlate/` package directory.
-  - [ ] Add `__init__.py` with version and public API exports.
-  - [ ] Configure `pyproject.toml` with package metadata and dependencies.
-- [ ] 1.1.2. Configure development tooling
-  - [ ] Add pytest configuration with coverage requirements (target: 90%).
-  - [ ] Configure ruff for linting and formatting.
-  - [ ] Configure mypy for type checking.
-  - [ ] Update Makefile with test, lint, and typecheck targets.
+- [x] 1.1.1. Initialise package structure
+  - [x] Create `falcon_correlate/` package directory.
+  - [x] Add `__init__.py` with version and public API exports.
+  - [x] Configure `pyproject.toml` with package metadata and dependencies.
+- [x] 1.1.2. Configure development tooling
+  - [x] Add pytest configuration with coverage requirements (target: 90%).
+  - [x] Configure ruff for linting and formatting.
+  - [x] Configure ty for type checking.
+  - [x] Update Makefile with test, lint, and typecheck targets.
 - [ ] 1.1.3. Set up continuous integration
   - [ ] Add GitHub Actions workflow for test, lint, and typecheck.
   - [ ] Configure matrix testing for Python 3.10, 3.11, 3.12, and 3.13.
