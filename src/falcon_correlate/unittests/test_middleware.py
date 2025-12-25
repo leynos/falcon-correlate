@@ -125,33 +125,53 @@ class TestCorrelationIDMiddlewareWithFalcon:
         for expected_call in expected_calls:
             assert expected_call in call_log
 
-    def test_process_request_is_called(self) -> None:
-        """Verify process_request is invoked during request processing."""
+    @pytest.mark.parametrize(
+        ("hook_name", "call_name", "expected_order"),
+        [
+            (
+                "process_request",
+                "process_request_called",
+                ["process_request_called", "resource_called"],
+            ),
+            (
+                "process_response",
+                "process_response_called",
+                ["resource_called", "process_response_called"],
+            ),
+        ],
+        ids=["process_request", "process_response"],
+    )
+    def test_middleware_hook_is_called(
+        self,
+        hook_name: str,
+        call_name: str,
+        expected_order: list[str],
+    ) -> None:
+        """Verify middleware hooks are invoked during request processing.
+
+        Parameters
+        ----------
+        hook_name : str
+            Name of the hook being tested ('process_request' or 'process_response').
+        call_name : str
+            String to append to call_log when the hook is invoked.
+        expected_order : list[str]
+            Expected sequence of calls in the call log.
+
+        """
         call_log: list[str] = []
 
         class TrackingMiddleware(CorrelationIDMiddleware):
-            """Middleware that tracks process_request calls."""
+            """Middleware that tracks method calls."""
 
             def process_request(
                 self,
                 req: falcon.Request,
                 resp: falcon.Response,
             ) -> None:
-                call_log.append("process_request_called")
+                if hook_name == "process_request":
+                    call_log.append(call_name)
                 super().process_request(req, resp)
-
-        self._verify_middleware_hook_called(
-            middleware=TrackingMiddleware(),
-            call_log=call_log,
-            expected_calls=["process_request_called", "resource_called"],
-        )
-
-    def test_process_response_is_called(self) -> None:
-        """Verify process_response is invoked during request processing."""
-        call_log: list[str] = []
-
-        class TrackingMiddleware(CorrelationIDMiddleware):
-            """Middleware that tracks process_response calls."""
 
             def process_response(
                 self,
@@ -160,11 +180,12 @@ class TestCorrelationIDMiddlewareWithFalcon:
                 resource: object,
                 req_succeeded: bool,  # noqa: FBT001
             ) -> None:
-                call_log.append("process_response_called")
+                if hook_name == "process_response":
+                    call_log.append(call_name)
                 super().process_response(req, resp, resource, req_succeeded)
 
         self._verify_middleware_hook_called(
             middleware=TrackingMiddleware(),
             call_log=call_log,
-            expected_calls=["resource_called", "process_response_called"],
+            expected_calls=expected_order,
         )
