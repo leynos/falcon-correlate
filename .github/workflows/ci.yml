@@ -6,25 +6,20 @@ on:
   pull_request:
 
 jobs:
-  lint-test:
+  lint:
     runs-on: ubuntu-latest
-    env:
-      CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
-      CODESCENE_CLI_SHA256: ${{ vars.CODESCENE_CLI_SHA256 }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
 
       - name: Set up bun
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install 3.13
 
       - name: Install yaml schema validator
         run: bun install -g pajv
@@ -49,24 +44,46 @@ jobs:
       - name: Run typechecker
         run: make typecheck
 
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13', '3.14']
+    env:
+      CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
+      CODESCENE_CLI_SHA256: ${{ vars.CODESCENE_CLI_SHA256 }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install code
+        run: uv sync --group dev --python ${{ matrix.python-version }}
+
       - name: Run tests with coverage
         run: |
           uv pip install slipcover pytest-forked
           uv run python -m slipcover \
-            --source=./ghillie \
+            --source=./falcon_correlate \
             --omit="*/unittests/*,*/.venv/*" \
             --branch \
-            --out coverage.xml \
-            -m pytest --forked -v
+            --out coverage-${{ matrix.python-version }}.xml \
+            -m pytest --forked -v --ignore=tests/workflows
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coverage
-          path: coverage.xml
+          name: coverage-${{ matrix.python-version }}
+          path: coverage-${{ matrix.python-version }}.xml
 
       - name: Install CodeScene Coverage CLI
-        if: env.CS_ACCESS_TOKEN != ''
+        if: env.CS_ACCESS_TOKEN != '' && matrix.python-version == '3.13'
         run: |
           curl -fsSL https://downloads.codescene.io/enterprise/cli/install-cs-coverage-tool.sh | bash -s -- -y
           if [ -n "${CODESCENE_CLI_SHA256:-}" ]; then
@@ -74,13 +91,13 @@ jobs:
           fi
 
       - name: Upload coverage to CodeScene
-        if: env.CS_ACCESS_TOKEN != ''
+        if: env.CS_ACCESS_TOKEN != '' && matrix.python-version == '3.13'
         run: |
-          if [ ! -f coverage.xml ]; then
-            echo "coverage.xml not found!"
+          if [ ! -f coverage-${{ matrix.python-version }}.xml ]; then
+            echo "coverage-${{ matrix.python-version }}.xml not found!"
             exit 1
           fi
           cs-coverage upload \
             --format "cobertura" \
             --metric "line-coverage" \
-            coverage.xml
+            coverage-${{ matrix.python-version }}.xml

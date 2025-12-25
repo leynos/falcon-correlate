@@ -1,3 +1,5 @@
+"""Pure Python utilities for falcon-correlate."""
+
 from __future__ import annotations
 
 

@@ -22,7 +22,7 @@ Establish the project structure, build tooling, and core middleware skeleton.
   - [x] Update Makefile with test, lint, and typecheck targets.
 - [x] 1.1.3. Set up continuous integration
   - [x] Add GitHub Actions workflow for test, lint, and typecheck.
-  - [ ] Configure matrix testing for Python 3.10, 3.11, 3.12, and 3.13.
+  - [x] Configure matrix testing for Python 3.12, 3.13 and 3.14.
 
 ### 1.2. Core middleware class (WSGI)
 

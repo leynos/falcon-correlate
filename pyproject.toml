@@ -17,6 +17,7 @@ dev = [
     "pyright",
     "ty",
     "pytest-timeout",
+    "pyyaml",
 ]
 
 [tool.ruff]
@@ -98,6 +99,9 @@ max-args = 4
 [tool.pytest.ini_options]
 # Tests automatically killed after seconds elapsed
 timeout = 30
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
 
 [tool.uv]
 package = true
