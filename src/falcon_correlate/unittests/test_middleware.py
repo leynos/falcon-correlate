@@ -87,12 +87,50 @@ class TestCorrelationIDMiddlewareWithFalcon:
         # 404 is expected since no routes are defined
         assert result.status_code == HTTPStatus.NOT_FOUND
 
+    def _verify_middleware_hook_called(
+        self,
+        middleware: CorrelationIDMiddleware,
+        call_log: list[str],
+        expected_calls: list[str],
+    ) -> None:
+        """Verify middleware hooks are called during request processing.
+
+        Creates a Falcon app with the given middleware, adds a simple resource
+        that logs when called, makes a GET request, and verifies that all
+        expected calls appear in the call log.
+
+        Parameters
+        ----------
+        middleware : CorrelationIDMiddleware
+            The middleware instance to test (typically a tracking subclass).
+        call_log : list[str]
+            A list that will be populated with call events by the middleware
+            and resource.
+        expected_calls : list[str]
+            List of call event strings that should appear in the call_log
+            after the request completes.
+
+        """
+
+        class LoggingResource:
+            def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
+                call_log.append("resource_called")
+                resp.media = {"status": "ok"}
+
+        app = falcon.App(middleware=[middleware])
+        app.add_route("/test", LoggingResource())
+        client = falcon.testing.TestClient(app)
+        client.simulate_get("/test")
+
+        for expected_call in expected_calls:
+            assert expected_call in call_log
+
     def test_process_request_is_called(self) -> None:
         """Verify process_request is invoked during request processing."""
         call_log: list[str] = []
 
         class TrackingMiddleware(CorrelationIDMiddleware):
-            """Middleware that tracks method calls."""
+            """Middleware that tracks process_request calls."""
 
             def process_request(
                 self,
@@ -102,25 +140,18 @@ class TestCorrelationIDMiddlewareWithFalcon:
                 call_log.append("process_request_called")
                 super().process_request(req, resp)
 
-        class LoggingResource:
-            def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
-                call_log.append("resource_called")
-                resp.media = {"status": "ok"}
-
-        app = falcon.App(middleware=[TrackingMiddleware()])
-        app.add_route("/test", LoggingResource())
-        client = falcon.testing.TestClient(app)
-        client.simulate_get("/test")
-
-        assert "process_request_called" in call_log
-        assert "resource_called" in call_log
+        self._verify_middleware_hook_called(
+            middleware=TrackingMiddleware(),
+            call_log=call_log,
+            expected_calls=["process_request_called", "resource_called"],
+        )
 
     def test_process_response_is_called(self) -> None:
         """Verify process_response is invoked during request processing."""
         call_log: list[str] = []
 
         class TrackingMiddleware(CorrelationIDMiddleware):
-            """Middleware that tracks method calls."""
+            """Middleware that tracks process_response calls."""
 
             def process_response(
                 self,
@@ -132,15 +163,8 @@ class TestCorrelationIDMiddlewareWithFalcon:
                 call_log.append("process_response_called")
                 super().process_response(req, resp, resource, req_succeeded)
 
-        class LoggingResource:
-            def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
-                call_log.append("resource_called")
-                resp.media = {"status": "ok"}
-
-        app = falcon.App(middleware=[TrackingMiddleware()])
-        app.add_route("/test", LoggingResource())
-        client = falcon.testing.TestClient(app)
-        client.simulate_get("/test")
-
-        assert "resource_called" in call_log
-        assert "process_response_called" in call_log
+        self._verify_middleware_hook_called(
+            middleware=TrackingMiddleware(),
+            call_log=call_log,
+            expected_calls=["resource_called", "process_response_called"],
+        )
