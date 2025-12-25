@@ -26,12 +26,12 @@ Establish the project structure, build tooling, and core middleware skeleton.
 
 ### 1.2. Core middleware class (WSGI)
 
-- [ ] 1.2.1. Implement middleware skeleton. See design-doc §3.1.1.
-  - [ ] Create `CorrelationIDMiddleware` class.
-  - [ ] Implement `process_request(self, req, resp)` method stub.
-  - [ ] Implement `process_response(self, req, resp, resource, req_succeeded)`
+- [x] 1.2.1. Implement middleware skeleton. See design-doc §3.1.1.
+  - [x] Create `CorrelationIDMiddleware` class.
+  - [x] Implement `process_request(self, req, resp)` method stub.
+  - [x] Implement `process_response(self, req, resp, resource, req_succeeded)`
         method stub.
-  - [ ] Add type hints for all public methods.
+  - [x] Add type hints for all public methods.
 - [ ] 1.2.2. Implement configurable options. See design-doc §4.5.
   - [ ] Add `header_name` parameter (default: `X-Correlation-ID`).
   - [ ] Add `trusted_sources` parameter for IP allowlist.
