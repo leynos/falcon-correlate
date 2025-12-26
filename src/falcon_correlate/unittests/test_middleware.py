@@ -171,8 +171,7 @@ class TestCorrelationIDMiddlewareWithFalcon:
                 req: falcon.Request,
                 resp: falcon.Response,
                 resource: object,
-                # Falcon WSGI middleware interface requirement
-                req_succeeded: bool,  # noqa: FBT001
+                req_succeeded: bool,  # noqa: FBT001, TD001, TD002, TD003  # FIXME: Falcon WSGI middleware interface requirement
             ) -> None:
                 call_log.append(call_name)
                 super().process_response(req, resp, resource, req_succeeded)

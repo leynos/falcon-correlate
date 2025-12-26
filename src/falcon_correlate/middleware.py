@@ -53,7 +53,7 @@ class CorrelationIDMiddleware:
         req: falcon.Request,
         resp: falcon.Response,
         resource: object,
-        req_succeeded: bool,  # noqa: FBT001 - Falcon WSGI middleware interface requirement
+        req_succeeded: bool,  # noqa: FBT001, TD001, TD002, TD003  # FIXME: Falcon WSGI middleware interface requirement
     ) -> None:
         """Post-process the response to add correlation ID header and cleanup.
 

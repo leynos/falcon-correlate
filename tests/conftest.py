@@ -42,8 +42,7 @@ class TrackingMiddleware(CorrelationIDMiddleware):
         req: falcon.Request,
         resp: falcon.Response,
         resource: object,
-        # Falcon WSGI middleware interface requirement
-        req_succeeded: bool,  # noqa: FBT001
+        req_succeeded: bool,  # noqa: FBT001, TD001, TD002, TD003  # FIXME: Falcon WSGI middleware interface requirement
     ) -> None:
         """Track process_response invocation."""
         self.process_response_called = True
