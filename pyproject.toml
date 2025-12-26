@@ -5,7 +5,7 @@ description = "falcon-correlate package"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "ISC" }
-dependencies = []
+dependencies = ["falcon>=4,<5"]
 
 [dependency-groups]
 dev = [

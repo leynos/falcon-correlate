@@ -1137,3 +1137,54 @@ distributed environments.
 [^24]: Celery message protocol correlation_id field.
 [^25]: Celery signals documentation.
 [^27]: Celery custom Task base class documentation.
+
+## Appendix A: Implementation Design Decisions
+
+This appendix documents design decisions made during implementation of the
+middleware.
+
+### A.1. Middleware Skeleton (Task 1.2.1)
+
+**Decision:** Implement the initial `CorrelationIDMiddleware` as a skeleton with
+method stubs, deferring full functionality to subsequent tasks.
+
+**Rationale:**
+
+1. **Incremental development:** Following the roadmap structure allows for
+   focused, testable increments. The skeleton establishes the class structure
+   and interface before adding complex logic.
+
+2. **WSGI-first approach:** The initial implementation targets WSGI applications
+   using synchronous `process_request` and `process_response` methods. The ASGI
+   variant with async methods is planned for task 5.1.
+
+3. **Type safety:** Full type hints using `falcon.Request` and `falcon.Response`
+   from Falcon's public API ensure type checker compatibility and IDE support.
+
+4. **Test-driven development:** Unit tests and BDD behavioural tests are written
+   alongside the skeleton to validate the interface before functionality is
+   added.
+
+**Files created:**
+
+- `src/falcon_correlate/middleware.py` - Core middleware class
+- `src/falcon_correlate/unittests/test_middleware.py` - Colocated unit tests
+- `tests/bdd/middleware.feature` - BDD feature file
+- `tests/bdd/test_middleware_steps.py` - BDD step definitions
+
+**Interface:**
+
+```python
+class CorrelationIDMiddleware:
+    def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
+        ...
+
+    def process_response(
+        self,
+        req: falcon.Request,
+        resp: falcon.Response,
+        resource: object,
+        req_succeeded: bool,
+    ) -> None:
+        ...
+```
