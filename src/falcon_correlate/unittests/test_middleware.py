@@ -125,26 +125,82 @@ class TestCorrelationIDMiddlewareWithFalcon:
         for expected_call in expected_calls:
             assert expected_call in call_log
 
+    def _create_request_tracking_middleware(
+        self,
+        call_log: list[str],
+    ) -> CorrelationIDMiddleware:
+        """Create middleware that tracks process_request calls.
+
+        Parameters
+        ----------
+        call_log : list[str]
+            List to append call events to.
+
+        Returns
+        -------
+        CorrelationIDMiddleware
+            Middleware instance that logs process_request invocations.
+
+        """
+
+        class RequestTrackingMiddleware(CorrelationIDMiddleware):
+            """Middleware that tracks process_request calls."""
+
+            def process_request(
+                self,
+                req: falcon.Request,
+                resp: falcon.Response,
+            ) -> None:
+                call_log.append("process_request_called")
+                super().process_request(req, resp)
+
+        return RequestTrackingMiddleware()
+
+    def _create_response_tracking_middleware(
+        self,
+        call_log: list[str],
+    ) -> CorrelationIDMiddleware:
+        """Create middleware that tracks process_response calls.
+
+        Parameters
+        ----------
+        call_log : list[str]
+            List to append call events to.
+
+        Returns
+        -------
+        CorrelationIDMiddleware
+            Middleware instance that logs process_response invocations.
+
+        """
+
+        class ResponseTrackingMiddleware(CorrelationIDMiddleware):
+            """Middleware that tracks process_response calls."""
+
+            def process_response(
+                self,
+                req: falcon.Request,
+                resp: falcon.Response,
+                resource: object,
+                # Falcon WSGI middleware interface requirement
+                req_succeeded: bool,  # noqa: FBT001
+            ) -> None:
+                call_log.append("process_response_called")
+                super().process_response(req, resp, resource, req_succeeded)
+
+        return ResponseTrackingMiddleware()
+
     @pytest.mark.parametrize(
-        ("hook_name", "call_name", "expected_order"),
+        ("hook_name", "expected_order"),
         [
-            (
-                "process_request",
-                "process_request_called",
-                ["process_request_called", "resource_called"],
-            ),
-            (
-                "process_response",
-                "process_response_called",
-                ["resource_called", "process_response_called"],
-            ),
+            ("process_request", ["process_request_called", "resource_called"]),
+            ("process_response", ["resource_called", "process_response_called"]),
         ],
         ids=["process_request", "process_response"],
     )
     def test_middleware_hook_is_called(
         self,
         hook_name: str,
-        call_name: str,
         expected_order: list[str],
     ) -> None:
         """Verify middleware hooks are invoked during request processing.
@@ -153,39 +209,19 @@ class TestCorrelationIDMiddlewareWithFalcon:
         ----------
         hook_name : str
             Name of the hook being tested ('process_request' or 'process_response').
-        call_name : str
-            String to append to call_log when the hook is invoked.
         expected_order : list[str]
             Expected sequence of calls in the call log.
 
         """
         call_log: list[str] = []
 
-        class TrackingMiddleware(CorrelationIDMiddleware):
-            """Middleware that tracks method calls."""
-
-            def process_request(
-                self,
-                req: falcon.Request,
-                resp: falcon.Response,
-            ) -> None:
-                if hook_name == "process_request":
-                    call_log.append(call_name)
-                super().process_request(req, resp)
-
-            def process_response(
-                self,
-                req: falcon.Request,
-                resp: falcon.Response,
-                resource: object,
-                req_succeeded: bool,  # noqa: FBT001
-            ) -> None:
-                if hook_name == "process_response":
-                    call_log.append(call_name)
-                super().process_response(req, resp, resource, req_succeeded)
+        if hook_name == "process_request":
+            middleware = self._create_request_tracking_middleware(call_log)
+        else:
+            middleware = self._create_response_tracking_middleware(call_log)
 
         self._verify_middleware_hook_called(
-            middleware=TrackingMiddleware(),
+            middleware=middleware,
             call_log=call_log,
             expected_calls=expected_order,
         )

@@ -10,42 +10,9 @@ import falcon.testing
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from falcon_correlate import CorrelationIDMiddleware
+from tests.conftest import SimpleResource, TrackingMiddleware
 
 scenarios("middleware.feature")
-
-
-class SimpleResource:
-    """A simple resource for testing."""
-
-    def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
-        """Handle GET requests."""
-        resp.media = {"message": "hello"}
-
-
-class TrackingMiddleware(CorrelationIDMiddleware):
-    """Middleware that tracks method calls for testing."""
-
-    def __init__(self) -> None:
-        """Initialise tracking middleware."""
-        super().__init__()
-        self.process_request_called = False
-        self.process_response_called = False
-
-    def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
-        """Track process_request calls."""
-        self.process_request_called = True
-        super().process_request(req, resp)
-
-    def process_response(
-        self,
-        req: falcon.Request,
-        resp: falcon.Response,
-        resource: object,
-        req_succeeded: bool,  # noqa: FBT001
-    ) -> None:
-        """Track process_response calls."""
-        self.process_response_called = True
-        super().process_response(req, resp, resource, req_succeeded)
 
 
 class Context(typ.TypedDict, total=False):
