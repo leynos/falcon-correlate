@@ -5,6 +5,9 @@ from __future__ import annotations
 import typing as typ
 from http import HTTPStatus
 
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
+
 import falcon
 import falcon.testing
 from pytest_bdd import given, parsers, scenarios, then, when
@@ -22,6 +25,8 @@ class Context(typ.TypedDict, total=False):
     app: falcon.App
     client: falcon.testing.TestClient
     response: falcon.testing.Result
+    custom_generator: cabc.Callable[[], str]
+    custom_validator: cabc.Callable[[str], bool]
 
 
 @given("a new CorrelationIDMiddleware instance", target_fixture="context")
@@ -83,3 +88,103 @@ def then_process_response_called(context: Context) -> None:
     middleware = context["middleware"]
     assert isinstance(middleware, TrackingMiddleware)
     assert middleware.process_response_called
+
+
+# Configuration scenario steps
+
+
+@given(
+    parsers.parse('a CorrelationIDMiddleware with header_name "{header_name}"'),
+    target_fixture="context",
+)
+def given_middleware_with_header_name(header_name: str) -> Context:
+    """Create middleware with custom header name."""
+    return {"middleware": CorrelationIDMiddleware(header_name=header_name)}
+
+
+@then(parsers.parse('the middleware should use "{header_name}" as the header name'))
+def then_middleware_uses_header_name(context: Context, header_name: str) -> None:
+    """Verify middleware uses specified header name."""
+    assert context["middleware"].header_name == header_name
+
+
+@given(
+    parsers.parse('a CorrelationIDMiddleware with trusted_sources "{sources}"'),
+    target_fixture="context",
+)
+def given_middleware_with_trusted_sources(sources: str) -> Context:
+    """Create middleware with trusted sources (comma-separated)."""
+    source_list = [s.strip() for s in sources.split(",")]
+    return {"middleware": CorrelationIDMiddleware(trusted_sources=source_list)}
+
+
+@then(parsers.parse("the middleware should have {count:d} trusted sources"))
+def then_middleware_has_trusted_sources_count(context: Context, count: int) -> None:
+    """Verify middleware has expected number of trusted sources."""
+    assert len(context["middleware"].trusted_sources) == count
+
+
+@given(
+    parsers.parse('a custom ID generator that returns "{return_value}"'),
+    target_fixture="context",
+)
+def given_custom_generator(return_value: str) -> Context:
+    """Create a custom generator function."""
+
+    def custom_gen() -> str:
+        return return_value
+
+    return {"custom_generator": custom_gen}
+
+
+@given("a CorrelationIDMiddleware with that generator")
+def given_middleware_with_custom_generator(context: Context) -> None:
+    """Create middleware with the custom generator from context."""
+    context["middleware"] = CorrelationIDMiddleware(
+        generator=context["custom_generator"],
+    )
+
+
+@then("the middleware should use the custom generator")
+def then_middleware_uses_custom_generator(context: Context) -> None:
+    """Verify middleware uses the custom generator."""
+    assert context["middleware"].generator is context["custom_generator"]
+
+
+@given("a custom validator that accepts any string", target_fixture="context")
+def given_custom_validator() -> Context:
+    """Create a custom validator function."""
+
+    def custom_val(value: str) -> bool:
+        return True
+
+    return {"custom_validator": custom_val}
+
+
+@given("a CorrelationIDMiddleware with that validator")
+def given_middleware_with_custom_validator(context: Context) -> None:
+    """Create middleware with the custom validator from context."""
+    context["middleware"] = CorrelationIDMiddleware(
+        validator=context["custom_validator"],
+    )
+
+
+@then("the middleware should use the custom validator")
+def then_middleware_uses_custom_validator(context: Context) -> None:
+    """Verify middleware uses the custom validator."""
+    assert context["middleware"].validator is context["custom_validator"]
+
+
+@given(
+    "a CorrelationIDMiddleware with echo_header_in_response disabled",
+    target_fixture="context",
+)
+def given_middleware_with_echo_disabled() -> Context:
+    """Create middleware with echo_header_in_response disabled."""
+    return {"middleware": CorrelationIDMiddleware(echo_header_in_response=False)}
+
+
+@then("the middleware should have echo_header_in_response set to False")
+def then_middleware_echo_disabled(context: Context) -> None:
+    """Verify echo_header_in_response is False."""
+    assert context["middleware"].echo_header_in_response is False
