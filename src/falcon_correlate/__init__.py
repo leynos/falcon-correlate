@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .middleware import CorrelationIDMiddleware
+from .middleware import CorrelationIDMiddleware, default_uuid7_generator
 
 PACKAGE_NAME = "falcon_correlate"
 
@@ -12,4 +12,4 @@ try:  # pragma: no cover - Rust optional
 except ModuleNotFoundError:  # pragma: no cover - Python fallback
     from .pure import hello
 
-__all__ = ["CorrelationIDMiddleware", "hello"]
+__all__ = ["CorrelationIDMiddleware", "default_uuid7_generator", "hello"]

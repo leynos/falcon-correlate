@@ -32,16 +32,16 @@ Establish the project structure, build tooling, and core middleware skeleton.
   - [x] Implement `process_response(self, req, resp, resource, req_succeeded)`
         method stub.
   - [x] Add type hints for all public methods.
-- [ ] 1.2.2. Implement configurable options. See design-doc §4.5.
-  - [ ] Add `header_name` parameter (default: `X-Correlation-ID`).
-  - [ ] Add `trusted_sources` parameter for IP allowlist.
-  - [ ] Add `generator` parameter for custom ID generation.
-  - [ ] Add `validator` parameter for incoming ID validation.
-  - [ ] Add `echo_header_in_response` parameter (default: `True`).
-- [ ] 1.2.3. Write unit tests for middleware initialisation
-  - [ ] Test default parameter values.
-  - [ ] Test custom parameter configuration.
-  - [ ] Test parameter validation and error handling.
+- [x] 1.2.2. Implement configurable options. See design-doc §4.5.
+  - [x] Add `header_name` parameter (default: `X-Correlation-ID`).
+  - [x] Add `trusted_sources` parameter for IP allowlist.
+  - [x] Add `generator` parameter for custom ID generation.
+  - [x] Add `validator` parameter for incoming ID validation.
+  - [x] Add `echo_header_in_response` parameter (default: `True`).
+- [x] 1.2.3. Write unit tests for middleware initialisation
+  - [x] Test default parameter values.
+  - [x] Test custom parameter configuration.
+  - [x] Test parameter validation and error handling.
 
 ## 2. Correlation ID lifecycle
 

@@ -26,9 +26,9 @@ class TrackingMiddleware(CorrelationIDMiddleware):
     to verify middleware lifecycle behaviour.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, **kwargs: object) -> None:
         """Initialise tracking middleware with call flags reset."""
-        super().__init__()
+        super().__init__(**kwargs)  # type: ignore[arg-type]
         self.process_request_called = False
         self.process_response_called = False
 
