@@ -101,6 +101,7 @@ class CorrelationIDConfig:
             msg = "validator must be callable"
             raise TypeError(msg)
 
+    # @CodeScene(disable:"Excess Number of Function Arguments")
     @classmethod
     def from_kwargs(  # noqa: PLR0913
         cls,
@@ -146,6 +147,17 @@ class CorrelationIDConfig:
         )
 
 
+_VALID_CONFIG_KWARGS = frozenset(
+    {
+        "header_name",
+        "trusted_sources",
+        "generator",
+        "validator",
+        "echo_header_in_response",
+    }
+)
+
+
 class CorrelationIDMiddleware:
     """Middleware for managing correlation IDs in Falcon applications.
 
@@ -157,34 +169,22 @@ class CorrelationIDMiddleware:
     Parameters
     ----------
     config : CorrelationIDConfig | None
-        A pre-built configuration object. If provided, all other parameters
-        are ignored. Defaults to ``None``.
-    header_name : str
-        The HTTP header name to check for incoming correlation IDs and to
-        use for outgoing response headers. Defaults to ``X-Correlation-ID``.
-    trusted_sources : Iterable[str] | None
-        An iterable of IP addresses considered trusted. Only correlation IDs
-        from these sources will be accepted; requests from other sources
-        will have new IDs generated. If ``None`` or empty, no sources are
-        trusted and all requests will receive generated IDs.
-    generator : Callable[[], str] | None
-        A callable that returns a new correlation ID string. Defaults to
-        ``default_uuid7_generator`` which generates UUIDv7 identifiers.
-    validator : Callable[[str], bool] | None
-        An optional callable that validates incoming correlation IDs.
-        Takes an ID string and returns ``True`` if valid, ``False`` otherwise.
-        If ``None``, no validation is performed beyond trust checking.
-    echo_header_in_response : bool
-        If ``True``, the correlation ID will be added to response headers.
-        Defaults to ``True``.
+        A pre-built configuration object. If provided, no other keyword
+        arguments may be specified. Defaults to ``None``.
+    **kwargs
+        Individual configuration parameters. Valid keys are: ``header_name``,
+        ``trusted_sources``, ``generator``, ``validator``, and
+        ``echo_header_in_response``. See :meth:`CorrelationIDConfig.from_kwargs`
+        for parameter details.
 
     Raises
     ------
     ValueError
-        If ``header_name`` is empty or contains only whitespace, or if
-        ``trusted_sources`` contains empty strings.
+        If both ``config`` and other keyword arguments are provided, or if
+        ``header_name`` is empty or ``trusted_sources`` contains empty strings.
     TypeError
-        If ``generator`` or ``validator`` is provided but not callable.
+        If unknown keyword arguments are provided, or if ``generator`` or
+        ``validator`` is provided but not callable.
 
     Examples
     --------
@@ -218,27 +218,24 @@ class CorrelationIDMiddleware:
 
     __slots__ = ("_config",)
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         *,
         config: CorrelationIDConfig | None = None,
-        header_name: str = DEFAULT_HEADER_NAME,
-        trusted_sources: cabc.Iterable[str] | None = None,
-        generator: cabc.Callable[[], str] | None = None,
-        validator: cabc.Callable[[str], bool] | None = None,
-        echo_header_in_response: bool = True,
+        **kwargs: object,
     ) -> None:
         """Initialise the correlation ID middleware with configuration options."""
         if config is not None:
+            if kwargs:
+                msg = "Cannot specify both 'config' and individual parameters"
+                raise ValueError(msg)
             self._config = config
         else:
-            self._config = CorrelationIDConfig.from_kwargs(
-                header_name=header_name,
-                trusted_sources=trusted_sources,
-                generator=generator,
-                validator=validator,
-                echo_header_in_response=echo_header_in_response,
-            )
+            unknown_keys = set(kwargs.keys()) - _VALID_CONFIG_KWARGS
+            if unknown_keys:
+                msg = f"Unknown keyword arguments: {', '.join(sorted(unknown_keys))}"
+                raise TypeError(msg)
+            self._config = CorrelationIDConfig.from_kwargs(**kwargs)  # type: ignore[arg-type]
 
     @property
     def config(self) -> CorrelationIDConfig:
