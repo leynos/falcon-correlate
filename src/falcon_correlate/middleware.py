@@ -237,6 +237,7 @@ class CorrelationIDMiddleware:
                 raise TypeError(msg)
             self._config = CorrelationIDConfig.from_kwargs(**kwargs)  # type: ignore[arg-type]
 
+    # @CodeScene(disable:"Bumpy Road Ahead")
     @property
     def config(self) -> CorrelationIDConfig:
         """The middleware configuration."""
