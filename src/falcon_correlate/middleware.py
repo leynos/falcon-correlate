@@ -147,14 +147,9 @@ class CorrelationIDConfig:
         )
 
 
+# Derive valid kwargs from dataclass fields to ensure synchronisation
 _VALID_CONFIG_KWARGS = frozenset(
-    {
-        "header_name",
-        "trusted_sources",
-        "generator",
-        "validator",
-        "echo_header_in_response",
-    }
+    field.name for field in dataclasses.fields(CorrelationIDConfig)
 )
 
 
