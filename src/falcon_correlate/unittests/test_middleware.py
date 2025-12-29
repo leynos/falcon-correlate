@@ -9,7 +9,7 @@ import falcon
 import falcon.testing
 import pytest
 
-from falcon_correlate import CorrelationIDMiddleware
+from falcon_correlate import CorrelationIDConfig, CorrelationIDMiddleware
 from falcon_correlate.middleware import default_uuid7_generator
 
 
@@ -245,6 +245,16 @@ class TestCorrelationIDMiddlewareConfiguration:
         middleware = CorrelationIDMiddleware()
         assert middleware.generator is default_uuid7_generator
 
+    def test_default_uuid7_generator_raises_not_implemented_error(self) -> None:
+        """Verify default_uuid7_generator currently raises NotImplementedError.
+
+        This documents the interim behaviour until UUIDv7 generation is implemented.
+        """
+        with pytest.raises(NotImplementedError) as exc_info:
+            default_uuid7_generator()
+
+        assert "not yet implemented" in str(exc_info.value)
+
     def test_default_validator_is_none(self) -> None:
         """Verify default validator is None."""
         middleware = CorrelationIDMiddleware()
@@ -341,6 +351,28 @@ class TestCorrelationIDMiddlewareConfiguration:
         with pytest.raises(TypeError, match="validator must be callable"):
             CorrelationIDMiddleware(validator="not-callable")  # type: ignore[arg-type]
 
+    def test_unknown_kwarg_raises_type_error(self) -> None:
+        """Verify unknown keyword arguments raise TypeError with helpful message."""
+        with pytest.raises(TypeError) as excinfo:
+            CorrelationIDMiddleware(foo=1)  # type: ignore[call-arg]
+
+        message = str(excinfo.value)
+        assert "foo" in message
+        assert "Unknown keyword arguments" in message
+
+    def test_config_and_kwargs_conflict_raises_value_error(self) -> None:
+        """Verify providing both config and other kwargs raises ValueError."""
+        config = CorrelationIDConfig()
+
+        with pytest.raises(
+            ValueError,
+            match="Cannot specify both 'config' and individual parameters",
+        ):
+            CorrelationIDMiddleware(
+                config=config,
+                header_name="X-Request-ID",
+            )
+
     # Immutability tests
 
     def test_trusted_sources_is_immutable(self) -> None:
@@ -374,3 +406,88 @@ class TestCorrelationIDMiddlewareConfiguration:
         assert middleware.generator is gen
         assert middleware.validator is val
         assert middleware.echo_header_in_response is False
+
+    # Config-based construction tests
+
+    def test_config_based_construction_uses_given_config(self) -> None:
+        """Verify supplying a CorrelationIDConfig sets and exposes the same config."""
+        cfg = CorrelationIDConfig(
+            header_name="X-Request-ID",
+            echo_header_in_response=False,
+            trusted_sources=frozenset({"127.0.0.1", "10.0.0.1"}),
+        )
+
+        middleware = CorrelationIDMiddleware(config=cfg)
+
+        # The middleware should hold a reference to the exact config object
+        assert middleware.config is cfg
+
+        # And its exposed properties should reflect the config values
+        assert middleware.header_name == cfg.header_name
+        assert middleware.echo_header_in_response == cfg.echo_header_in_response
+        assert middleware.trusted_sources == cfg.trusted_sources
+
+    def test_config_from_kwargs_equivalence(self) -> None:
+        """Verify CorrelationIDConfig.from_kwargs matches direct construction."""
+        header_name = "X-Request-ID"
+        trusted_sources_list = ["127.0.0.1", "10.0.0.1"]
+        echo_header_in_response = False
+
+        cfg_direct = CorrelationIDConfig(
+            header_name=header_name,
+            trusted_sources=frozenset(trusted_sources_list),
+            echo_header_in_response=echo_header_in_response,
+        )
+        cfg_from_kwargs = CorrelationIDConfig.from_kwargs(
+            header_name=header_name,
+            trusted_sources=trusted_sources_list,
+            echo_header_in_response=echo_header_in_response,
+        )
+
+        # from_kwargs should produce an equivalent configuration
+        assert cfg_from_kwargs.header_name == cfg_direct.header_name
+        assert (
+            cfg_from_kwargs.echo_header_in_response
+            == cfg_direct.echo_header_in_response
+        )
+        assert cfg_from_kwargs.trusted_sources == cfg_direct.trusted_sources
+
+
+class TestCorrelationIDConfigValidation:
+    """Direct unit tests for CorrelationIDConfig validation."""
+
+    def test_config_empty_header_name_raises_value_error(self) -> None:
+        """Verify empty header_name on CorrelationIDConfig raises ValueError."""
+        with pytest.raises(ValueError, match="header_name must not be empty"):
+            CorrelationIDConfig(header_name="")
+
+    def test_config_whitespace_header_name_raises_value_error(self) -> None:
+        """Verify whitespace-only header_name raises ValueError."""
+        with pytest.raises(ValueError, match="header_name must not be empty"):
+            CorrelationIDConfig(header_name="   ")
+
+    def test_config_empty_trusted_source_raises_value_error(self) -> None:
+        """Verify empty string in trusted_sources raises ValueError."""
+        with pytest.raises(
+            ValueError,
+            match="trusted_sources must not contain empty strings",
+        ):
+            CorrelationIDConfig(trusted_sources=frozenset(["127.0.0.1", ""]))
+
+    def test_config_whitespace_trusted_source_raises_value_error(self) -> None:
+        """Verify whitespace-only string in trusted_sources raises ValueError."""
+        with pytest.raises(
+            ValueError,
+            match="trusted_sources must not contain empty strings",
+        ):
+            CorrelationIDConfig(trusted_sources=frozenset(["127.0.0.1", "   "]))
+
+    def test_config_non_callable_generator_raises_type_error(self) -> None:
+        """Verify non-callable generator on CorrelationIDConfig raises TypeError."""
+        with pytest.raises(TypeError, match="generator must be callable"):
+            CorrelationIDConfig(generator="not-a-callable")  # type: ignore[arg-type]
+
+    def test_config_non_callable_validator_raises_type_error(self) -> None:
+        """Verify non-callable validator on CorrelationIDConfig raises TypeError."""
+        with pytest.raises(TypeError, match="validator must be callable"):
+            CorrelationIDConfig(validator="not-a-callable")  # type: ignore[arg-type]

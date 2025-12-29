@@ -132,7 +132,7 @@ Several libraries and patterns exist within the Python ecosystem for handling
 correlation IDs. A notable example is `asgi-correlation-id`, a middleware
 designed for ASGI frameworks like FastAPI and Starlette.[^2] Although Falcon
 can operate in both WSGI and ASGI modes, the feature set of
-`asgi-correlation- id` provides a valuable reference. Its capabilities include
+`asgi-correlation-id` provides a valuable reference. Its capabilities include
 reading correlation IDs from headers (configurable, defaulting to
 `X-Request-ID`), generating new UUIDs if no ID is found, providing a logging
 filter to inject the ID into log records, and offering support for propagating
@@ -748,13 +748,13 @@ class CorrelationIDMiddleware:
     def __init__(
         self,
         header_name: str = "X-Correlation-ID",
-        trusted_sources: Optional[List[str]] = None,
+        trusted_sources: Iterable[str] | None = None,
         generator: Callable[[], str] = default_uuid7_generator,
-        validator: Optional[Callable[[str], bool]] = None,
+        validator: Callable[[str], bool] | None = None,
         echo_header_in_response: bool = True,
     ):
         self.header_name = header_name
-        self.trusted_sources = set(trusted_sources) if trusted_sources else set()
+        self.trusted_sources = frozenset(trusted_sources) if trusted_sources else frozenset()
         self.generator = generator
         self.validator = validator
         self.echo_header_in_response = echo_header_in_response
@@ -1028,13 +1028,13 @@ correlation_middleware = CorrelationIDMiddleware(
 
 #### Table: Middleware configuration options
 
-| Parameter Name            | Type                              | Default Value             | Description                                                                                                  |
-| ------------------------- | --------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `header_name`             | `str`                             | `X-Correlation-ID`        | The HTTP header name to check for an incoming correlation ID and to use for the outgoing response header.    |
-| `trusted_sources`         | `Optional[List[str]]`             | `None` (empty set)        | A list of IP addresses or subnets considered trusted. If `None` or empty, no sources are trusted by default. |
-| `generator`               | `Callable[[], str]`               | `default_uuid7_generator` | A callable that returns a new string-based correlation ID (e.g., a UUIDv7).                                  |
-| `validator`               | `Optional[Callable[[str], bool]]` | `None`                    | An optional callable that takes the incoming ID string and returns `True` if valid, `False` otherwise.       |
-| `echo_header_in_response` | `bool`                            | `True`                    | If `True`, the determined correlation ID will be added to the specified header in the outgoing response.     |
+| Parameter Name            | Type                              | Default Value             | Description                                                                                                       |
+| ------------------------- | --------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `header_name`             | `str`                             | `X-Correlation-ID`        | The HTTP header name to check for an incoming correlation ID and to use for the outgoing response header.         |
+| `trusted_sources`         | `Iterable[str]` or `None`         | `None` (empty set)        | An iterable of IP addresses or subnets considered trusted. If `None` or empty, no sources are trusted by default. |
+| `generator`               | `Callable[[], str]`               | `default_uuid7_generator` | A callable that returns a new string-based correlation ID (e.g., a UUIDv7).                                       |
+| `validator`               | `Optional[Callable[[str], bool]]` | `None`                    | An optional callable that takes the incoming ID string and returns `True` if valid, `False` otherwise.            |
+| `echo_header_in_response` | `bool`                            | `True`                    | If `True`, the determined correlation ID will be added to the specified header in the outgoing response.          |
 
 *Table 3: Middleware configuration options.*
 
