@@ -297,7 +297,7 @@ Some older libraries or implementations might use outdated draft specifications
 with different precision levels (e.g., nanosecond precision), which could lead
 to compatibility issues or unexpected sorting behaviour.[^16]
 
-The following table summarises some available options for UUIDv7 generation:
+The following table summarizes some available options for UUIDv7 generation:
 
 | Library Name   | PyPI Link                      | Function for UUIDv7  | Key Features/Standard Compliance                  | Last Updated | Notes                                                                       |
 | -------------- | ------------------------------ | -------------------- | ------------------------------------------------- | ------------ | --------------------------------------------------------------------------- |
@@ -648,7 +648,7 @@ This end-to-end flow ensures that:
 
 | System   | Method                       | Pros                                                                | Cons                                                                      | Recommended For                                                                   |
 | -------- | ---------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `httpx`  | Client Event Hooks           | Centralised logic for reused `Client` instances.                    | Correlation ID is request-specific, hook needs access to `contextvars`.   | Applications with well-managed, request-scoped or short-lived `Client` instances. |
+| `httpx`  | Client Event Hooks           | Centralized logic for reused `Client` instances.                    | Correlation ID is request-specific, hook needs access to `contextvars`.   | Applications with well-managed, request-scoped or short-lived `Client` instances. |
 | `httpx`  | Custom Transport             | Cleanly encapsulates logic; transparent to calling code.            | More boilerplate than simple injection; might be overkill for one header. | Scenarios requiring uniform header injection across many calls or complex logic.  |
 | `httpx`  | Wrapper Function             | Good balance of encapsulation and flexibility; easy to use.         | Requires developer discipline to consistently use the wrapper.            | Most common use cases, providing a simple and explicit way to add the header.     |
 | `Celery` | `before_task_publish` Signal | Idiomatic Celery approach; modifies the actual message; global.     | Affects all tasks (can filter by `sender` argument if needed).            | **Generally recommended** for most Celery integration scenarios.                  |
@@ -1028,13 +1028,13 @@ correlation_middleware = CorrelationIDMiddleware(
 
 #### Table: Middleware configuration options
 
-| Parameter Name            | Type                              | Default Value             | Description                                                                                                       |
-| ------------------------- | --------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `header_name`             | `str`                             | `X-Correlation-ID`        | The HTTP header name to check for an incoming correlation ID and to use for the outgoing response header.         |
-| `trusted_sources`         | `Iterable[str]` or `None`         | `None` (empty set)        | An iterable of IP addresses or subnets considered trusted. If `None` or empty, no sources are trusted by default. |
-| `generator`               | `Callable[[], str]`               | `default_uuid7_generator` | A callable that returns a new string-based correlation ID (e.g., a UUIDv7).                                       |
-| `validator`               | `Optional[Callable[[str], bool]]` | `None`                    | An optional callable that takes the incoming ID string and returns `True` if valid, `False` otherwise.            |
-| `echo_header_in_response` | `bool`                            | `True`                    | If `True`, the determined correlation ID will be added to the specified header in the outgoing response.          |
+| Parameter Name            | Type                              | Default Value             | Description                                                                                                        |
+| ------------------------- | --------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `header_name`             | `str`                             | `X-Correlation-ID`        | The HTTP header name to check for an incoming correlation ID and to use for the outgoing response header.          |
+| `trusted_sources`         | `Iterable[str]` or `None`         | `None` (empty set)        | A collection of IP addresses or subnets considered trusted. If `None` or empty, no sources are trusted by default. |
+| `generator`               | `Callable[[], str]`               | `default_uuid7_generator` | A callable that returns a new string-based correlation ID (e.g., a UUIDv7).                                        |
+| `validator`               | `Optional[Callable[[str], bool]]` | `None`                    | An optional callable that takes the incoming ID string and returns `True` if valid, `False` otherwise.             |
+| `echo_header_in_response` | `bool`                            | `True`                    | If `True`, the determined correlation ID will be added to the specified header in the outgoing response.           |
 
 *Table 3: Middleware configuration options.*
 

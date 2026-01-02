@@ -65,8 +65,8 @@ middleware = CorrelationIDMiddleware(header_name="X-Request-ID")
 
 ### trusted_sources
 
-An iterable of IP addresses considered trusted. Correlation IDs will only be
-accepted from requests originating from these addresses. Requests from
+A collection of IP addresses considered trusted. Correlation IDs will only be
+accepted from requests originating from these addresses, and requests from
 untrusted sources will have new IDs generated regardless of any incoming header
 value.
 
