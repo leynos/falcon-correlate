@@ -38,7 +38,6 @@ Establish the project structure, build tooling, and core middleware skeleton.
   - [x] Add `generator` parameter for custom ID generation.
   - [x] Add `validator` parameter for incoming ID validation.
   - [x] Add `echo_header_in_response` parameter (default: `True`).
-  - [x] Write unit tests for middleware initialisation.
   - [x] Test default parameter values.
   - [x] Test custom parameter configuration.
   - [x] Test parameter validation and error handling.
@@ -132,6 +131,7 @@ Provide utilities for injecting correlation IDs into log records.
   - [ ] Explain `merge_contextvars` processor usage.
   - [ ] Provide configuration example.
   - [ ] Note that no additional code is required if contextvars are used.
+- [ ] 3.2.2. Validate structlog integration
   - [ ] Test correlation ID appears in structured log output.
   - [ ] Mark test as skipped if structlog is not installed.
 
@@ -171,6 +171,7 @@ Enable correlation ID propagation to downstream HTTP services and Celery tasks.
 - [ ] 4.2.3. Provide Celery configuration utilities
   - [ ] Create `configure_celery_correlation(app)` helper function.
   - [ ] Connect all signal handlers in one call.
+- [ ] 4.2.4. Validate optional Celery integration
   - [ ] Mark tests as skipped if Celery is not installed.
 
 ## 5. ASGI support
@@ -185,7 +186,7 @@ Extend the middleware to support Falcon's ASGI mode.
   - [ ] Implement `async process_response(self, req, resp, resource,
         req_succeeded)`.
   - [ ] Share configuration logic with WSGI variant.
-  - [ ] Test middleware functions in ASGI application.
+  - [ ] Test middleware functions in an ASGI application.
 - [ ] 5.1.2. Ensure context variable compatibility with async
   - [ ] Verify `contextvars` behaviour in async context.
   - [ ] Test with concurrent async requests.
