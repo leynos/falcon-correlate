@@ -301,7 +301,7 @@ The following table summarizes some available options for UUIDv7 generation:
 
 | Library Name   | PyPI Link                      | Function for UUIDv7  | Key Features/Standard Compliance                  | Last Updated | Notes                                                                       |
 | -------------- | ------------------------------ | -------------------- | ------------------------------------------------- | ------------ | --------------------------------------------------------------------------- |
-| `uuid6`        | `pypi.org/project/uuid6/`      | `uuid6.uuid7()`      | Implements draft RFC for v6, v7, v8; time-ordered | Mid-2023     | Provides `uuid7()`. Recommended by its own docs for new systems over v1/v6. |
+| `uuid6`        | `pypi.org/project/uuid6/`      | `uuid6.uuid7()`      | Implements draft RFC for v6, v7, v8; time-ordered | Mid-2023     | Provides `uuid7()`. Recommended for new systems over v1/v6.                 |
 | `uuid-v7`      | `pypi.org/project/uuid-v7/`    | `uuid_v7.generate()` | Aims for latest spec, simple API                  | Early 2024   | Appears viable and focused specifically on UUIDv7.                          |
 | `uuid-utils`   | `pypi.org/project/uuid-utils/` | `uuid_utils.uuid7()` | General UUID utilities, includes v7 generation    | Recent       | Mentioned as a preferable option in community discussions.                  |
 | `uuid7` (old)  | `pypi.org/project/uuid7/`      | `uuid7.uuid7()`      | Based on an old draft (nanosecond precision)      | 2021         | **Should be avoided** due to outdated specification adherence.              |
@@ -1058,8 +1058,9 @@ but is stored internally as a `frozenset[str]`. This provides:
 - **Immutability**: Configuration cannot be accidentally modified after
   instantiation
 - **O(1) lookup**: Membership testing during request processing is constant-time
-- **Defensive copy**: Changes to the original sequence do not affect the
-  middleware
+- **Defensive copy**: Changes to the original sequence after middleware
+  instantiation do not affect the middleware's trusted sources, protecting
+  against accidental misconfiguration
 
 #### 4.6.3. Deferred generator implementation
 
