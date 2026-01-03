@@ -2,10 +2,155 @@
 
 from __future__ import annotations
 
+import dataclasses
 import typing as typ
 
 if typ.TYPE_CHECKING:
+    import collections.abc as cabc
+
     import falcon
+
+DEFAULT_HEADER_NAME = "X-Correlation-ID"
+
+
+def default_uuid7_generator() -> str:
+    """Generate a UUIDv7 correlation ID.
+
+    This is a placeholder that will be implemented in task 2.2.1.
+    Currently raises NotImplementedError.
+
+    Returns
+    -------
+    str
+        A UUIDv7 string representation.
+
+    Raises
+    ------
+    NotImplementedError
+        Always raised as UUIDv7 generation is not yet implemented.
+
+    """
+    raise NotImplementedError("UUIDv7 generation not yet implemented")
+
+
+@dataclasses.dataclass(frozen=True)
+class CorrelationIDConfig:
+    """Configuration for CorrelationIDMiddleware.
+
+    This immutable configuration object encapsulates all settings for the
+    correlation ID middleware, providing validation and sensible defaults.
+
+    Parameters
+    ----------
+    header_name : str
+        The HTTP header name for correlation IDs. Defaults to ``X-Correlation-ID``.
+    trusted_sources : frozenset[str]
+        IP addresses considered trusted. Defaults to empty frozenset.
+    generator : Callable[[], str]
+        Function to generate new correlation IDs. Defaults to
+        ``default_uuid7_generator``.
+    validator : Callable[[str], bool] | None
+        Optional function to validate incoming IDs. Defaults to ``None``.
+    echo_header_in_response : bool
+        Whether to echo the ID in response headers. Defaults to ``True``.
+
+    Raises
+    ------
+    ValueError
+        If ``header_name`` is empty or ``trusted_sources`` contains empty strings.
+    TypeError
+        If ``generator`` or ``validator`` is not callable.
+
+    """
+
+    header_name: str = DEFAULT_HEADER_NAME
+    trusted_sources: frozenset[str] = dataclasses.field(default_factory=frozenset)
+    generator: cabc.Callable[[], str] = default_uuid7_generator
+    validator: cabc.Callable[[str], bool] | None = None
+    echo_header_in_response: bool = True
+
+    def __post_init__(self) -> None:
+        """Validate configuration after initialisation."""
+        self._validate_header_name()
+        self._validate_trusted_sources()
+        self._validate_generator()
+        self._validate_validator()
+
+    def _validate_header_name(self) -> None:
+        """Validate that header_name is not empty."""
+        if not self.header_name or not self.header_name.strip():
+            msg = "header_name must not be empty"
+            raise ValueError(msg)
+
+    def _validate_trusted_sources(self) -> None:
+        """Validate that trusted_sources contains no empty strings."""
+        for source in self.trusted_sources:
+            if not source or not source.strip():
+                msg = "trusted_sources must not contain empty strings"
+                raise ValueError(msg)
+
+    def _validate_generator(self) -> None:
+        """Validate that generator is callable."""
+        if not callable(self.generator):
+            msg = "generator must be callable"
+            raise TypeError(msg)
+
+    def _validate_validator(self) -> None:
+        """Validate that validator is callable if provided."""
+        if self.validator is not None and not callable(self.validator):
+            msg = "validator must be callable"
+            raise TypeError(msg)
+
+    # @CodeScene(disable:"Excess Number of Function Arguments")
+    @classmethod
+    def from_kwargs(  # noqa: PLR0913
+        cls,
+        *,
+        header_name: str = DEFAULT_HEADER_NAME,
+        trusted_sources: cabc.Iterable[str] | None = None,
+        generator: cabc.Callable[[], str] | None = None,
+        validator: cabc.Callable[[str], bool] | None = None,
+        echo_header_in_response: bool = True,
+    ) -> CorrelationIDConfig:
+        """Create a configuration from individual keyword arguments.
+
+        This factory method handles conversion of ``trusted_sources`` to a
+        frozenset and applies the default generator if none is provided.
+
+        Parameters
+        ----------
+        header_name : str
+            The HTTP header name. Defaults to ``X-Correlation-ID``.
+        trusted_sources : Iterable[str] | None
+            IP addresses to trust. Converted to frozenset.
+        generator : Callable[[], str] | None
+            ID generator function. Defaults to ``default_uuid7_generator``.
+        validator : Callable[[str], bool] | None
+            ID validation function.
+        echo_header_in_response : bool
+            Whether to echo ID in response.
+
+        Returns
+        -------
+        CorrelationIDConfig
+            A new configuration instance.
+
+        """
+        return cls(
+            header_name=header_name,
+            trusted_sources=(
+                frozenset(trusted_sources) if trusted_sources else frozenset()
+            ),
+            generator=generator if generator is not None else default_uuid7_generator,
+            validator=validator,
+            echo_header_in_response=echo_header_in_response,
+        )
+
+
+# Derive valid kwargs from dataclass fields to ensure synchronisation
+_VALID_CONFIG_KWARGS = frozenset(
+    field.name for field in dataclasses.fields(CorrelationIDConfig)
+)
 
 
 class CorrelationIDMiddleware:
@@ -16,9 +161,25 @@ class CorrelationIDMiddleware:
     them available throughout the request lifecycle, and optionally
     echoing them in response headers.
 
-    This is a skeleton implementation providing method stubs for the
-    WSGI middleware interface. Full functionality will be added in
-    subsequent tasks.
+    Parameters
+    ----------
+    config : CorrelationIDConfig | None
+        A pre-built configuration object. If provided, no other keyword
+        arguments may be specified. Defaults to ``None``.
+    **kwargs
+        Individual configuration parameters. Valid keys are: ``header_name``,
+        ``trusted_sources``, ``generator``, ``validator``, and
+        ``echo_header_in_response``. See :meth:`CorrelationIDConfig.from_kwargs`
+        for parameter details.
+
+    Raises
+    ------
+    ValueError
+        If both ``config`` and other keyword arguments are provided, or if
+        ``header_name`` is empty or ``trusted_sources`` contains empty strings.
+    TypeError
+        If unknown keyword arguments are provided, or if ``generator`` or
+        ``validator`` is provided but not callable.
 
     Examples
     --------
@@ -30,7 +191,77 @@ class CorrelationIDMiddleware:
         middleware = CorrelationIDMiddleware()
         app = falcon.App(middleware=[middleware])
 
+    Custom configuration::
+
+        middleware = CorrelationIDMiddleware(
+            header_name="X-Request-ID",
+            trusted_sources=["10.0.0.1", "192.168.1.1"],
+            echo_header_in_response=True,
+        )
+
+    Using a configuration object::
+
+        from falcon_correlate import CorrelationIDConfig
+
+        config = CorrelationIDConfig(
+            header_name="X-Request-ID",
+            trusted_sources=frozenset(["10.0.0.1"]),
+        )
+        middleware = CorrelationIDMiddleware(config=config)
+
     """
+
+    __slots__ = ("_config",)
+
+    def __init__(
+        self,
+        *,
+        config: CorrelationIDConfig | None = None,
+        **kwargs: object,
+    ) -> None:
+        """Initialise the correlation ID middleware with configuration options."""
+        if config is not None:
+            if kwargs:
+                msg = "Cannot specify both 'config' and individual parameters"
+                raise ValueError(msg)
+            self._config = config
+        else:
+            unknown_keys = set(kwargs.keys()) - _VALID_CONFIG_KWARGS
+            if unknown_keys:
+                msg = f"Unknown keyword arguments: {', '.join(sorted(unknown_keys))}"
+                raise TypeError(msg)
+            self._config = CorrelationIDConfig.from_kwargs(**kwargs)  # type: ignore[arg-type]
+
+    # @CodeScene(disable:"Bumpy Road Ahead")
+    @property
+    def config(self) -> CorrelationIDConfig:
+        """The middleware configuration."""
+        return self._config
+
+    @property
+    def header_name(self) -> str:
+        """The HTTP header name for correlation IDs."""
+        return self._config.header_name
+
+    @property
+    def trusted_sources(self) -> frozenset[str]:
+        """The set of trusted IP addresses."""
+        return self._config.trusted_sources
+
+    @property
+    def generator(self) -> cabc.Callable[[], str]:
+        """The correlation ID generator function."""
+        return self._config.generator
+
+    @property
+    def validator(self) -> cabc.Callable[[str], bool] | None:
+        """The correlation ID validator function, or None if not set."""
+        return self._config.validator
+
+    @property
+    def echo_header_in_response(self) -> bool:
+        """Whether to echo the correlation ID in response headers."""
+        return self._config.echo_header_in_response
 
     def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
         """Process an incoming request to establish correlation ID context.

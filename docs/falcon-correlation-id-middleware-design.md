@@ -114,8 +114,7 @@ significant advantage.[^6] Its structure typically combines a Unix timestamp
 (milliseconds since epoch) with random bits, ensuring both uniqueness and
 chronological ordering when sorted lexicographically.[^6] This time-sortable
 property is particularly beneficial for database indexing and querying logs
-based on time ranges, potentially improving performance for such
-operations.[^6]
+based on time ranges, potentially improving performance for such operations.[^6]
 
 UUIDv7 offers precise timestamping, with the current draft RFC4122 specifying
 millisecond precision by default.[^6] This contrasts with UUIDv4, which is
@@ -132,11 +131,12 @@ database primary keys or frequently queried in a time-sensitive manner.
 Several libraries and patterns exist within the Python ecosystem for handling
 correlation IDs. A notable example is `asgi-correlation-id`, a middleware
 designed for ASGI frameworks like FastAPI and Starlette.[^2] Although Falcon
-can operate in both WSGI and ASGI modes, the feature set of `asgi-correlation-
-id` provides a valuable reference. Its capabilities include reading correlation
-IDs from headers (configurable, defaulting to `X-Request-ID`), generating new
-UUIDs if no ID is found, providing a logging filter to inject the ID into log
-records, and offering support for propagating IDs to Celery tasks.[^2]
+can operate in both WSGI and ASGI modes, the feature set of
+`asgi-correlation-id` provides a valuable reference. Its capabilities include
+reading correlation IDs from headers (configurable, defaulting to
+`X-Request-ID`), generating new UUIDs if no ID is found, providing a logging
+filter to inject the ID into log records, and offering support for propagating
+IDs to Celery tasks.[^2]
 
 Application Performance Monitoring (APM) tools, such as Elastic APM, also
 employ similar concepts by injecting trace and transaction IDs into logs to
@@ -191,10 +191,10 @@ application, these methods typically include:
   the correlation ID to response headers and for cleanup tasks.
 
 If the Falcon application is running in ASGI mode, these methods will be
-`async`.[^11] ASGI middleware can also include `process_startup(self, scope,
-event)` and `process_shutdown(self, scope, event)` to handle ASGI lifespan
-events, though these are not directly involved in per-request correlation ID
-handling.[^11]
+`async`.[^11] ASGI middleware can also include
+`process_startup(self, scope, event)` and
+`process_shutdown(self, scope, event)` to handle ASGI lifespan events, though
+these are not directly involved in per-request correlation ID handling.[^11]
 
 #### 3.1.2. Integrating with Falcon's request/response cycle
 
@@ -292,20 +292,20 @@ backporting the CPython implementation[^16] are necessary.
 
 It is crucial to select a library that adheres to the latest UUIDv7
 specification (RFC 4122, as updated by the new UUID formats draft),
-particularly regarding millisecond precision for the timestamp
-component.[^6] Some older libraries or implementations might use outdated draft
-specifications with different precision levels (e.g., nanosecond precision),
-which could lead to compatibility issues or unexpected sorting behaviour.[^16]
+particularly regarding millisecond precision for the timestamp component.[^6]
+Some older libraries or implementations might use outdated draft specifications
+with different precision levels (e.g., nanosecond precision), which could lead
+to compatibility issues or unexpected sorting behaviour.[^16]
 
-The following table summarises some available options for UUIDv7 generation:
+The following table summarizes some available options for UUIDv7 generation:
 
-| Library Name   | PyPI Link                    | Function for UUIDv7    | Key Features/Standard Compliance                  | Last Updated  | Notes                                                                        |
-| -------------- | ---------------------------- | ---------------------- | ------------------------------------------------- | ------------- | ---------------------------------------------------------------------------- |
-| `uuid6`        | `pypi.org/project/uuid6/`    | `uuid6.uuid7()`        | Implements draft RFC for v6, v7, v8; time-ordered | Mid 2023      | Provides `uuid7()`. Recommended by its own docs for new systems over v1/v6.  |
-| `uuid-v7`      | `pypi.org/project/uuid-v7/`  | `uuid_v7.generate()`   | Aims for latest spec, simple API                  | Early 2024    | Appears viable and focused specifically on UUIDv7.                           |
-| `uuid-utils`   | `pypi.org/project/uuid-utils/` | `uuid_utils.uuid7()` | General UUID utilities, includes v7 generation    | Recent        | Mentioned as a preferable option in community discussions.                   |
-| `uuid7` (old)  | `pypi.org/project/uuid7/`    | `uuid7.uuid7()`        | Based on an old draft (nanosecond precision)      | 2021          | **Should be avoided** due to outdated specification adherence.               |
-| CPython `uuid` | N/A (Standard Library)       | `uuid.uuid7()`         | Official standard library implementation          | Python 3.13+  | For older Python, consider copying source from CPython `Lib/uuid.py`.        |
+| Library Name   | PyPI Link                      | Function for UUIDv7  | Key Features/Standard Compliance                  | Last Updated | Notes                                                                       |
+| -------------- | ------------------------------ | -------------------- | ------------------------------------------------- | ------------ | --------------------------------------------------------------------------- |
+| `uuid6`        | `pypi.org/project/uuid6/`      | `uuid6.uuid7()`      | Implements draft RFC for v6, v7, v8; time-ordered | Mid-2023     | Provides `uuid7()`. Recommended for new systems over v1/v6.                 |
+| `uuid-v7`      | `pypi.org/project/uuid-v7/`    | `uuid_v7.generate()` | Aims for latest spec, simple API                  | Early 2024   | Appears viable and focused specifically on UUIDv7.                          |
+| `uuid-utils`   | `pypi.org/project/uuid-utils/` | `uuid_utils.uuid7()` | General UUID utilities, includes v7 generation    | Recent       | Mentioned as a preferable option in community discussions.                  |
+| `uuid7` (old)  | `pypi.org/project/uuid7/`      | `uuid7.uuid7()`      | Based on an old draft (nanosecond precision)      | 2021         | **Should be avoided** due to outdated specification adherence.              |
+| CPython `uuid` | N/A (Standard Library)         | `uuid.uuid7()`       | Official standard library implementation          | Python 3.13+ | For older Python, consider copying source from CPython `Lib/uuid.py`.       |
 
 *Table 1: Available options for UUIDv7 generation in Python.*
 
@@ -381,11 +381,10 @@ for helper functions or libraries that do not have access to Falcon's `req`
 object, it can also be convenient to populate `req.context`.
 
 A balanced approach is to use `contextvars` as the primary and authoritative
-store for the correlation ID and user ID. This ensures broad accessibility. The
-middleware can then, as a convenience, also copy these values into `req.context`
-(e.g., `req.context.correlation_id = correlation_id_var.get()`). This provides
-developers working directly with Falcon resource handlers easy access via
-`req.context` while maintaining the wider availability through `contextvars`.
+store for the correlation ID and user ID. This ensures broad accessibility. As a convenience, the middleware can copy these values into `req.context` (for
+example, `req.context.correlation_id = correlation_id_var.get()`), providing
+handlers easy access via `req.context` while retaining broader availability
+through `contextvars`.
 
 #### 3.3.4. Clearing context variables
 
@@ -623,8 +622,7 @@ worker. The handler would:
 
 1. Retrieve `task.request.correlation_id`.
 2. Set this ID into `correlation_id_var` (the same `ContextVar` used in the web
-   application) using
-   `correlation_id_var.set(task.request.correlation_id)`.
+   application) using `correlation_id_var.set(task.request.correlation_id)`.
 3. Optionally, if the user ID was also propagated (e.g., in task arguments or
    headers), set `user_id_var` as well.
 
@@ -646,13 +644,13 @@ This end-to-end flow ensures that:
 
 #### Table: Comparison of propagation methods
 
-| System   | Method                         | Pros                                                                  | Cons                                                                       | Recommended For                                                                |
-| -------- | ------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `httpx`  | Client Event Hooks             | Centralised logic for reused `Client` instances.                      | Correlation ID is request-specific, hook needs access to `contextvars`.   | Applications with well-managed, request-scoped or short-lived `Client` instances. |
-| `httpx`  | Custom Transport               | Cleanly encapsulates logic; transparent to calling code.              | More boilerplate than simple injection; might be overkill for one header. | Scenarios requiring uniform header injection across many calls or complex logic. |
-| `httpx`  | Wrapper Function               | Good balance of encapsulation and flexibility; easy to use.           | Requires developer discipline to consistently use the wrapper.            | Most common use cases, providing a simple and explicit way to add the header.  |
-| `Celery` | `before_task_publish` Signal   | Idiomatic Celery approach; modifies the actual message; global.       | Affects all tasks (can filter by `sender` argument if needed).            | **Generally recommended** for most Celery integration scenarios.               |
-| `Celery` | Custom `Task` Base Class       | Behaviour encapsulated with task definition; good for shared logic.   | Requires modifying all task definitions to inherit from the custom base.  | Applications where tasks already share a custom base class for other reasons.  |
+| System   | Method                       | Pros                                                                | Cons                                                                      | Recommended For                                                                   |
+| -------- | ---------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `httpx`  | Client Event Hooks           | Centralized logic for reused `Client` instances.                    | Correlation ID is request-specific, hook needs access to `contextvars`.   | Applications with well-managed, request-scoped or short-lived `Client` instances. |
+| `httpx`  | Custom Transport             | Cleanly encapsulates logic; transparent to calling code.            | More boilerplate than simple injection; might be overkill for one header. | Scenarios requiring uniform header injection across many calls or complex logic.  |
+| `httpx`  | Wrapper Function             | Good balance of encapsulation and flexibility; easy to use.         | Requires developer discipline to consistently use the wrapper.            | Most common use cases, providing a simple and explicit way to add the header.     |
+| `Celery` | `before_task_publish` Signal | Idiomatic Celery approach; modifies the actual message; global.     | Affects all tasks (can filter by `sender` argument if needed).            | **Generally recommended** for most Celery integration scenarios.                  |
+| `Celery` | Custom `Task` Base Class     | Behaviour encapsulated with task definition; good for shared logic. | Requires modifying all task definitions to inherit from the custom base.  | Applications where tasks already share a custom base class for other reasons.     |
 
 *Table 2: Comparison of propagation methods for httpx and Celery.*
 
@@ -748,13 +746,13 @@ class CorrelationIDMiddleware:
     def __init__(
         self,
         header_name: str = "X-Correlation-ID",
-        trusted_sources: Optional[List[str]] = None,
+        trusted_sources: Iterable[str] | None = None,
         generator: Callable[[], str] = default_uuid7_generator,
-        validator: Optional[Callable[[str], bool]] = None,
+        validator: Callable[[str], bool] | None = None,
         echo_header_in_response: bool = True,
     ):
         self.header_name = header_name
-        self.trusted_sources = set(trusted_sources) if trusted_sources else set()
+        self.trusted_sources = frozenset(trusted_sources) if trusted_sources else frozenset()
         self.generator = generator
         self.validator = validator
         self.echo_header_in_response = echo_header_in_response
@@ -1028,15 +1026,60 @@ correlation_middleware = CorrelationIDMiddleware(
 
 #### Table: Middleware configuration options
 
-| Parameter Name          | Type                            | Default Value             | Description                                                                                                                  |
-| ----------------------- | ------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `header_name`           | `str`                           | `X-Correlation-ID`        | The HTTP header name to check for an incoming correlation ID and to use for the outgoing response header.                   |
-| `trusted_sources`       | `Optional[List[str]]`           | `None` (empty set)        | A list of IP addresses or subnets considered trusted. If `None` or empty, no sources are trusted by default.                |
-| `generator`             | `Callable[[], str]`             | `default_uuid7_generator` | A callable that returns a new string-based correlation ID (e.g., a UUIDv7).                                                  |
-| `validator`             | `Optional[Callable[[str], bool]]` | `None`                  | An optional callable that takes the incoming ID string and returns `True` if valid, `False` otherwise.                      |
-| `echo_header_in_response` | `bool`                        | `True`                    | If `True`, the determined correlation ID will be added to the specified header in the outgoing response.                    |
+| Parameter Name            | Type                                | Default Value             | Description                                                                                                        |
+| ------------------------- | ----------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `header_name`             | `str`                               | `X-Correlation-ID`        | The HTTP header name to check for an incoming correlation ID and to use for the outgoing response header.          |
+| `trusted_sources`         | `Iterable[str] \| None`             | `None` (empty set)        | A collection of IP addresses or subnets considered trusted. If `None` or empty, no sources are trusted by default. |
+| `generator`               | `Callable[[], str]`                 | `default_uuid7_generator` | A callable that returns a new string-based correlation ID (e.g., a UUIDv7).                                        |
+| `validator`               | `Callable[[str], bool] \| None`     | `None`                    | An optional callable that takes the incoming ID string and returns `True` if valid, `False` otherwise.             |
+| `echo_header_in_response` | `bool`                              | `True`                    | If `True`, the determined correlation ID will be added to the specified header in the outgoing response.           |
 
 *Table 3: Middleware configuration options.*
+
+### 4.6. Implementation notes
+
+This section records design decisions made during implementation of the
+configurable options (task 1.2.2).
+
+#### 4.6.1. Keyword-only arguments
+
+All constructor parameters are keyword-only (enforced via `*` in the function
+signature). This design choice:
+
+- Enforces explicit configuration, preventing positional argument mistakes
+- Makes code self-documenting at the call site
+- Allows future parameter additions without breaking existing code
+
+#### 4.6.2. Internal storage of trusted_sources
+
+The `trusted_sources` parameter accepts any `Sequence[str]` (list, tuple, set)
+but is stored internally as a `frozenset[str]`. This provides:
+
+- **Immutability**: Configuration cannot be accidentally modified after
+  instantiation
+- **O(1) lookup**: Membership testing during request processing is constant-time
+- **Defensive copy**: Changes to the original sequence after middleware
+  instantiation do not affect the middleware's trusted sources, protecting
+  against accidental misconfiguration
+
+#### 4.6.3. Deferred generator implementation
+
+The `default_uuid7_generator` function is defined as a stub that raises
+`NotImplementedError`. Actual UUIDv7 generation is implemented in task 2.2.1.
+This separation allows:
+
+- Configuration infrastructure to be tested independently
+- Clear delineation of responsibilities per roadmap tasks
+- Custom generators to be used immediately while the default is pending
+
+#### 4.6.4. Property-based attribute access
+
+Configuration values are exposed via read-only properties rather than direct
+attribute access. This ensures:
+
+- Encapsulation of internal implementation details
+- Consistent interface for subclasses (like `TrackingMiddleware`)
+- Future flexibility to add computed properties if needed
 
 ## 5. Conclusion and recommendations
 
@@ -1145,8 +1188,8 @@ middleware.
 
 ### A.1. Middleware Skeleton (Task 1.2.1)
 
-**Decision:** Implement the initial `CorrelationIDMiddleware` as a skeleton with
-method stubs, deferring full functionality to subsequent tasks.
+**Decision:** Implement the initial `CorrelationIDMiddleware` as a skeleton
+with method stubs, deferring full functionality to subsequent tasks.
 
 **Rationale:**
 

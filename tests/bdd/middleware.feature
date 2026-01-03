@@ -20,3 +20,27 @@ Feature: Correlation ID Middleware
     When I make a GET request to "/hello"
     Then the response should be returned
     And process_response should have been called
+
+  # Configuration scenarios
+
+  Scenario: Middleware accepts custom header name
+    Given a CorrelationIDMiddleware with header_name "X-Request-ID"
+    Then the middleware should use "X-Request-ID" as the header name
+
+  Scenario: Middleware accepts trusted sources configuration
+    Given a CorrelationIDMiddleware with trusted_sources "127.0.0.1,10.0.0.1"
+    Then the middleware should have 2 trusted sources
+
+  Scenario: Middleware accepts custom generator
+    Given a custom ID generator that returns "custom-id-123"
+    And a CorrelationIDMiddleware with that generator
+    Then the middleware should use the custom generator
+
+  Scenario: Middleware accepts custom validator
+    Given a custom validator that accepts any string
+    And a CorrelationIDMiddleware with that validator
+    Then the middleware should use the custom validator
+
+  Scenario: Middleware can disable response header echoing
+    Given a CorrelationIDMiddleware with echo_header_in_response disabled
+    Then the middleware should have echo_header_in_response set to False
