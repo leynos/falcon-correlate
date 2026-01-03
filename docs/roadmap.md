@@ -38,7 +38,7 @@ Establish the project structure, build tooling, and core middleware skeleton.
   - [x] Add `generator` parameter for custom ID generation.
   - [x] Add `validator` parameter for incoming ID validation.
   - [x] Add `echo_header_in_response` parameter (default: `True`).
-- [x] 1.2.3. Write unit tests for middleware initialisation
+  - [x] Write unit tests for middleware initialisation.
   - [x] Test default parameter values.
   - [x] Test custom parameter configuration.
   - [x] Test parameter validation and error handling.
@@ -52,14 +52,13 @@ Implement ID retrieval, generation, validation, and contextual storage.
 - [ ] 2.1.1. Implement header retrieval. See design-doc §3.2.1.
   - [ ] Read correlation ID from configured header name.
   - [ ] Handle missing or empty header values.
+  - [ ] Test missing header handling.
 - [ ] 2.1.2. Implement trusted source checking. See design-doc §3.2.2.
   - [ ] Check `req.remote_addr` against trusted sources set.
   - [ ] Support both exact IP matching and CIDR subnet notation.
   - [ ] Accept incoming ID only if source is trusted.
-- [ ] 2.1.3. Write unit tests for header retrieval and trust logic
   - [ ] Test ID acceptance from trusted source.
   - [ ] Test ID rejection from untrusted source.
-  - [ ] Test missing header handling.
   - [ ] Test CIDR matching behaviour.
 
 ### 2.2. UUIDv7 generation
@@ -69,13 +68,12 @@ Implement ID retrieval, generation, validation, and contextual storage.
         standard library for Python 3.13+).
   - [ ] Create `default_uuid7_generator()` function returning hex string.
   - [ ] Ensure RFC 4122 compliance with millisecond precision.
+  - [ ] Test default generator produces valid UUIDv7 format.
+  - [ ] Test generated IDs are unique across calls.
 - [ ] 2.2.2. Support custom generator injection
   - [ ] Accept `Callable[[], str]` as generator parameter.
   - [ ] Fall back to default generator if not provided.
-- [ ] 2.2.3. Write unit tests for ID generation
-  - [ ] Test default generator produces valid UUIDv7 format.
   - [ ] Test custom generator is called when provided.
-  - [ ] Test generated IDs are unique across calls.
 
 ### 2.3. Incoming ID validation
 
@@ -83,12 +81,12 @@ Implement ID retrieval, generation, validation, and contextual storage.
   - [ ] Create `default_uuid_validator(id: str) -> bool` function.
   - [ ] Validate standard UUID format (any version).
   - [ ] Return `False` for malformed or excessively long IDs.
+  - [ ] Test valid UUID formats are accepted.
+  - [ ] Test invalid formats are rejected.
 - [ ] 2.3.2. Integrate validation into request processing
   - [ ] Validate incoming ID before acceptance.
   - [ ] Generate new ID if validation fails.
   - [ ] Log validation failures at DEBUG level.
-- [ ] 2.3.3. Write unit tests for validation
-  - [ ] Test valid UUID formats are accepted.
   - [ ] Test invalid formats trigger new ID generation.
   - [ ] Test custom validator is called when provided.
 
@@ -103,13 +101,12 @@ Implement ID retrieval, generation, validation, and contextual storage.
   - [ ] Store reset token for cleanup.
   - [ ] Reset context variable in `process_response`.
   - [ ] Ensure cleanup occurs even if request processing fails.
-- [ ] 2.4.3. Integrate with Falcon's req.context. See design-doc §3.3.3.
-  - [ ] Copy correlation ID to `req.context.correlation_id`.
-  - [ ] Provide both access methods in documentation.
-- [ ] 2.4.4. Write unit tests for context storage
   - [ ] Test context variable is set during request.
   - [ ] Test context variable is cleared after response.
   - [ ] Test context isolation between concurrent requests.
+- [ ] 2.4.3. Integrate with Falcon's req.context. See design-doc §3.3.3.
+  - [ ] Copy correlation ID to `req.context.correlation_id`.
+  - [ ] Provide both access methods in documentation.
 
 ## 3. Logging integration
 
@@ -122,13 +119,12 @@ Provide utilities for injecting correlation IDs into log records.
   - [ ] Inject `correlation_id` attribute into log records.
   - [ ] Inject `user_id` attribute into log records.
   - [ ] Use placeholder value (e.g., `-`) when context is not set.
-- [ ] 3.1.2. Provide example logging configuration. See design-doc §3.4.2.
-  - [ ] Document recommended format string.
-  - [ ] Provide dictConfig example in docstrings.
-- [ ] 3.1.3. Write unit tests for logging filter
   - [ ] Test filter adds attributes to log records.
   - [ ] Test placeholder values when context is empty.
   - [ ] Test filter integrates with standard logging configuration.
+- [ ] 3.1.2. Provide example logging configuration. See design-doc §3.4.2.
+  - [ ] Document recommended format string.
+  - [ ] Provide dictConfig example in docstrings.
 
 ### 3.2. Structlog integration (optional)
 
@@ -136,7 +132,6 @@ Provide utilities for injecting correlation IDs into log records.
   - [ ] Explain `merge_contextvars` processor usage.
   - [ ] Provide configuration example.
   - [ ] Note that no additional code is required if contextvars are used.
-- [ ] 3.2.2. Write integration test with structlog
   - [ ] Test correlation ID appears in structured log output.
   - [ ] Mark test as skipped if structlog is not installed.
 
@@ -151,15 +146,14 @@ Enable correlation ID propagation to downstream HTTP services and Celery tasks.
   - [ ] Create async variant `async_request_with_correlation_id`.
   - [ ] Inject correlation ID header if context variable is set.
   - [ ] Preserve existing headers passed by caller.
+  - [ ] Test wrapper function adds header.
+  - [ ] Test existing headers are preserved.
 - [ ] 4.1.2. Implement custom transport. See design-doc §3.5.1.3.
   - [ ] Create `CorrelationIDTransport(httpx.BaseTransport)` class.
   - [ ] Create async variant `AsyncCorrelationIDTransport`.
   - [ ] Inject header in `handle_request` method.
-- [ ] 4.1.3. Write unit tests for httpx propagation
-  - [ ] Test wrapper function adds header.
   - [ ] Test custom transport adds header.
   - [ ] Test header is not added when context is empty.
-  - [ ] Test existing headers are preserved.
 
 ### 4.2. Celery propagation utilities
 
@@ -167,17 +161,16 @@ Enable correlation ID propagation to downstream HTTP services and Celery tasks.
   - [ ] Create `propagate_correlation_id_to_celery` signal handler.
   - [ ] Connect to `before_task_publish` signal.
   - [ ] Inject correlation ID into message properties.
+  - [ ] Test correlation ID is injected into task message.
 - [ ] 4.2.2. Implement worker signal handlers. See design-doc §3.5.2.4.
   - [ ] Create `setup_correlation_id_in_worker` for `task_prerun`.
   - [ ] Create `clear_correlation_id_in_worker` for `task_postrun`.
   - [ ] Store reset tokens for cleanup.
+  - [ ] Test correlation ID is available in worker context.
+  - [ ] Test context is cleared after task execution.
 - [ ] 4.2.3. Provide Celery configuration utilities
   - [ ] Create `configure_celery_correlation(app)` helper function.
   - [ ] Connect all signal handlers in one call.
-- [ ] 4.2.4. Write unit tests for Celery propagation
-  - [ ] Test correlation ID is injected into task message.
-  - [ ] Test correlation ID is available in worker context.
-  - [ ] Test context is cleared after task execution.
   - [ ] Mark tests as skipped if Celery is not installed.
 
 ## 5. ASGI support
@@ -192,11 +185,10 @@ Extend the middleware to support Falcon's ASGI mode.
   - [ ] Implement `async process_response(self, req, resp, resource,
         req_succeeded)`.
   - [ ] Share configuration logic with WSGI variant.
+  - [ ] Test middleware functions in ASGI application.
 - [ ] 5.1.2. Ensure context variable compatibility with async
   - [ ] Verify `contextvars` behaviour in async context.
   - [ ] Test with concurrent async requests.
-- [ ] 5.1.3. Write unit tests for ASGI middleware
-  - [ ] Test middleware functions in ASGI application.
   - [ ] Test context isolation with concurrent async requests.
   - [ ] Test cleanup on async request completion.
 
