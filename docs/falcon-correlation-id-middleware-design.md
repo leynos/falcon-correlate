@@ -301,7 +301,7 @@ The following table summarizes some available options for UUIDv7 generation:
 
 | Library Name   | PyPI Link                      | Function for UUIDv7  | Key Features/Standard Compliance                  | Last Updated | Notes                                                                       |
 | -------------- | ------------------------------ | -------------------- | ------------------------------------------------- | ------------ | --------------------------------------------------------------------------- |
-| `uuid6`        | `pypi.org/project/uuid6/`      | `uuid6.uuid7()`      | Implements draft RFC for v6, v7, v8; time-ordered | Mid 2023     | Provides `uuid7()`. Recommended by its own docs for new systems over v1/v6. |
+| `uuid6`        | `pypi.org/project/uuid6/`      | `uuid6.uuid7()`      | Implements draft RFC for v6, v7, v8; time-ordered | Mid-2023     | Provides `uuid7()`. Recommended by its own docs for new systems over v1/v6. |
 | `uuid-v7`      | `pypi.org/project/uuid-v7/`    | `uuid_v7.generate()` | Aims for latest spec, simple API                  | Early 2024   | Appears viable and focused specifically on UUIDv7.                          |
 | `uuid-utils`   | `pypi.org/project/uuid-utils/` | `uuid_utils.uuid7()` | General UUID utilities, includes v7 generation    | Recent       | Mentioned as a preferable option in community discussions.                  |
 | `uuid7` (old)  | `pypi.org/project/uuid7/`      | `uuid7.uuid7()`      | Based on an old draft (nanosecond precision)      | 2021         | **Should be avoided** due to outdated specification adherence.              |
@@ -1028,13 +1028,13 @@ correlation_middleware = CorrelationIDMiddleware(
 
 #### Table: Middleware configuration options
 
-| Parameter Name            | Type                              | Default Value             | Description                                                                                                        |
-| ------------------------- | --------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `header_name`             | `str`                             | `X-Correlation-ID`        | The HTTP header name to check for an incoming correlation ID and to use for the outgoing response header.          |
-| `trusted_sources`         | `Iterable[str]` or `None`         | `None` (empty set)        | A collection of IP addresses or subnets considered trusted. If `None` or empty, no sources are trusted by default. |
-| `generator`               | `Callable[[], str]`               | `default_uuid7_generator` | A callable that returns a new string-based correlation ID (e.g., a UUIDv7).                                        |
-| `validator`               | `Optional[Callable[[str], bool]]` | `None`                    | An optional callable that takes the incoming ID string and returns `True` if valid, `False` otherwise.             |
-| `echo_header_in_response` | `bool`                            | `True`                    | If `True`, the determined correlation ID will be added to the specified header in the outgoing response.           |
+| Parameter Name            | Type                                | Default Value             | Description                                                                                                        |
+| ------------------------- | ----------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `header_name`             | `str`                               | `X-Correlation-ID`        | The HTTP header name to check for an incoming correlation ID and to use for the outgoing response header.          |
+| `trusted_sources`         | `Iterable[str] \| None`             | `None` (empty set)        | A collection of IP addresses or subnets considered trusted. If `None` or empty, no sources are trusted by default. |
+| `generator`               | `Callable[[], str]`                 | `default_uuid7_generator` | A callable that returns a new string-based correlation ID (e.g., a UUIDv7).                                        |
+| `validator`               | `Callable[[str], bool] \| None`     | `None`                    | An optional callable that takes the incoming ID string and returns `True` if valid, `False` otherwise.             |
+| `echo_header_in_response` | `bool`                              | `True`                    | If `True`, the determined correlation ID will be added to the specified header in the outgoing response.           |
 
 *Table 3: Middleware configuration options.*
 
