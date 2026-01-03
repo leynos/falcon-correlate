@@ -381,12 +381,10 @@ for helper functions or libraries that do not have access to Falcon's `req`
 object, it can also be convenient to populate `req.context`.
 
 A balanced approach is to use `contextvars` as the primary and authoritative
-store for the correlation ID and user ID. This ensures broad accessibility. The
-middleware can then, as a convenience, also copy these values into
-`req.context` (e.g., `req.context.correlation_id = correlation_id_var.get()`).
-This provides developers working directly with Falcon resource handlers easy
-access via `req.context` while maintaining the wider availability through
-`contextvars`.
+store for the correlation ID and user ID. This ensures broad accessibility. As a convenience, the middleware can copy these values into `req.context` (for
+example, `req.context.correlation_id = correlation_id_var.get()`), providing
+handlers easy access via `req.context` while retaining broader availability
+through `contextvars`.
 
 #### 3.3.4. Clearing context variables
 
