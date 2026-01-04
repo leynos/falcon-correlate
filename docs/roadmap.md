@@ -48,10 +48,10 @@ Implement ID retrieval, generation, validation, and contextual storage.
 
 ### 2.1. Header retrieval and trusted source logic
 
-- [ ] 2.1.1. Implement header retrieval. See design-doc §3.2.1.
-  - [ ] Read correlation ID from configured header name.
-  - [ ] Handle missing or empty header values.
-  - [ ] Test missing header handling.
+- [x] 2.1.1. Implement header retrieval. See design-doc §3.2.1.
+  - [x] Read correlation ID from configured header name.
+  - [x] Handle missing or empty header values.
+  - [x] Test missing header handling.
 - [ ] 2.1.2. Implement trusted source checking. See design-doc §3.2.2.
   - [ ] Check `req.remote_addr` against trusted sources set.
   - [ ] Support both exact IP matching and CIDR subnet notation.

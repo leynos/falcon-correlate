@@ -299,13 +299,13 @@ to compatibility issues or unexpected sorting behaviour.[^16]
 
 The following table summarizes some available options for UUIDv7 generation:
 
-| Library Name   | PyPI Link                      | Function for UUIDv7  | Key Features/Standard Compliance                  | Last Updated | Notes                                                                       |
-| -------------- | ------------------------------ | -------------------- | ------------------------------------------------- | ------------ | --------------------------------------------------------------------------- |
-| `uuid6`        | `pypi.org/project/uuid6/`      | `uuid6.uuid7()`      | Implements draft RFC for v6, v7, v8; time-ordered | Mid-2023     | Provides `uuid7()`. Recommended for new systems over v1/v6.                 |
-| `uuid-v7`      | `pypi.org/project/uuid-v7/`    | `uuid_v7.generate()` | Aims for latest spec, simple API                  | Early 2024   | Appears viable and focused specifically on UUIDv7.                          |
-| `uuid-utils`   | `pypi.org/project/uuid-utils/` | `uuid_utils.uuid7()` | General UUID utilities, includes v7 generation    | Recent       | Mentioned as a preferable option in community discussions.                  |
-| `uuid7` (old)  | `pypi.org/project/uuid7/`      | `uuid7.uuid7()`      | Based on an old draft (nanosecond precision)      | 2021         | **Should be avoided** due to outdated specification adherence.              |
-| CPython `uuid` | N/A (Standard Library)         | `uuid.uuid7()`       | Official standard library implementation          | Python 3.13+ | For older Python, consider copying source from CPython `Lib/uuid.py`.       |
+| Library Name   | PyPI Link                      | Function for UUIDv7  | Key Features/Standard Compliance                  | Last Updated | Notes                                                                 |
+| -------------- | ------------------------------ | -------------------- | ------------------------------------------------- | ------------ | --------------------------------------------------------------------- |
+| `uuid6`        | `pypi.org/project/uuid6/`      | `uuid6.uuid7()`      | Implements draft RFC for v6, v7, v8; time-ordered | Mid-2023     | Provides `uuid7()`. Recommended for new systems over v1/v6.           |
+| `uuid-v7`      | `pypi.org/project/uuid-v7/`    | `uuid_v7.generate()` | Aims for latest spec, simple API                  | Early 2024   | Appears viable and focused specifically on UUIDv7.                    |
+| `uuid-utils`   | `pypi.org/project/uuid-utils/` | `uuid_utils.uuid7()` | General UUID utilities, includes v7 generation    | Recent       | Mentioned as a preferable option in community discussions.            |
+| `uuid7` (old)  | `pypi.org/project/uuid7/`      | `uuid7.uuid7()`      | Based on an old draft (nanosecond precision)      | 2021         | **Should be avoided** due to outdated specification adherence.        |
+| CPython `uuid` | N/A (Standard Library)         | `uuid.uuid7()`       | Official standard library implementation          | Python 3.13+ | For older Python, consider copying source from CPython `Lib/uuid.py`. |
 
 *Table 1: Available options for UUIDv7 generation in Python.*
 
@@ -381,7 +381,8 @@ for helper functions or libraries that do not have access to Falcon's `req`
 object, it can also be convenient to populate `req.context`.
 
 A balanced approach is to use `contextvars` as the primary and authoritative
-store for the correlation ID and user ID. This ensures broad accessibility. As a convenience, the middleware can copy these values into `req.context` (for
+store for the correlation ID and user ID. This ensures broad accessibility. As
+a convenience, the middleware can copy these values into `req.context` (for
 example, `req.context.correlation_id = correlation_id_var.get()`), providing
 handlers easy access via `req.context` while retaining broader availability
 through `contextvars`.
@@ -1026,13 +1027,13 @@ correlation_middleware = CorrelationIDMiddleware(
 
 #### Table: Middleware configuration options
 
-| Parameter Name            | Type                                | Default Value             | Description                                                                                                        |
-| ------------------------- | ----------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `header_name`             | `str`                               | `X-Correlation-ID`        | The HTTP header name to check for an incoming correlation ID and to use for the outgoing response header.          |
-| `trusted_sources`         | `Iterable[str] \| None`             | `None` (empty set)        | A collection of IP addresses or subnets considered trusted. If `None` or empty, no sources are trusted by default. |
-| `generator`               | `Callable[[], str]`                 | `default_uuid7_generator` | A callable that returns a new string-based correlation ID (e.g., a UUIDv7).                                        |
-| `validator`               | `Callable[[str], bool] \| None`     | `None`                    | An optional callable that takes the incoming ID string and returns `True` if valid, `False` otherwise.             |
-| `echo_header_in_response` | `bool`                              | `True`                    | If `True`, the determined correlation ID will be added to the specified header in the outgoing response.           |
+| Parameter Name            | Type                              | Default Value             | Description                                                                                                        |
+| ------------------------- | --------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `header_name`             | `str`                             | `X-Correlation-ID`        | The HTTP header name to check for an incoming correlation ID and to use for the outgoing response header.          |
+| `trusted_sources`         | `Iterable[str]`, optional         | `None` (empty set)        | A collection of IP addresses or subnets considered trusted. If `None` or empty, no sources are trusted by default. |
+| `generator`               | `Callable[[], str]`               | `default_uuid7_generator` | A callable that returns a new string-based correlation ID (e.g., a UUIDv7).                                        |
+| `validator`               | `Callable[[str], bool]`, optional | `None`                    | An optional callable that takes the incoming ID string and returns `True` if valid, `False` otherwise.             |
+| `echo_header_in_response` | `bool`                            | `True`                    | If `True`, the determined correlation ID will be added to the specified header in the outgoing response.           |
 
 *Table 3: Middleware configuration options.*
 
@@ -1080,6 +1081,15 @@ attribute access. This ensures:
 - Encapsulation of internal implementation details
 - Consistent interface for subclasses (like `TrackingMiddleware`)
 - Future flexibility to add computed properties if needed
+
+#### 4.6.5. Header retrieval handling
+
+Incoming correlation ID headers are read via `req.get_header` using the
+configured header name. The middleware treats missing, empty, or
+whitespace-only values as absent and stores the value on
+`req.context.correlation_id` only when non-empty. This prevents empty
+identifiers from entering the lifecycle while keeping generation and validation
+logic isolated to later tasks.
 
 ## 5. Conclusion and recommendations
 

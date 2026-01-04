@@ -19,18 +19,21 @@ missing or empty headers. Documentation will describe the new behaviour, and
 
     - [x] (2026-01-04 00:00Z) Capture requirements from the roadmap and design
       document.
-    - [ ] Add failing unit and behavioural tests for header retrieval and
-      missing/empty handling.
-    - [ ] Implement header retrieval in
+    - [x] (2026-01-04 00:15Z) Add unit and behavioural tests for header
+      retrieval and missing/empty handling.
+    - [x] (2026-01-04 00:25Z) Implement header retrieval in
       `src/falcon_correlate/middleware.py`.
-    - [ ] Update documentation and the roadmap to reflect the new behaviour.
-    - [ ] Run formatting, linting, type checking, and tests with passing
-      results.
+    - [x] (2026-01-04 00:35Z) Update documentation and the roadmap to reflect
+      the new behaviour.
+    - [x] (2026-01-04 00:45Z) Run formatting, linting, type checking, and tests
+      with passing results.
 
 ## Surprises & Discoveries
 
-    - Observation: None yet.
-      Evidence: N/A.
+    - Observation: `make fmt` initially failed due to table column count errors
+      in `docs/falcon-correlation-id-middleware-design.md`.
+      Evidence: markdownlint reported MD056/MD060 on the configuration options
+      table until the type cells were rewritten without `|` characters.
 
 ## Decision Log
 
@@ -47,15 +50,20 @@ missing or empty headers. Documentation will describe the new behaviour, and
 
 ## Outcomes & Retrospective
 
-Not started yet. Update after implementation and validation.
+Header retrieval now reads the configured header, ignores missing or empty
+values, and stores non-empty values on `req.context.correlation_id`. Unit and
+behavioural tests cover the present, missing, and whitespace-only cases. The
+roadmap and user documentation were updated, and all quality gates passed
+(`make fmt`, `make check-fmt`, `make lint`, `make typecheck`, `make test`,
+`make markdownlint`, and `make nixie`).
 
 ## Context and Orientation
 
 The middleware lives in `src/falcon_correlate/middleware.py`. The
-`CorrelationIDMiddleware.process_request` method is currently a stub. Unit
-coverage for middleware behaviour is in
-`src/falcon_correlate/unittests/test_middleware.py`. Behavioural tests are in
-`tests/bdd/middleware.feature` with step definitions in
+`CorrelationIDMiddleware.process_request` method now reads the header and sets
+request context values when present. Unit coverage for middleware behaviour is
+in `src/falcon_correlate/unittests/test_middleware.py`. Behavioural tests are
+in `tests/bdd/middleware.feature` with step definitions in
 `tests/bdd/test_middleware_steps.py` and shared helpers in `tests/conftest.py`.
 The design guidance for this change is in
 `docs/falcon-correlation-id-middleware-design.md` §3.2.1. The roadmap item to
@@ -175,13 +183,12 @@ suite. If documentation formatting changes introduce lint failures, run
 ## Artifacts and Notes
 
 Capture short evidence of success in the log files created by `tee`. For
-example, after `make test`, the tail of
-`/tmp/falcon-correlate-test.log` should show all tests passing.
+example, after `make test`, the tail of `/tmp/falcon-correlate-test.log` should
+show all tests passing.
 
 ## Interfaces and Dependencies
 
-Implement or update these interfaces in
-`src/falcon_correlate/middleware.py`:
+Implement or update these interfaces in `src/falcon_correlate/middleware.py`:
 
     class CorrelationIDMiddleware:
         def _get_incoming_header_value(
@@ -190,7 +197,17 @@ Implement or update these interfaces in
         ) -> str | None:
             """Return a normalised header value or None when missing/empty."""
 
-        def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
+        def process_request(
+            self,
+            req: falcon.Request,
+            resp: falcon.Response,
+        ) -> None:
             """Read the configured header and store it on req.context."""
 
 No new external dependencies are required for this task.
+
+## Revision note (required when editing an ExecPlan)
+
+2026-01-04: Marked the plan steps complete, recorded the markdownlint table
+fix, and summarised the outcomes and validation results now that implementation
+and verification are finished.

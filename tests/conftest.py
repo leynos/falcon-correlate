@@ -18,6 +18,18 @@ class SimpleResource:
         resp.media = {"message": "hello"}
 
 
+class CorrelationEchoResource:
+    """A Falcon resource that echoes correlation ID context."""
+
+    def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
+        """Return correlation ID context for testing."""
+        correlation_id = getattr(req.context, "correlation_id", None)
+        resp.media = {
+            "correlation_id": correlation_id,
+            "has_correlation_id": hasattr(req.context, "correlation_id"),
+        }
+
+
 class TrackingMiddleware(CorrelationIDMiddleware):
     """Middleware that tracks hook invocations for testing.
 

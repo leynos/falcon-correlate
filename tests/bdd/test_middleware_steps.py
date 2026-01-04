@@ -13,7 +13,7 @@ import falcon.testing
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from falcon_correlate import CorrelationIDMiddleware
-from tests.conftest import SimpleResource, TrackingMiddleware
+from tests.conftest import CorrelationEchoResource, SimpleResource, TrackingMiddleware
 
 scenarios("middleware.feature")
 
@@ -63,10 +63,34 @@ def given_simple_resource(context: Context, path: str) -> None:
     context["app"].add_route(path, SimpleResource())
 
 
+@given(parsers.parse('a correlation echo resource at "{path}"'))
+def given_correlation_resource(context: Context, path: str) -> None:
+    """Add a correlation echo resource to the app."""
+    context["app"].add_route(path, CorrelationEchoResource())
+
+
 @when(parsers.parse('I make a GET request to "{path}"'))
 def when_make_get_request(context: Context, path: str) -> None:
     """Make a GET request to the specified path."""
     context["response"] = context["client"].simulate_get(path)
+
+
+@when(
+    parsers.parse(
+        'I request "{path}" with header "{header_name}" value "{header_value}"'
+    )
+)
+def when_make_get_request_with_header(
+    context: Context,
+    path: str,
+    header_name: str,
+    header_value: str,
+) -> None:
+    """Make a GET request with a header."""
+    context["response"] = context["client"].simulate_get(
+        path,
+        headers={header_name: header_value},
+    )
 
 
 @then("the request should complete successfully")
@@ -88,6 +112,22 @@ def then_process_response_called(context: Context) -> None:
     middleware = context["middleware"]
     assert isinstance(middleware, TrackingMiddleware)
     assert middleware.process_response_called
+
+
+@then(parsers.parse('the response correlation id should be "{expected_id}"'))
+def then_response_has_correlation_id(context: Context, expected_id: str) -> None:
+    """Verify the response includes the expected correlation ID."""
+    data = context["response"].json
+    assert data["has_correlation_id"] is True
+    assert data["correlation_id"] == expected_id
+
+
+@then("the response should not include a correlation ID")
+def then_response_has_no_correlation_id(context: Context) -> None:
+    """Verify the response does not include a correlation ID."""
+    data = context["response"].json
+    assert data["has_correlation_id"] is False
+    assert data["correlation_id"] is None
 
 
 # Configuration scenario steps

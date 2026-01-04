@@ -224,6 +224,63 @@ class TestCorrelationIDMiddlewareWithFalcon:
         )
 
 
+class TestCorrelationIDHeaderRetrieval:
+    """Tests for correlation ID header retrieval."""
+
+    class CorrelationEchoResource:
+        """Resource that echoes correlation ID context in the response."""
+
+        def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
+            """Return correlation ID context in the response body."""
+            correlation_id = getattr(req.context, "correlation_id", None)
+            resp.media = {
+                "correlation_id": correlation_id,
+                "has_correlation_id": hasattr(req.context, "correlation_id"),
+            }
+
+    def _client_with_resource(self) -> falcon.testing.TestClient:
+        """Create a test client with the correlation echo resource."""
+        middleware = CorrelationIDMiddleware()
+        app = falcon.App(middleware=[middleware])
+        app.add_route("/correlation", self.CorrelationEchoResource())
+        return falcon.testing.TestClient(app)
+
+    def test_header_value_is_stored_in_request_context(self) -> None:
+        """Verify a present header is stored on req.context."""
+        client = self._client_with_resource()
+        response = client.simulate_get(
+            "/correlation",
+            headers={"X-Correlation-ID": "cid-123"},
+        )
+
+        assert response.json["has_correlation_id"] is True
+        assert response.json["correlation_id"] == "cid-123"
+
+    def test_missing_header_does_not_set_context(self) -> None:
+        """Verify missing header leaves req.context unset."""
+        client = self._client_with_resource()
+        response = client.simulate_get("/correlation")
+
+        assert response.json["has_correlation_id"] is False
+        assert response.json["correlation_id"] is None
+
+    @pytest.mark.parametrize(
+        "header_value",
+        ["", " ", "\t", "   "],
+        ids=["empty", "space", "tab", "spaces"],
+    )
+    def test_empty_header_is_treated_as_missing(self, header_value: str) -> None:
+        """Verify empty or whitespace header values are ignored."""
+        client = self._client_with_resource()
+        response = client.simulate_get(
+            "/correlation",
+            headers={"X-Correlation-ID": header_value},
+        )
+
+        assert response.json["has_correlation_id"] is False
+        assert response.json["correlation_id"] is None
+
+
 class TestCorrelationIDMiddlewareConfiguration:
     """Tests for CorrelationIDMiddleware configuration options."""
 
