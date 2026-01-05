@@ -21,6 +21,18 @@ Feature: Correlation ID Middleware
     Then the response should be returned
     And process_response should have been called
 
+  Scenario: Correlation ID header is captured
+    Given a Falcon application with CorrelationIDMiddleware
+    And a correlation echo resource at "/correlation"
+    When I request "/correlation" with header "X-Correlation-ID" value "cid-123"
+    Then the response correlation id should be "cid-123"
+
+  Scenario: Missing correlation ID header yields no context
+    Given a Falcon application with CorrelationIDMiddleware
+    And a correlation echo resource at "/correlation"
+    When I make a GET request to "/correlation"
+    Then the response should not include a correlation ID
+
   # Configuration scenarios
 
   Scenario: Middleware accepts custom header name

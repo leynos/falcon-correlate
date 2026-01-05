@@ -48,6 +48,15 @@ The middleware provides two hook points in the request/response lifecycle:
    resource responder has been invoked. This is where the correlation ID will
    be added to response headers and any cleanup will be performed.
 
+### Header retrieval behaviour
+
+During `process_request`, the middleware reads the configured header name. If
+the header is missing, empty, or contains only whitespace, it is treated as
+absent and no correlation ID is stored. When a non-empty header value is
+present, the middleware trims leading and trailing whitespace and stores the
+result on `req.context.correlation_id` for downstream access during the request
+lifecycle.
+
 ## Configuration Options
 
 The middleware accepts several configuration options as keyword-only arguments:
@@ -165,7 +174,6 @@ app = falcon.App(middleware=[middleware])
 The middleware configuration options are now implemented. The following
 functionality will be added in future releases:
 
-- Correlation ID retrieval from request headers (task 2.1)
 - UUIDv7 generation for new correlation IDs (task 2.2)
 - Trusted source IP matching including CIDR notation (task 2.1.2)
 - Context variable storage (task 2.4)
