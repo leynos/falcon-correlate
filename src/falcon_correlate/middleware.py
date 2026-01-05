@@ -264,10 +264,19 @@ class CorrelationIDMiddleware:
         return self._config.echo_header_in_response
 
     def _get_incoming_header_value(self, req: falcon.Request) -> str | None:
-        """Return the incoming correlation ID header value, if present."""
+        """Return the incoming correlation ID header value, if present.
+
+        Leading and trailing whitespace is stripped; empty or whitespace-only
+        values are treated as missing.
+        """
         incoming = req.get_header(self.header_name)
-        if incoming is None or not incoming.strip():
+        if incoming is None:
             return None
+
+        incoming = incoming.strip()
+        if not incoming:
+            return None
+
         return incoming
 
     def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:

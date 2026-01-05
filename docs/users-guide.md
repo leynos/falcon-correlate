@@ -53,8 +53,9 @@ The middleware provides two hook points in the request/response lifecycle:
 During `process_request`, the middleware reads the configured header name. If
 the header is missing, empty, or contains only whitespace, it is treated as
 absent and no correlation ID is stored. When a non-empty header value is
-present, the middleware stores it on `req.context.correlation_id` for
-downstream access during the request lifecycle.
+present, the middleware trims leading and trailing whitespace and stores the
+result on `req.context.correlation_id` for downstream access during the request
+lifecycle.
 
 ## Configuration Options
 

@@ -106,7 +106,8 @@ full suite passes and record results in the plan.
      - header present: value stored on `req.context.correlation_id`.
      - header missing: `req.context` does not expose `correlation_id`.
      - header empty or whitespace: treated as missing.
-   - Add a BDD scenario in `tests/bdd/middleware.feature` and implement steps in
+   - Add a Behaviour-Driven Development (BDD) scenario in
+     `tests/bdd/middleware.feature` and implement steps in
      `tests/bdd/test_middleware_steps.py` to assert behaviour via a Falcon
      resource that reads `req.context.correlation_id`.
 
@@ -211,3 +212,6 @@ No new external dependencies are required for this task.
 2026-01-04: Marked the plan steps complete, recorded the markdownlint table
 fix, and summarised the outcomes and validation results now that implementation
 and verification are finished.
+
+2026-01-05: Expanded Behaviour-Driven Development (BDD) on first use to comply
+with documentation guidelines.

@@ -1085,8 +1085,8 @@ attribute access. This ensures:
 #### 4.6.5. Header retrieval handling
 
 Incoming correlation ID headers are read via `req.get_header` using the
-configured header name. The middleware treats missing, empty, or
-whitespace-only values as absent and stores the value on
+configured header name. The middleware trims leading and trailing whitespace,
+treats missing or empty values as absent, and stores the value on
 `req.context.correlation_id` only when non-empty. This prevents empty
 identifiers from entering the lifecycle while keeping generation and validation
 logic isolated to later tasks.
