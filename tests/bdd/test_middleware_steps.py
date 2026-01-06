@@ -50,8 +50,12 @@ def then_app_created(context: Context) -> None:
 
 @given("a Falcon application with CorrelationIDMiddleware", target_fixture="context")
 def given_app_with_middleware() -> Context:
-    """Create a Falcon app with tracking middleware."""
-    middleware = TrackingMiddleware()
+    """Create a Falcon app with tracking middleware.
+
+    The middleware is configured to trust 127.0.0.1 (TestClient's default
+    remote_addr) so that header capture tests work correctly.
+    """
+    middleware = TrackingMiddleware(trusted_sources=["127.0.0.1"])
     app = falcon.App(middleware=[middleware])
     client = falcon.testing.TestClient(app)
     return {"middleware": middleware, "app": app, "client": client}
@@ -228,3 +232,21 @@ def given_middleware_with_echo_disabled() -> Context:
 def then_middleware_echo_disabled(context: Context) -> None:
     """Verify echo_header_in_response is False."""
     assert context["middleware"].echo_header_in_response is False
+
+
+# Trusted source scenario steps
+
+
+@given(
+    parsers.parse(
+        'a Falcon application with CorrelationIDMiddleware trusting "{sources}"'
+    ),
+    target_fixture="context",
+)
+def given_app_with_trusted_sources(sources: str) -> Context:
+    """Create a Falcon app with middleware configured with trusted sources."""
+    source_list = [s.strip() for s in sources.split(",")]
+    middleware = CorrelationIDMiddleware(trusted_sources=source_list)
+    app = falcon.App(middleware=[middleware])
+    client = falcon.testing.TestClient(app)
+    return {"middleware": middleware, "app": app, "client": client}
