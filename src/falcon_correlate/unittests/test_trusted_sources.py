@@ -174,6 +174,18 @@ class TestTrustedSourceIntegration:
         app.add_route("/correlation", CorrelationEchoResource())
         return falcon.testing.TestClient(app)
 
+    def _assert_no_correlation_id(self, response: falcon.testing.Result) -> None:
+        """Assert that the response indicates no correlation ID was set.
+
+        Parameters
+        ----------
+        response : falcon.testing.Result
+            The response object from a simulated request.
+
+        """
+        assert response.json["has_correlation_id"] is False
+        assert response.json["correlation_id"] is None
+
     def test_trusted_source_accepts_incoming_id(self) -> None:
         """Verify incoming ID is accepted from trusted source.
 
@@ -200,8 +212,7 @@ class TestTrustedSourceIntegration:
             headers={"X-Correlation-ID": "incoming-id"},
         )
         # Incoming ID was rejected, no correlation_id set
-        assert response.json["has_correlation_id"] is False
-        assert response.json["correlation_id"] is None
+        self._assert_no_correlation_id(response)
 
     def test_no_trusted_sources_rejects_incoming_id(self) -> None:
         """Verify empty trusted_sources rejects incoming ID.
@@ -217,8 +228,7 @@ class TestTrustedSourceIntegration:
             headers={"X-Correlation-ID": "incoming-id"},
         )
         # Incoming ID was rejected, no correlation_id set
-        assert response.json["has_correlation_id"] is False
-        assert response.json["correlation_id"] is None
+        self._assert_no_correlation_id(response)
 
     def test_cidr_trusted_source_accepts_incoming_id(self) -> None:
         """Verify CIDR matching accepts incoming ID."""
@@ -239,8 +249,7 @@ class TestTrustedSourceIntegration:
             trusted_sources=["127.0.0.1"],
         )
         response = client.simulate_get("/correlation")
-        assert response.json["has_correlation_id"] is False
-        assert response.json["correlation_id"] is None
+        self._assert_no_correlation_id(response)
 
     def test_empty_header_has_no_correlation_id(self) -> None:
         """Verify empty header results in no correlation_id set.
@@ -255,5 +264,4 @@ class TestTrustedSourceIntegration:
             "/correlation",
             headers={"X-Correlation-ID": ""},
         )
-        assert response.json["has_correlation_id"] is False
-        assert response.json["correlation_id"] is None
+        self._assert_no_correlation_id(response)
