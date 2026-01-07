@@ -101,22 +101,58 @@ class CorrelationIDConfig:
         """
         parsed: list[_NetworkType] = []
         for source in self.trusted_sources:
-            if not source or not source.strip():
-                msg = "trusted_sources must not contain empty strings"
-                raise ValueError(msg)
-
-            try:
-                network = ipaddress.ip_network(source, strict=True)
-                parsed.append(network)
-            except ValueError as e:
-                if "has host bits set" in str(e):
-                    msg = f"Invalid CIDR notation '{source}': has host bits set"
-                    raise ValueError(msg) from e
-                msg = f"Invalid IP address or CIDR notation: '{source}'"
-                raise ValueError(msg) from e
+            self._validate_source_not_empty(source)
+            parsed.append(self._parse_network(source))
 
         # Use object.__setattr__ to set frozen field
         object.__setattr__(self, "_parsed_networks", tuple(parsed))
+
+    def _validate_source_not_empty(self, source: str) -> None:
+        """Validate that a trusted source string is not empty or whitespace.
+
+        Parameters
+        ----------
+        source : str
+            The trusted source string to validate.
+
+        Raises
+        ------
+        ValueError
+            If ``source`` is empty or contains only whitespace characters.
+
+        """
+        if not source or not source.strip():
+            msg = "trusted_sources must not contain empty strings"
+            raise ValueError(msg)
+
+    def _parse_network(self, source: str) -> _NetworkType:
+        """Parse an IP address or CIDR notation into a network object.
+
+        Parameters
+        ----------
+        source : str
+            The IP address or CIDR notation string to parse.
+
+        Returns
+        -------
+        IPv4Network | IPv6Network
+            The parsed network object.
+
+        Raises
+        ------
+        ValueError
+            If ``source`` has host bits set (for CIDR notation) or is not a
+            valid IP address or CIDR notation.
+
+        """
+        try:
+            return ipaddress.ip_network(source, strict=True)
+        except ValueError as e:
+            if "has host bits set" in str(e):
+                msg = f"Invalid CIDR notation '{source}': has host bits set"
+                raise ValueError(msg) from e
+            msg = f"Invalid IP address or CIDR notation: '{source}'"
+            raise ValueError(msg) from e
 
     def _validate_generator(self) -> None:
         """Validate that generator is callable."""
