@@ -198,36 +198,52 @@ class TestTrustedSourceIntegration:
         )
         assert response.json["correlation_id"] == "incoming-id"
 
-    def test_untrusted_source_rejects_incoming_id(self) -> None:
-        """Verify incoming ID is rejected from untrusted source.
+    @pytest.mark.parametrize(
+        ("test_id", "trusted_sources", "headers"),
+        [
+            pytest.param(
+                "untrusted_source",
+                ["10.0.0.1"],
+                {"X-Correlation-ID": "incoming-id"},
+                id="untrusted_source",
+            ),
+            pytest.param(
+                "no_trusted_sources",
+                [],
+                {"X-Correlation-ID": "incoming-id"},
+                id="no_trusted_sources",
+            ),
+            pytest.param(
+                "missing_header",
+                ["127.0.0.1"],
+                None,
+                id="missing_header",
+            ),
+            pytest.param(
+                "empty_header",
+                ["127.0.0.1"],
+                {"X-Correlation-ID": ""},
+                id="empty_header",
+            ),
+        ],
+    )
+    def test_scenarios_with_no_correlation_id(
+        self,
+        test_id: str,
+        trusted_sources: list[str],
+        headers: dict[str, str] | None,
+    ) -> None:
+        """Verify scenarios where no correlation ID should be set.
 
-        Note: ID generation will be added in task 2.2. For now, untrusted
-        sources simply don't get a correlation_id set.
+        Tests various conditions that result in no correlation_id being set
+        on the request context: untrusted sources, empty trusted sources,
+        missing headers, and empty headers.
+
+        Note: ID generation will be added in task 2.2. For now, these
+        scenarios result in no correlation_id being set.
         """
-        client = self._create_client(
-            trusted_sources=["10.0.0.1"],  # Not 127.0.0.1
-        )
-        response = client.simulate_get(
-            "/correlation",
-            headers={"X-Correlation-ID": "incoming-id"},
-        )
-        # Incoming ID was rejected, no correlation_id set
-        self._assert_no_correlation_id(response)
-
-    def test_no_trusted_sources_rejects_incoming_id(self) -> None:
-        """Verify empty trusted_sources rejects incoming ID.
-
-        Note: ID generation will be added in task 2.2. For now, when no
-        sources are trusted, incoming IDs are simply rejected.
-        """
-        client = self._create_client(
-            trusted_sources=[],
-        )
-        response = client.simulate_get(
-            "/correlation",
-            headers={"X-Correlation-ID": "incoming-id"},
-        )
-        # Incoming ID was rejected, no correlation_id set
+        client = self._create_client(trusted_sources=trusted_sources)
+        response = client.simulate_get("/correlation", headers=headers)
         self._assert_no_correlation_id(response)
 
     def test_cidr_trusted_source_accepts_incoming_id(self) -> None:
@@ -238,30 +254,3 @@ class TestTrustedSourceIntegration:
             headers={"X-Correlation-ID": "cidr-matched-id"},
         )
         assert response.json["correlation_id"] == "cidr-matched-id"
-
-    def test_missing_header_has_no_correlation_id(self) -> None:
-        """Verify missing header results in no correlation_id set.
-
-        Note: ID generation will be added in task 2.2. For now, missing
-        headers result in no correlation_id being set.
-        """
-        client = self._create_client(
-            trusted_sources=["127.0.0.1"],
-        )
-        response = client.simulate_get("/correlation")
-        self._assert_no_correlation_id(response)
-
-    def test_empty_header_has_no_correlation_id(self) -> None:
-        """Verify empty header results in no correlation_id set.
-
-        Note: ID generation will be added in task 2.2. For now, empty
-        headers result in no correlation_id being set.
-        """
-        client = self._create_client(
-            trusted_sources=["127.0.0.1"],
-        )
-        response = client.simulate_get(
-            "/correlation",
-            headers={"X-Correlation-ID": ""},
-        )
-        self._assert_no_correlation_id(response)
