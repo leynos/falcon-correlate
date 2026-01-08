@@ -147,18 +147,18 @@ class CorrelationIDConfig:
         """
         try:
             network = ipaddress.ip_network(source, strict=False)
-        except ValueError:
+        except ValueError as err:
             msg = f"Invalid IP address or CIDR notation: '{source}'"
-            raise ValueError(msg)  # noqa: B904
+            raise ValueError(msg) from err
 
         # If CIDR notation was provided, check for host bits explicitly
         if "/" in source:
             addr_str, _, _ = source.partition("/")
             try:
                 ip = ipaddress.ip_address(addr_str)
-            except ValueError:
+            except ValueError as err:
                 msg = f"Invalid IP address or CIDR notation: '{source}'"
-                raise ValueError(msg)  # noqa: B904
+                raise ValueError(msg) from err
             if ip != network.network_address:
                 msg = f"Invalid CIDR notation '{source}': has host bits set"
                 raise ValueError(msg)
