@@ -83,10 +83,10 @@ middleware = CorrelationIDMiddleware(header_name="X-Request-ID")
 
 ### trusted_sources
 
-A collection of IP addresses or CIDR subnets considered trusted. Correlation
-IDs will only be accepted from requests originating from these addresses, and
-requests from untrusted sources will have new IDs generated regardless of any
-incoming header value.
+A collection of IP addresses or Classless Inter-Domain Routing (CIDR) subnets
+considered trusted. Correlation IDs will only be accepted from requests
+originating from these addresses, and requests from untrusted sources will have
+new IDs generated regardless of any incoming header value.
 
 - **Type**: `Iterable[str] | None`
 - **Default**: `None` (no sources trusted, all IDs are generated)

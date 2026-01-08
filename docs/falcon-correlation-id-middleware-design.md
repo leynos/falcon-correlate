@@ -1091,7 +1091,7 @@ treats missing or empty values as absent, and stores the value on
 identifiers from entering the lifecycle while keeping generation and validation
 logic isolated to later tasks.
 
-#### 4.6.6. Trusted source IP/CIDR matching
+#### 4.6.6. Trusted source IP/Classless Inter-Domain Routing (CIDR) matching
 
 Trusted source matching is implemented using Python's standard library
 `ipaddress` module. IP addresses and CIDR subnet notations provided in

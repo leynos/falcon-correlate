@@ -1,4 +1,4 @@
-# Implement trusted source checking with CIDR subnet support
+# Implement trusted source checking with Classless Inter-Domain Routing (CIDR) subnet support
 
 This ExecPlan is a living document. The sections `Progress`,
 `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must
@@ -144,7 +144,7 @@ What needs to be added:
 
 ## Plan of Work
 
-### Phase 1: Write Tests (TDD)
+### Phase 1: Write Tests (Test-Driven Development)
 
 Following AGENTS.md guidance, tests are written before implementation.
 

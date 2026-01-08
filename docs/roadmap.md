@@ -54,7 +54,8 @@ Implement ID retrieval, generation, validation, and contextual storage.
   - [x] Test missing header handling.
 - [x] 2.1.2. Implement trusted source checking. See design-doc §3.2.2.
   - [x] Check `req.remote_addr` against trusted sources set.
-  - [x] Support both exact IP matching and CIDR subnet notation.
+  - [x] Support both exact IP matching and Classless Inter-Domain Routing (CIDR)
+    subnet notation.
   - [x] Accept incoming ID only if source is trusted.
   - [x] Test ID acceptance from trusted source.
   - [x] Test ID rejection from untrusted source.

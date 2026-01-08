@@ -146,13 +146,24 @@ class CorrelationIDConfig:
 
         """
         try:
-            return ipaddress.ip_network(source, strict=True)
-        except ValueError as e:
-            if "has host bits set" in str(e):
-                msg = f"Invalid CIDR notation '{source}': has host bits set"
-                raise ValueError(msg) from e
+            network = ipaddress.ip_network(source, strict=False)
+        except ValueError:
             msg = f"Invalid IP address or CIDR notation: '{source}'"
-            raise ValueError(msg) from e
+            raise ValueError(msg)  # noqa: B904
+
+        # If CIDR notation was provided, check for host bits explicitly
+        if "/" in source:
+            addr_str, _, _ = source.partition("/")
+            try:
+                ip = ipaddress.ip_address(addr_str)
+            except ValueError:
+                msg = f"Invalid IP address or CIDR notation: '{source}'"
+                raise ValueError(msg)  # noqa: B904
+            if ip != network.network_address:
+                msg = f"Invalid CIDR notation '{source}': has host bits set"
+                raise ValueError(msg)
+
+        return network
 
     def _validate_generator(self) -> None:
         """Validate that generator is callable."""

@@ -111,9 +111,41 @@ class TestTrustedSourceChecking:
         )
         assert middleware._is_trusted_source("8.8.8.8") is False
 
+    # Mixed IPv4/IPv6 sources
+
+    def test_mixed_sources_ipv6_addr_not_in_ipv4_sources(self) -> None:
+        """Verify IPv6 address does not match IPv4-only trusted sources."""
+        middleware = CorrelationIDMiddleware(
+            trusted_sources=["10.0.0.0/8", "192.168.1.0/24"],
+        )
+        assert middleware._is_trusted_source("::1") is False
+
+    def test_mixed_sources_ipv4_addr_matches_ipv4_in_mixed_list(self) -> None:
+        """Verify IPv4 address matches IPv4 source in mixed IPv4/IPv6 list."""
+        middleware = CorrelationIDMiddleware(
+            trusted_sources=["::1", "10.0.0.0/8"],
+        )
+        assert middleware._is_trusted_source("10.0.0.1") is True
+
+    def test_mixed_sources_ipv6_addr_matches_ipv6_in_mixed_list(self) -> None:
+        """Verify IPv6 address matches IPv6 source in mixed IPv4/IPv6 list."""
+        middleware = CorrelationIDMiddleware(
+            trusted_sources=["10.0.0.0/8", "2001:db8::/32"],
+        )
+        assert middleware._is_trusted_source("2001:db8::1") is True
+
+    def test_mixed_sources_ipv4_addr_not_in_ipv6_sources(self) -> None:
+        """Verify IPv4 address does not match IPv6-only trusted sources."""
+        middleware = CorrelationIDMiddleware(
+            trusted_sources=["::1", "2001:db8::/32"],
+        )
+        assert middleware._is_trusted_source("10.0.0.1") is False
+
 
 class TestTrustedSourceConfigValidation:
     """Tests for IP/CIDR validation in CorrelationIDConfig."""
+
+    # IPv4 validation tests
 
     def test_invalid_ip_raises_value_error(self) -> None:
         """Verify invalid IP address raises ValueError."""
@@ -121,14 +153,31 @@ class TestTrustedSourceConfigValidation:
             CorrelationIDMiddleware(trusted_sources=["not-an-ip"])
 
     def test_invalid_cidr_prefix_raises_value_error(self) -> None:
-        """Verify invalid CIDR prefix raises ValueError."""
+        """Verify invalid IPv4 CIDR prefix raises ValueError."""
         with pytest.raises(ValueError, match="Invalid IP address or CIDR"):
             CorrelationIDMiddleware(trusted_sources=["10.0.0.0/33"])
 
     def test_cidr_with_host_bits_raises_value_error(self) -> None:
-        """Verify CIDR with host bits set raises ValueError."""
+        """Verify IPv4 CIDR with host bits set raises ValueError."""
         with pytest.raises(ValueError, match="has host bits set"):
             CorrelationIDMiddleware(trusted_sources=["10.0.0.5/24"])
+
+    # IPv6 validation tests
+
+    def test_invalid_ipv6_raises_value_error(self) -> None:
+        """Verify invalid IPv6 address raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid IP address or CIDR"):
+            CorrelationIDMiddleware(trusted_sources=["not:a:valid:ipv6"])
+
+    def test_invalid_ipv6_cidr_prefix_raises_value_error(self) -> None:
+        """Verify invalid IPv6 CIDR prefix raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid IP address or CIDR"):
+            CorrelationIDMiddleware(trusted_sources=["2001:db8::/129"])
+
+    def test_ipv6_cidr_with_host_bits_raises_value_error(self) -> None:
+        """Verify IPv6 CIDR with host bits set raises ValueError."""
+        with pytest.raises(ValueError, match="has host bits set"):
+            CorrelationIDMiddleware(trusted_sources=["2001:db8::1/32"])
 
     def test_valid_ipv4_address_accepted(self) -> None:
         """Verify valid IPv4 address is accepted."""
