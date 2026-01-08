@@ -1100,7 +1100,7 @@ or `IPv6Network` objects. This design choice:
 
 - **Validates early**: Invalid IP/CIDR formats raise `ValueError` at
   instantiation, providing immediate feedback rather than runtime errors.
-- **Optimises lookups**: Pre-parsed network objects enable O(1) containment
+- **Optimizes lookups**: Pre-parsed network objects enable O(1) containment
   checks at request time using `addr in network`.
 - **Enforces correctness**: Using `strict=True` ensures CIDR notations specify
   network addresses (e.g., `10.0.0.0/24`) rather than host addresses with
@@ -1113,9 +1113,10 @@ The `_is_trusted_source()` method returns `False` for:
 - IP addresses not matching any configured trusted source
 
 This defensive approach ensures that misconfigured or unexpected inputs never
-accidentally grant trust. The `process_request` method now always sets
-`req.context.correlation_id`, either to the incoming ID (if from a trusted
-source) or to a newly generated ID.
+accidentally grant trust. The `process_request` method sets
+`req.context.correlation_id` to the incoming ID when the source is trusted.
+When the source is untrusted or the header is missing, no correlation ID is set
+in the current implementation; ID generation will be added in task 2.2.
 
 ## 5. Conclusion and recommendations
 

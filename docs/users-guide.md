@@ -54,17 +54,21 @@ During `process_request`, the middleware reads the configured header name and
 checks whether the request originates from a trusted source. The correlation ID
 stored on `req.context.correlation_id` is determined as follows:
 
-1. If the header is missing, empty, or contains only whitespace, a new ID is
-   generated using the configured generator.
-
-2. If a valid header value is present but the request source is not trusted, a
-   new ID is generated.
-
-3. If a valid header value is present and the request source is trusted, the
+1. If a valid header value is present and the request source is trusted, the
    incoming ID is accepted after trimming leading and trailing whitespace.
 
-This ensures that correlation IDs can only propagate through trusted
-infrastructure, preventing untrusted clients from injecting arbitrary IDs.
+2. If a valid header value is present, but the request source is not trusted,
+   the incoming ID is rejected and no correlation ID is set on the request
+   context.
+
+3. If the header is missing, empty, or contains only whitespace, no correlation
+   ID is set on the request context.
+
+**Note**: In the current release, ID generation for rejected or missing headers
+is not yet implemented. When generation is added (task 2.2), scenarios 2 and 3
+will generate new IDs instead of leaving the context unset. This ensures that
+correlation IDs can only propagate through trusted infrastructure, preventing
+untrusted clients from injecting arbitrary IDs.
 
 ## Configuration Options
 
@@ -85,11 +89,14 @@ middleware = CorrelationIDMiddleware(header_name="X-Request-ID")
 
 A collection of IP addresses or Classless Inter-Domain Routing (CIDR) subnets
 considered trusted. Correlation IDs will only be accepted from requests
-originating from these addresses, and requests from untrusted sources will have
-new IDs generated regardless of any incoming header value.
+originating from these addresses.
 
 - **Type**: `Iterable[str] | None`
-- **Default**: `None` (no sources trusted, all IDs are generated)
+- **Default**: `None` (no sources trusted)
+
+**Note**: In the current release, requests from untrusted sources will not have
+a correlation ID set. When ID generation is implemented (task 2.2), untrusted
+sources will have new IDs generated regardless of any incoming header value.
 
 Both exact IP addresses and CIDR subnet notation are supported:
 
@@ -112,8 +119,9 @@ middleware = CorrelationIDMiddleware(
 - CIDR notation must specify network addresses, not host addresses. For example,
   `10.0.0.0/24` is valid, but `10.0.0.5/24` will raise an error because it has
   host bits set.
-- An empty or unspecified `trusted_sources` means no sources are trusted and all
-  incoming IDs are replaced with generated ones.
+- An empty or unspecified `trusted_sources` means no sources are trusted, and
+  all incoming IDs are rejected. (When ID generation is implemented, incoming
+  IDs will be replaced with generated ones.)
 
 **Security note**: Only add IP addresses that are fully trusted to propagate
 correlation IDs. Misconfiguration could allow malicious actors to inject
@@ -201,7 +209,7 @@ app = falcon.App(middleware=[middleware])
 The following functionality is now implemented:
 
 - Middleware configuration options (header name, generator, validator, etc.)
-- Header retrieval and whitespace normalisation
+- Header retrieval and whitespace normalization
 - Trusted source IP/CIDR matching
 
 The following functionality will be added in future releases:

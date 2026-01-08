@@ -77,8 +77,7 @@ class TestCorrelationIDMiddlewareWithFalcon:
         client = falcon.testing.TestClient(app)
         client.simulate_get("/test")
 
-        for expected_call in expected_calls:
-            assert expected_call in call_log
+        assert call_log == expected_calls
 
     def _create_tracking_middleware(
         self,

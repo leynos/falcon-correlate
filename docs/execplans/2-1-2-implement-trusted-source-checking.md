@@ -104,16 +104,22 @@ Success is observable when:
 
 ### Key Files
 
-| File                                                | Purpose                                                                  |
-| --------------------------------------------------- | ------------------------------------------------------------------------ |
-| `src/falcon_correlate/middleware.py`                | Core middleware with `CorrelationIDConfig` and `CorrelationIDMiddleware` |
-| `src/falcon_correlate/unittests/test_middleware.py` | Colocated unit tests                                                     |
-| `tests/bdd/middleware.feature`                      | BDD feature specifications                                               |
-| `tests/bdd/test_middleware_steps.py`                | BDD step definitions                                                     |
-| `tests/conftest.py`                                 | Shared test fixtures                                                     |
-| `docs/users-guide.md`                               | User documentation                                                       |
-| `docs/falcon-correlation-id-middleware-design.md`   | Design document                                                          |
-| `docs/roadmap.md`                                   | Task checklist                                                           |
+| File                                                                   | Purpose                                                                  |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `src/falcon_correlate/middleware.py`                                   | Core middleware with `CorrelationIDConfig` and `CorrelationIDMiddleware` |
+| `src/falcon_correlate/unittests/test_trusted_sources.py`               | Unit tests for trusted source IP/CIDR matching                           |
+| `src/falcon_correlate/unittests/test_config_validation.py`             | Unit tests for configuration validation                                  |
+| `src/falcon_correlate/unittests/test_middleware_configuration.py`      | Unit tests for middleware configuration options                          |
+| `src/falcon_correlate/unittests/test_middleware_instantiation.py`      | Unit tests for middleware instantiation                                  |
+| `src/falcon_correlate/unittests/test_middleware_falcon_integration.py` | Unit tests for Falcon integration                                        |
+| `src/falcon_correlate/unittests/test_middleware_header_handling.py`    | Unit tests for header handling                                           |
+| `src/falcon_correlate/unittests/test_public_exports.py`                | Unit tests for public API exports                                        |
+| `tests/bdd/middleware.feature`                                         | BDD feature specifications                                               |
+| `tests/bdd/test_middleware_steps.py`                                   | BDD step definitions                                                     |
+| `tests/conftest.py`                                                    | Shared test fixtures                                                     |
+| `docs/users-guide.md`                                                  | User documentation                                                       |
+| `docs/falcon-correlation-id-middleware-design.md`                      | Design document                                                          |
+| `docs/roadmap.md`                                                      | Task checklist                                                           |
 
 ### Current State
 
@@ -237,7 +243,7 @@ Update these files:
 
 1. Create tests before changing code.
 
-   - Add `TestTrustedSourceChecking` class to unit tests with parametrised tests
+   - Add `TestTrustedSourceChecking` class to unit tests with parametrized tests
      for exact IP matching, CIDR matching, IPv6 support, and edge cases.
    - Add config validation tests for invalid IP/CIDR formats.
    - Add `TestTrustedSourceIntegration` class for `process_request` integration.
@@ -273,8 +279,9 @@ Update these files:
 5. Integrate trust checking into `process_request()`.
 
    - Modify method to check trust before accepting incoming ID.
-   - Generate new ID when source not trusted or header missing.
-   - Always set `req.context.correlation_id`.
+   - Accept incoming ID only when source is trusted and header is present.
+   - Leave `req.context.correlation_id` unset when source is untrusted or header
+     is missing (ID generation is deferred to task 2.2).
 
 6. Update documentation and roadmap.
 
@@ -315,11 +322,12 @@ Update these files:
 
 - **Behavioural tests**: BDD scenarios verify end-to-end:
   - Trusted source accepts incoming ID
-  - Untrusted source generates new ID
+  - Untrusted source rejects incoming ID (no correlation ID set)
   - CIDR matching works
-  - Missing header generates ID even from trusted source
+  - Missing header results in no correlation ID (generation deferred to task
+    2.2)
 
-- **Documentation**: Users guide updated with CIDR examples and security notes
+- **Documentation**: User's guide updated with CIDR examples and security notes
 
 - **Quality gates**: All pass (`make check-fmt`, `make lint`, `make typecheck`,
   `make test`, `make markdownlint`, `make nixie`)
