@@ -1091,6 +1091,33 @@ treats missing or empty values as absent, and stores the value on
 identifiers from entering the lifecycle while keeping generation and validation
 logic isolated to later tasks.
 
+#### 4.6.6. Trusted source IP/Classless Inter-Domain Routing (CIDR) matching
+
+Trusted source matching is implemented using Python's standard library
+`ipaddress` module. IP addresses and CIDR subnet notations provided in
+`trusted_sources` are parsed at configuration time and stored as `IPv4Network`
+or `IPv6Network` objects. This design choice:
+
+- **Validates early**: Invalid IP/CIDR formats raise `ValueError` at
+  instantiation, providing immediate feedback rather than runtime errors.
+- **Optimizes lookups**: Pre-parsed network objects enable O(1) containment
+  checks at request time using `addr in network`.
+- **Enforces correctness**: Using `strict=True` ensures CIDR notations specify
+  network addresses (e.g., `10.0.0.0/24`) rather than host addresses with
+  subnet masks (e.g., `10.0.0.5/24`), preventing common configuration mistakes.
+
+The `_is_trusted_source()` method returns `False` for:
+
+- `None` or empty `remote_addr` values
+- Malformed IP addresses that cannot be parsed
+- IP addresses not matching any configured trusted source
+
+This defensive approach ensures that misconfigured or unexpected inputs never
+accidentally grant trust. The `process_request` method sets
+`req.context.correlation_id` to the incoming ID when the source is trusted.
+When the source is untrusted or the header is missing, no correlation ID is set
+in the current implementation; ID generation will be added in task 2.2.
+
 ## 5. Conclusion and recommendations
 
 This report has detailed the design for a comprehensive correlation ID

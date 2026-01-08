@@ -52,13 +52,14 @@ Implement ID retrieval, generation, validation, and contextual storage.
   - [x] Read correlation ID from configured header name.
   - [x] Handle missing or empty header values.
   - [x] Test missing header handling.
-- [ ] 2.1.2. Implement trusted source checking. See design-doc §3.2.2.
-  - [ ] Check `req.remote_addr` against trusted sources set.
-  - [ ] Support both exact IP matching and CIDR subnet notation.
-  - [ ] Accept incoming ID only if source is trusted.
-  - [ ] Test ID acceptance from trusted source.
-  - [ ] Test ID rejection from untrusted source.
-  - [ ] Test CIDR matching behaviour.
+- [x] 2.1.2. Implement trusted source checking. See design-doc §3.2.2.
+  - [x] Check `req.remote_addr` against trusted sources set.
+  - [x] Support both exact IP matching and Classless Inter-Domain Routing (CIDR)
+    subnet notation.
+  - [x] Accept incoming ID only if source is trusted.
+  - [x] Test ID acceptance from trusted source.
+  - [x] Test ID rejection from untrusted source.
+  - [x] Test CIDR matching behaviour.
 
 ### 2.2. UUIDv7 generation
 

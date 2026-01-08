@@ -56,3 +56,29 @@ Feature: Correlation ID Middleware
   Scenario: Middleware can disable response header echoing
     Given a CorrelationIDMiddleware with echo_header_in_response disabled
     Then the middleware should have echo_header_in_response set to False
+
+  # Trusted source scenarios
+
+  Scenario: Incoming ID accepted from trusted source
+    Given a Falcon application with CorrelationIDMiddleware trusting "127.0.0.1"
+    And a correlation echo resource at "/correlation"
+    When I request "/correlation" with header "X-Correlation-ID" value "trusted-id"
+    Then the response correlation id should be "trusted-id"
+
+  Scenario: Incoming ID rejected from untrusted source
+    Given a Falcon application with CorrelationIDMiddleware trusting "10.0.0.1"
+    And a correlation echo resource at "/correlation"
+    When I request "/correlation" with header "X-Correlation-ID" value "untrusted-id"
+    Then the response should not include a correlation ID
+
+  Scenario: CIDR subnet matching accepts incoming ID
+    Given a Falcon application with CorrelationIDMiddleware trusting "127.0.0.0/8"
+    And a correlation echo resource at "/correlation"
+    When I request "/correlation" with header "X-Correlation-ID" value "cidr-id"
+    Then the response correlation id should be "cidr-id"
+
+  Scenario: Missing header has no correlation ID even from trusted source
+    Given a Falcon application with CorrelationIDMiddleware trusting "127.0.0.1"
+    And a correlation echo resource at "/correlation"
+    When I make a GET request to "/correlation"
+    Then the response should not include a correlation ID

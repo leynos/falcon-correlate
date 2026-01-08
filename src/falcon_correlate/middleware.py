@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import dataclasses
+import ipaddress
 import typing as typ
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
     import falcon
+
+# Type alias for parsed network objects
+_NetworkType = ipaddress.IPv4Network | ipaddress.IPv6Network
 
 DEFAULT_HEADER_NAME = "X-Correlation-ID"
 
@@ -68,6 +72,12 @@ class CorrelationIDConfig:
     generator: cabc.Callable[[], str] = default_uuid7_generator
     validator: cabc.Callable[[str], bool] | None = None
     echo_header_in_response: bool = True
+    _parsed_networks: tuple[_NetworkType, ...] = dataclasses.field(
+        default=(),
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
         """Validate configuration after initialisation."""
@@ -83,11 +93,77 @@ class CorrelationIDConfig:
             raise ValueError(msg)
 
     def _validate_trusted_sources(self) -> None:
-        """Validate that trusted_sources contains no empty strings."""
+        """Validate trusted_sources and parse IP/CIDR notations.
+
+        Each entry in trusted_sources must be a valid IP address or CIDR
+        notation. Parsed networks are stored in _parsed_networks for efficient
+        matching at request time.
+        """
+        parsed: list[_NetworkType] = []
         for source in self.trusted_sources:
-            if not source or not source.strip():
-                msg = "trusted_sources must not contain empty strings"
+            self._validate_source_not_empty(source)
+            parsed.append(self._parse_network(source))
+
+        # Use object.__setattr__ to set frozen field
+        object.__setattr__(self, "_parsed_networks", tuple(parsed))
+
+    def _validate_source_not_empty(self, source: str) -> None:
+        """Validate that a trusted source string is not empty or whitespace.
+
+        Parameters
+        ----------
+        source : str
+            The trusted source string to validate.
+
+        Raises
+        ------
+        ValueError
+            If ``source`` is empty or contains only whitespace characters.
+
+        """
+        if not source or not source.strip():
+            msg = "trusted_sources must not contain empty strings"
+            raise ValueError(msg)
+
+    def _parse_network(self, source: str) -> _NetworkType:
+        """Parse an IP address or CIDR notation into a network object.
+
+        Parameters
+        ----------
+        source : str
+            The IP address or CIDR notation string to parse.
+
+        Returns
+        -------
+        IPv4Network | IPv6Network
+            The parsed network object.
+
+        Raises
+        ------
+        ValueError
+            If ``source`` has host bits set (for CIDR notation) or is not a
+            valid IP address or CIDR notation.
+
+        """
+        try:
+            network = ipaddress.ip_network(source, strict=False)
+        except ValueError as err:
+            msg = f"Invalid IP address or CIDR notation: '{source}'"
+            raise ValueError(msg) from err
+
+        # If CIDR notation was provided, check for host bits explicitly
+        if "/" in source:
+            addr_str, _, _ = source.partition("/")
+            try:
+                ip = ipaddress.ip_address(addr_str)
+            except ValueError as err:
+                msg = f"Invalid IP address or CIDR notation: '{source}'"
+                raise ValueError(msg) from err
+            if ip != network.network_address:
+                msg = f"Invalid CIDR notation '{source}': has host bits set"
                 raise ValueError(msg)
+
+        return network
 
     def _validate_generator(self) -> None:
         """Validate that generator is callable."""
@@ -279,12 +355,41 @@ class CorrelationIDMiddleware:
 
         return incoming
 
+    def _is_trusted_source(self, remote_addr: str | None) -> bool:
+        """Check if remote_addr is from a trusted source.
+
+        Parameters
+        ----------
+        remote_addr : str | None
+            The IP address of the request source, from req.remote_addr.
+
+        Returns
+        -------
+        bool
+            True if remote_addr matches any trusted source, False otherwise.
+
+        """
+        if not remote_addr:
+            return False
+
+        if not self._config._parsed_networks:
+            return False
+
+        try:
+            addr = ipaddress.ip_address(remote_addr)
+        except ValueError:
+            # Malformed address, cannot be trusted
+            return False
+
+        return any(addr in network for network in self._config._parsed_networks)
+
     def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
         """Process an incoming request to establish correlation ID context.
 
         This method is called before routing the request to a resource.
         It will retrieve or generate a correlation ID and store it in
-        the request context.
+        the request context. If the source is trusted and an incoming header
+        is present, the incoming ID is used; otherwise a new ID is generated.
 
         Parameters
         ----------
@@ -293,11 +398,20 @@ class CorrelationIDMiddleware:
         resp : falcon.Response
             The response object (not yet populated).
 
+        Note
+        ----
+        Currently, this method only accepts incoming IDs from trusted sources.
+        When no trusted sources are configured or the source is untrusted,
+        the incoming ID is rejected. ID generation for rejected/missing IDs
+        will be implemented in task 2.2 (UUIDv7 generation).
+
         """
         incoming = self._get_incoming_header_value(req)
-        if incoming is None:
-            return
-        req.context.correlation_id = incoming
+
+        # Accept incoming ID only from trusted sources
+        if incoming is not None and self._is_trusted_source(req.remote_addr):
+            req.context.correlation_id = incoming
+        # Note: ID generation for missing/rejected IDs is implemented in task 2.2
 
     def process_response(
         self,
