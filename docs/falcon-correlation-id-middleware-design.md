@@ -1066,10 +1066,10 @@ but is stored internally as a `frozenset[str]`. This provides:
 #### 4.6.3. Default UUIDv7 generator implementation
 
 The `default_uuid7_generator` function uses the standard library `uuid.uuid7()`
-when available (Python 3.13 and later). For Python 3.12 compatibility, it falls
-back to `uuid_utils.uuid7()`. The generator returns the UUID hex string
-representation to keep correlation IDs compact and consistent. Custom
-generators remain supported via the `generator` parameter.
+when available. If the runtime does not provide `uuid.uuid7()`, it falls back
+to `uuid_utils.uuid7()` so UUIDv7 generation remains available. The generator
+returns the UUID hex string representation to keep correlation IDs compact and
+consistent. Custom generators remain supported via the `generator` parameter.
 
 #### 4.6.4. Property-based attribute access
 

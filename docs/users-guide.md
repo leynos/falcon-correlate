@@ -135,7 +135,7 @@ return a string.
 
 - **Type**: `Callable[[], str] | None`
 - **Default**: `default_uuid7_generator` (returns UUIDv7 hex strings via
-  `uuid.uuid7()` on Python 3.13+ and `uuid-utils` on Python 3.12)
+  `uuid.uuid7()` when available, otherwise `uuid-utils`)
 
 ```python
 import uuid

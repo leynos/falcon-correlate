@@ -21,8 +21,8 @@ DEFAULT_HEADER_NAME = "X-Correlation-ID"
 def default_uuid7_generator() -> str:
     """Generate a UUIDv7 correlation ID.
 
-    Uses the standard library ``uuid.uuid7()`` when available (Python 3.13+)
-    and falls back to ``uuid_utils.uuid7()`` on earlier Python versions.
+    Uses the standard library ``uuid.uuid7()`` when available and falls back
+    to ``uuid_utils.uuid7()`` when the runtime lacks ``uuid.uuid7()``.
 
     Returns
     -------

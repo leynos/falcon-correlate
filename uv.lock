@@ -60,7 +60,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "falcon" },
-    { name = "uuid-utils", marker = "python_full_version < '3.13'" },
+    { name = "uuid-utils" },
 ]
 
 [package.dev-dependencies]
@@ -79,7 +79,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "falcon", specifier = ">=4,<5" },
-    { name = "uuid-utils", marker = "python_full_version < '3.13'", specifier = ">=0.14,<1" },
+    { name = "uuid-utils", specifier = ">=0.14,<1" },
 ]
 
 [package.metadata.requires-dev]

@@ -86,9 +86,9 @@ task 2.2.1 as complete.
   tasks; keeping scope aligned avoids conflating milestones. Date/Author:
   2026-01-26 Codex.
 - Decision: Prefer `uuid.uuid7()` when available and fall back to
-  `uuid_utils.uuid7()` via a conditional dependency for Python 3.12. Rationale:
-  Aligns with the design doc preference for the standard library while
-  preserving Python 3.12 support. Date/Author: 2026-01-30 Codex.
+  `uuid_utils.uuid7()` when the runtime lacks `uuid.uuid7()`. Rationale: Aligns
+  with the design doc preference for the standard library while ensuring UUIDv7
+  generation remains available across runtimes. Date/Author: 2026-01-30 Codex.
 - Decision: Return UUID hex strings from the default generator.
   Rationale: Matches existing API expectations and keeps identifiers compact.
   Date/Author: 2026-01-30 Codex.
@@ -100,10 +100,11 @@ task 2.2.1 as complete.
 ## Outcomes & retrospective
 
 The default UUIDv7 generator is now implemented with a standard library path
-and a Python 3.12 fallback, returning UUID hex strings. New unit and BDD tests
-cover format, version, variant, and uniqueness. Documentation and the roadmap
-now reflect the completed 2.2.1 milestone. All quality gates passed, including
-formatting, linting, type checking, tests, markdownlint, and nixie.
+and a runtime fallback when `uuid.uuid7()` is unavailable, returning UUID hex
+strings. New unit and BDD tests cover format, version, variant, and uniqueness.
+Documentation and the roadmap now reflect the completed 2.2.1 milestone. All
+quality gates passed, including formatting, linting, type checking, tests,
+markdownlint, and nixie.
 
 ## Context and orientation
 
@@ -253,3 +254,6 @@ tests and documentation updates.
 2026-01-30: Marked the plan complete, recorded execution details, and updated
 progress, decisions, and outcomes to reflect the implemented generator and
 quality gate results.
+
+2026-01-30: Updated the dependency decision to keep `uuid-utils` installed
+whenever the runtime lacks `uuid.uuid7()`.
