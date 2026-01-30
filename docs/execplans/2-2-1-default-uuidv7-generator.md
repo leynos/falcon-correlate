@@ -1,8 +1,9 @@
 # Implement default UUIDv7 generator (2.2.1)
 
-This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
-`Risks`, `Progress`, `Surprizes & Discoveries`, `Decision log`, and
-`Outcomes & retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
+proceeds.
 
 Status: COMPLETE
 
@@ -12,18 +13,18 @@ No `PLANS.md` file exists in the repository root at the time of writing.
 
 This change replaces the placeholder UUIDv7 generator with a compliant, working
 implementation that returns a hex string suitable for correlation IDs. Success
-is observable when the new generator returns RFC 4122-compliant UUIDv7 values
-with millisecond precision, unit and Behaviour-Driven Development (BDD) tests
-pass, documentation reflects the new behaviour, and `docs/roadmap.md` shows
-task 2.2.1 as complete.
+is observable when the new generator returns RFC 9562-compliant UUIDv7 values
+with RFC 4122 variant bits and millisecond precision, unit and Behaviour-Driven
+Development (BDD) tests pass, documentation reflects the new behaviour, and
+`docs/roadmap.md` shows task 2.2.1 as complete.
 
 ## Constraints
 
 - Preserve the public API: `default_uuid7_generator() -> str` remains the same
   name and signature and stays exported from `falcon_correlate.__init__`.
 - Maintain Python compatibility for the supported range (`>=3.12`).
-- Use a UUIDv7 implementation that complies with RFC 4122 and the current
-  draft specification for millisecond precision.
+- Use a UUIDv7 implementation that complies with RFC 9562 and RFC 4122 variant
+  requirements for millisecond precision and compatibility.
 - Prefer the standard library `uuid.uuid7()` when available; otherwise use
   `uuid-utils` as the external dependency.
 - Follow documentation style rules (80-column wrapping, Markdown linting,
@@ -46,7 +47,7 @@ task 2.2.1 as complete.
   Severity: medium Likelihood: medium Mitigation: verify API by reading package
   documentation and add tests that validate version and variant bits from
   returned values.
-- Risk: Standard library `uuid.uuid7()` is unavailable on Python 3.12.
+- Risk: Standard library `uuid.uuid7()` is unavailable on Python <3.14.
   Severity: low Likelihood: high Mitigation: implement a clean fallback to
   `uuid-utils` and document it.
 - Risk: Uniqueness tests become flaky if they depend on timing.
@@ -62,12 +63,12 @@ task 2.2.1 as complete.
 - [x] (2026-01-30 09:15Z) Added unit and BDD tests for UUIDv7 format and
   uniqueness.
 - [x] (2026-01-30 09:35Z) Implemented the default UUIDv7 generator and added
-  the conditional dependency.
+  the version-gated dependency.
 - [x] (2026-01-30 09:50Z) Updated documentation and the roadmap.
 - [x] (2026-01-30 10:10Z) Ran formatting, linting, type checking, tests,
   markdownlint, and nixie.
 
-## Surprizes & Discoveries
+## Surprises & Discoveries
 
 - Observation: `make markdownlint` required
   `MDLINT=/root/.bun/bin/markdownlint-cli2` in this environment. Evidence: The
@@ -122,7 +123,7 @@ notes in §4.6.3. The user-facing behaviour is documented in
 ## Plan of work
 
 Stage A is research and scope confirmation. Re-read design-doc §3.2.3, identify
-the preferred UUIDv7 implementation for Python 3.12+ (standard library when
+the preferred UUIDv7 implementation for Python 3.14+ (standard library when
 available, otherwise `uuid-utils`), and confirm how to produce a hex string
 from the chosen API. Decide whether a conditional import is needed for
 `uuid.uuid7()` and document the rationale.
@@ -176,8 +177,8 @@ what format it returns, and tick off task 2.2.1 in `docs/roadmap.md`.
    - Edit `src/falcon_correlate/middleware.py` to implement
      `default_uuid7_generator` with a standard-library path and a
      `uuid-utils` fallback.
-   - If `uuid-utils` is required, add it to `pyproject.toml` and update
-     `uv.lock` (use `uv lock`).
+   - If `uuid-utils` is required, add it to `pyproject.toml` with a version
+     marker and update `uv.lock` (use `uv lock`).
 
 4. Update documentation and roadmap.
 
@@ -244,7 +245,7 @@ The following interface must exist at the end of the change:
 Dependencies:
 
 - Standard library `uuid` when `uuid.uuid7()` is available.
-- `uuid-utils` as the external fallback dependency for Python 3.12.
+- `uuid-utils` as the external fallback dependency for Python <3.14.
 
 ## Revision note (required when editing an ExecPlan)
 

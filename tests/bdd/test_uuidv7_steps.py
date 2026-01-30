@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import typing as typ
-import uuid
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -11,11 +10,9 @@ if typ.TYPE_CHECKING:
 from pytest_bdd import given, scenarios, then, when
 
 from falcon_correlate import default_uuid7_generator
+from falcon_correlate.unittests.uuid7_helpers import assert_uuid7_hex
 
 scenarios("uuidv7.feature")
-
-UUID_HEX_LENGTH = 32
-UUID_VERSION = 7
 
 
 class Context(typ.TypedDict, total=False):
@@ -51,15 +48,12 @@ def when_generate_two_correlation_ids(context: Context) -> None:
 def then_correlation_id_is_uuid7_hex(context: Context) -> None:
     """Verify the correlation ID is a UUIDv7 hex string."""
     value = context["generated_id"]
-    assert len(value) == UUID_HEX_LENGTH
-    assert value == value.lower()
-    _ = int(value, 16)
-    parsed = uuid.UUID(hex=value)
-    assert parsed.version == UUID_VERSION
-    assert parsed.variant == uuid.RFC_4122
+    assert_uuid7_hex(value)
 
 
 @then("the correlation IDs should be different")
 def then_correlation_ids_differ(context: Context) -> None:
     """Verify the generated correlation IDs differ."""
-    assert context["first_id"] != context["second_id"]
+    assert context["first_id"] != context["second_id"], (
+        "expected unique UUIDv7 values across calls"
+    )

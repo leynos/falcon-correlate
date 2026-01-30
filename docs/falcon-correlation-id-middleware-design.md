@@ -286,16 +286,16 @@ UUIDv7 is chosen for its time-sortable properties and improved characteristics
 over older UUID versions.[^6]
 
 Several Python libraries are available for generating UUIDv7s. The standard
-library uuid module is slated to include uuid.uuid7() in Python 3.13 and
-later.[^15] For applications using older Python versions, external libraries or
-backporting the CPython implementation[^16] are necessary.
+library uuid module includes uuid.uuid7() in Python 3.14 and later.[^15] For
+applications using older Python versions, external libraries or backporting the
+CPython implementation[^16] are necessary.
 
 It is crucial to select a library that adheres to the latest UUIDv7
-specification (RFC 4122, as updated by the new UUID formats draft),
-particularly regarding millisecond precision for the timestamp component.[^6]
-Some older libraries or implementations might use outdated draft specifications
-with different precision levels (e.g., nanosecond precision), which could lead
-to compatibility issues or unexpected sorting behaviour.[^16]
+specification (RFC 9562, which obsoletes RFC 4122), particularly regarding
+millisecond precision for the timestamp component.[^6] Some older libraries or
+implementations might use outdated draft specifications with different
+precision levels (e.g., nanosecond precision), which could lead to
+compatibility issues or unexpected sorting behaviour.[^16]
 
 The following table summarizes some available options for UUIDv7 generation:
 
@@ -305,7 +305,7 @@ The following table summarizes some available options for UUIDv7 generation:
 | `uuid-v7`      | `pypi.org/project/uuid-v7/`    | `uuid_v7.generate()` | Aims for latest spec, simple API                  | Early 2024   | Appears viable and focused specifically on UUIDv7.                    |
 | `uuid-utils`   | `pypi.org/project/uuid-utils/` | `uuid_utils.uuid7()` | General UUID utilities, includes v7 generation    | Recent       | Mentioned as a preferable option in community discussions.            |
 | `uuid7` (old)  | `pypi.org/project/uuid7/`      | `uuid7.uuid7()`      | Based on an old draft (nanosecond precision)      | 2021         | **Should be avoided** due to outdated specification adherence.        |
-| CPython `uuid` | N/A (Standard Library)         | `uuid.uuid7()`       | Official standard library implementation          | Python 3.13+ | For older Python, consider copying source from CPython `Lib/uuid.py`. |
+| CPython `uuid` | N/A (Standard Library)         | `uuid.uuid7()`       | Official standard library implementation          | Python 3.14+ | For older Python, consider copying source from CPython `Lib/uuid.py`. |
 
 *Table 1: Available options for UUIDv7 generation in Python.*
 
@@ -1166,7 +1166,7 @@ the task's execution context, enabling consistent logging.
 - **Consistency:** Ensure all services within the distributed system adhere to
   the same correlation ID header name and propagation practices.
 - **UUIDv7 library selection:** Carefully choose and vet the UUIDv7 generation
-  library, especially for Python versions older than 3.13, ensuring it conforms
+  library, especially for Python versions older than 3.14, ensuring it conforms
   to the latest specification.
 
 ### 5.3. Potential future enhancements
@@ -1205,7 +1205,7 @@ distributed environments.
 [^11]: Falcon web framework middleware documentation.
 [^13]: X-Forwarded-For header specification.
 [^14]: Security considerations for X-Forwarded-For headers.
-[^15]: Python 3.13 uuid.uuid7() addition.
+[^15]: Python 3.14 uuid.uuid7() addition.
 [^16]: UUIDv7 library comparison discussions.
 [^17]: Python contextvars module documentation.
 [^18]: structlog contextvars integration.

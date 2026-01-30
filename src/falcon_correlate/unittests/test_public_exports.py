@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-UUID_HEX_LENGTH = 32
+from falcon_correlate.unittests.uuid7_helpers import assert_uuid7_hex
 
 
 class TestPublicExports:
@@ -21,5 +21,4 @@ class TestPublicExports:
         from falcon_correlate import default_uuid7_generator as gen
 
         value = gen()
-        assert isinstance(value, str)
-        assert len(value) == UUID_HEX_LENGTH
+        assert_uuid7_hex(value)

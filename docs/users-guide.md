@@ -64,12 +64,12 @@ stored on `req.context.correlation_id` is determined as follows:
 3. If the header is missing, empty, or contains only whitespace, no correlation
    ID is set on the request context.
 
-**Note**: The default UUIDv7 generator is now implemented, but the middleware
-does not yet generate IDs for rejected or missing headers. Task 2.2.2 will wire
-generator usage so scenarios 2 and 3 generate new IDs instead of leaving the
-context unset. This ensures that correlation IDs can only propagate through
-trusted infrastructure, preventing untrusted clients from injecting arbitrary
-IDs.
+**Note**: The middleware does not yet generate IDs for rejected or missing
+headers, even though the default UUIDv7 generator is implemented. Task 2.2.2
+will wire generator usage so scenarios 2 and 3 generate new IDs instead of
+leaving the context unset. This design ensures correlation IDs only propagate
+through trusted infrastructure and blocks untrusted clients from injecting
+arbitrary IDs.
 
 ## Configuration Options
 
@@ -210,15 +210,15 @@ app = falcon.App(middleware=[middleware])
 
 The following functionality is now implemented:
 
-- Middleware configuration options (header name, generator, validator, etc.)
-- Header retrieval and whitespace normalization
-- Trusted source IP/CIDR matching
-- Default UUIDv7 generator implementation
+- Middleware configuration options (header name, generator, validator, etc.).
+- Header retrieval and whitespace normalization.
+- Trusted source IP/CIDR matching.
+- Default UUIDv7 generator implementation.
 
 The following functionality will be added in future releases:
 
-- Request-time UUIDv7 generation for new correlation IDs (task 2.2.2)
-- Context variable storage (task 2.4)
-- Logging integration (task 3.1)
+- Request-time UUIDv7 generation for new correlation IDs (task 2.2.2).
+- Context variable storage (task 2.4).
+- Logging integration (task 3.1).
 
 See the [roadmap](roadmap.md) for the full implementation plan.
