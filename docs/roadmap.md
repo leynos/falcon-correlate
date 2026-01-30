@@ -63,13 +63,13 @@ Implement ID retrieval, generation, validation, and contextual storage.
 
 ### 2.2. UUIDv7 generation
 
-- [ ] 2.2.1. Implement default UUIDv7 generator. See design-doc §3.2.3.
-  - [ ] Select and add UUIDv7 library dependency (prefer `uuid-utils` or
-        standard library for Python 3.13+).
-  - [ ] Create `default_uuid7_generator()` function returning hex string.
-  - [ ] Ensure RFC 4122 compliance with millisecond precision.
-  - [ ] Test default generator produces valid UUIDv7 format.
-  - [ ] Test generated IDs are unique across calls.
+- [x] 2.2.1. Implement default UUIDv7 generator. See design-doc §3.2.3.
+  - [x] Select and add UUIDv7 library dependency (prefer `uuid-utils` or
+        standard library for Python 3.14+).
+  - [x] Create `default_uuid7_generator()` function returning hex string.
+  - [x] Ensure RFC 4122 compliance with millisecond precision.
+  - [x] Test default generator produces valid UUIDv7 format.
+  - [x] Test generated IDs are unique across calls.
 - [ ] 2.2.2. Support custom generator injection
   - [ ] Accept `Callable[[], str]` as generator parameter.
   - [ ] Fall back to default generator if not provided.
