@@ -305,7 +305,7 @@ The following table summarizes some available options for UUIDv7 generation:
 | `uuid-v7`      | `pypi.org/project/uuid-v7/`    | `uuid_v7.generate()` | Aims for latest spec, simple API                  | Early 2024   | Appears viable and focused specifically on UUIDv7.                    |
 | `uuid-utils`   | `pypi.org/project/uuid-utils/` | `uuid_utils.uuid7()` | General UUID utilities, includes v7 generation    | Recent       | Mentioned as a preferable option in community discussions.            |
 | `uuid7` (old)  | `pypi.org/project/uuid7/`      | `uuid7.uuid7()`      | Based on an old draft (nanosecond precision)      | 2021         | **Should be avoided** due to outdated specification adherence.        |
-| CPython `uuid` | N/A (Standard Library)         | `uuid.uuid7()`       | Official standard library implementation          | Python 3.14+ | For older Python, consider copying source from CPython `Lib/uuid.py`. |
+| CPython `uuid` | N/A (Standard Library)         | `uuid.uuid7()`       | Official standard library implementation          | Python 3.14  | For older Python, consider copying source from CPython `Lib/uuid.py`. |
 
 *Table 1: Available options for UUIDv7 generation in Python.*
 
