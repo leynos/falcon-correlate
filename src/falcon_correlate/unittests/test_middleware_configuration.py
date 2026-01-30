@@ -29,16 +29,6 @@ class TestCorrelationIDMiddlewareConfiguration:
         middleware = CorrelationIDMiddleware()
         assert middleware.generator is default_uuid7_generator
 
-    def test_default_uuid7_generator_raises_not_implemented_error(self) -> None:
-        """Verify default_uuid7_generator currently raises NotImplementedError.
-
-        This documents the interim behaviour until UUIDv7 generation is implemented.
-        """
-        with pytest.raises(NotImplementedError) as exc_info:
-            default_uuid7_generator()
-
-        assert "not yet implemented" in str(exc_info.value)
-
     def test_default_validator_is_none(self) -> None:
         """Verify default validator is None."""
         middleware = CorrelationIDMiddleware()
@@ -128,17 +118,17 @@ class TestCorrelationIDMiddlewareConfiguration:
     def test_non_callable_generator_raises_type_error(self) -> None:
         """Verify non-callable generator raises TypeError."""
         with pytest.raises(TypeError, match="generator must be callable"):
-            CorrelationIDMiddleware(generator="not-callable")  # type: ignore[arg-type]
+            CorrelationIDMiddleware(generator="not-callable")
 
     def test_non_callable_validator_raises_type_error(self) -> None:
         """Verify non-callable validator raises TypeError."""
         with pytest.raises(TypeError, match="validator must be callable"):
-            CorrelationIDMiddleware(validator="not-callable")  # type: ignore[arg-type]
+            CorrelationIDMiddleware(validator="not-callable")
 
     def test_unknown_kwarg_raises_type_error(self) -> None:
         """Verify unknown keyword arguments raise TypeError with helpful message."""
         with pytest.raises(TypeError) as excinfo:
-            CorrelationIDMiddleware(foo=1)  # type: ignore[call-arg]
+            CorrelationIDMiddleware(foo=1)
 
         message = str(excinfo.value)
         assert "foo" in message

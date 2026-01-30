@@ -64,11 +64,12 @@ stored on `req.context.correlation_id` is determined as follows:
 3. If the header is missing, empty, or contains only whitespace, no correlation
    ID is set on the request context.
 
-**Note**: In the current release, ID generation for rejected or missing headers
-is not yet implemented. When generation is added (task 2.2), scenarios 2 and 3
-will generate new IDs instead of leaving the context unset. This ensures that
-correlation IDs can only propagate through trusted infrastructure, preventing
-untrusted clients from injecting arbitrary IDs.
+**Note**: The default UUIDv7 generator is now implemented, but the middleware
+does not yet generate IDs for rejected or missing headers. Task 2.2.2 will wire
+generator usage so scenarios 2 and 3 generate new IDs instead of leaving the
+context unset. This ensures that correlation IDs can only propagate through
+trusted infrastructure, preventing untrusted clients from injecting arbitrary
+IDs.
 
 ## Configuration Options
 
@@ -133,7 +134,8 @@ A callable that generates new correlation IDs. Must take no arguments and
 return a string.
 
 - **Type**: `Callable[[], str] | None`
-- **Default**: `default_uuid7_generator` (generates UUIDv7 identifiers)
+- **Default**: `default_uuid7_generator` (returns UUIDv7 hex strings via
+  `uuid.uuid7()` on Python 3.13+ and `uuid-utils` on Python 3.12)
 
 ```python
 import uuid
@@ -211,10 +213,11 @@ The following functionality is now implemented:
 - Middleware configuration options (header name, generator, validator, etc.)
 - Header retrieval and whitespace normalization
 - Trusted source IP/CIDR matching
+- Default UUIDv7 generator implementation
 
 The following functionality will be added in future releases:
 
-- UUIDv7 generation for new correlation IDs (task 2.2)
+- Request-time UUIDv7 generation for new correlation IDs (task 2.2.2)
 - Context variable storage (task 2.4)
 - Logging integration (task 3.1)
 

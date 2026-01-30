@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import ipaddress
 import typing as typ
+import uuid
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -20,21 +21,22 @@ DEFAULT_HEADER_NAME = "X-Correlation-ID"
 def default_uuid7_generator() -> str:
     """Generate a UUIDv7 correlation ID.
 
-    This is a placeholder that will be implemented in task 2.2.1.
-    Currently raises NotImplementedError.
+    Uses the standard library ``uuid.uuid7()`` when available (Python 3.13+)
+    and falls back to ``uuid_utils.uuid7()`` on earlier Python versions.
 
     Returns
     -------
     str
-        A UUIDv7 string representation.
-
-    Raises
-    ------
-    NotImplementedError
-        Always raised as UUIDv7 generation is not yet implemented.
+        A UUIDv7 hex string representation.
 
     """
-    raise NotImplementedError("UUIDv7 generation not yet implemented")
+    uuid7 = getattr(uuid, "uuid7", None)
+    if uuid7 is not None:
+        return uuid7().hex
+
+    import uuid_utils
+
+    return uuid_utils.uuid7().hex
 
 
 @dataclasses.dataclass(frozen=True)
@@ -403,7 +405,7 @@ class CorrelationIDMiddleware:
         Currently, this method only accepts incoming IDs from trusted sources.
         When no trusted sources are configured or the source is untrusted,
         the incoming ID is rejected. ID generation for rejected/missing IDs
-        will be implemented in task 2.2 (UUIDv7 generation).
+        will be implemented in task 2.2.2 (generator usage).
 
         """
         incoming = self._get_incoming_header_value(req)

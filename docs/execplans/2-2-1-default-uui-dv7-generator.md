@@ -4,18 +4,18 @@ This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprizes & Discoveries`, `Decision log`, and
 `Outcomes & retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 No `PLANS.md` file exists in the repository root at the time of writing.
 
 ## Purpose / big picture
 
-This change replaces the placeholder UUIDv7 generator with a compliant,
-working implementation that returns a hex string suitable for correlation IDs.
-Success is observable when the new generator returns RFC 4122-compliant UUIDv7
-values with millisecond precision, unit and Behaviour-Driven Development (BDD)
-tests pass, documentation reflects the new behaviour, and
-`docs/roadmap.md` shows task 2.2.1 as complete.
+This change replaces the placeholder UUIDv7 generator with a compliant, working
+implementation that returns a hex string suitable for correlation IDs. Success
+is observable when the new generator returns RFC 4122-compliant UUIDv7 values
+with millisecond precision, unit and Behaviour-Driven Development (BDD) tests
+pass, documentation reflects the new behaviour, and `docs/roadmap.md` shows
+task 2.2.1 as complete.
 
 ## Constraints
 
@@ -43,54 +43,72 @@ tests pass, documentation reflects the new behaviour, and
 ## Risks
 
 - Risk: `uuid-utils` API or behaviour differs from expectations for UUIDv7.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: verify API by reading package documentation and add tests that
-  validate version and variant bits from returned values.
+  Severity: medium Likelihood: medium Mitigation: verify API by reading package
+  documentation and add tests that validate version and variant bits from
+  returned values.
 - Risk: Standard library `uuid.uuid7()` is unavailable on Python 3.12.
-  Severity: low
-  Likelihood: high
-  Mitigation: implement a clean fallback to `uuid-utils` and document it.
+  Severity: low Likelihood: high Mitigation: implement a clean fallback to
+  `uuid-utils` and document it.
 - Risk: Uniqueness tests become flaky if they depend on timing.
-  Severity: low
-  Likelihood: low
-  Mitigation: assert only that two sequential calls differ, without asserting
-  ordering or timestamp monotonicity.
+  Severity: low Likelihood: low Mitigation: assert only that two sequential
+  calls differ, without asserting ordering or timestamp monotonicity.
 - Risk: Markdownlint fails if documentation tables include pipe characters.
-  Severity: low
-  Likelihood: medium
-  Mitigation: use "optional" phrasing in tables instead of `|` types.
+  Severity: low Likelihood: medium Mitigation: use "optional" phrasing in
+  tables instead of `|` types.
 
 ## Progress
 
-- [ ] (2026-01-26) Review design-doc §3.2.3 and current stub implementation.
-- [ ] (2026-01-26) Add unit and BDD tests for UUIDv7 format and uniqueness.
-- [ ] (2026-01-26) Implement default UUIDv7 generator and update dependencies.
-- [ ] (2026-01-26) Update documentation and roadmap to reflect the change.
-- [ ] (2026-01-26) Run formatting, linting, type checking, and tests.
+- [x] (2026-01-30 09:00Z) Reviewed design-doc §3.2.3 and the stub generator.
+- [x] (2026-01-30 09:15Z) Added unit and BDD tests for UUIDv7 format and
+  uniqueness.
+- [x] (2026-01-30 09:35Z) Implemented the default UUIDv7 generator and added
+  the conditional dependency.
+- [x] (2026-01-30 09:50Z) Updated documentation and the roadmap.
+- [x] (2026-01-30 10:10Z) Ran formatting, linting, type checking, tests,
+  markdownlint, and nixie.
 
 ## Surprizes & Discoveries
 
-- None yet (plan draft).
+- Observation: `make markdownlint` required
+  `MDLINT=/root/.bun/bin/markdownlint-cli2` in this environment. Evidence: The
+  default command failed with a missing tool error before using the override.
+  Impact: Reran the command with the override to satisfy the quality gate.
+- Observation: `make nixie` exceeded the default command timeout.
+  Evidence: The first run timed out and the rerun with a longer timeout
+  completed successfully. Impact: None beyond rerunning with a longer timeout.
 
 ## Decision log
 
 - Decision: Scope is limited to 2.2.1 (default generator implementation and
   tests). Generator integration into request handling is left for 2.2.2 unless
-  tests or documentation updates require a broader change.
-  Rationale: The roadmap splits generator implementation and generator usage
-  into separate tasks; keeping scope aligned avoids conflating milestones.
-  Date/Author: 2026-01-26 Codex.
+  tests or documentation updates require a broader change. Rationale: The
+  roadmap splits generator implementation and generator usage into separate
+  tasks; keeping scope aligned avoids conflating milestones. Date/Author:
+  2026-01-26 Codex.
+- Decision: Prefer `uuid.uuid7()` when available and fall back to
+  `uuid_utils.uuid7()` via a conditional dependency for Python 3.12. Rationale:
+  Aligns with the design doc preference for the standard library while
+  preserving Python 3.12 support. Date/Author: 2026-01-30 Codex.
+- Decision: Return UUID hex strings from the default generator.
+  Rationale: Matches existing API expectations and keeps identifiers compact.
+  Date/Author: 2026-01-30 Codex.
+- Decision: Skipped the pre-implementation failing-test run and relied on
+  full-suite validation after implementation. Rationale: Tests were added
+  before implementation and validated post-change, which still verifies
+  behaviour. Date/Author: 2026-01-30 Codex.
 
 ## Outcomes & retrospective
 
-Pending execution. This section will be completed once implementation and
-validation finish.
+The default UUIDv7 generator is now implemented with a standard library path
+and a Python 3.12 fallback, returning UUID hex strings. New unit and BDD tests
+cover format, version, variant, and uniqueness. Documentation and the roadmap
+now reflect the completed 2.2.1 milestone. All quality gates passed, including
+formatting, linting, type checking, tests, markdownlint, and nixie.
 
 ## Context and orientation
 
-The current `default_uuid7_generator` in `src/falcon_correlate/middleware.py`
-raises `NotImplementedError`. The generator is exported from
+The `default_uuid7_generator` in `src/falcon_correlate/middleware.py` now
+generates UUIDv7 identifiers. The generator is exported from
 `src/falcon_correlate/__init__.py` and referenced in unit tests under
 `src/falcon_correlate/unittests/test_middleware_configuration.py`. Behavioural
 tests live in `tests/bdd/middleware.feature` with step definitions in
@@ -102,14 +120,15 @@ notes in §4.6.3. The user-facing behaviour is documented in
 
 ## Plan of work
 
-Stage A is research and scope confirmation. Re-read design-doc §3.2.3,
-identify the preferred UUIDv7 implementation for Python 3.12+ (standard
-library when available, otherwise `uuid-utils`), and confirm how to produce a
-hex string from the chosen API. Decide whether a conditional import is needed
-for `uuid.uuid7()` and document the rationale.
+Stage A is research and scope confirmation. Re-read design-doc §3.2.3, identify
+the preferred UUIDv7 implementation for Python 3.12+ (standard library when
+available, otherwise `uuid-utils`), and confirm how to produce a hex string
+from the chosen API. Decide whether a conditional import is needed for
+`uuid.uuid7()` and document the rationale.
 
 Stage B adds tests before implementation. Update or replace the unit test that
 expects `NotImplementedError` with tests that assert:
+
 - the generator returns a 32-character lowercase hex string,
 - the value parses as a UUIDv7 with RFC 4122 variant, and
 - two sequential calls return distinct values.
@@ -125,8 +144,8 @@ the chosen implementation and any fallback logic.
 
 Stage D updates documentation and the roadmap. Record the library choice and
 rationale in `docs/falcon-correlation-id-middleware-design.md` §4.6.3, update
-`docs/users-guide.md` to note that the default generator is now implemented
-and what format it returns, and tick off task 2.2.1 in `docs/roadmap.md`.
+`docs/users-guide.md` to note that the default generator is now implemented and
+what format it returns, and tick off task 2.2.1 in `docs/roadmap.md`.
 
 ## Concrete steps
 
@@ -230,3 +249,7 @@ Dependencies:
 
 2026-01-26: Initial draft created to cover roadmap task 2.2.1 and associated
 tests and documentation updates.
+
+2026-01-30: Marked the plan complete, recorded execution details, and updated
+progress, decisions, and outcomes to reflect the implemented generator and
+quality gate results.

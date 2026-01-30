@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
+UUID_HEX_LENGTH = 32
 
 
 class TestPublicExports:
@@ -20,5 +20,6 @@ class TestPublicExports:
         """Verify default_uuid7_generator can be imported from package root."""
         from falcon_correlate import default_uuid7_generator as gen
 
-        with pytest.raises(NotImplementedError):
-            gen()
+        value = gen()
+        assert isinstance(value, str)
+        assert len(value) == UUID_HEX_LENGTH

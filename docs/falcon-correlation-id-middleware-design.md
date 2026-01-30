@@ -1063,15 +1063,13 @@ but is stored internally as a `frozenset[str]`. This provides:
   instantiation do not affect the middleware's trusted sources, protecting
   against accidental misconfiguration
 
-#### 4.6.3. Deferred generator implementation
+#### 4.6.3. Default UUIDv7 generator implementation
 
-The `default_uuid7_generator` function is defined as a stub that raises
-`NotImplementedError`. Actual UUIDv7 generation is implemented in task 2.2.1.
-This separation allows:
-
-- Configuration infrastructure to be tested independently
-- Clear delineation of responsibilities per roadmap tasks
-- Custom generators to be used immediately while the default is pending
+The `default_uuid7_generator` function uses the standard library `uuid.uuid7()`
+when available (Python 3.13 and later). For Python 3.12 compatibility, it falls
+back to `uuid_utils.uuid7()`. The generator returns the UUID hex string
+representation to keep correlation IDs compact and consistent. Custom
+generators remain supported via the `generator` parameter.
 
 #### 4.6.4. Property-based attribute access
 
