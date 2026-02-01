@@ -1113,8 +1113,21 @@ The `_is_trusted_source()` method returns `False` for:
 This defensive approach ensures that misconfigured or unexpected inputs never
 accidentally grant trust. The `process_request` method sets
 `req.context.correlation_id` to the incoming ID when the source is trusted.
-When the source is untrusted or the header is missing, no correlation ID is set
-in the current implementation; ID generation will be added in task 2.2.
+When the source is untrusted or the header is missing, a new correlation ID is
+generated using the configured generator.
+
+#### 4.6.7. Generator invocation timing
+
+The configured generator is called in `process_request()` when either:
+
+- No correlation ID header is present (missing or whitespace-only)
+- The request source is not trusted (incoming ID rejected)
+
+This ensures every request receives a correlation ID for complete traceability.
+The generator is called synchronously; async generator support will be added
+with the ASGI middleware variant (task 5.1). Generated IDs are not validated
+since the generator is trusted to produce valid output. Validation (task 2.3)
+applies only to incoming IDs from external sources.
 
 ## 5. Conclusion and recommendations
 

@@ -70,10 +70,10 @@ Implement ID retrieval, generation, validation, and contextual storage.
   - [x] Ensure RFC 4122 compliance with millisecond precision.
   - [x] Test default generator produces valid UUIDv7 format.
   - [x] Test generated IDs are unique across calls.
-- [ ] 2.2.2. Support custom generator injection
-  - [ ] Accept `Callable[[], str]` as generator parameter.
-  - [ ] Fall back to default generator if not provided.
-  - [ ] Test custom generator is called when provided.
+- [x] 2.2.2. Support custom generator injection
+  - [x] Accept `Callable[[], str]` as generator parameter.
+  - [x] Fall back to default generator if not provided.
+  - [x] Test custom generator is called when provided.
 
 ### 2.3. Incoming ID validation
 

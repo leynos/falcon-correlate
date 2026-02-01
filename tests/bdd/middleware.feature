@@ -27,11 +27,11 @@ Feature: Correlation ID Middleware
     When I request "/correlation" with header "X-Correlation-ID" value "cid-123"
     Then the response correlation id should be "cid-123"
 
-  Scenario: Missing correlation ID header yields no context
+  Scenario: Missing correlation ID header triggers generation
     Given a Falcon application with CorrelationIDMiddleware
     And a correlation echo resource at "/correlation"
     When I make a GET request to "/correlation"
-    Then the response should not include a correlation ID
+    Then a correlation ID should be generated
 
   # Configuration scenarios
 
@@ -65,11 +65,12 @@ Feature: Correlation ID Middleware
     When I request "/correlation" with header "X-Correlation-ID" value "trusted-id"
     Then the response correlation id should be "trusted-id"
 
-  Scenario: Incoming ID rejected from untrusted source
+  Scenario: Incoming ID rejected from untrusted source triggers generation
     Given a Falcon application with CorrelationIDMiddleware trusting "10.0.0.1"
     And a correlation echo resource at "/correlation"
     When I request "/correlation" with header "X-Correlation-ID" value "untrusted-id"
-    Then the response should not include a correlation ID
+    Then a correlation ID should be generated
+    And the correlation ID should not be "untrusted-id"
 
   Scenario: CIDR subnet matching accepts incoming ID
     Given a Falcon application with CorrelationIDMiddleware trusting "127.0.0.0/8"
@@ -77,8 +78,23 @@ Feature: Correlation ID Middleware
     When I request "/correlation" with header "X-Correlation-ID" value "cidr-id"
     Then the response correlation id should be "cidr-id"
 
-  Scenario: Missing header has no correlation ID even from trusted source
+  Scenario: Missing header triggers generation even from trusted source
     Given a Falcon application with CorrelationIDMiddleware trusting "127.0.0.1"
     And a correlation echo resource at "/correlation"
     When I make a GET request to "/correlation"
-    Then the response should not include a correlation ID
+    Then a correlation ID should be generated
+
+  # Generator invocation scenarios
+
+  Scenario: Custom generator output is used for request
+    Given a custom ID generator that returns "custom-generated-id"
+    And a Falcon application with that custom generator
+    And a correlation echo resource at "/correlation"
+    When I make a GET request to "/correlation"
+    Then the response correlation id should be "custom-generated-id"
+
+  Scenario: Default generator produces valid UUIDv7
+    Given a Falcon application with CorrelationIDMiddleware
+    And a correlation echo resource at "/correlation"
+    When I make a GET request to "/correlation"
+    Then the correlation ID should be a valid UUIDv7
