@@ -29,6 +29,27 @@ class SimpleResource:
         }
 
 
+def _verify_generator_called_and_id_matches(
+    client: falcon.testing.TestClient,
+    mock_generator: mock.MagicMock,
+    expected_id: str,
+    headers: dict[str, str] | None = None,
+) -> None:
+    """Verify generator was called once and produced the expected correlation ID.
+
+    Args:
+        client: The Falcon test client to use.
+        mock_generator: The mock generator to verify was called.
+        expected_id: The expected correlation ID in the response.
+        headers: Optional headers to include in the request.
+
+    """
+    response = client.simulate_get("/test", headers=headers)
+
+    mock_generator.assert_called_once()
+    assert response.json["correlation_id"] == expected_id
+
+
 @pytest.fixture
 def simple_resource() -> SimpleResource:
     """Provide a SimpleResource instance for testing."""
@@ -88,10 +109,9 @@ class TestGeneratorInvocationWhenHeaderMissing:
         mock_generator = mock.MagicMock(return_value="generated-id-123")
         client = create_test_client(generator=mock_generator)
 
-        response = client.simulate_get("/test")
-
-        mock_generator.assert_called_once()
-        assert response.json["correlation_id"] == "generated-id-123"
+        _verify_generator_called_and_id_matches(
+            client, mock_generator, "generated-id-123"
+        )
 
     def test_default_generator_used_when_custom_not_provided(
         self,
@@ -127,25 +147,46 @@ class TestGeneratorInvocationWhenHeaderMissing:
 class TestGeneratorInvocationWhenSourceUntrusted:
     """Tests for generator invocation when request source is untrusted."""
 
-    def test_generator_called_when_source_untrusted(
+    @pytest.mark.parametrize(
+        ("trusted_sources", "incoming_header"),
+        [
+            pytest.param(
+                ["10.0.0.1"],
+                "external-id-should-be-rejected",
+                id="untrusted_source",
+            ),
+            pytest.param(
+                None,
+                "should-be-rejected",
+                id="no_trusted_sources_configured",
+            ),
+        ],
+    )
+    def test_generator_called_for_untrusted_scenarios(
         self,
         create_test_client: cabc.Callable[..., falcon.testing.TestClient],
+        trusted_sources: list[str] | None,
+        incoming_header: str,
     ) -> None:
-        """Verify generator is called when source is not trusted."""
-        mock_generator = mock.MagicMock(return_value="generated-for-untrusted")
-        # Trust only 10.0.0.1, but TestClient uses 127.0.0.1 by default
+        """Verify generator is called when source is untrusted or no sources configured.
+
+        When trusted_sources is configured but doesn't include the client IP,
+        or when no trusted sources are configured at all, the generator should
+        be called and any incoming correlation ID header should be rejected.
+        """
+        expected_id = "generated-for-untrusted-scenario"
+        mock_generator = mock.MagicMock(return_value=expected_id)
         client = create_test_client(
             generator=mock_generator,
-            trusted_sources=["10.0.0.1"],
+            trusted_sources=trusted_sources,
         )
 
-        response = client.simulate_get(
-            "/test",
-            headers={"X-Correlation-ID": "external-id-should-be-rejected"},
+        _verify_generator_called_and_id_matches(
+            client,
+            mock_generator,
+            expected_id,
+            headers={"X-Correlation-ID": incoming_header},
         )
-
-        mock_generator.assert_called_once()
-        assert response.json["correlation_id"] == "generated-for-untrusted"
 
     def test_incoming_id_rejected_from_untrusted_source(
         self,
@@ -169,22 +210,6 @@ class TestGeneratorInvocationWhenSourceUntrusted:
 
         # The incoming ID should be ignored; generator output should be used
         assert response.json["correlation_id"] == "new-generated-id"
-
-    def test_generator_called_when_no_trusted_sources_configured(
-        self,
-        create_test_client: cabc.Callable[..., falcon.testing.TestClient],
-    ) -> None:
-        """Verify generator is called when no trusted sources are configured."""
-        mock_generator = mock.MagicMock(return_value="no-trust-generated-id")
-        client = create_test_client(generator=mock_generator)
-
-        response = client.simulate_get(
-            "/test",
-            headers={"X-Correlation-ID": "should-be-rejected"},
-        )
-
-        mock_generator.assert_called_once()
-        assert response.json["correlation_id"] == "no-trust-generated-id"
 
 
 class TestGeneratorInvocationWithTrustedSource:
@@ -221,13 +246,12 @@ class TestGeneratorInvocationWithTrustedSource:
             trusted_sources=["127.0.0.1"],
         )
 
-        response = client.simulate_get(
-            "/test",
+        _verify_generator_called_and_id_matches(
+            client,
+            mock_generator,
+            "generated-for-empty",
             headers={"X-Correlation-ID": "   "},  # whitespace-only
         )
-
-        mock_generator.assert_called_once()
-        assert response.json["correlation_id"] == "generated-for-empty"
 
 
 class TestCustomGeneratorBehaviour:
