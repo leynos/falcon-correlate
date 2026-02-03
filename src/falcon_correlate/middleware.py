@@ -400,20 +400,21 @@ class CorrelationIDMiddleware:
         resp : falcon.Response
             The response object (not yet populated).
 
-        Note
-        ----
-        Currently, this method only accepts incoming IDs from trusted sources.
-        When no trusted sources are configured or the source is untrusted,
-        the incoming ID is rejected. ID generation for rejected/missing IDs
-        will be implemented in task 2.2.2 (generator usage).
+        Raises
+        ------
+        Exception
+            Any exception raised by the configured generator will propagate
+            to the caller. Custom generators are responsible for their own
+            error handling; the middleware does not catch generator exceptions.
 
         """
         incoming = self._get_incoming_header_value(req)
 
-        # Accept incoming ID only from trusted sources
+        # Accept incoming ID only from trusted sources; otherwise generate new ID
         if incoming is not None and self._is_trusted_source(req.remote_addr):
             req.context.correlation_id = incoming
-        # Note: ID generation for missing/rejected IDs is implemented in task 2.2
+        else:
+            req.context.correlation_id = self._config.generator()
 
     def process_response(
         self,

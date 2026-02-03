@@ -57,19 +57,16 @@ stored on `req.context.correlation_id` is determined as follows:
 1. If a valid header value is present and the request source is trusted, the
    incoming ID is accepted after trimming leading and trailing whitespace.
 
-2. If a valid header value is present, but the request source is not trusted,
-   the incoming ID is rejected and no correlation ID is set on the request
-   context.
+2. If a valid header value is present but the request source is not trusted,
+   the incoming ID is rejected and a new ID is generated using the configured
+   generator.
 
-3. If the header is missing, empty, or contains only whitespace, no correlation
-   ID is set on the request context.
+3. If the header is missing, empty, or contains only whitespace, a new ID is
+   generated using the configured generator.
 
-**Note**: The middleware still skips ID generation for rejected or missing
-headers, even though the default UUIDv7 generator is implemented. Task 2.2.2
-will wire generator usage so scenarios 2 and 3 generate new IDs instead of
-leaving the context unset. This design ensures correlation IDs only propagate
-through trusted infrastructure and blocks untrusted clients from injecting
-arbitrary IDs.
+This design ensures that every request receives a correlation ID for complete
+traceability, while preventing untrusted clients from injecting arbitrary IDs
+into the system.
 
 ## Configuration Options
 
@@ -95,10 +92,6 @@ originating from these addresses.
 - **Type**: `Iterable[str] | None`
 - **Default**: `None` (no sources trusted)
 
-**Note**: In the current release, requests from untrusted sources will not have
-a correlation ID set. When ID generation is implemented (task 2.2), untrusted
-sources will have new IDs generated regardless of any incoming header value.
-
 Both exact IP addresses and CIDR subnet notation are supported:
 
 ```python
@@ -121,8 +114,7 @@ middleware = CorrelationIDMiddleware(
   `10.0.0.0/24` is valid, but `10.0.0.5/24` will raise an error because it has
   host bits set.
 - An empty or unspecified `trusted_sources` means no sources are trusted, and
-  all incoming IDs are rejected. (When ID generation is implemented, incoming
-  IDs will be replaced with generated ones.)
+  all incoming IDs are rejected. New IDs will be generated for every request.
 
 **Security note**: Only add IP addresses that are fully trusted to propagate
 correlation IDs. Misconfiguration could allow malicious actors to inject
@@ -214,10 +206,12 @@ The following functionality is now implemented:
 - Header retrieval and whitespace normalization.
 - Trusted source IP/CIDR matching.
 - Default UUIDv7 generator implementation.
+- Automatic correlation ID generation for requests without valid incoming IDs.
+- Custom generator injection support.
 
 The following functionality will be added in future releases:
 
-- Request-time UUIDv7 generation for new correlation IDs (task 2.2.2).
+- Incoming ID validation (task 2.3).
 - Context variable storage (task 2.4).
 - Logging integration (task 3.1).
 

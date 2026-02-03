@@ -40,29 +40,39 @@ class TestCorrelationIDHeaderRetrieval:
         assert response.json["has_correlation_id"] is True
         assert response.json["correlation_id"] == "cid-123"
 
-    def test_missing_header_does_not_set_context(self) -> None:
-        """Verify missing header leaves req.context unset."""
+    def test_missing_header_triggers_generation(self) -> None:
+        """Verify missing header triggers ID generation."""
         client = self._client_with_resource()
         response = client.simulate_get("/correlation")
 
-        assert response.json["has_correlation_id"] is False
-        assert response.json["correlation_id"] is None
+        # Missing header should trigger generation
+        assert response.json["has_correlation_id"] is True, (
+            "Expected correlation ID to be set on request context"
+        )
+        assert response.json["correlation_id"] is not None, (
+            "Expected generated correlation ID, got None"
+        )
 
     @pytest.mark.parametrize(
         "header_value",
         ["", " ", "\t", "   "],
         ids=["empty", "space", "tab", "spaces"],
     )
-    def test_empty_header_is_treated_as_missing(self, header_value: str) -> None:
-        """Verify empty or whitespace header values are ignored."""
+    def test_empty_header_triggers_generation(self, header_value: str) -> None:
+        """Verify empty or whitespace header values trigger ID generation."""
         client = self._client_with_resource()
         response = client.simulate_get(
             "/correlation",
             headers={"X-Correlation-ID": header_value},
         )
 
-        assert response.json["has_correlation_id"] is False
-        assert response.json["correlation_id"] is None
+        # Empty/whitespace header should trigger generation
+        assert response.json["has_correlation_id"] is True, (
+            "Expected correlation ID to be set on request context"
+        )
+        assert response.json["correlation_id"] is not None, (
+            f"Expected generated correlation ID for header '{header_value!r}', got None"
+        )
 
     def test_header_value_with_surrounding_whitespace_is_normalized(self) -> None:
         """Verify non-empty header values are trimmed before use."""

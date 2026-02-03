@@ -223,17 +223,28 @@ class TestTrustedSourceIntegration:
         app.add_route("/correlation", CorrelationEchoResource())
         return falcon.testing.TestClient(app)
 
-    def _assert_no_correlation_id(self, response: falcon.testing.Result) -> None:
-        """Assert that the response indicates no correlation ID was set.
+    def _assert_generated_correlation_id(
+        self,
+        response: falcon.testing.Result,
+        expected_id: str = "generated-id",
+    ) -> None:
+        """Assert that the response has a generated correlation ID.
 
         Parameters
         ----------
         response : falcon.testing.Result
             The response object from a simulated request.
+        expected_id : str
+            The expected generated ID (default matches the default generator).
 
         """
-        assert response.json["has_correlation_id"] is False
-        assert response.json["correlation_id"] is None
+        assert response.json["has_correlation_id"] is True, (
+            "Expected correlation ID to be set on request context"
+        )
+        assert response.json["correlation_id"] == expected_id, (
+            f"Expected correlation ID '{expected_id}', "
+            f"got '{response.json['correlation_id']}'"
+        )
 
     def test_trusted_source_accepts_incoming_id(self) -> None:
         """Verify incoming ID is accepted from trusted source.
@@ -276,24 +287,22 @@ class TestTrustedSourceIntegration:
             ),
         ],
     )
-    def test_scenarios_with_no_correlation_id(
+    def test_scenarios_that_trigger_generation(
         self,
         test_id: str,
         trusted_sources: list[str],
         headers: dict[str, str] | None,
     ) -> None:
-        """Verify scenarios where no correlation ID should be set.
+        """Verify scenarios where ID generation is triggered.
 
-        Tests various conditions that result in no correlation_id being set
-        on the request context: untrusted sources, empty trusted sources,
-        missing headers, and empty headers.
-
-        Note: ID generation will be added in task 2.2. For now, these
-        scenarios result in no correlation_id being set.
+        Tests various conditions that result in a generated correlation_id:
+        untrusted sources, empty trusted sources, missing headers, and empty
+        headers. In all these cases, the incoming ID (if any) is rejected and
+        a new ID is generated.
         """
         client = self._create_client(trusted_sources=trusted_sources)
         response = client.simulate_get("/correlation", headers=headers)
-        self._assert_no_correlation_id(response)
+        self._assert_generated_correlation_id(response)
 
     def test_cidr_trusted_source_accepts_incoming_id(self) -> None:
         """Verify CIDR matching accepts incoming ID."""

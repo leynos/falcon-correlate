@@ -13,6 +13,7 @@ import falcon.testing
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from falcon_correlate import CorrelationIDMiddleware
+from falcon_correlate.unittests.uuid7_helpers import assert_uuid7_hex
 from tests.conftest import CorrelationEchoResource, SimpleResource, TrackingMiddleware
 
 scenarios("middleware.feature")
@@ -250,3 +251,48 @@ def given_app_with_trusted_sources(sources: str) -> Context:
     app = falcon.App(middleware=[middleware])
     client = falcon.testing.TestClient(app)
     return {"middleware": middleware, "app": app, "client": client}
+
+
+@given("a Falcon application with that custom generator")
+def given_app_with_custom_generator(context: Context) -> None:
+    """Create a Falcon app with the custom generator from context."""
+    middleware = CorrelationIDMiddleware(generator=context["custom_generator"])
+    app = falcon.App(middleware=[middleware])
+    client = falcon.testing.TestClient(app)
+    context["middleware"] = middleware
+    context["app"] = app
+    context["client"] = client
+
+
+# Generator invocation steps
+
+
+@then("a correlation ID should be generated")
+def then_correlation_id_generated(context: Context) -> None:
+    """Verify a correlation ID was generated."""
+    data = context["response"].json
+    assert data["has_correlation_id"] is True, "Expected has_correlation_id to be True"
+    assert data["correlation_id"] is not None, (
+        "Expected correlation_id to be set, got None"
+    )
+    assert len(data["correlation_id"]) > 0, "Expected correlation_id to be non-empty"
+
+
+@then(parsers.parse('the correlation ID should not be "{unexpected_id}"'))
+def then_correlation_id_not_equal(context: Context, unexpected_id: str) -> None:
+    """Verify the correlation ID is not the unexpected value."""
+    data = context["response"].json
+    assert data["correlation_id"] != unexpected_id, (
+        f"Expected correlation_id to differ from '{unexpected_id}'"
+    )
+
+
+@then("the correlation ID should be a valid UUIDv7")
+def then_correlation_id_is_uuid7(context: Context) -> None:
+    """Verify the correlation ID is a valid UUIDv7 hex string."""
+    data = context["response"].json
+    assert data["has_correlation_id"] is True, (
+        "Expected has_correlation_id to be True before UUIDv7 validation"
+    )
+    # assert_uuid7_hex raises AssertionError with detailed message on failure
+    assert_uuid7_hex(data["correlation_id"])
