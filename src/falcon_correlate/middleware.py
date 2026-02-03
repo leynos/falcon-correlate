@@ -400,6 +400,13 @@ class CorrelationIDMiddleware:
         resp : falcon.Response
             The response object (not yet populated).
 
+        Raises
+        ------
+        Exception
+            Any exception raised by the configured generator will propagate
+            to the caller. Custom generators are responsible for their own
+            error handling; the middleware does not catch generator exceptions.
+
         """
         incoming = self._get_incoming_header_value(req)
 

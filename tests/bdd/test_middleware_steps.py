@@ -13,6 +13,7 @@ import falcon.testing
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from falcon_correlate import CorrelationIDMiddleware
+from falcon_correlate.unittests.uuid7_helpers import assert_uuid7_hex
 from tests.conftest import CorrelationEchoResource, SimpleResource, TrackingMiddleware
 
 scenarios("middleware.feature")
@@ -285,8 +286,6 @@ def then_correlation_id_not_equal(context: Context, unexpected_id: str) -> None:
 @then("the correlation ID should be a valid UUIDv7")
 def then_correlation_id_is_uuid7(context: Context) -> None:
     """Verify the correlation ID is a valid UUIDv7 hex string."""
-    from falcon_correlate.unittests.uuid7_helpers import assert_uuid7_hex
-
     data = context["response"].json
     assert data["has_correlation_id"] is True
     assert_uuid7_hex(data["correlation_id"])

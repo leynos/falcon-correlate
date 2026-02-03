@@ -77,7 +77,7 @@ when:
 - Decision: Generator is called for both missing headers and untrusted sources.
   Rationale: Ensures every request gets a correlation ID, maintaining
   traceability even for untrusted clients. This aligns with the design document
-  §3.2.3 which states "If no correlation ID is found in the header, if the
+  §3.2.3[^1] which states, "If no correlation ID is found in the header, if the
   source is not trusted, or if an incoming ID fails validation, the middleware
   must generate a new UUIDv7." Date/Author: 2026-02-01 DevBoxer.
 - Decision: Generated IDs are not validated. Rationale: The generator is
@@ -257,3 +257,7 @@ Dependencies:
 2026-02-01: Marked the plan complete, recorded execution details, and updated
 progress, surprises, and outcomes to reflect the implemented generator
 integration and quality gate results.
+
+[^1]: Design document reference:
+    [docs/falcon-correlation-id-middleware-design.md](../falcon-correlation-id-middleware-design.md),
+    section 3.2.3 "ID Generation".

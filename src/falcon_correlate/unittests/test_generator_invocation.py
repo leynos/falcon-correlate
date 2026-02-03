@@ -12,6 +12,7 @@ import pytest
 from falcon_correlate import CorrelationIDMiddleware
 from falcon_correlate.middleware import default_uuid7_generator
 from falcon_correlate.unittests.uuid7_helpers import assert_uuid7_hex
+from tests.conftest import CorrelationEchoResource
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -22,18 +23,6 @@ class _MiddlewareKwargs(typ.TypedDict, total=False):
 
     generator: cabc.Callable[[], str]
     trusted_sources: cabc.Iterable[str]
-
-
-class SimpleResource:
-    """A simple Falcon resource for testing."""
-
-    def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
-        """Handle GET requests with correlation ID from context."""
-        correlation_id = getattr(req.context, "correlation_id", None)
-        resp.media = {
-            "correlation_id": correlation_id,
-            "has_correlation_id": hasattr(req.context, "correlation_id"),
-        }
 
 
 def _verify_generator_called_and_id_matches(
@@ -53,7 +42,9 @@ def _verify_generator_called_and_id_matches(
     """
     response = client.simulate_get("/test", headers=headers)
 
-    mock_generator.assert_called_once()
+    assert mock_generator.call_count == 1, (
+        f"Expected generator called once, got {mock_generator.call_count} calls"
+    )
     assert response.json["has_correlation_id"] is True, (
         "Expected correlation ID to be set on request context"
     )
@@ -64,19 +55,19 @@ def _verify_generator_called_and_id_matches(
 
 
 @pytest.fixture
-def simple_resource() -> SimpleResource:
-    """Provide a SimpleResource instance for testing."""
-    return SimpleResource()
+def correlation_echo_resource() -> CorrelationEchoResource:
+    """Provide a CorrelationEchoResource instance for testing."""
+    return CorrelationEchoResource()
 
 
 @pytest.fixture
 def create_test_client(
-    simple_resource: SimpleResource,
+    correlation_echo_resource: CorrelationEchoResource,
 ) -> cabc.Callable[..., falcon.testing.TestClient]:
     """Build test clients with configurable middleware.
 
     Args:
-        simple_resource: The resource fixture to add to the app.
+        correlation_echo_resource: The resource fixture to add to the app.
 
     Returns:
         A factory function that creates TestClient instances.
@@ -105,7 +96,7 @@ def create_test_client(
 
         middleware = CorrelationIDMiddleware(**kwargs)
         app = falcon.App(middleware=[middleware])
-        app.add_route("/test", simple_resource)
+        app.add_route("/test", correlation_echo_resource)
         return falcon.testing.TestClient(app)
 
     return _create
@@ -137,8 +128,10 @@ class TestGeneratorInvocationWhenHeaderMissing:
 
         # The default generator produces UUIDv7 hex strings
         correlation_id = response.json["correlation_id"]
-        assert correlation_id is not None
-        assert_uuid7_hex(correlation_id)
+        assert correlation_id is not None, (
+            "Expected correlation_id in response but got None"
+        )
+        assert_uuid7_hex(correlation_id)  # Raises AssertionError if not valid UUIDv7
 
     def test_generator_output_stored_in_context(
         self,
@@ -153,8 +146,12 @@ class TestGeneratorInvocationWhenHeaderMissing:
 
         response = client.simulate_get("/test")
 
-        assert response.json["has_correlation_id"] is True
-        assert response.json["correlation_id"] == "context-stored-id"
+        assert response.json["has_correlation_id"] is True, (
+            "Expected has_correlation_id to be True"
+        )
+        assert response.json["correlation_id"] == "context-stored-id", (
+            f"Expected 'context-stored-id', got '{response.json['correlation_id']}'"
+        )
 
 
 class TestGeneratorInvocationWhenSourceUntrusted:
@@ -222,7 +219,10 @@ class TestGeneratorInvocationWhenSourceUntrusted:
         )
 
         # The incoming ID should be ignored; generator output should be used
-        assert response.json["correlation_id"] == "new-generated-id"
+        assert response.json["correlation_id"] == "new-generated-id", (
+            f"Expected 'new-generated-id' (untrusted source rejected), "
+            f"got '{response.json['correlation_id']}'"
+        )
 
 
 class TestGeneratorInvocationWithTrustedSource:
@@ -245,8 +245,12 @@ class TestGeneratorInvocationWithTrustedSource:
             headers={"X-Correlation-ID": "trusted-incoming-id"},
         )
 
-        mock_generator.assert_not_called()
-        assert response.json["correlation_id"] == "trusted-incoming-id"
+        assert mock_generator.call_count == 0, (
+            f"Expected generator not called, got {mock_generator.call_count} calls"
+        )
+        assert response.json["correlation_id"] == "trusted-incoming-id", (
+            f"Expected 'trusted-incoming-id', got '{response.json['correlation_id']}'"
+        )
 
     def test_generator_called_when_trusted_source_sends_empty_header(
         self,
@@ -283,7 +287,10 @@ class TestCustomGeneratorBehaviour:
 
         response = client.simulate_get("/test")
 
-        assert response.json["correlation_id"] == "my-custom-correlation-id"
+        assert response.json["correlation_id"] == "my-custom-correlation-id", (
+            f"Expected 'my-custom-correlation-id', "
+            f"got '{response.json['correlation_id']}'"
+        )
 
     def test_generator_called_for_each_request(
         self,
@@ -303,9 +310,15 @@ class TestCustomGeneratorBehaviour:
         response1 = client.simulate_get("/test")
         response2 = client.simulate_get("/test")
 
-        assert call_count == expected_call_count
-        assert response1.json["correlation_id"] == "request-1"
-        assert response2.json["correlation_id"] == "request-2"
+        assert call_count == expected_call_count, (
+            f"Expected {expected_call_count} calls, got {call_count}"
+        )
+        assert response1.json["correlation_id"] == "request-1", (
+            f"Expected 'request-1', got '{response1.json['correlation_id']}'"
+        )
+        assert response2.json["correlation_id"] == "request-2", (
+            f"Expected 'request-2', got '{response2.json['correlation_id']}'"
+        )
 
     def test_middleware_generator_property_returns_configured_generator(self) -> None:
         """Verify middleware.generator returns the configured generator."""
@@ -314,9 +327,13 @@ class TestCustomGeneratorBehaviour:
             return "test"
 
         middleware = CorrelationIDMiddleware(generator=my_gen)
-        assert middleware.generator is my_gen
+        assert middleware.generator is my_gen, (
+            "Expected middleware.generator to be the configured generator"
+        )
 
     def test_middleware_uses_default_generator_when_none_provided(self) -> None:
         """Verify middleware uses default_uuid7_generator when no generator given."""
         middleware = CorrelationIDMiddleware()
-        assert middleware.generator is default_uuid7_generator
+        assert middleware.generator is default_uuid7_generator, (
+            "Expected middleware.generator to be default_uuid7_generator"
+        )
