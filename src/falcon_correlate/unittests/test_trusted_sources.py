@@ -238,8 +238,13 @@ class TestTrustedSourceIntegration:
             The expected generated ID (default matches the default generator).
 
         """
-        assert response.json["has_correlation_id"] is True
-        assert response.json["correlation_id"] == expected_id
+        assert response.json["has_correlation_id"] is True, (
+            "Expected correlation ID to be set on request context"
+        )
+        assert response.json["correlation_id"] == expected_id, (
+            f"Expected correlation ID '{expected_id}', "
+            f"got '{response.json['correlation_id']}'"
+        )
 
     def test_trusted_source_accepts_incoming_id(self) -> None:
         """Verify incoming ID is accepted from trusted source.

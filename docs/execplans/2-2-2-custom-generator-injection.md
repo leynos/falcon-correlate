@@ -32,7 +32,7 @@ when:
   - No correlation ID header is present
   - The request source is not trusted (incoming ID rejected)
 - Generated IDs must be stored on `req.context.correlation_id`.
-- Follow TDD: write tests before implementation.
+- Follow test-driven development (TDD): write tests before implementation.
 - Follow documentation style rules (80-column wrapping, Markdown linting).
 
 ## Tolerances (exception triggers)
@@ -56,7 +56,8 @@ when:
 
 - [x] (2026-02-01 00:00Z) Create ExecPlan document (this file).
 - [x] (2026-02-01 00:05Z) Write unit tests for generator invocation.
-- [x] (2026-02-01 00:10Z) Write BDD scenarios for generator behaviour.
+- [x] (2026-02-01 00:10Z) Write behaviour-driven development (BDD) scenarios for
+  generator behaviour.
 - [x] (2026-02-01 00:15Z) Implement generator integration in `process_request()`.
 - [x] (2026-02-01 00:20Z) Update documentation (users-guide, design doc).
 - [x] (2026-02-01 00:25Z) Update roadmap to mark task complete.

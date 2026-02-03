@@ -46,8 +46,12 @@ class TestCorrelationIDHeaderRetrieval:
         response = client.simulate_get("/correlation")
 
         # Missing header should trigger generation
-        assert response.json["has_correlation_id"] is True
-        assert response.json["correlation_id"] is not None
+        assert response.json["has_correlation_id"] is True, (
+            "Expected correlation ID to be set on request context"
+        )
+        assert response.json["correlation_id"] is not None, (
+            "Expected generated correlation ID, got None"
+        )
 
     @pytest.mark.parametrize(
         "header_value",
@@ -63,8 +67,12 @@ class TestCorrelationIDHeaderRetrieval:
         )
 
         # Empty/whitespace header should trigger generation
-        assert response.json["has_correlation_id"] is True
-        assert response.json["correlation_id"] is not None
+        assert response.json["has_correlation_id"] is True, (
+            "Expected correlation ID to be set on request context"
+        )
+        assert response.json["correlation_id"] is not None, (
+            f"Expected generated correlation ID for header '{header_value!r}', got None"
+        )
 
     def test_header_value_with_surrounding_whitespace_is_normalized(self) -> None:
         """Verify non-empty header values are trimmed before use."""

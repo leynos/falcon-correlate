@@ -17,6 +17,13 @@ if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
 
+class _MiddlewareKwargs(typ.TypedDict, total=False):
+    """Type definition for CorrelationIDMiddleware keyword arguments."""
+
+    generator: cabc.Callable[[], str]
+    trusted_sources: cabc.Iterable[str]
+
+
 class SimpleResource:
     """A simple Falcon resource for testing."""
 
@@ -47,7 +54,13 @@ def _verify_generator_called_and_id_matches(
     response = client.simulate_get("/test", headers=headers)
 
     mock_generator.assert_called_once()
-    assert response.json["correlation_id"] == expected_id
+    assert response.json["has_correlation_id"] is True, (
+        "Expected correlation ID to be set on request context"
+    )
+    assert response.json["correlation_id"] == expected_id, (
+        f"Expected correlation ID '{expected_id}', "
+        f"got '{response.json['correlation_id']}'"
+    )
 
 
 @pytest.fixture
@@ -84,7 +97,7 @@ def create_test_client(
             A configured Falcon TestClient.
 
         """
-        kwargs: dict[str, typ.Any] = {}
+        kwargs: _MiddlewareKwargs = {}
         if generator is not None:
             kwargs["generator"] = generator
         if trusted_sources is not None:
