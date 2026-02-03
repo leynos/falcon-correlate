@@ -6,6 +6,7 @@ from .middleware import (
     CorrelationIDConfig,
     CorrelationIDMiddleware,
     default_uuid7_generator,
+    default_uuid_validator,
 )
 
 PACKAGE_NAME = "falcon_correlate"
@@ -20,5 +21,6 @@ __all__ = [
     "CorrelationIDConfig",
     "CorrelationIDMiddleware",
     "default_uuid7_generator",
+    "default_uuid_validator",
     "hello",
 ]

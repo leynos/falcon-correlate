@@ -39,6 +39,48 @@ def default_uuid7_generator() -> str:
     return uuid_utils.uuid7().hex
 
 
+# Maximum length for a valid UUID string (hyphenated format: 8-4-4-4-12)
+_MAX_UUID_LENGTH = 36
+
+
+def default_uuid_validator(value: str) -> bool:
+    """Validate that a string is a valid UUID (any version).
+
+    Accepts both hyphenated (8-4-4-4-12) and hex-only (32 character) UUID
+    formats. Case-insensitive.
+
+    Parameters
+    ----------
+    value : str
+        The string to validate.
+
+    Returns
+    -------
+    bool
+        ``True`` if the value is a valid UUID, ``False`` otherwise.
+
+    Examples
+    --------
+    >>> default_uuid_validator("550e8400-e29b-41d4-a716-446655440000")
+    True
+    >>> default_uuid_validator("550e8400e29b41d4a716446655440000")
+    True
+    >>> default_uuid_validator("not-a-uuid")
+    False
+
+    """
+    # Early exit for empty or excessively long strings
+    if not value or len(value) > _MAX_UUID_LENGTH:
+        return False
+
+    try:
+        uuid.UUID(value)
+    except (ValueError, AttributeError):
+        return False
+    else:
+        return True
+
+
 @dataclasses.dataclass(frozen=True)
 class CorrelationIDConfig:
     """Configuration for CorrelationIDMiddleware.
