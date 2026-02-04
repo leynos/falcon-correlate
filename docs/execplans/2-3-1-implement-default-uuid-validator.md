@@ -9,11 +9,11 @@ Status: COMPLETE
 
 ## Purpose / big picture
 
-This change implements a default UUID validator function that validates
-incoming correlation IDs against the standard UUID format (any version). The
-validator enables the middleware to reject malformed or excessively long IDs
-from trusted sources, triggering new ID generation instead of propagating
-invalid data.
+This change implements a default universally unique identifier (UUID) validator
+function that validates incoming correlation IDs against the standard UUID
+format (any version). The validator enables the middleware to reject malformed
+or excessively long IDs from trusted sources, triggering new ID generation
+instead of propagating invalid data.
 
 Success is observable when:
 
@@ -40,7 +40,7 @@ Success is observable when:
   (>36 characters for hyphenated, >32 for hex-only).
 - Follow documentation style rules (80-column wrapping, Markdown linting, no
   `|` characters inside table cells).
-- Follow TDD: write tests first, then implement.
+- Follow test-driven development (TDD): write tests first, then implement.
 
 ## Tolerances (exception triggers)
 
@@ -74,16 +74,18 @@ Success is observable when:
 - [x] (2026-02-03 00:20Z) Implement `default_uuid_validator` function.
 - [x] (2026-02-03 00:20Z) Export from `falcon_correlate.__init__`.
 - [x] (2026-02-03 00:25Z) Update `docs/users-guide.md`.
-- [x] (2026-02-03 00:25Z) Update `docs/falcon-correlation-id-middleware-design.md` (not needed).
+- [x] (2026-02-03 00:25Z) Update
+      `docs/falcon-correlation-id-middleware-design.md` (not needed).
 - [x] (2026-02-03 00:25Z) Mark task 2.3.1 complete in `docs/roadmap.md`.
 - [x] (2026-02-03 00:30Z) Run all quality gates.
 
 ## Surprises & Discoveries
 
 - Observation: BDD step definition for empty string validation required special
-  handling. Evidence: pytest-bdd's parser could not match `When I validate ""`
-  because the empty quotes created ambiguity. Impact: Added a separate step
-  `When I validate an empty string` to handle this edge case cleanly.
+  handling. Evidence: pytest-bdd's parser could not match
+  `When the validator checks ""` because the empty quotes created ambiguity.
+  Impact: Added a separate step `When the validator checks an empty string` to
+  handle this edge case cleanly.
 
 ## Decision log
 
@@ -97,8 +99,8 @@ Success is observable when:
   implemented in C for performance. It validates structure, version bits, and
   variant bits. Date/Author: 2026-02-03.
 - Decision: Reject inputs longer than 36 characters as an early exit.
-  Rationale: Prevents DoS via excessively long strings; 36 is the max length
-  for a hyphenated UUID. Date/Author: 2026-02-03.
+  Rationale: Prevents denial of service (DoS) via excessively long strings; 36
+  is the max length for a hyphenated UUID. Date/Author: 2026-02-03.
 
 ## Outcomes & retrospective
 
@@ -109,8 +111,8 @@ malformed, or excessively long strings. New unit tests (27 test cases) and BDD
 scenarios (5 scenarios) cover all validation edge cases. Documentation in
 `docs/users-guide.md` now describes the `default_uuid_validator` function and
 provides usage examples. The roadmap shows task 2.3.1 as complete. All quality
-gates passed, including formatting, linting, type checking, and tests (161
-tests total, 149 passed, 11 skipped for CI-only tests).
+gates passed, including formatting, linting, type checking, and tests (160
+tests total, 149 passed, 11 skipped for continuous integration (CI)-only tests).
 
 ## Context and orientation
 
@@ -174,7 +176,7 @@ Add `default_uuid_validator` to `src/falcon_correlate/middleware.py`:
 def default_uuid_validator(value: str) -> bool:
     """Validate that a string is a valid UUID (any version).
 
-    Accepts both hyphenated (8-4-4-4-12) and hex-only (32 character) UUID
+    Accepts both hyphenated (8-4-4-4-12) and hex-only (32-character) UUID
     formats. Case-insensitive.
 
     Parameters
@@ -329,3 +331,8 @@ default UUID validator with tests and documentation.
 2026-02-03: Marked the plan complete, recorded execution details, and updated
 progress, decisions, surprises, and outcomes to reflect the implemented
 validator and quality gate results.
+
+2026-02-04: Addressed PR review comments: expanded acronyms (UUID, TDD, DoS,
+CI) on first use; fixed test count (160, not 161); removed first-person
+pronouns from BDD step examples; hyphenated "32-character" as compound
+adjective.

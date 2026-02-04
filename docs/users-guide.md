@@ -159,7 +159,7 @@ from falcon_correlate import CorrelationIDMiddleware, default_uuid_validator
 middleware = CorrelationIDMiddleware(validator=default_uuid_validator)
 ```
 
-For custom validation requirements, provide your own validator function:
+For custom validation requirements, a custom validator function can be provided:
 
 ```python
 import re

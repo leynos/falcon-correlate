@@ -41,13 +41,33 @@ def default_uuid7_generator() -> str:
 
 # Maximum length for a valid UUID string (hyphenated format: 8-4-4-4-12)
 _MAX_UUID_LENGTH = 36
+# Minimum length for a valid UUID string (hex-only format: 32 characters)
+_MIN_UUID_LENGTH = 32
+# Expected hyphen positions in 8-4-4-4-12 format (indices 8, 13, 18, 23)
+_HYPHEN_POSITIONS = frozenset({8, 13, 18, 23})
+# Valid UUID versions per RFC 4122 and RFC 9562
+_VALID_UUID_VERSIONS = frozenset({1, 2, 3, 4, 5, 6, 7, 8})
+
+
+def _has_valid_hyphen_placement(value: str) -> bool:
+    """Check that hyphens appear only at positions 8, 13, 18, 23."""
+    for i, char in enumerate(value):
+        if char == "-":
+            if i not in _HYPHEN_POSITIONS:
+                return False
+        elif i in _HYPHEN_POSITIONS:
+            # Expected a hyphen but found a different character
+            return False
+    return True
 
 
 def default_uuid_validator(value: str) -> bool:
-    """Validate that a string is a valid UUID (any version).
+    """Validate that a string is a valid UUID (versions 1-8).
 
-    Accepts both hyphenated (8-4-4-4-12) and hex-only (32 character) UUID
-    formats. Case-insensitive.
+    Accepts both hyphenated (8-4-4-4-12) and hex-only (32-character) UUID
+    formats. Case-insensitive. Rejects UUIDs with non-standard version nibbles.
+    Enforces strict hyphen placement at positions 8, 13, 18, and 23 for
+    36-character inputs.
 
     Parameters
     ----------
@@ -57,7 +77,7 @@ def default_uuid_validator(value: str) -> bool:
     Returns
     -------
     bool
-        ``True`` if the value is a valid UUID, ``False`` otherwise.
+        ``True`` if the value is a valid UUID (version 1-8), ``False`` otherwise.
 
     Examples
     --------
@@ -69,16 +89,27 @@ def default_uuid_validator(value: str) -> bool:
     False
 
     """
-    # Early exit for empty or excessively long strings
-    if not value or len(value) > _MAX_UUID_LENGTH:
+    # Early exit for empty or out-of-range length strings
+    if not value or len(value) > _MAX_UUID_LENGTH or len(value) < _MIN_UUID_LENGTH:
+        return False
+
+    # Reject strings in the 33-35 character "gap" (neither hex-only nor valid
+    # hyphenated format)
+    length = len(value)
+    if _MIN_UUID_LENGTH < length < _MAX_UUID_LENGTH:
+        return False
+
+    # For 36-character strings, enforce strict 8-4-4-4-12 hyphen placement
+    if length == _MAX_UUID_LENGTH and not _has_valid_hyphen_placement(value):
         return False
 
     try:
-        uuid.UUID(value)
+        parsed = uuid.UUID(value)
     except (ValueError, AttributeError):
         return False
-    else:
-        return True
+
+    # Enforce valid UUID version (1-8)
+    return parsed.version in _VALID_UUID_VERSIONS
 
 
 @dataclasses.dataclass(frozen=True)

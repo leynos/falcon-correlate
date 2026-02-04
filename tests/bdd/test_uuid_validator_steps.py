@@ -1,4 +1,22 @@
-"""Step definitions for uuid_validator.feature."""
+"""Step definitions for uuid_validator.feature.
+
+This module provides pytest-bdd step definitions for behaviour-driven testing of
+the default UUID validator. The steps exercise validation of both valid and
+invalid UUID formats, verifying that the validator correctly accepts or rejects
+various input strings.
+
+Usage
+-----
+These steps are automatically loaded by pytest-bdd when running tests against
+the uuid_validator.feature file. The ``scenarios()`` call registers all feature
+scenarios for execution.
+
+Example feature step::
+
+    Given the default UUID validator
+    When the validator checks "550e8400-e29b-41d4-a716-446655440000"
+    Then the validation result should be True
+"""
 
 from __future__ import annotations
 
