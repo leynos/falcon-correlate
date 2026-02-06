@@ -89,13 +89,17 @@ def default_uuid_validator(value: str) -> bool:
     False
 
     """
-    # Early exit for empty or out-of-range length strings
-    if not value or len(value) > _MAX_UUID_LENGTH or len(value) < _MIN_UUID_LENGTH:
+    # Early exit for empty strings
+    if not value:
+        return False
+
+    # Early exit for out-of-range length strings
+    length = len(value)
+    if length > _MAX_UUID_LENGTH or length < _MIN_UUID_LENGTH:
         return False
 
     # Reject strings in the 33-35 character "gap" (neither hex-only nor valid
     # hyphenated format)
-    length = len(value)
     if _MIN_UUID_LENGTH < length < _MAX_UUID_LENGTH:
         return False
 

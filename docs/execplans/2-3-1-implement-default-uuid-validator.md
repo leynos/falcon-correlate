@@ -68,7 +68,8 @@ Success is observable when:
 ## Progress
 
 - [x] (2026-02-03 00:00Z) Research and scope confirmation.
-- [x] (2026-02-03 00:10Z) Add unit tests for valid UUID formats.
+- [x] (2026-02-03 00:10Z) Add unit tests for valid universally unique identifier
+      (UUID) formats.
 - [x] (2026-02-03 00:10Z) Add unit tests for invalid/malformed formats.
 - [x] (2026-02-03 00:15Z) Add BDD scenarios for validator behaviour.
 - [x] (2026-02-03 00:20Z) Implement `default_uuid_validator` function.
