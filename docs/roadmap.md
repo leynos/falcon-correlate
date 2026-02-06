@@ -77,12 +77,12 @@ Implement ID retrieval, generation, validation, and contextual storage.
 
 ### 2.3. Incoming ID validation
 
-- [ ] 2.3.1. Implement default UUID validator. See design-doc §3.2.4.
-  - [ ] Create `default_uuid_validator(id: str) -> bool` function.
-  - [ ] Validate standard UUID format (any version).
-  - [ ] Return `False` for malformed or excessively long IDs.
-  - [ ] Test valid UUID formats are accepted.
-  - [ ] Test invalid formats are rejected.
+- [x] 2.3.1. Implement default UUID validator. See design-doc §3.2.4.
+  - [x] Create `default_uuid_validator(id: str) -> bool` function.
+  - [x] Validate standard UUID format (any version).
+  - [x] Return `False` for malformed or excessively long IDs.
+  - [x] Test valid UUID formats are accepted.
+  - [x] Test invalid formats are rejected.
 - [ ] 2.3.2. Integrate validation into request processing
   - [ ] Validate incoming ID before acceptance.
   - [ ] Generate new ID if validation fails.

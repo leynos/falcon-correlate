@@ -204,3 +204,5 @@ target/
 **/mutants.out*/
 
 .crush/
+
+bin/act
