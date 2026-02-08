@@ -17,11 +17,12 @@ instead of propagating invalid data.
 
 Success is observable when:
 
-- `default_uuid_validator(id: str) -> bool` function exists and is exported.
+- `default_uuid_validator(value: str) -> bool` function exists and is exported.
 - The function returns `True` for valid UUID strings (any version, with or
   without hyphens).
 - The function returns `False` for malformed, empty, or excessively long IDs.
-- Unit and BDD tests cover all validation scenarios.
+- Unit and behaviour-driven development (BDD) tests cover all validation
+  scenarios.
 - Documentation reflects the new behaviour.
 - `docs/roadmap.md` shows task 2.3.1 as complete.
 - All quality gates pass (`make check-fmt`, `make typecheck`, `make lint`,
@@ -308,7 +309,7 @@ The following interface will exist at the end of the change:
 
 ```python
 def default_uuid_validator(value: str) -> bool:
-    """Return True if value is a valid UUID (any version), False otherwise."""
+    """Return True if value is a valid UUID (versions 1-8), False otherwise."""
 ```
 
 Dependencies: Standard library `uuid` module only (no new dependencies).

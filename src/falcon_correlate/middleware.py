@@ -50,7 +50,7 @@ _VALID_UUID_VERSIONS = frozenset({1, 2, 3, 4, 5, 6, 7, 8})
 
 
 def _has_valid_hyphen_placement(value: str) -> bool:
-    """Check that hyphens appear only at positions 8, 13, 18, 23."""
+    """Check that hyphens appear exactly at positions 8, 13, 18, 23 and nowhere else."""
     for i, char in enumerate(value):
         if char == "-":
             if i not in _HYPHEN_POSITIONS:
@@ -109,7 +109,7 @@ def default_uuid_validator(value: str) -> bool:
 
     try:
         parsed = uuid.UUID(value)
-    except (ValueError, AttributeError):
+    except ValueError:
         return False
 
     # Enforce valid UUID version (1-8)
