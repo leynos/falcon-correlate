@@ -98,3 +98,32 @@ Feature: Correlation ID Middleware
     And a correlation echo resource at "/correlation"
     When I make a GET request to "/correlation"
     Then the correlation ID should be a valid UUIDv7
+
+  # Validation scenarios
+
+  Scenario: Invalid ID from trusted source triggers new generation
+    Given a Falcon application with CorrelationIDMiddleware trusting "127.0.0.1" and a rejecting validator
+    And a correlation echo resource at "/correlation"
+    When I request "/correlation" with header "X-Correlation-ID" value "bad-format"
+    Then a correlation ID should be generated
+    And the correlation ID should not be "bad-format"
+
+  Scenario: Valid ID from trusted source is accepted after validation
+    Given a Falcon application with CorrelationIDMiddleware trusting "127.0.0.1" and an accepting validator
+    And a correlation echo resource at "/correlation"
+    When I request "/correlation" with header "X-Correlation-ID" value "valid-id"
+    Then the response correlation id should be "valid-id"
+
+  Scenario: No validator configured accepts any ID from trusted source
+    Given a Falcon application with CorrelationIDMiddleware trusting "127.0.0.1"
+    And a correlation echo resource at "/correlation"
+    When I request "/correlation" with header "X-Correlation-ID" value "any-string-no-validation"
+    Then the response correlation id should be "any-string-no-validation"
+
+  Scenario: Custom validator is called for incoming IDs
+    Given a custom validator that rejects IDs starting with "bad"
+    And a Falcon application with that validator trusting "127.0.0.1"
+    And a correlation echo resource at "/correlation"
+    When I request "/correlation" with header "X-Correlation-ID" value "bad-id"
+    Then a correlation ID should be generated
+    And the correlation ID should not be "bad-id"

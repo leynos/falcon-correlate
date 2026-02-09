@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import ipaddress
+import logging
 import typing as typ
 import uuid
 
@@ -16,6 +17,8 @@ if typ.TYPE_CHECKING:
 _NetworkType = ipaddress.IPv4Network | ipaddress.IPv6Network
 
 DEFAULT_HEADER_NAME = "X-Correlation-ID"
+
+logger = logging.getLogger(__name__)
 
 
 def default_uuid7_generator() -> str:
@@ -462,13 +465,36 @@ class CorrelationIDMiddleware:
 
         return any(addr in network for network in self._config._parsed_networks)
 
+    def _is_valid_id(self, value: str) -> bool:
+        """Check incoming ID against the configured validator.
+
+        Returns ``True`` if no validator is configured or if the validator
+        accepts the value.
+
+        Parameters
+        ----------
+        value : str
+            The incoming correlation ID string to validate.
+
+        Returns
+        -------
+        bool
+            ``True`` if the ID is valid or no validator is set,
+            ``False`` if the validator rejects the ID.
+
+        """
+        if self._config.validator is None:
+            return True
+        return self._config.validator(value)
+
     def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
         """Process an incoming request to establish correlation ID context.
 
         This method is called before routing the request to a resource.
         It will retrieve or generate a correlation ID and store it in
-        the request context. If the source is trusted and an incoming header
-        is present, the incoming ID is used; otherwise a new ID is generated.
+        the request context. If the source is trusted, an incoming header
+        is present, and the ID passes validation, the incoming ID is used;
+        otherwise a new ID is generated.
 
         Parameters
         ----------
@@ -487,9 +513,15 @@ class CorrelationIDMiddleware:
         """
         incoming = self._get_incoming_header_value(req)
 
-        # Accept incoming ID only from trusted sources; otherwise generate new ID
         if incoming is not None and self._is_trusted_source(req.remote_addr):
-            req.context.correlation_id = incoming
+            if self._is_valid_id(incoming):
+                req.context.correlation_id = incoming
+            else:
+                logger.debug(
+                    "Correlation ID failed validation, generating new ID: %s",
+                    incoming,
+                )
+                req.context.correlation_id = self._config.generator()
         else:
             req.context.correlation_id = self._config.generator()
 
