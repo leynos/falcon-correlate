@@ -175,11 +175,31 @@ Create comprehensive test coverage following TDD:
 Add `default_uuid_validator` to `src/falcon_correlate/middleware.py`:
 
 ```python
+# Module-level constants
+_MAX_UUID_LENGTH = 36
+_MIN_UUID_LENGTH = 32
+_HYPHEN_POSITIONS = frozenset({8, 13, 18, 23})
+_VALID_UUID_VERSIONS = frozenset({1, 2, 3, 4, 5, 6, 7, 8})
+
+
+def _has_valid_hyphen_placement(value: str) -> bool:
+    """Check that hyphens appear exactly at positions 8, 13, 18, 23 and nowhere else."""
+    for i, char in enumerate(value):
+        if char == "-":
+            if i not in _HYPHEN_POSITIONS:
+                return False
+        elif i in _HYPHEN_POSITIONS:
+            return False
+    return True
+
+
 def default_uuid_validator(value: str) -> bool:
     """Validate that a string is a valid UUID (versions 1-8).
 
     Accepts both hyphenated (8-4-4-4-12) and hex-only (32-character) UUID
-    formats. Case-insensitive.
+    formats. Case-insensitive. Rejects UUIDs with non-standard version nibbles.
+    Enforces strict hyphen placement at positions 8, 13, 18, and 23 for
+    36-character inputs.
 
     Parameters
     ----------
@@ -192,15 +212,30 @@ def default_uuid_validator(value: str) -> bool:
         True if the value is a valid UUID (version 1-8), False otherwise.
 
     """
-    # Early exit for excessively long or empty strings
-    if not value or len(value) > 36:
+    # Early exit for empty strings
+    if not value:
+        return False
+
+    # Early exit for out-of-range length strings
+    length = len(value)
+    if length > _MAX_UUID_LENGTH or length < _MIN_UUID_LENGTH:
+        return False
+
+    # Reject strings in the 33-35 character "gap"
+    if _MIN_UUID_LENGTH < length < _MAX_UUID_LENGTH:
+        return False
+
+    # For 36-character strings, enforce strict 8-4-4-4-12 hyphen placement
+    if length == _MAX_UUID_LENGTH and not _has_valid_hyphen_placement(value):
         return False
 
     try:
-        uuid.UUID(value)
-        return True
-    except (ValueError, AttributeError):
+        parsed = uuid.UUID(value)
+    except ValueError:
         return False
+    else:
+        # Enforce valid UUID version (1-8)
+        return parsed.version in _VALID_UUID_VERSIONS
 ```
 
 ### Stage D: Export and document
