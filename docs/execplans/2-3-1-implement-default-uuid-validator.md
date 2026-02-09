@@ -11,14 +11,14 @@ Status: COMPLETE
 
 This change implements a default universally unique identifier (UUID) validator
 function that validates incoming correlation IDs against the standard UUID
-format (any version). The validator enables the middleware to reject malformed
+format (versions 1-8). The validator enables the middleware to reject malformed
 or excessively long IDs from trusted sources, triggering new ID generation
 instead of propagating invalid data.
 
 Success is observable when:
 
 - `default_uuid_validator(value: str) -> bool` function exists and is exported.
-- The function returns `True` for valid UUID strings (any version, with or
+- The function returns `True` for valid UUID strings (versions 1-8, with or
   without hyphens).
 - The function returns `False` for malformed, empty, or excessively long IDs.
 - Unit and behaviour-driven development (BDD) tests cover all validation
@@ -144,7 +144,7 @@ Key files:
 
 Confirm the UUID validation requirements from design-doc section 3.2.4:
 
-- Validate standard UUID format (any version).
+- Validate standard UUID format (versions 1-8).
 - Return `False` for malformed or excessively long IDs.
 - Simple default validator that can be overridden with custom validators.
 
@@ -176,7 +176,7 @@ Add `default_uuid_validator` to `src/falcon_correlate/middleware.py`:
 
 ```python
 def default_uuid_validator(value: str) -> bool:
-    """Validate that a string is a valid UUID (any version).
+    """Validate that a string is a valid UUID (versions 1-8).
 
     Accepts both hyphenated (8-4-4-4-12) and hex-only (32-character) UUID
     formats. Case-insensitive.
@@ -189,7 +189,7 @@ def default_uuid_validator(value: str) -> bool:
     Returns
     -------
     bool
-        True if the value is a valid UUID, False otherwise.
+        True if the value is a valid UUID (version 1-8), False otherwise.
 
     """
     # Early exit for excessively long or empty strings

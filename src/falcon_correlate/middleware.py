@@ -111,9 +111,9 @@ def default_uuid_validator(value: str) -> bool:
         parsed = uuid.UUID(value)
     except ValueError:
         return False
-
-    # Enforce valid UUID version (1-8)
-    return parsed.version in _VALID_UUID_VERSIONS
+    else:
+        # Enforce valid UUID version (1-8)
+        return parsed.version in _VALID_UUID_VERSIONS
 
 
 @dataclasses.dataclass(frozen=True)
