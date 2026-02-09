@@ -58,7 +58,8 @@ when:
 - [x] (2026-02-01 00:05Z) Write unit tests for generator invocation.
 - [x] (2026-02-01 00:10Z) Write behaviour-driven development (BDD) scenarios for
   generator behaviour.
-- [x] (2026-02-01 00:15Z) Implement generator integration in `process_request()`.
+- [x] (2026-02-01 00:15Z) Implement generator integration in
+      `process_request()`.
 - [x] (2026-02-01 00:20Z) Update documentation (users-guide, design doc).
 - [x] (2026-02-01 00:25Z) Update roadmap to mark task complete.
 - [x] (2026-02-01 00:30Z) Run quality gates.
@@ -86,11 +87,11 @@ when:
 
 ## Outcomes & retrospective
 
-The custom generator injection feature is now complete. The configured generator
-is called in `process_request()` whenever an incoming correlation ID is not
-accepted (missing header, empty header, or untrusted source). The default
-`default_uuid7_generator` is used as a fallback when no custom generator is
-provided.
+The custom generator injection feature is now complete. The configured
+generator is called in `process_request()` whenever an incoming correlation ID
+is not accepted (missing header, empty header, or untrusted source). The
+default `default_uuid7_generator` is used as a fallback when no custom
+generator is provided.
 
 Key files modified:
 

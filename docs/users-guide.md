@@ -147,6 +147,20 @@ discarded and new ones are generated.
 - **Type**: `Callable[[str], bool] | None`
 - **Default**: `None` (no validation beyond trust checking)
 
+The library provides `default_uuid_validator` as a ready-to-use validator that
+accepts any standard UUID format (versions 1-8), both hyphenated
+(`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) and hex-only (32 characters). It is
+case-insensitive and rejects empty, malformed, or excessively long strings.
+
+```python
+from falcon_correlate import CorrelationIDMiddleware, default_uuid_validator
+
+# Use the built-in UUID validator
+middleware = CorrelationIDMiddleware(validator=default_uuid_validator)
+```
+
+For custom validation requirements, a custom validator function can be provided:
+
 ```python
 import re
 
@@ -208,10 +222,11 @@ The following functionality is now implemented:
 - Default UUIDv7 generator implementation.
 - Automatic correlation ID generation for requests without valid incoming IDs.
 - Custom generator injection support.
+- Default UUID validator for incoming ID format validation.
 
 The following functionality will be added in future releases:
 
-- Incoming ID validation (task 2.3).
+- Validation integration into request processing (task 2.3.2).
 - Context variable storage (task 2.4).
 - Logging integration (task 3.1).
 
