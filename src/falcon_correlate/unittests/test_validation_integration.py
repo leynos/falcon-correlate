@@ -371,41 +371,31 @@ class TestValidationNotCalledWhenUnnecessary:
             f"got {mock_validator.call_count} calls"
         )
 
-    def test_validator_not_called_when_header_missing(
+    @pytest.mark.parametrize(
+        ("scenario", "headers", "reason"),
+        [
+            ("header_missing", None, "header missing"),
+            ("header_empty", {"X-Correlation-ID": "   "}, "whitespace header"),
+        ],
+        ids=["missing_header", "empty_header"],
+    )
+    def test_validator_not_called_when_unnecessary(
         self,
         create_test_client: cabc.Callable[..., falcon.testing.TestClient],
+        scenario: str,
+        headers: dict[str, str] | None,
+        reason: str,
     ) -> None:
-        """Verify validator is not called when no incoming header is present."""
+        """Verify validator is not called when no valid incoming header exists."""
         mock_validator = mock.MagicMock(return_value=True)
         client = create_test_client(
             trusted_sources=["127.0.0.1"],
             validator=mock_validator,
         )
 
-        client.simulate_get("/test")
+        client.simulate_get("/test", headers=headers)
 
         assert mock_validator.call_count == 0, (
-            f"Expected validator not called when header missing, "
-            f"got {mock_validator.call_count} calls"
-        )
-
-    def test_validator_not_called_when_header_empty(
-        self,
-        create_test_client: cabc.Callable[..., falcon.testing.TestClient],
-    ) -> None:
-        """Verify validator is not called when header is empty/whitespace."""
-        mock_validator = mock.MagicMock(return_value=True)
-        client = create_test_client(
-            trusted_sources=["127.0.0.1"],
-            validator=mock_validator,
-        )
-
-        client.simulate_get(
-            "/test",
-            headers={"X-Correlation-ID": "   "},
-        )
-
-        assert mock_validator.call_count == 0, (
-            f"Expected validator not called for whitespace header, "
+            f"Expected validator not called for {reason}, "
             f"got {mock_validator.call_count} calls"
         )
