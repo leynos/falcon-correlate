@@ -96,7 +96,7 @@ Success is observable when:
 
 ## Surprises & discoveries
 
-- Observation: The `make typecheck` gate (`ty check`) fails on the baseline
+- Observation: The `make typecheck` gate (`typecheck`) fails on the baseline
   commit with an `unresolved-import` error for `uuid_utils`. Evidence: stashing
   all changes and running `make typecheck` on the clean baseline produces the
   identical error. Impact: none for this task; the error is pre-existing and

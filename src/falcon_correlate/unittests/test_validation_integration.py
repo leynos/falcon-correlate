@@ -271,69 +271,55 @@ class TestValidationWithValidatorRejecting:
 class TestValidationLogging:
     """Tests for DEBUG-level logging of validation failures."""
 
-    def test_debug_log_emitted_on_validation_failure(
+    @pytest.mark.parametrize(
+        ("validator_result", "correlation_id", "expect_log", "log_contains"),
+        [
+            (False, "bad-id-value", True, "bad-id-value"),
+            (True, "good-id-value", False, None),
+            (None, "any-value", False, None),
+        ],
+        ids=[
+            "validation_failure_logs",
+            "validation_success_no_log",
+            "no_validator_no_log",
+        ],
+    )
+    def test_validation_logging_behavior(  # noqa: PLR0913
         self,
         create_test_client: cabc.Callable[..., falcon.testing.TestClient],
         caplog: pytest.LogCaptureFixture,
+        validator_result: bool | None,  # noqa: FBT001
+        correlation_id: str,
+        expect_log: bool,  # noqa: FBT001
+        log_contains: str | None,
     ) -> None:
-        """Verify DEBUG log message emitted when validation fails."""
-        mock_validator = mock.MagicMock(return_value=False)
-        client = create_test_client(
-            trusted_sources=["127.0.0.1"],
-            validator=mock_validator,
-        )
+        """Verify DEBUG logging behavior for validation outcomes."""
+        if validator_result is None:
+            client = create_test_client(trusted_sources=["127.0.0.1"])
+        else:
+            mock_validator = mock.MagicMock(return_value=validator_result)
+            client = create_test_client(
+                trusted_sources=["127.0.0.1"],
+                validator=mock_validator,
+            )
 
         with caplog.at_level(logging.DEBUG, logger="falcon_correlate.middleware"):
             client.simulate_get(
                 "/test",
-                headers={"X-Correlation-ID": "bad-id-value"},
+                headers={"X-Correlation-ID": correlation_id},
             )
 
-        assert any(
-            record.levelno == logging.DEBUG and "bad-id-value" in record.getMessage()
-            for record in caplog.records
-        ), "Expected at least one DEBUG log containing the rejected correlation ID"
-
-    def test_no_log_emitted_on_validation_success(
-        self,
-        create_test_client: cabc.Callable[..., falcon.testing.TestClient],
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        """Verify no log message emitted when validation succeeds."""
-        mock_validator = mock.MagicMock(return_value=True)
-        client = create_test_client(
-            trusted_sources=["127.0.0.1"],
-            validator=mock_validator,
-        )
-
-        with caplog.at_level(logging.DEBUG, logger="falcon_correlate.middleware"):
-            client.simulate_get(
-                "/test",
-                headers={"X-Correlation-ID": "good-id-value"},
+        if expect_log:
+            assert log_contains is not None
+            assert any(
+                record.levelno == logging.DEBUG and log_contains in record.getMessage()
+                for record in caplog.records
+            ), f"Expected DEBUG log containing '{log_contains}'"
+        else:
+            assert len(caplog.records) == 0, (
+                f"Expected no log records, got {len(caplog.records)}: "
+                f"{[r.message for r in caplog.records]}"
             )
-
-        assert len(caplog.records) == 0, (
-            f"Expected no log records, got {len(caplog.records)}: "
-            f"{[r.message for r in caplog.records]}"
-        )
-
-    def test_no_log_emitted_when_no_validator_configured(
-        self,
-        create_test_client: cabc.Callable[..., falcon.testing.TestClient],
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        """Verify no log message when no validator is configured."""
-        client = create_test_client(trusted_sources=["127.0.0.1"])
-
-        with caplog.at_level(logging.DEBUG, logger="falcon_correlate.middleware"):
-            client.simulate_get(
-                "/test",
-                headers={"X-Correlation-ID": "any-value"},
-            )
-
-        assert len(caplog.records) == 0, (
-            f"Expected no log records without validator, got {len(caplog.records)}"
-        )
 
 
 class TestValidationNotCalledWhenUnnecessary:
@@ -392,4 +378,81 @@ class TestValidationNotCalledWhenUnnecessary:
         assert mock_validator.call_count == 0, (
             f"Expected validator not called for {reason}, "
             f"got {mock_validator.call_count} calls"
+        )
+
+
+class TestValidatorExceptionHandling:
+    """Tests for graceful handling of exceptions raised by user-supplied validators."""
+
+    def test_validator_exception_triggers_new_generation(
+        self,
+        create_test_client: cabc.Callable[..., falcon.testing.TestClient],
+    ) -> None:
+        """Verify a new ID is generated when the validator raises an exception."""
+        mock_generator = mock.MagicMock(return_value="fallback-id")
+        mock_validator = mock.MagicMock(side_effect=ValueError("boom"))
+        client = create_test_client(
+            generator=mock_generator,
+            trusted_sources=["127.0.0.1"],
+            validator=mock_validator,
+        )
+
+        response = client.simulate_get(
+            "/test",
+            headers={"X-Correlation-ID": "triggers-crash"},
+        )
+
+        assert response.json["correlation_id"] == "fallback-id", (
+            "Expected generated ID when validator raises"
+        )
+        assert mock_generator.call_count == 1, (
+            f"Expected generator called once, got {mock_generator.call_count} calls"
+        )
+
+    def test_validator_exception_logs_warning(
+        self,
+        create_test_client: cabc.Callable[..., falcon.testing.TestClient],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Verify a WARNING log is emitted when the validator raises."""
+        mock_validator = mock.MagicMock(
+            side_effect=RuntimeError("unexpected"),
+        )
+        client = create_test_client(
+            trusted_sources=["127.0.0.1"],
+            validator=mock_validator,
+        )
+
+        with caplog.at_level(logging.DEBUG, logger="falcon_correlate.middleware"):
+            client.simulate_get(
+                "/test",
+                headers={"X-Correlation-ID": "crash-value"},
+            )
+
+        assert any(
+            record.levelno == logging.WARNING and "crash-value" in record.getMessage()
+            for record in caplog.records
+        ), "Expected WARNING log containing the correlation ID value"
+
+    def test_request_succeeds_despite_validator_exception(
+        self,
+        create_test_client: cabc.Callable[..., falcon.testing.TestClient],
+    ) -> None:
+        """Verify the request completes with 200 even when the validator raises."""
+        mock_validator = mock.MagicMock(side_effect=TypeError("bad type"))
+        client = create_test_client(
+            trusted_sources=["127.0.0.1"],
+            validator=mock_validator,
+        )
+
+        response = client.simulate_get(
+            "/test",
+            headers={"X-Correlation-ID": "will-crash-validator"},
+        )
+
+        assert response.status == "200 OK", f"Expected 200 OK, got {response.status}"
+        # A correlation ID should still be present (generated, not the incoming one)
+        assert response.json["correlation_id"] is not None
+        assert response.json["correlation_id"] != "will-crash-validator", (
+            "Expected incoming ID not used when validator raises"
         )

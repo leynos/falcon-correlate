@@ -469,7 +469,8 @@ class CorrelationIDMiddleware:
         """Check incoming ID against the configured validator.
 
         Returns ``True`` if no validator is configured or if the validator
-        accepts the value.
+        accepts the value.  If the validator raises an exception, the ID
+        is treated as invalid and a ``WARNING``-level log is emitted.
 
         Parameters
         ----------
@@ -480,12 +481,21 @@ class CorrelationIDMiddleware:
         -------
         bool
             ``True`` if the ID is valid or no validator is set,
-            ``False`` if the validator rejects the ID.
+            ``False`` if the validator rejects the ID or raises.
 
         """
         if self._config.validator is None:
             return True
-        return self._config.validator(value)
+        try:
+            return self._config.validator(value)
+        except Exception:  # noqa: BLE001 — user-supplied validators may raise anything
+            logger.warning(
+                "Validator raised an exception for correlation ID %s, "
+                "treating as invalid",
+                value,
+                exc_info=True,
+            )
+            return False
 
     def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
         """Process an incoming request to establish correlation ID context.
