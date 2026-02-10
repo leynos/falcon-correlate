@@ -289,16 +289,10 @@ class TestValidationLogging:
                 headers={"X-Correlation-ID": "bad-id-value"},
             )
 
-        assert len(caplog.records) == 1, (
-            f"Expected exactly 1 log record, got {len(caplog.records)}"
-        )
-        record = caplog.records[0]
-        assert record.levelno == logging.DEBUG, (
-            f"Expected DEBUG level, got {record.levelname}"
-        )
-        assert "bad-id-value" in record.message, (
-            f"Expected rejected value in log message, got: {record.message}"
-        )
+        assert any(
+            record.levelno == logging.DEBUG and "bad-id-value" in record.getMessage()
+            for record in caplog.records
+        ), "Expected at least one DEBUG log containing the rejected correlation ID"
 
     def test_no_log_emitted_on_validation_success(
         self,

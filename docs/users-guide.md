@@ -191,7 +191,7 @@ middleware = CorrelationIDMiddleware(validator=uuid_validator)
 
 **Logging note**: When an incoming ID fails validation, the middleware logs a
 `DEBUG`-level message containing the rejected value. To see these messages,
-ensure your logging configuration captures `DEBUG` output from the
+configure logging to capture `DEBUG` output from the
 `falcon_correlate.middleware` logger.
 
 ### echo_header_in_response

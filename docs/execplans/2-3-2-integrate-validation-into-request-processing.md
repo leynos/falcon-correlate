@@ -148,7 +148,7 @@ echoes it in the response.
 In `src/falcon_correlate/middleware.py` at lines 465-494, `process_request`
 currently:
 
-1. Calls `_get_incoming_header_value(req)` to read and normalise the header.
+1. Calls `_get_incoming_header_value(req)` to read and normalize the header.
 2. If a non-empty header exists and the source IP is trusted, accepts the
    incoming ID verbatim.
 3. Otherwise, calls `self._config.generator()` to produce a new ID.
