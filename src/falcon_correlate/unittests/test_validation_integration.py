@@ -50,17 +50,7 @@ def create_test_client(
         trusted_sources: cabc.Iterable[str] | None = None,
         validator: cabc.Callable[[str], bool] | None = None,
     ) -> falcon.testing.TestClient:
-        """Build a test client with the specified middleware configuration.
-
-        Args:
-            generator: Optional custom generator for correlation IDs.
-            trusted_sources: Optional list of trusted source IPs/CIDRs.
-            validator: Optional validator for incoming correlation IDs.
-
-        Returns:
-            A configured Falcon TestClient.
-
-        """
+        """Build a Falcon TestClient with optional middleware configuration."""
         kwargs: _MiddlewareKwargs = {}
         if generator is not None:
             kwargs["generator"] = generator
@@ -341,17 +331,16 @@ class TestValidationNotCalledWhenUnnecessary:
         )
 
     @pytest.mark.parametrize(
-        ("scenario", "headers", "reason"),
+        ("headers", "reason"),
         [
-            ("header_missing", None, "header missing"),
-            ("header_empty", {"X-Correlation-ID": "   "}, "whitespace header"),
+            (None, "header missing"),
+            ({"X-Correlation-ID": "   "}, "whitespace header"),
         ],
         ids=["missing_header", "empty_header"],
     )
     def test_validator_not_called_when_unnecessary(
         self,
         create_test_client: cabc.Callable[..., falcon.testing.TestClient],
-        scenario: str,
         headers: dict[str, str] | None,
         reason: str,
     ) -> None:
