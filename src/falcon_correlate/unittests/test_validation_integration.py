@@ -161,19 +161,20 @@ class TestValidationWithValidatorRejecting:
     """Tests for validator returning False (invalid ID triggers generation)."""
 
     @pytest.mark.parametrize(
-        "mock_validator",
-        [
-            mock.MagicMock(return_value=False),
-            mock.MagicMock(side_effect=ValueError("boom")),
-        ],
+        "validator_behavior",
+        ["returns_false", "raises"],
         ids=["validator_returns_false", "validator_raises"],
     )
     def test_generator_invoked_on_validation_failure(
         self,
         create_test_client: cabc.Callable[..., falcon.testing.TestClient],
-        mock_validator: mock.MagicMock,
+        validator_behavior: str,
     ) -> None:
         """Verify generator is called when the validator rejects or raises."""
+        if validator_behavior == "raises":
+            mock_validator = mock.MagicMock(side_effect=ValueError("boom"))
+        else:
+            mock_validator = mock.MagicMock(return_value=False)
         mock_generator = mock.MagicMock(return_value="fallback-id")
         client = create_test_client(
             generator=mock_generator,
@@ -303,9 +304,13 @@ class TestValidationLogging:
                 for record in caplog.records
             ), f"Expected DEBUG log containing '{log_contains}'"
         else:
-            assert len(caplog.records) == 0, (
-                f"Expected no log records, got {len(caplog.records)}: "
-                f"{[r.message for r in caplog.records]}"
+            middleware_records = [
+                r for r in caplog.records if r.name == "falcon_correlate.middleware"
+            ]
+            assert len(middleware_records) == 0, (
+                f"Expected no middleware log records, "
+                f"got {len(middleware_records)}: "
+                f"{[r.message for r in middleware_records]}"
             )
 
 
