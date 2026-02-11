@@ -466,36 +466,19 @@ class CorrelationIDMiddleware:
         return any(addr in network for network in self._config._parsed_networks)
 
     def _is_valid_id(self, value: str) -> bool:
-        """Check incoming ID against the configured validator.
-
-        Returns ``True`` if no validator is configured or if the validator
-        accepts the value.  If the validator raises an exception, the ID
-        is treated as invalid and a ``WARNING``-level log is emitted.
-
-        Parameters
-        ----------
-        value : str
-            The incoming correlation ID string to validate.
-
-        Returns
-        -------
-        bool
-            ``True`` if the ID is valid or no validator is set,
-            ``False`` if the validator rejects the ID or raises.
-
-        """
+        """Return whether *value* passes the configured validator, if any."""
         if self._config.validator is None:
             return True
         try:
-            return self._config.validator(value)
-        except Exception:  # noqa: BLE001 — user-supplied validators may raise anything
+            result = self._config.validator(value)
+        except Exception:  # noqa: BLE001 — FIXME: user-supplied; cannot narrow
             logger.warning(
-                "Validator raised an exception for correlation ID %s, "
-                "treating as invalid",
-                value,
+                "Validator raised an exception for correlation ID, treating as invalid",
                 exc_info=True,
             )
             return False
+        else:
+            return result
 
     def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
         """Process an incoming request to establish correlation ID context.
@@ -528,8 +511,7 @@ class CorrelationIDMiddleware:
                 req.context.correlation_id = incoming
             else:
                 logger.debug(
-                    "Correlation ID failed validation, generating new ID: %s",
-                    incoming,
+                    "Correlation ID failed validation, generating new ID",
                 )
                 req.context.correlation_id = self._config.generator()
         else:

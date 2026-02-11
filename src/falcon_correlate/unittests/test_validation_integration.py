@@ -80,37 +80,26 @@ def create_test_client(
 class TestValidationWhenNoValidatorConfigured:
     """Tests for backwards compatibility when no validator is configured."""
 
+    @pytest.mark.parametrize(
+        "incoming_id",
+        ["any-string-is-fine", "not-a-uuid-at-all"],
+        ids=["arbitrary_string", "non_uuid_string"],
+    )
     def test_incoming_id_accepted_without_validation(
         self,
         create_test_client: cabc.Callable[..., falcon.testing.TestClient],
+        incoming_id: str,
     ) -> None:
         """Verify incoming ID from trusted source is accepted when no validator set."""
-        # Trust 127.0.0.1, which is TestClient's default remote_addr
         client = create_test_client(trusted_sources=["127.0.0.1"])
 
         response = client.simulate_get(
             "/test",
-            headers={"X-Correlation-ID": "any-string-is-fine"},
+            headers={"X-Correlation-ID": incoming_id},
         )
 
-        assert response.json["correlation_id"] == "any-string-is-fine", (
-            "Expected incoming ID accepted verbatim without validator"
-        )
-
-    def test_non_uuid_accepted_without_validation(
-        self,
-        create_test_client: cabc.Callable[..., falcon.testing.TestClient],
-    ) -> None:
-        """Verify non-UUID strings pass through when no validator is configured."""
-        client = create_test_client(trusted_sources=["127.0.0.1"])
-
-        response = client.simulate_get(
-            "/test",
-            headers={"X-Correlation-ID": "not-a-uuid-at-all"},
-        )
-
-        assert response.json["correlation_id"] == "not-a-uuid-at-all", (
-            "Expected non-UUID ID accepted when no validator configured"
+        assert response.json["correlation_id"] == incoming_id, (
+            f"Expected incoming ID '{incoming_id}' accepted verbatim without validator"
         )
 
 
@@ -274,7 +263,7 @@ class TestValidationLogging:
     @pytest.mark.parametrize(
         ("validator_result", "correlation_id", "expect_log", "log_contains"),
         [
-            (False, "bad-id-value", True, "bad-id-value"),
+            (False, "bad-id-value", True, "failed validation"),
             (True, "good-id-value", False, None),
             (None, "any-value", False, None),
         ],
@@ -284,13 +273,13 @@ class TestValidationLogging:
             "no_validator_no_log",
         ],
     )
-    def test_validation_logging_behavior(  # noqa: PLR0913
+    def test_validation_logging_behavior(  # noqa: PLR0913 — FIXME: pytest parametrize injects many args
         self,
         create_test_client: cabc.Callable[..., falcon.testing.TestClient],
         caplog: pytest.LogCaptureFixture,
-        validator_result: bool | None,  # noqa: FBT001
+        validator_result: bool | None,  # noqa: FBT001 — FIXME: pytest parametrize injects bool
         correlation_id: str,
-        expect_log: bool,  # noqa: FBT001
+        expect_log: bool,  # noqa: FBT001 — FIXME: pytest parametrize injects bool
         log_contains: str | None,
     ) -> None:
         """Verify DEBUG logging behavior for validation outcomes."""
@@ -430,9 +419,10 @@ class TestValidatorExceptionHandling:
             )
 
         assert any(
-            record.levelno == logging.WARNING and "crash-value" in record.getMessage()
+            record.levelno == logging.WARNING
+            and "exception" in record.getMessage().lower()
             for record in caplog.records
-        ), "Expected WARNING log containing the correlation ID value"
+        ), "Expected WARNING log about validator exception"
 
     def test_request_succeeds_despite_validator_exception(
         self,
