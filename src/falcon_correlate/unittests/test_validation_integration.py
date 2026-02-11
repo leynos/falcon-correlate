@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import typing as typ
 from unittest import mock
@@ -256,36 +257,63 @@ class TestValidationWithValidatorRejecting:
         )
 
 
+@dataclasses.dataclass(frozen=True)
+class ValidationLoggingScenario:
+    """Encapsulates parameters for a validation logging test scenario."""
+
+    validator_result: bool | None
+    correlation_id: str
+    expect_log: bool
+    log_contains: str | None
+
+    @property
+    def description(self) -> str:
+        """Return a human-readable description of this scenario."""
+        if self.validator_result is False:
+            return "validation_failure_logs"
+        if self.validator_result is True:
+            return "validation_success_no_log"
+        return "no_validator_no_log"
+
+
 class TestValidationLogging:
     """Tests for DEBUG-level logging of validation failures."""
 
     @pytest.mark.parametrize(
-        ("validator_result", "correlation_id", "expect_log", "log_contains"),
+        "scenario",
         [
-            (False, "bad-id-value", True, "failed validation"),
-            (True, "good-id-value", False, None),
-            (None, "any-value", False, None),
+            ValidationLoggingScenario(
+                validator_result=False,
+                correlation_id="bad-id-value",
+                expect_log=True,
+                log_contains="failed validation",
+            ),
+            ValidationLoggingScenario(
+                validator_result=True,
+                correlation_id="good-id-value",
+                expect_log=False,
+                log_contains=None,
+            ),
+            ValidationLoggingScenario(
+                validator_result=None,
+                correlation_id="any-value",
+                expect_log=False,
+                log_contains=None,
+            ),
         ],
-        ids=[
-            "validation_failure_logs",
-            "validation_success_no_log",
-            "no_validator_no_log",
-        ],
+        ids=lambda s: s.description,
     )
-    def test_validation_logging_behavior(  # noqa: PLR0913 — FIXME: pytest parametrize injects many args
+    def test_validation_logging_behavior(
         self,
         create_test_client: cabc.Callable[..., falcon.testing.TestClient],
         caplog: pytest.LogCaptureFixture,
-        validator_result: bool | None,  # noqa: FBT001 — FIXME: pytest parametrize injects bool
-        correlation_id: str,
-        expect_log: bool,  # noqa: FBT001 — FIXME: pytest parametrize injects bool
-        log_contains: str | None,
+        scenario: ValidationLoggingScenario,
     ) -> None:
-        """Verify DEBUG logging behavior for validation outcomes."""
-        if validator_result is None:
+        """Verify DEBUG logging behaviour for validation outcomes."""
+        if scenario.validator_result is None:
             client = create_test_client(trusted_sources=["127.0.0.1"])
         else:
-            mock_validator = mock.MagicMock(return_value=validator_result)
+            mock_validator = mock.MagicMock(return_value=scenario.validator_result)
             client = create_test_client(
                 trusted_sources=["127.0.0.1"],
                 validator=mock_validator,
@@ -294,15 +322,16 @@ class TestValidationLogging:
         with caplog.at_level(logging.DEBUG, logger="falcon_correlate.middleware"):
             client.simulate_get(
                 "/test",
-                headers={"X-Correlation-ID": correlation_id},
+                headers={"X-Correlation-ID": scenario.correlation_id},
             )
 
-        if expect_log:
-            assert log_contains is not None
+        if scenario.expect_log:
+            assert scenario.log_contains is not None
             assert any(
-                record.levelno == logging.DEBUG and log_contains in record.getMessage()
+                record.levelno == logging.DEBUG
+                and scenario.log_contains in record.getMessage()
                 for record in caplog.records
-            ), f"Expected DEBUG log containing '{log_contains}'"
+            ), f"Expected DEBUG log containing '{scenario.log_contains}'"
         else:
             middleware_records = [
                 r for r in caplog.records if r.name == "falcon_correlate.middleware"
