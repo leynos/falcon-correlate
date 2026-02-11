@@ -160,13 +160,21 @@ class TestValidationWithValidatorAccepting:
 class TestValidationWithValidatorRejecting:
     """Tests for validator returning False (invalid ID triggers generation)."""
 
-    def test_invalid_id_triggers_new_generation(
+    @pytest.mark.parametrize(
+        "mock_validator",
+        [
+            mock.MagicMock(return_value=False),
+            mock.MagicMock(side_effect=ValueError("boom")),
+        ],
+        ids=["validator_returns_false", "validator_raises"],
+    )
+    def test_generator_invoked_on_validation_failure(
         self,
         create_test_client: cabc.Callable[..., falcon.testing.TestClient],
+        mock_validator: mock.MagicMock,
     ) -> None:
-        """Verify new ID is generated when validator returns False."""
-        mock_generator = mock.MagicMock(return_value="freshly-generated")
-        mock_validator = mock.MagicMock(return_value=False)
+        """Verify generator is called when the validator rejects or raises."""
+        mock_generator = mock.MagicMock(return_value="fallback-id")
         client = create_test_client(
             generator=mock_generator,
             trusted_sources=["127.0.0.1"],
@@ -178,7 +186,7 @@ class TestValidationWithValidatorRejecting:
             headers={"X-Correlation-ID": "bad-format-id"},
         )
 
-        assert response.json["correlation_id"] == "freshly-generated", (
+        assert response.json["correlation_id"] == "fallback-id", (
             "Expected generated ID when validation fails"
         )
         assert mock_generator.call_count == 1, (
@@ -361,31 +369,6 @@ class TestValidationNotCalledWhenUnnecessary:
 
 class TestValidatorExceptionHandling:
     """Tests for graceful handling of exceptions raised by user-supplied validators."""
-
-    def test_validator_exception_triggers_new_generation(
-        self,
-        create_test_client: cabc.Callable[..., falcon.testing.TestClient],
-    ) -> None:
-        """Verify a new ID is generated when the validator raises an exception."""
-        mock_generator = mock.MagicMock(return_value="fallback-id")
-        mock_validator = mock.MagicMock(side_effect=ValueError("boom"))
-        client = create_test_client(
-            generator=mock_generator,
-            trusted_sources=["127.0.0.1"],
-            validator=mock_validator,
-        )
-
-        response = client.simulate_get(
-            "/test",
-            headers={"X-Correlation-ID": "triggers-crash"},
-        )
-
-        assert response.json["correlation_id"] == "fallback-id", (
-            "Expected generated ID when validator raises"
-        )
-        assert mock_generator.call_count == 1, (
-            f"Expected generator called once, got {mock_generator.call_count} calls"
-        )
 
     def test_validator_exception_logs_warning(
         self,
