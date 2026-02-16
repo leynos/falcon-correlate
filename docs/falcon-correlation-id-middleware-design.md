@@ -1279,3 +1279,47 @@ class CorrelationIDMiddleware:
     ) -> None:
         ...
 ```
+
+### A.2. Context Variable Definitions (Task 2.4.1)
+
+**Decision:** Define `correlation_id_var` and `user_id_var` as module-level
+`contextvars.ContextVar[str | None]` instances in `middleware.py`, with
+`default=None`, and export them via `__init__.py` as part of the public API.
+
+**Rationale:**
+
+1. **Placement in `middleware.py`:** The design document (§3.3.1) specifies
+   "At the module level where the middleware is defined." Co-locating the
+   context variables with the middleware that will manage their lifecycle (task
+   2.4.2) avoids circular imports and keeps the dependency graph simple.
+
+2. **`default=None`:** Matches the design specification. A `None` default
+   allows consumers to distinguish between "no correlation ID set" and a valid
+   ID without risking `LookupError` exceptions from `ContextVar.get()`.
+
+3. **Variable names (`"correlation_id"`, `"user_id"`):** Match the design
+   specification exactly. These are the internal names passed to the
+   `ContextVar` constructor and appear in debugging output.
+
+4. **Public API export:** Both variables are included in `__all__` and
+   importable from the package root
+   (`from falcon_correlate import correlation_id_var, user_id_var`). This
+   enables consumers — logging filters, downstream service clients, and
+   application code — to access request-scoped data without coupling to
+   Falcon's `req` object.
+
+5. **Lifecycle deferred to task 2.4.2:** This task defines the variables
+   only. Setting the correlation ID in `process_request` and resetting it in
+   `process_response` is the responsibility of task 2.4.2. The `user_id_var` is
+   intended for use by authentication middleware or application code; the
+   correlation ID middleware does not set it.
+
+**Files created/modified:**
+
+- `src/falcon_correlate/middleware.py` — Added `import contextvars` and two
+  `ContextVar` definitions.
+- `src/falcon_correlate/__init__.py` — Added both variables to imports and
+  `__all__`.
+- `src/falcon_correlate/unittests/test_context_variables.py` — Unit tests.
+- `tests/bdd/context_variables.feature` — BDD feature file.
+- `tests/bdd/test_context_variables_steps.py` — BDD step definitions.
