@@ -296,3 +296,79 @@ def then_correlation_id_is_uuid7(context: Context) -> None:
     )
     # assert_uuid7_hex raises AssertionError with detailed message on failure
     assert_uuid7_hex(data["correlation_id"])
+
+
+# Validation scenario steps
+
+
+@given(
+    parsers.parse(
+        "a Falcon application with CorrelationIDMiddleware trusting"
+        ' "{sources}" and a rejecting validator'
+    ),
+    target_fixture="context",
+)
+def given_app_with_trusted_sources_and_rejecting_validator(
+    sources: str,
+) -> Context:
+    """Create a Falcon app with trusted sources and a validator that rejects all IDs."""
+    source_list = [s.strip() for s in sources.split(",")]
+    middleware = CorrelationIDMiddleware(
+        trusted_sources=source_list,
+        validator=lambda value: False,
+    )
+    app = falcon.App(middleware=[middleware])
+    client = falcon.testing.TestClient(app)
+    return {"middleware": middleware, "app": app, "client": client}
+
+
+@given(
+    parsers.parse(
+        "a Falcon application with CorrelationIDMiddleware trusting"
+        ' "{sources}" and an accepting validator'
+    ),
+    target_fixture="context",
+)
+def given_app_with_trusted_sources_and_accepting_validator(
+    sources: str,
+) -> Context:
+    """Create a Falcon app with trusted sources and a validator that accepts all IDs."""
+    source_list = [s.strip() for s in sources.split(",")]
+    middleware = CorrelationIDMiddleware(
+        trusted_sources=source_list,
+        validator=lambda value: True,
+    )
+    app = falcon.App(middleware=[middleware])
+    client = falcon.testing.TestClient(app)
+    return {"middleware": middleware, "app": app, "client": client}
+
+
+@given(
+    parsers.parse('a custom validator that rejects IDs starting with "{prefix}"'),
+    target_fixture="context",
+)
+def given_custom_prefix_rejecting_validator(prefix: str) -> Context:
+    """Create a custom validator that rejects IDs starting with the given prefix."""
+
+    def prefix_validator(value: str) -> bool:
+        return not value.startswith(prefix)
+
+    return {"custom_validator": prefix_validator}
+
+
+@given(parsers.parse('a Falcon application with that validator trusting "{sources}"'))
+def given_app_with_custom_validator_and_trusted_sources(
+    context: Context,
+    sources: str,
+) -> None:
+    """Create a Falcon app with the custom validator and trusted sources."""
+    source_list = [s.strip() for s in sources.split(",")]
+    middleware = CorrelationIDMiddleware(
+        trusted_sources=source_list,
+        validator=context["custom_validator"],
+    )
+    app = falcon.App(middleware=[middleware])
+    client = falcon.testing.TestClient(app)
+    context["middleware"] = middleware
+    context["app"] = app
+    context["client"] = client

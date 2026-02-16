@@ -83,12 +83,12 @@ Implement ID retrieval, generation, validation, and contextual storage.
   - [x] Return `False` for malformed or excessively long IDs.
   - [x] Test valid UUID formats are accepted.
   - [x] Test invalid formats are rejected.
-- [ ] 2.3.2. Integrate validation into request processing
-  - [ ] Validate incoming ID before acceptance.
-  - [ ] Generate new ID if validation fails.
-  - [ ] Log validation failures at DEBUG level.
-  - [ ] Test invalid formats trigger new ID generation.
-  - [ ] Test custom validator is called when provided.
+- [x] 2.3.2. Integrate validation into request processing
+  - [x] Validate incoming ID before acceptance.
+  - [x] Generate new ID if validation fails.
+  - [x] Log validation failures at DEBUG level.
+  - [x] Test invalid formats trigger new ID generation.
+  - [x] Test custom validator is called when provided.
 
 ### 2.4. Contextual storage with contextvars
 

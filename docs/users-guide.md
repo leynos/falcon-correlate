@@ -54,15 +54,24 @@ During `process_request`, the middleware reads the configured header name and
 checks whether the request originates from a trusted source. The correlation ID
 stored on `req.context.correlation_id` is determined as follows:
 
-1. If a valid header value is present and the request source is trusted, the
-   incoming ID is accepted after trimming leading and trailing whitespace.
+1. If a valid header value is present, the request source is trusted, and the
+   value passes validation (when a validator is configured), the incoming ID is
+   accepted after trimming leading and trailing whitespace.
 
-2. If a valid header value is present but the request source is not trusted,
+2. If a valid header value is present and the request source is trusted, but
+   the value fails validation, the incoming ID is rejected and a new ID is
+   generated. The validation failure is logged at `DEBUG` level.
+
+3. If a valid header value is present but the request source is not trusted,
    the incoming ID is rejected and a new ID is generated using the configured
-   generator.
+   generator. The validator is not called in this case.
 
-3. If the header is missing, empty, or contains only whitespace, a new ID is
+4. If the header is missing, empty, or contains only whitespace, a new ID is
    generated using the configured generator.
+
+When no validator is configured (the default), incoming IDs from trusted
+sources are accepted without format checking, preserving backwards
+compatibility.
 
 This design ensures that every request receives a correlation ID for complete
 traceability, while preventing untrusted clients from injecting arbitrary IDs
@@ -140,12 +149,17 @@ middleware = CorrelationIDMiddleware(generator=custom_generator)
 
 ### validator
 
-An optional callable that validates incoming correlation IDs. Takes a string
-and returns `True` if the ID is valid, `False` otherwise. Invalid IDs are
-discarded and new ones are generated.
+An optional callable that validates incoming correlation IDs during request
+processing. Takes a string and returns `True` if the ID is valid, `False`
+otherwise. When a validator is configured, incoming IDs from trusted sources
+are checked before acceptance. Invalid IDs are discarded, a new ID is
+generated, and the failure is logged at `DEBUG` level.
 
 - **Type**: `Callable[[str], bool] | None`
 - **Default**: `None` (no validation beyond trust checking)
+
+When no validator is configured, incoming IDs from trusted sources are accepted
+without format checking. This maintains backwards compatibility.
 
 The library provides `default_uuid_validator` as a ready-to-use validator that
 accepts any standard UUID format (versions 1-8), both hyphenated
@@ -174,6 +188,11 @@ def uuid_validator(value: str) -> bool:
 
 middleware = CorrelationIDMiddleware(validator=uuid_validator)
 ```
+
+**Logging note**: When an incoming ID fails validation, the middleware logs a
+`DEBUG`-level message. The rejected value is not included in the log to avoid
+log injection and privacy risks. To see these messages, configure logging to
+capture `DEBUG` output from the `falcon_correlate.middleware` logger.
 
 ### echo_header_in_response
 
@@ -223,10 +242,12 @@ The following functionality is now implemented:
 - Automatic correlation ID generation for requests without valid incoming IDs.
 - Custom generator injection support.
 - Default UUID validator for incoming ID format validation.
+- Validation integration into request processing: incoming IDs from trusted
+  sources are validated (when a validator is configured) before acceptance,
+  with `DEBUG`-level logging of failures.
 
 The following functionality will be added in future releases:
 
-- Validation integration into request processing (task 2.3.2).
 - Context variable storage (task 2.4).
 - Logging integration (task 3.1).
 
