@@ -26,8 +26,8 @@ Success is observable when:
 - A request with no validator configured behaves exactly as before (backwards
   compatible).
 - A custom validator callable is invoked when provided.
-- Validation failures produce a `DEBUG`-level log message containing the
-  rejected value.
+- Validation failures produce a `DEBUG`-level log message (the rejected
+  value is omitted to avoid log injection and privacy risks).
 - All existing tests continue to pass unchanged.
 - New unit and behaviour-driven development (BDD) tests cover every new code
   path.
@@ -229,7 +229,7 @@ patterns in `test_generator_invocation.py`. The tests cover five categories:
 **4. Logging of validation failures:**
 
 - Test that when validation fails, a DEBUG-level log message is emitted
-  containing the rejected value.
+  (the rejected value is not included in the log).
 - Test that when validation succeeds, no log message is emitted.
 
 **5. Validator not invoked when unnecessary:**
@@ -299,9 +299,7 @@ Modify `src/falcon_correlate/middleware.py`:
                req.context.correlation_id = incoming
            else:
                logger.debug(
-                   "Correlation ID failed validation, "
-                   "generating new ID: %s",
-                   incoming,
+                   "Correlation ID failed validation, generating new ID",
                )
                req.context.correlation_id = self._config.generator()
        else:
@@ -483,3 +481,8 @@ and documentation updates.
 2026-02-09: Marked the plan complete, recorded execution details, and updated
 progress, decisions, surprises, and outcomes to reflect the implemented
 validation integration and quality gate results.
+
+2026-02-16: Updated stale references to logging the rejected correlation ID
+value. The implementation omits the rejected value from log messages to prevent
+log injection and privacy risks. Updated success criteria, test descriptions,
+and code examples to match the actual implementation.
