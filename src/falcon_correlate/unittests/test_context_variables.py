@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import contextvars
 
+import pytest
+
 
 class TestContextVariableDefinitions:
     """Tests for context variable existence, type, naming, and defaults."""
@@ -48,56 +50,44 @@ class TestContextVariableDefinitions:
 class TestContextVariableOperations:
     """Tests for context variable set, get, and reset operations."""
 
-    def test_correlation_id_var_set_and_get(self) -> None:
-        """Verify correlation_id_var set/get works and is context-isolated."""
-        from falcon_correlate import correlation_id_var
+    @pytest.mark.parametrize(
+        ("var_name", "test_value"),
+        [
+            ("correlation_id_var", "test-correlation-id"),
+            ("user_id_var", "test-user-id"),
+        ],
+    )
+    def test_context_var_set_and_get(self, var_name: str, test_value: str) -> None:
+        """Verify context var set/get works and is context-isolated."""
+        import falcon_correlate
+
+        var: contextvars.ContextVar[str | None] = getattr(falcon_correlate, var_name)
 
         def _inner() -> None:
-            token = correlation_id_var.set("test-correlation-id")
-            assert correlation_id_var.get() == "test-correlation-id"
-            correlation_id_var.reset(token)
+            token = var.set(test_value)
+            assert var.get() == test_value
+            var.reset(token)
 
         ctx = contextvars.copy_context()
         ctx.run(_inner)
 
         # Values set in the copied context must not leak into the outer context.
-        assert correlation_id_var.get() is None
+        assert var.get() is None
 
-    def test_user_id_var_set_and_get(self) -> None:
-        """Verify user_id_var can be set and retrieved and is context-isolated."""
-        from falcon_correlate import user_id_var
+    @pytest.mark.parametrize(
+        "var_name",
+        ["correlation_id_var", "user_id_var"],
+    )
+    def test_context_var_reset_restores_default(self, var_name: str) -> None:
+        """Verify resetting a context var restores None default."""
+        import falcon_correlate
 
-        def _inner() -> None:
-            token = user_id_var.set("test-user-id")
-            assert user_id_var.get() == "test-user-id"
-            user_id_var.reset(token)
-
-        ctx = contextvars.copy_context()
-        ctx.run(_inner)
-
-        # Values set in the copied context must not leak into the outer context.
-        assert user_id_var.get() is None
-
-    def test_correlation_id_var_reset_restores_default(self) -> None:
-        """Verify resetting correlation_id_var restores None default."""
-        from falcon_correlate import correlation_id_var
+        var: contextvars.ContextVar[str | None] = getattr(falcon_correlate, var_name)
 
         def _inner() -> None:
-            token = correlation_id_var.set("temporary-value")
-            correlation_id_var.reset(token)
-            assert correlation_id_var.get() is None
-
-        ctx = contextvars.copy_context()
-        ctx.run(_inner)
-
-    def test_user_id_var_reset_restores_default(self) -> None:
-        """Verify resetting user_id_var restores None default."""
-        from falcon_correlate import user_id_var
-
-        def _inner() -> None:
-            token = user_id_var.set("temporary-value")
-            user_id_var.reset(token)
-            assert user_id_var.get() is None
+            token = var.set("temporary-value")
+            var.reset(token)
+            assert var.get() is None
 
         ctx = contextvars.copy_context()
         ctx.run(_inner)
