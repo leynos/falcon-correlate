@@ -49,7 +49,7 @@ class TestContextVariableOperations:
     """Tests for context variable set, get, and reset operations."""
 
     def test_correlation_id_var_set_and_get(self) -> None:
-        """Verify correlation_id_var can be set and retrieved."""
+        """Verify correlation_id_var set/get works and is context-isolated."""
         from falcon_correlate import correlation_id_var
 
         def _inner() -> None:
@@ -60,8 +60,11 @@ class TestContextVariableOperations:
         ctx = contextvars.copy_context()
         ctx.run(_inner)
 
+        # Values set in the copied context must not leak into the outer context.
+        assert correlation_id_var.get() is None
+
     def test_user_id_var_set_and_get(self) -> None:
-        """Verify user_id_var can be set and retrieved."""
+        """Verify user_id_var can be set and retrieved and is context-isolated."""
         from falcon_correlate import user_id_var
 
         def _inner() -> None:
@@ -71,6 +74,9 @@ class TestContextVariableOperations:
 
         ctx = contextvars.copy_context()
         ctx.run(_inner)
+
+        # Values set in the copied context must not leak into the outer context.
+        assert user_id_var.get() is None
 
     def test_correlation_id_var_reset_restores_default(self) -> None:
         """Verify resetting correlation_id_var restores None default."""

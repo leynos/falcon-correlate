@@ -144,8 +144,7 @@ echoes it in the response.
 
 ### Design specification
 
-The design document (§3.3.1, lines 338-357 of
-`docs/falcon-correlation-id-middleware-design.md`) specifies:
+The design document[^1] specifies:
 
 ```python
 import contextvars
@@ -160,6 +159,9 @@ user_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 
 These are defined at module level in `middleware.py` and exported via
 `__init__.py`.
+
+[^1]: `docs/falcon-correlation-id-middleware-design.md` — §3.3.1, lines
+    338–357.
 
 ### Key files
 
