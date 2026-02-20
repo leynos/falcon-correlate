@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextvars
 import dataclasses
 import ipaddress
 import logging
@@ -19,6 +20,13 @@ _NetworkType = ipaddress.IPv4Network | ipaddress.IPv6Network
 DEFAULT_HEADER_NAME = "X-Correlation-ID"
 
 logger = logging.getLogger(__name__)
+
+correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "correlation_id", default=None
+)
+user_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "user_id", default=None
+)
 
 
 def default_uuid7_generator() -> str:

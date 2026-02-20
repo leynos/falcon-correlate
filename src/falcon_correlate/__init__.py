@@ -5,8 +5,10 @@ from __future__ import annotations
 from .middleware import (
     CorrelationIDConfig,
     CorrelationIDMiddleware,
+    correlation_id_var,
     default_uuid7_generator,
     default_uuid_validator,
+    user_id_var,
 )
 
 PACKAGE_NAME = "falcon_correlate"
@@ -20,7 +22,9 @@ except ModuleNotFoundError:  # pragma: no cover - Python fallback
 __all__ = [
     "CorrelationIDConfig",
     "CorrelationIDMiddleware",
+    "correlation_id_var",
     "default_uuid7_generator",
     "default_uuid_validator",
     "hello",
+    "user_id_var",
 ]

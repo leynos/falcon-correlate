@@ -194,6 +194,48 @@ middleware = CorrelationIDMiddleware(validator=uuid_validator)
 log injection and privacy risks. To see these messages, configure logging to
 capture `DEBUG` output from the `falcon_correlate.middleware` logger.
 
+## Context Variables
+
+The middleware provides two `contextvars.ContextVar` instances for
+request-scoped storage. These variables make the correlation ID and user ID
+available throughout the application — including code that does not have access
+to Falcon's `req` object, such as logging filters, utility functions, and
+downstream service clients.
+
+### correlation_id_var
+
+A context variable for the current request's correlation ID.
+
+- **Type**: `contextvars.ContextVar[str | None]`
+- **Default**: `None`
+
+```python
+from falcon_correlate import correlation_id_var
+
+# Retrieve the current correlation ID (None if not set)
+cid = correlation_id_var.get()
+```
+
+### user_id_var
+
+A context variable for the current request's authenticated user ID.
+
+- **Type**: `contextvars.ContextVar[str | None]`
+- **Default**: `None`
+
+```python
+from falcon_correlate import user_id_var
+
+# Retrieve the current user ID (None if not set)
+uid = user_id_var.get()
+```
+
+**Note**: These context variables are currently defined and exported as part of
+the public API. Automatic lifecycle management — setting the correlation ID in
+`process_request` and resetting it in `process_response` — will be added in a
+future release (task 2.4.2). The `user_id_var` is intended for use by
+authentication middleware or application code that identifies the current user.
+
 ### echo_header_in_response
 
 Whether to include the correlation ID in response headers.
@@ -245,10 +287,13 @@ The following functionality is now implemented:
 - Validation integration into request processing: incoming IDs from trusted
   sources are validated (when a validator is configured) before acceptance,
   with `DEBUG`-level logging of failures.
+- Context variables (`correlation_id_var` and `user_id_var`) for
+  request-scoped storage via `contextvars`.
 
 The following functionality will be added in future releases:
 
-- Context variable storage (task 2.4).
+- Context variable lifecycle management and `req.context` integration
+  (tasks 2.4.2, 2.4.3).
 - Logging integration (task 3.1).
 
 See the [roadmap](roadmap.md) for the full implementation plan.

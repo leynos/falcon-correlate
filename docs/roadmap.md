@@ -92,10 +92,10 @@ Implement ID retrieval, generation, validation, and contextual storage.
 
 ### 2.4. Contextual storage with contextvars
 
-- [ ] 2.4.1. Define context variables. See design-doc §3.3.1.
-  - [ ] Create `correlation_id_var: ContextVar[str | None]`.
-  - [ ] Create `user_id_var: ContextVar[str | None]`.
-  - [ ] Export context variables in public API.
+- [x] 2.4.1. Define context variables. See design-doc §3.3.1.
+  - [x] Create `correlation_id_var: ContextVar[str | None]`.
+  - [x] Create `user_id_var: ContextVar[str | None]`.
+  - [x] Export context variables in public API.
 - [ ] 2.4.2. Implement context variable lifecycle. See design-doc §3.3.4.
   - [ ] Set correlation ID in `process_request`.
   - [ ] Store reset token for cleanup.
