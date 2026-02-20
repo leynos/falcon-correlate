@@ -9,6 +9,7 @@ from typing import Callable  # noqa: UP035, ICN003  # FIXME: explicit import req
 
 import falcon
 import falcon.testing
+import pytest
 
 from falcon_correlate import CorrelationIDMiddleware, correlation_id_var
 from falcon_correlate.middleware import _CORRELATION_ID_RESET_TOKEN_ATTR
@@ -41,6 +42,17 @@ def _run_in_isolated_context(test_func: Callable[[], None]) -> None:
     contextvars.copy_context().run(test_func)
 
 
+@pytest.fixture
+def isolated_context() -> Callable[[Callable[[], None]], None]:
+    """Fixture providing a fresh contextvar context for each test."""
+    context = contextvars.copy_context()
+
+    def runner(func: Callable[[], None]) -> None:
+        context.run(func)
+
+    return runner
+
+
 class TestContextVariableLifecycle:
     """Tests for middleware-managed `correlation_id_var` lifecycle."""
 
@@ -51,7 +63,10 @@ class TestContextVariableLifecycle:
         token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
         assert isinstance(token, contextvars.Token)
 
-    def test_process_request_sets_context_var_and_stores_reset_token(self) -> None:
+    def test_process_request_sets_context_var_and_stores_reset_token(
+        self,
+        isolated_context: Callable[[Callable[[], None]], None],
+    ) -> None:
         """Verify process_request sets `correlation_id_var` and stores a reset token."""
         middleware = CorrelationIDMiddleware(trusted_sources=["127.0.0.1"])
 
@@ -62,9 +77,12 @@ class TestContextVariableLifecycle:
 
             self._assert_contextvar_state(req, "trusted-id")
 
-        _run_in_isolated_context(_inner)
+        isolated_context(_inner)
 
-    def test_process_request_generates_id_when_header_missing(self) -> None:
+    def test_process_request_generates_id_when_header_missing(
+        self,
+        isolated_context: Callable[[Callable[[], None]], None],
+    ) -> None:
         """Verify missing header triggers generated ID and contextvar token storage."""
         middleware = CorrelationIDMiddleware(
             trusted_sources=["127.0.0.1"],
@@ -78,9 +96,12 @@ class TestContextVariableLifecycle:
 
             self._assert_contextvar_state(req, "generated-missing-header")
 
-        _run_in_isolated_context(_inner)
+        isolated_context(_inner)
 
-    def test_process_request_replaces_invalid_id_from_trusted_source(self) -> None:
+    def test_process_request_replaces_invalid_id_from_trusted_source(
+        self,
+        isolated_context: Callable[[Callable[[], None]], None],
+    ) -> None:
         """Verify trusted invalid IDs are replaced and lifecycle state tracks them."""
         middleware = CorrelationIDMiddleware(
             trusted_sources=["127.0.0.1"],
@@ -95,9 +116,12 @@ class TestContextVariableLifecycle:
 
             self._assert_contextvar_state(req, "generated-invalid-trusted")
 
-        _run_in_isolated_context(_inner)
+        isolated_context(_inner)
 
-    def test_process_request_ignores_valid_id_from_untrusted_source(self) -> None:
+    def test_process_request_ignores_valid_id_from_untrusted_source(
+        self,
+        isolated_context: Callable[[Callable[[], None]], None],
+    ) -> None:
         """Verify untrusted incoming IDs are ignored and replaced."""
         middleware = CorrelationIDMiddleware(
             trusted_sources=["127.0.0.1"],
@@ -114,9 +138,12 @@ class TestContextVariableLifecycle:
 
             self._assert_contextvar_state(req, "generated-untrusted")
 
-        _run_in_isolated_context(_inner)
+        isolated_context(_inner)
 
-    def test_process_response_resets_context_var_after_successful_request(self) -> None:
+    def test_process_response_resets_context_var_after_successful_request(
+        self,
+        isolated_context: Callable[[Callable[[], None]], None],
+    ) -> None:
         """Verify process_response clears `correlation_id_var` on normal completion."""
         middleware = CorrelationIDMiddleware(trusted_sources=["127.0.0.1"])
 
@@ -135,9 +162,12 @@ class TestContextVariableLifecycle:
 
             assert correlation_id_var.get() is None
 
-        _run_in_isolated_context(_inner)
+        isolated_context(_inner)
 
-    def test_process_response_resets_context_var_when_request_fails(self) -> None:
+    def test_process_response_resets_context_var_when_request_fails(
+        self,
+        isolated_context: Callable[[Callable[[], None]], None],
+    ) -> None:
         """Verify cleanup runs when request processing reports failure."""
         middleware = CorrelationIDMiddleware(trusted_sources=["127.0.0.1"])
 
@@ -156,9 +186,12 @@ class TestContextVariableLifecycle:
 
             assert correlation_id_var.get() is None
 
-        _run_in_isolated_context(_inner)
+        isolated_context(_inner)
 
-    def test_process_response_is_safe_when_token_missing(self) -> None:
+    def test_process_response_is_safe_when_token_missing(
+        self,
+        isolated_context: Callable[[Callable[[], None]], None],
+    ) -> None:
         """Verify process_response is a no-op when no reset token is present."""
         middleware = CorrelationIDMiddleware()
 
@@ -174,9 +207,12 @@ class TestContextVariableLifecycle:
 
             assert correlation_id_var.get() is None
 
-        _run_in_isolated_context(_inner)
+        isolated_context(_inner)
 
-    def test_process_response_is_safe_with_non_token_reset_attr(self) -> None:
+    def test_process_response_is_safe_with_non_token_reset_attr(
+        self,
+        isolated_context: Callable[[Callable[[], None]], None],
+    ) -> None:
         """Verify process_response ignores non-Token reset attribute values."""
         middleware = CorrelationIDMiddleware()
 
@@ -197,9 +233,12 @@ class TestContextVariableLifecycle:
             assert getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR) is non_token
             correlation_id_var.reset(original_token)
 
-        _run_in_isolated_context(_inner)
+        isolated_context(_inner)
 
-    def test_process_response_is_safe_with_mismatched_token_var(self) -> None:
+    def test_process_response_is_safe_with_mismatched_token_var(
+        self,
+        isolated_context: Callable[[Callable[[], None]], None],
+    ) -> None:
         """Verify process_response ignores tokens from unrelated context variables."""
         middleware = CorrelationIDMiddleware()
         foreign_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
@@ -227,7 +266,7 @@ class TestContextVariableLifecycle:
             foreign_var.reset(foreign_token)
             correlation_id_var.reset(original_token)
 
-        _run_in_isolated_context(_inner)
+        isolated_context(_inner)
 
     def test_context_is_isolated_between_concurrent_requests(self) -> None:
         """Verify concurrent requests do not share correlation context state."""
