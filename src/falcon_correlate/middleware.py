@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextvars
 import dataclasses
+import importlib
 import ipaddress
 import logging
 import typing as typ
@@ -45,8 +46,7 @@ def default_uuid7_generator() -> str:
     if uuid7 is not None:
         return uuid7().hex
 
-    import uuid_utils
-
+    uuid_utils = importlib.import_module("uuid_utils")
     return uuid_utils.uuid7().hex
 
 
