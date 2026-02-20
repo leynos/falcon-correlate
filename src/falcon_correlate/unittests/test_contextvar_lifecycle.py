@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextvars
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from typing import Callable  # noqa: UP035, ICN003  # FIXME: explicit import requested
 
 import falcon
 import falcon.testing
@@ -31,8 +32,24 @@ def _build_request_response(
     return falcon.Request(environ), falcon.Response()
 
 
+def _run_in_isolated_context(test_func: Callable[[], None]) -> None:
+    """Execute test function in an isolated contextvar context.
+
+    Ensures each test starts with a clean contextvar state and prevents
+    cross-test contamination of correlation_id_var values.
+    """
+    contextvars.copy_context().run(test_func)
+
+
 class TestContextVariableLifecycle:
     """Tests for middleware-managed `correlation_id_var` lifecycle."""
+
+    def _assert_contextvar_state(self, req: falcon.Request, expected_id: str) -> None:
+        """Assert request/contextvar lifecycle state after process_request."""
+        assert req.context.correlation_id == expected_id
+        assert correlation_id_var.get() == expected_id
+        token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
+        assert isinstance(token, contextvars.Token)
 
     def test_process_request_sets_context_var_and_stores_reset_token(self) -> None:
         """Verify process_request sets `correlation_id_var` and stores a reset token."""
@@ -43,12 +60,9 @@ class TestContextVariableLifecycle:
 
             middleware.process_request(req, resp)
 
-            assert req.context.correlation_id == "trusted-id"
-            assert correlation_id_var.get() == "trusted-id"
-            token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
-            assert isinstance(token, contextvars.Token)
+            self._assert_contextvar_state(req, "trusted-id")
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(_inner)
 
     def test_process_request_generates_id_when_header_missing(self) -> None:
         """Verify missing header triggers generated ID and contextvar token storage."""
@@ -62,12 +76,9 @@ class TestContextVariableLifecycle:
 
             middleware.process_request(req, resp)
 
-            assert req.context.correlation_id == "generated-missing-header"
-            assert correlation_id_var.get() == "generated-missing-header"
-            token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
-            assert isinstance(token, contextvars.Token)
+            self._assert_contextvar_state(req, "generated-missing-header")
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(_inner)
 
     def test_process_request_replaces_invalid_id_from_trusted_source(self) -> None:
         """Verify trusted invalid IDs are replaced and lifecycle state tracks them."""
@@ -82,12 +93,9 @@ class TestContextVariableLifecycle:
 
             middleware.process_request(req, resp)
 
-            assert req.context.correlation_id == "generated-invalid-trusted"
-            assert correlation_id_var.get() == "generated-invalid-trusted"
-            token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
-            assert isinstance(token, contextvars.Token)
+            self._assert_contextvar_state(req, "generated-invalid-trusted")
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(_inner)
 
     def test_process_request_ignores_valid_id_from_untrusted_source(self) -> None:
         """Verify untrusted incoming IDs are ignored and replaced."""
@@ -104,12 +112,9 @@ class TestContextVariableLifecycle:
 
             middleware.process_request(req, resp)
 
-            assert req.context.correlation_id == "generated-untrusted"
-            assert correlation_id_var.get() == "generated-untrusted"
-            token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
-            assert isinstance(token, contextvars.Token)
+            self._assert_contextvar_state(req, "generated-untrusted")
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(_inner)
 
     def test_process_response_resets_context_var_after_successful_request(self) -> None:
         """Verify process_response clears `correlation_id_var` on normal completion."""
@@ -119,7 +124,7 @@ class TestContextVariableLifecycle:
             req, resp = _build_request_response(correlation_id="trusted-id")
 
             middleware.process_request(req, resp)
-            assert correlation_id_var.get() == "trusted-id"
+            self._assert_contextvar_state(req, "trusted-id")
 
             middleware.process_response(
                 req,
@@ -130,7 +135,7 @@ class TestContextVariableLifecycle:
 
             assert correlation_id_var.get() is None
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(_inner)
 
     def test_process_response_resets_context_var_when_request_fails(self) -> None:
         """Verify cleanup runs when request processing reports failure."""
@@ -140,7 +145,7 @@ class TestContextVariableLifecycle:
             req, resp = _build_request_response(correlation_id="trusted-id")
 
             middleware.process_request(req, resp)
-            assert correlation_id_var.get() == "trusted-id"
+            self._assert_contextvar_state(req, "trusted-id")
 
             middleware.process_response(
                 req,
@@ -151,7 +156,7 @@ class TestContextVariableLifecycle:
 
             assert correlation_id_var.get() is None
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(_inner)
 
     def test_process_response_is_safe_when_token_missing(self) -> None:
         """Verify process_response is a no-op when no reset token is present."""
@@ -169,7 +174,7 @@ class TestContextVariableLifecycle:
 
             assert correlation_id_var.get() is None
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(_inner)
 
     def test_process_response_is_safe_with_non_token_reset_attr(self) -> None:
         """Verify process_response ignores non-Token reset attribute values."""
@@ -192,7 +197,7 @@ class TestContextVariableLifecycle:
             assert getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR) is non_token
             correlation_id_var.reset(original_token)
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(_inner)
 
     def test_process_response_is_safe_with_mismatched_token_var(self) -> None:
         """Verify process_response ignores tokens from unrelated context variables."""
@@ -222,7 +227,7 @@ class TestContextVariableLifecycle:
             foreign_var.reset(foreign_token)
             correlation_id_var.reset(original_token)
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(_inner)
 
     def test_context_is_isolated_between_concurrent_requests(self) -> None:
         """Verify concurrent requests do not share correlation context state."""
