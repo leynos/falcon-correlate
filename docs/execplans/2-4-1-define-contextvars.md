@@ -104,7 +104,7 @@ Success is observable when:
   management. Date/Author: 2026-02-16.
 
 - Decision: Use `import contextvars` (not `from contextvars import ContextVar`)
-  and fully-qualified `contextvars.ContextVar[str | None]` annotations.
+  and fully qualified `contextvars.ContextVar[str | None]` annotations.
   Rationale: matches the design document's example code and keeps the
   dependency explicit. Date/Author: 2026-02-16.
 
