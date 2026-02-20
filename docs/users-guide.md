@@ -230,11 +230,11 @@ from falcon_correlate import user_id_var
 uid = user_id_var.get()
 ```
 
-**Note**: These context variables are currently defined and exported as part of
-the public API. Automatic lifecycle management — setting the correlation ID in
-`process_request` and resetting it in `process_response` — will be added in a
-future release (task 2.4.2). The `user_id_var` is intended for use by
-authentication middleware or application code that identifies the current user.
+**Note**: `correlation_id_var` lifecycle is managed automatically by the
+middleware. It is set during `process_request` and reset during
+`process_response`, including request-failure paths. The `user_id_var` is
+intended for use by authentication middleware or application code that
+identifies the current user.
 
 ### echo_header_in_response
 
@@ -289,11 +289,12 @@ The following functionality is now implemented:
   with `DEBUG`-level logging of failures.
 - Context variables (`correlation_id_var` and `user_id_var`) for
   request-scoped storage via `contextvars`.
+- Correlation ID context variable lifecycle management: `correlation_id_var` is
+  set during request processing and reset during response cleanup.
 
 The following functionality will be added in future releases:
 
-- Context variable lifecycle management and `req.context` integration
-  (tasks 2.4.2, 2.4.3).
+- `req.context` and `contextvars` parity guidance (task 2.4.3).
 - Logging integration (task 3.1).
 
 See the [roadmap](roadmap.md) for the full implementation plan.

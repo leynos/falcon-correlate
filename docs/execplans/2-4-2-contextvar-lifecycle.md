@@ -5,7 +5,7 @@ This Execution Plan (ExecPlan) is a living document. The sections
 `Decision log`, and `Outcomes & retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -62,20 +62,16 @@ Success is observable when:
 ## Risks
 
 - Risk: token storage location introduces concurrency bugs if shared across
-  requests (e.g., middleware instance attribute).
-  Severity: high. Likelihood: medium.
-  Mitigation: store reset token on request-scoped state (`req.context`) instead
-  of middleware instance state.
+  requests (e.g., middleware instance attribute). Severity: high. Likelihood:
+  medium. Mitigation: store reset token on request-scoped state (`req.context`)
+  instead of middleware instance state.
 
 - Risk: `process_response` may run when request setup failed before token
-  creation.
-  Severity: medium. Likelihood: medium.
-  Mitigation: treat token as optional and make cleanup idempotent/no-op when no
-  token is present.
+  creation. Severity: medium. Likelihood: medium. Mitigation: treat token as
+  optional and make cleanup idempotent/no-op when no token is present.
 
 - Risk: tests can falsely pass if they only assert final response payload and
-  not in-flight context state.
-  Severity: medium. Likelihood: medium.
+  not in-flight context state. Severity: medium. Likelihood: medium.
   Mitigation: add a dedicated Falcon test resource that reads
   `correlation_id_var.get()` inside `on_get` during request handling.
 
@@ -84,12 +80,15 @@ Success is observable when:
 - [x] (2026-02-20 09:23Z) Review roadmap, design doc §3.3.4, and current
   middleware/test state.
 - [x] (2026-02-20 09:23Z) Draft ExecPlan for task 2.4.2.
-- [ ] Add/modify unit tests for lifecycle behaviour (red phase).
-- [ ] Add/modify behavioural tests for lifecycle behaviour (red phase).
-- [ ] Implement lifecycle token set/reset in middleware (green phase).
-- [ ] Update user-facing and design documentation.
-- [ ] Mark roadmap task 2.4.2 complete.
-- [ ] Run all quality gates and capture logs.
+- [x] (2026-02-20 16:20Z) Add/modify unit tests for lifecycle behaviour (red
+  phase).
+- [x] (2026-02-20 16:20Z) Add/modify behavioural tests for lifecycle behaviour
+  (red phase).
+- [x] (2026-02-20 16:24Z) Implement lifecycle token set/reset in middleware
+  (green phase).
+- [x] (2026-02-20 16:35Z) Update user-facing and design documentation.
+- [x] (2026-02-20 16:35Z) Mark roadmap task 2.4.2 complete.
+- [x] (2026-02-20 16:35Z) Run all quality gates and capture logs.
 
 ## Surprises & discoveries
 
@@ -101,15 +100,18 @@ Success is observable when:
   `ContextVar` operations, but they do not yet exercise middleware lifecycle
   integration.
 
+- `ThreadPoolExecutor.map(..., strict=True)` is not a valid API and caused
+  initial test failures unrelated to lifecycle behaviour. The tests were
+  corrected to use `executor.map(...)` without `strict`.
+
 ## Decision log
 
 - Decision: store the token returned by `correlation_id_var.set(...)` on
   request-scoped context (for example,
   `req.context._correlation_id_reset_token`) instead of middleware instance
-  state.
-  Rationale: middleware instances are reused across requests and may execute
-  concurrently; request-scoped token storage avoids cross-request races.
-  Date/Author: 2026-02-20.
+  state. Rationale: middleware instances are reused across requests and may
+  execute concurrently; request-scoped token storage avoids cross-request
+  races. Date/Author: 2026-02-20.
 
 - Decision: make `process_response` cleanup unconditional with respect to
   `req_succeeded`; cleanup should run for both success and failure paths.
@@ -118,14 +120,32 @@ Success is observable when:
   Date/Author: 2026-02-20.
 
 - Decision: verify concurrency isolation with behavioural tests that issue
-  overlapping requests and assert per-request context values.
-  Rationale: this is the closest user-visible proof that context lifecycle
-  state is isolated and cleaned correctly.
-  Date/Author: 2026-02-20.
+  overlapping requests and assert per-request context values. Rationale: this
+  is the closest user-visible proof that context lifecycle state is isolated
+  and cleaned correctly. Date/Author: 2026-02-20.
 
 ## Outcomes & retrospective
 
-Pending implementation.
+Task 2.4.2 is implemented end to end.
+
+`CorrelationIDMiddleware.process_request` now sets `correlation_id_var` to the
+active request correlation ID and stores the returned reset token on
+`req.context._correlation_id_reset_token`. `process_response` now resets
+`correlation_id_var` from that token and clears token storage, running cleanup
+for both successful and failed requests.
+
+New lifecycle tests were added in both unit and behavioural suites:
+
+- `src/falcon_correlate/unittests/test_contextvar_lifecycle.py`
+- `tests/bdd/contextvar_lifecycle.feature`
+- `tests/bdd/test_contextvar_lifecycle_steps.py`
+
+Documentation and tracking were updated:
+
+- `docs/users-guide.md` now documents active lifecycle behaviour.
+- `docs/falcon-correlation-id-middleware-design.md` now records task 2.4.2
+  lifecycle decisions.
+- `docs/roadmap.md` now marks 2.4.2 complete.
 
 ## Context and orientation
 
@@ -148,12 +168,11 @@ selects a correlation ID and stores it on `req.context.correlation_id`.
 - `docs/falcon-correlation-id-middleware-design.md` - decision record target.
 - `docs/roadmap.md` - completion checklist target.
 
-### Current implementation gap
+### Implementation result
 
-- `process_request` chooses/stores `req.context.correlation_id` but does not
-  call `correlation_id_var.set(...)`.
-- No token is stored for context reset.
-- `process_response` does not reset `correlation_id_var`.
+- `process_request` now sets `correlation_id_var` and stores reset token.
+- `process_response` now resets `correlation_id_var` via stored token.
+- Cleanup now runs for both `req_succeeded=True` and `req_succeeded=False`.
 
 ## Plan of work
 
@@ -188,8 +207,8 @@ Scenarios:
   after client request completes, out-of-request `correlation_id_var.get()` is
   `None`.
 - `Context isolation across concurrent requests`:
-  two overlapping requests with distinct incoming IDs each observe their own
-  ID inside request handling and do not cross-contaminate.
+  two overlapping requests with distinct incoming IDs each observe their own ID
+  inside request handling and do not cross-contaminate.
 
 ### Stage C: implement middleware lifecycle (green phase)
 
@@ -306,3 +325,4 @@ Dependencies remain unchanged.
 ## Revision note (required when editing an ExecPlan)
 
 - 2026-02-20: Initial DRAFT created for roadmap item 2.4.2.
+- 2026-02-20: Updated to COMPLETE after implementation, tests, and docs.

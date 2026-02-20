@@ -1323,3 +1323,43 @@ class CorrelationIDMiddleware:
 - `src/falcon_correlate/unittests/test_context_variables.py` — Unit tests.
 - `tests/bdd/context_variables.feature` — BDD feature file.
 - `tests/bdd/test_context_variables_steps.py` — BDD step definitions.
+
+### A.3. Context Variable Lifecycle Management (Task 2.4.2)
+
+**Decision:** Manage `correlation_id_var` lifecycle inside middleware request
+hooks by setting it in `process_request` and resetting it in `process_response`
+using the `contextvars.Token` returned by `.set()`.
+
+**Rationale:**
+
+1. **Design-spec alignment:** Section §3.3.4 requires clearing context variables
+   at end-of-request to prevent value leakage between requests.
+
+2. **Request-scoped token storage:** The reset token is stored on
+   `req.context` (private attribute `_correlation_id_reset_token`) rather than
+   on middleware instance state. Middleware instances are reused across
+   requests, so request-scoped token storage avoids cross-request races in
+   concurrent execution.
+
+3. **Failure-path cleanup:** `process_response` resets the context variable
+   regardless of `req_succeeded`. This ensures cleanup also runs when request
+   processing fails.
+
+4. **Idempotence guard:** After reset, token storage is set to `None` to avoid
+   accidental double-reset if response cleanup is re-entered.
+
+5. **Scope control:** Task 2.4.2 manages only `correlation_id_var`. The
+   `user_id_var` lifecycle remains the responsibility of authentication or
+   application code.
+
+**Files created/modified:**
+
+- `src/falcon_correlate/middleware.py` — Added contextvar set/token-store in
+  `process_request` and token-based reset in `process_response`.
+- `src/falcon_correlate/unittests/test_contextvar_lifecycle.py` — Unit tests
+  for set/reset, failure-path cleanup, missing-token safety, and concurrent
+  isolation.
+- `tests/bdd/contextvar_lifecycle.feature` — Behavioural scenarios for
+  in-request visibility, post-response cleanup, and concurrent isolation.
+- `tests/bdd/test_contextvar_lifecycle_steps.py` — BDD step definitions for
+  lifecycle behaviour.
