@@ -28,7 +28,7 @@ correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 user_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "user_id", default=None
 )
-_CORRELATION_ID_RESET_TOKEN_ATTR = "_correlation_id_reset_token"  # noqa: S105
+_CORRELATION_ID_RESET_TOKEN_ATTR = "_correlation_id_reset_token"  # noqa: S105  # FIXME: attribute-name string is not a secret
 
 
 def default_uuid7_generator() -> str:
@@ -314,7 +314,7 @@ class CorrelationIDConfig:
         )
 
 
-# Derive valid kwargs from dataclass fields to ensure synchronisation
+# Derive valid kwargs from dataclass fields to ensure synchronization
 _VALID_CONFIG_KWARGS = frozenset(
     field.name for field in dataclasses.fields(CorrelationIDConfig)
 )
@@ -535,7 +535,7 @@ class CorrelationIDMiddleware:
         req: falcon.Request,
         resp: falcon.Response,
         resource: object,
-        req_succeeded: bool,  # noqa: FBT001, TD001, TD002, TD003  # FIXME: Falcon WSGI middleware interface requirement
+        req_succeeded: bool,  # noqa: FBT001  # FIXME: Falcon WSGI middleware interface requirement
     ) -> None:
         """Post-process the response and clean up request-scoped context.
 
@@ -559,7 +559,18 @@ class CorrelationIDMiddleware:
         reset_token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
         if not isinstance(reset_token, contextvars.Token):
             return
+        if reset_token.var is not correlation_id_var:
+            logger.debug("Ignoring mismatched correlation ID reset token")
+            return
 
-        correlation_id_var.reset(reset_token)
+        try:
+            correlation_id_var.reset(reset_token)
+        except ValueError:
+            logger.debug(
+                "Ignoring invalid correlation ID reset token",
+                exc_info=True,
+            )
+            return
+
         # Prevent accidental double-reset if process_response is re-entered.
         setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)

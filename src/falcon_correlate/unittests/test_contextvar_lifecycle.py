@@ -10,18 +10,23 @@ import falcon
 import falcon.testing
 
 from falcon_correlate import CorrelationIDMiddleware, correlation_id_var
-
-_RESET_TOKEN_ATTR = "_correlation_id_reset_token"  # noqa: S105
+from falcon_correlate.middleware import _CORRELATION_ID_RESET_TOKEN_ATTR
 
 
 def _build_request_response(
     *,
-    correlation_id: str,
+    correlation_id: str | None = None,
+    remote_addr: str = "127.0.0.1",
 ) -> tuple[falcon.Request, falcon.Response]:
-    """Create request/response objects with an incoming correlation ID header."""
+    """Create request/response objects for lifecycle tests."""
+    headers: dict[str, str] | None = None
+    if correlation_id is not None:
+        headers = {"X-Correlation-ID": correlation_id}
+
     environ = falcon.testing.create_environ(
         path="/contextvar-lifecycle",
-        headers={"X-Correlation-ID": correlation_id},
+        headers=headers,
+        remote_addr=remote_addr,
     )
     return falcon.Request(environ), falcon.Response()
 
@@ -40,7 +45,68 @@ class TestContextVariableLifecycle:
 
             assert req.context.correlation_id == "trusted-id"
             assert correlation_id_var.get() == "trusted-id"
-            token = getattr(req.context, _RESET_TOKEN_ATTR, None)
+            token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
+            assert isinstance(token, contextvars.Token)
+
+        contextvars.copy_context().run(_inner)
+
+    def test_process_request_generates_id_when_header_missing(self) -> None:
+        """Verify missing header triggers generated ID and contextvar token storage."""
+        middleware = CorrelationIDMiddleware(
+            trusted_sources=["127.0.0.1"],
+            generator=lambda: "generated-missing-header",
+        )
+
+        def _inner() -> None:
+            req, resp = _build_request_response(correlation_id=None)
+
+            middleware.process_request(req, resp)
+
+            assert req.context.correlation_id == "generated-missing-header"
+            assert correlation_id_var.get() == "generated-missing-header"
+            token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
+            assert isinstance(token, contextvars.Token)
+
+        contextvars.copy_context().run(_inner)
+
+    def test_process_request_replaces_invalid_id_from_trusted_source(self) -> None:
+        """Verify trusted invalid IDs are replaced and lifecycle state tracks them."""
+        middleware = CorrelationIDMiddleware(
+            trusted_sources=["127.0.0.1"],
+            generator=lambda: "generated-invalid-trusted",
+            validator=lambda value: False,
+        )
+
+        def _inner() -> None:
+            req, resp = _build_request_response(correlation_id="invalid-id")
+
+            middleware.process_request(req, resp)
+
+            assert req.context.correlation_id == "generated-invalid-trusted"
+            assert correlation_id_var.get() == "generated-invalid-trusted"
+            token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
+            assert isinstance(token, contextvars.Token)
+
+        contextvars.copy_context().run(_inner)
+
+    def test_process_request_ignores_valid_id_from_untrusted_source(self) -> None:
+        """Verify untrusted incoming IDs are ignored and replaced."""
+        middleware = CorrelationIDMiddleware(
+            trusted_sources=["127.0.0.1"],
+            generator=lambda: "generated-untrusted",
+        )
+
+        def _inner() -> None:
+            req, resp = _build_request_response(
+                correlation_id="untrusted-id",
+                remote_addr="203.0.113.5",
+            )
+
+            middleware.process_request(req, resp)
+
+            assert req.context.correlation_id == "generated-untrusted"
+            assert correlation_id_var.get() == "generated-untrusted"
+            token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
             assert isinstance(token, contextvars.Token)
 
         contextvars.copy_context().run(_inner)
@@ -92,9 +158,7 @@ class TestContextVariableLifecycle:
         middleware = CorrelationIDMiddleware()
 
         def _inner() -> None:
-            environ = falcon.testing.create_environ(path="/contextvar-lifecycle")
-            req = falcon.Request(environ)
-            resp = falcon.Response()
+            req, resp = _build_request_response()
 
             middleware.process_response(
                 req,
@@ -104,6 +168,59 @@ class TestContextVariableLifecycle:
             )
 
             assert correlation_id_var.get() is None
+
+        contextvars.copy_context().run(_inner)
+
+    def test_process_response_is_safe_with_non_token_reset_attr(self) -> None:
+        """Verify process_response ignores non-Token reset attribute values."""
+        middleware = CorrelationIDMiddleware()
+
+        def _inner() -> None:
+            original_token = correlation_id_var.set("original-correlation-id")
+            req, resp = _build_request_response()
+            non_token = object()
+            setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, non_token)
+
+            middleware.process_response(
+                req,
+                resp,
+                resource=None,
+                req_succeeded=False,
+            )
+
+            assert correlation_id_var.get() == "original-correlation-id"
+            assert getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR) is non_token
+            correlation_id_var.reset(original_token)
+
+        contextvars.copy_context().run(_inner)
+
+    def test_process_response_is_safe_with_mismatched_token_var(self) -> None:
+        """Verify process_response ignores tokens from unrelated context variables."""
+        middleware = CorrelationIDMiddleware()
+        foreign_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+            "foreign",
+            default=None,
+        )
+
+        def _inner() -> None:
+            original_token = correlation_id_var.set("original-correlation-id")
+            foreign_token = foreign_var.set("foreign-value")
+            req, resp = _build_request_response()
+            setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, foreign_token)
+
+            middleware.process_response(
+                req,
+                resp,
+                resource=None,
+                req_succeeded=False,
+            )
+
+            assert correlation_id_var.get() == "original-correlation-id"
+            assert (
+                getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR) is foreign_token
+            )
+            foreign_var.reset(foreign_token)
+            correlation_id_var.reset(original_token)
 
         contextvars.copy_context().run(_inner)
 

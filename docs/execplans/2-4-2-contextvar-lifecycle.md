@@ -292,8 +292,8 @@ Documentation acceptance:
 
 - Re-running tests is safe and deterministic.
 - If partial implementation leaves stale context, rerun from Stage A and use
-  focused lifecycle tests to localise failures before full suite execution.
-- If concurrency tests are flaky, tighten synchronisation primitives in test
+  focused lifecycle tests to localize failures before full suite execution.
+- If concurrency tests are flaky, tighten synchronization primitives in test
   code (barriers/events) before changing production code.
 
 ## Artifacts and notes

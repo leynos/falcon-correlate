@@ -1324,7 +1324,7 @@ class CorrelationIDMiddleware:
 - `tests/bdd/context_variables.feature` — BDD feature file.
 - `tests/bdd/test_context_variables_steps.py` — BDD step definitions.
 
-### A.3. Context Variable Lifecycle Management (Task 2.4.2)
+### A.3. Context variable lifecycle management (Task 2.4.2)
 
 **Decision:** Manage `correlation_id_var` lifecycle inside middleware request
 hooks by setting it in `process_request` and resetting it in `process_response`
