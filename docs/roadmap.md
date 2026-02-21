@@ -96,14 +96,14 @@ Implement ID retrieval, generation, validation, and contextual storage.
   - [x] Create `correlation_id_var: ContextVar[str | None]`.
   - [x] Create `user_id_var: ContextVar[str | None]`.
   - [x] Export context variables in public API.
-- [ ] 2.4.2. Implement context variable lifecycle. See design-doc §3.3.4.
-  - [ ] Set correlation ID in `process_request`.
-  - [ ] Store reset token for cleanup.
-  - [ ] Reset context variable in `process_response`.
-  - [ ] Ensure cleanup occurs even if request processing fails.
-  - [ ] Test context variable is set during request.
-  - [ ] Test context variable is cleared after response.
-  - [ ] Test context isolation between concurrent requests.
+- [x] 2.4.2. Implement context variable lifecycle. See design-doc §3.3.4.
+  - [x] Set correlation ID in `process_request`.
+  - [x] Store reset token for cleanup.
+  - [x] Reset context variable in `process_response`.
+  - [x] Ensure cleanup occurs even if request processing fails.
+  - [x] Test context variable is set during request.
+  - [x] Test context variable is cleared after response.
+  - [x] Test context isolation between concurrent requests.
 - [ ] 2.4.3. Integrate with Falcon's req.context. See design-doc §3.3.3.
   - [ ] Copy correlation ID to `req.context.correlation_id`.
   - [ ] Provide both access methods in documentation.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextvars
 import dataclasses
+import importlib
 import ipaddress
 import logging
 import typing as typ
@@ -27,6 +28,7 @@ correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 user_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "user_id", default=None
 )
+_CORRELATION_ID_RESET_TOKEN_ATTR = "_correlation_id_reset_token"  # noqa: S105  # FIXME: attribute-name string is not a secret
 
 
 def default_uuid7_generator() -> str:
@@ -45,8 +47,7 @@ def default_uuid7_generator() -> str:
     if uuid7 is not None:
         return uuid7().hex
 
-    import uuid_utils
-
+    uuid_utils = importlib.import_module("uuid_utils")
     return uuid_utils.uuid7().hex
 
 
@@ -313,7 +314,7 @@ class CorrelationIDConfig:
         )
 
 
-# Derive valid kwargs from dataclass fields to ensure synchronisation
+# Derive valid kwargs from dataclass fields to ensure synchronization
 _VALID_CONFIG_KWARGS = frozenset(
     field.name for field in dataclasses.fields(CorrelationIDConfig)
 )
@@ -493,9 +494,9 @@ class CorrelationIDMiddleware:
 
         This method is called before routing the request to a resource.
         It will retrieve or generate a correlation ID and store it in
-        the request context. If the source is trusted, an incoming header
-        is present, and the ID passes validation, the incoming ID is used;
-        otherwise a new ID is generated.
+        the request context and `correlation_id_var`. If the source is trusted,
+        an incoming header is present, and the ID passes validation, the
+        incoming ID is used; otherwise a new ID is generated.
 
         Parameters
         ----------
@@ -516,27 +517,31 @@ class CorrelationIDMiddleware:
 
         if incoming is not None and self._is_trusted_source(req.remote_addr):
             if self._is_valid_id(incoming):
-                req.context.correlation_id = incoming
+                correlation_id = incoming
             else:
                 logger.debug(
                     "Correlation ID failed validation, generating new ID",
                 )
-                req.context.correlation_id = self._config.generator()
+                correlation_id = self._config.generator()
         else:
-            req.context.correlation_id = self._config.generator()
+            correlation_id = self._config.generator()
+
+        req.context.correlation_id = correlation_id
+        reset_token = correlation_id_var.set(correlation_id)
+        setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, reset_token)
 
     def process_response(
         self,
         req: falcon.Request,
         resp: falcon.Response,
         resource: object,
-        req_succeeded: bool,  # noqa: FBT001, TD001, TD002, TD003  # FIXME: Falcon WSGI middleware interface requirement
+        req_succeeded: bool,  # noqa: FBT001  # FIXME: Falcon WSGI middleware interface requirement
     ) -> None:
-        """Post-process the response to add correlation ID header and cleanup.
+        """Post-process the response and clean up request-scoped context.
 
         This method is called after the resource responder has been invoked.
-        It will add the correlation ID to response headers and clean up
-        any request-scoped context.
+        It resets `correlation_id_var` to the state that existed before
+        `process_request` set it for the current request.
 
         Parameters
         ----------
@@ -551,3 +556,21 @@ class CorrelationIDMiddleware:
             True if no exceptions were raised during request processing.
 
         """
+        reset_token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
+        if not isinstance(reset_token, contextvars.Token):
+            return
+        if reset_token.var is not correlation_id_var:
+            logger.debug("Ignoring mismatched correlation ID reset token")
+            return
+
+        try:
+            correlation_id_var.reset(reset_token)
+        except ValueError:
+            logger.debug(
+                "Ignoring invalid correlation ID reset token",
+                exc_info=True,
+            )
+            return
+
+        # Prevent accidental double-reset if process_response is re-entered.
+        setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
