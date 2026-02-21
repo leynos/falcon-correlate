@@ -236,6 +236,53 @@ middleware. It is set during `process_request` and reset during
 intended for use by authentication middleware or application code that
 identifies the current user.
 
+## Accessing the correlation ID
+
+The middleware provides two ways to access the current request's correlation
+ID. Both methods always return the same value for the duration of a request,
+because the middleware sets them from the same source in `process_request`.
+
+### Via `req.context.correlation_id`
+
+Within Falcon responders, hooks, and any code that has access to the `req`
+object, the correlation ID is available directly on the request context:
+
+```python
+class MyResource:
+    def on_get(self, req, resp):
+        cid = req.context.correlation_id
+        resp.media = {"correlation_id": cid}
+```
+
+This is the simplest approach when `req` is already in scope.
+
+### Via `correlation_id_var.get()`
+
+In code that does not have access to the Falcon `req` object — such as logging
+filters, utility functions, and downstream service clients — use the context
+variable instead:
+
+```python
+from falcon_correlate import correlation_id_var
+
+
+def build_downstream_headers():
+    cid = correlation_id_var.get()
+    if cid is not None:
+        return {"X-Correlation-ID": cid}
+    return {}
+```
+
+### When to use each method
+
+| Method                       | Use when                                                                                                                    |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `req.context.correlation_id` | Code already has access to the Falcon `req` object (responders, hooks, middleware). Simpler and more explicit.              |
+| `correlation_id_var.get()`   | Code does not have access to `req` (logging filters, utility functions, service clients, Celery tasks). Framework-agnostic. |
+
+Both methods are kept in sync by the middleware. There is no need to choose one
+exclusively — use whichever is most convenient for the call site.
+
 ### echo_header_in_response
 
 Whether to include the correlation ID in response headers.
@@ -291,10 +338,11 @@ The following functionality is now implemented:
   request-scoped storage via `contextvars`.
 - Correlation ID context variable lifecycle management: `correlation_id_var` is
   set during request processing and reset during response cleanup.
+- Dual access to the correlation ID via `req.context.correlation_id` and
+  `correlation_id_var.get()`, both always in sync during request handling.
 
 The following functionality will be added in future releases:
 
-- `req.context` and `contextvars` parity guidance (task 2.4.3).
 - Logging integration (task 3.1).
 
 See the [roadmap](roadmap.md) for the full implementation plan.
