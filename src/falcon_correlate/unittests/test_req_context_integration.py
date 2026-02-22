@@ -148,19 +148,24 @@ class TestReqContextIntegration:
 
         def _worker(
             correlation_id: str,
-        ) -> tuple[str | None, str | None, bool]:
-            def _inner() -> tuple[str | None, str | None, bool]:
+        ) -> tuple[str | None, str | None, str | None, bool, bool]:
+            def _inner() -> tuple[str | None, str | None, str | None, bool, bool]:
                 req, resp = request_response_factory(
                     correlation_id=correlation_id,
                 )
 
                 middleware.process_request(req, resp)
                 req_context_value = req.context.correlation_id
-                contextvar_value = correlation_id_var.get()
+                pre_barrier_contextvar = correlation_id_var.get()
                 # Wait for both threads to reach this point so their
                 # contexts overlap.
                 barrier.wait(timeout=2.0)
-                parity = req_context_value == contextvar_value
+                # Re-read contextvar after overlap to verify isolation
+                # holds under true concurrency.
+                post_barrier_contextvar = correlation_id_var.get()
+
+                pre_parity = req_context_value == pre_barrier_contextvar
+                post_parity = req_context_value == post_barrier_contextvar
 
                 middleware.process_response(
                     req,
@@ -168,7 +173,13 @@ class TestReqContextIntegration:
                     resource=None,
                     req_succeeded=True,
                 )
-                return req_context_value, contextvar_value, parity
+                return (
+                    req_context_value,
+                    pre_barrier_contextvar,
+                    post_barrier_contextvar,
+                    pre_parity,
+                    post_parity,
+                )
 
             return contextvars.copy_context().run(_inner)
 
@@ -176,7 +187,13 @@ class TestReqContextIntegration:
         with ThreadPoolExecutor(max_workers=2) as executor:
             results = list(executor.map(_worker, request_ids))
 
-        for expected_id, (req_ctx, ctx_var, parity) in zip(
+        for expected_id, (
+            req_ctx,
+            pre_ctx_var,
+            post_ctx_var,
+            pre_parity,
+            post_parity,
+        ) in zip(
             request_ids,
             results,
             strict=True,
@@ -184,7 +201,12 @@ class TestReqContextIntegration:
             assert req_ctx == expected_id, (
                 f"Expected req.context value {expected_id!r}, got {req_ctx!r}"
             )
-            assert ctx_var == expected_id, (
-                f"Expected contextvar value {expected_id!r}, got {ctx_var!r}"
+            assert pre_ctx_var == expected_id, (
+                f"Expected pre-barrier contextvar {expected_id!r}, got {pre_ctx_var!r}"
             )
-            assert parity, f"req.context and contextvar must match for {expected_id!r}"
+            assert post_ctx_var == expected_id, (
+                f"Expected post-barrier contextvar {expected_id!r}, "
+                f"got {post_ctx_var!r}"
+            )
+            assert pre_parity, f"Pre-barrier parity failed for {expected_id!r}"
+            assert post_parity, f"Post-barrier parity failed for {expected_id!r}"

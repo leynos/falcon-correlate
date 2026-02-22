@@ -25,13 +25,19 @@ class _ReqContextParityResource:
     def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
         """Return both access method values and whether they match."""
         req_context_value = getattr(req.context, "correlation_id", None)
-        contextvar_value = correlation_id_var.get()
+        pre_delay_contextvar = correlation_id_var.get()
         if self._delay_seconds > 0:
             time.sleep(self._delay_seconds)
+        # Re-read contextvar after delay to verify isolation holds
+        # when concurrent requests overlap.
+        post_delay_contextvar = correlation_id_var.get()
         resp.media = {
             "req_context_value": req_context_value,
-            "contextvar_value": contextvar_value,
-            "parity": req_context_value == contextvar_value,
+            "contextvar_value": post_delay_contextvar,
+            "parity": (
+                req_context_value == pre_delay_contextvar
+                and req_context_value == post_delay_contextvar
+            ),
         }
 
 
@@ -114,6 +120,10 @@ def when_send_concurrent_req_context_requests(
         result = context["client"].simulate_get(
             "/req-context",
             headers={"X-Correlation-ID": correlation_id},
+        )
+        assert result.status == falcon.HTTP_200, (
+            f"Expected HTTP 200 for correlation ID {correlation_id!r}, "
+            f"got {result.status}"
         )
         return correlation_id, typ.cast("dict[str, typ.Any]", result.json)
 
