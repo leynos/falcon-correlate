@@ -7,8 +7,6 @@ import threading
 import typing as typ
 from concurrent.futures import ThreadPoolExecutor
 
-import falcon
-import falcon.testing
 import pytest
 
 from falcon_correlate import CorrelationIDMiddleware, correlation_id_var
@@ -16,40 +14,7 @@ from falcon_correlate import CorrelationIDMiddleware, correlation_id_var
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
-
-@pytest.fixture
-def request_response_factory() -> cabc.Callable[
-    ..., tuple[falcon.Request, falcon.Response]
-]:
-    """Create request/response objects for dual-access parity tests."""
-
-    def factory(
-        *,
-        correlation_id: str | None = None,
-        remote_addr: str = "127.0.0.1",
-    ) -> tuple[falcon.Request, falcon.Response]:
-        headers: dict[str, str] | None = None
-        if correlation_id is not None:
-            headers = {"X-Correlation-ID": correlation_id}
-
-        environ = falcon.testing.create_environ(
-            path="/req-context-parity",
-            headers=headers,
-            remote_addr=remote_addr,
-        )
-        return falcon.Request(environ), falcon.Response()
-
-    return factory
-
-
-@pytest.fixture
-def isolated_context() -> cabc.Callable[[cabc.Callable[[], None]], None]:
-    """Fixture providing a fresh contextvar context for each test."""
-
-    def runner(func: cabc.Callable[[], None]) -> None:
-        contextvars.copy_context().run(func)
-
-    return runner
+    import falcon
 
 
 class TestReqContextIntegration:

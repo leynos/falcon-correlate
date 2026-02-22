@@ -112,12 +112,19 @@ def when_send_concurrent_req_context_requests(
     first_id: str,
     second_id: str,
 ) -> None:
-    """Send two req-context requests concurrently with distinct IDs."""
+    """Send two req-context requests concurrently with distinct IDs.
+
+    Each worker creates its own ``TestClient`` to avoid sharing a
+    single client instance across threads.  ``TestClient`` is not
+    documented as thread-safe, so per-thread clients eliminate the
+    risk of intermittent failures from concurrent access.
+    """
 
     def _request(
         correlation_id: str,
     ) -> tuple[str, dict[str, typ.Any]]:
-        result = context["client"].simulate_get(
+        client = falcon.testing.TestClient(context["app"])
+        result = client.simulate_get(
             "/req-context",
             headers={"X-Correlation-ID": correlation_id},
         )
