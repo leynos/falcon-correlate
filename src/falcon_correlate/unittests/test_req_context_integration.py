@@ -155,6 +155,107 @@ class TestReqContextIntegration:
 
         isolated_context(_inner)
 
+    @staticmethod
+    def _execute_concurrent_request(
+        middleware: CorrelationIDMiddleware,
+        barrier: threading.Barrier,
+        request_response_factory: cabc.Callable[
+            ..., tuple[falcon.Request, falcon.Response]
+        ],
+        correlation_id: str,
+    ) -> tuple[str | None, str | None, str | None, bool, bool]:
+        """Run a single concurrent request inside an isolated context.
+
+        Parameters
+        ----------
+        middleware : CorrelationIDMiddleware
+            The middleware instance shared across concurrent workers.
+        barrier : threading.Barrier
+            Barrier used to synchronise workers so their contexts
+            overlap.
+        request_response_factory : cabc.Callable
+            Fixture that builds ``(Request, Response)`` pairs from
+            keyword arguments.
+        correlation_id : str
+            The correlation ID to send as a trusted incoming header.
+
+        Returns
+        -------
+        tuple[str | None, str | None, str | None, bool, bool]
+            ``(req_context_value, pre_barrier_contextvar,
+            post_barrier_contextvar, pre_parity, post_parity)``.
+
+        """
+
+        def _inner() -> tuple[str | None, str | None, str | None, bool, bool]:
+            req, resp = request_response_factory(
+                correlation_id=correlation_id,
+            )
+
+            middleware.process_request(req, resp)
+            req_context_value = req.context.correlation_id
+            pre_barrier_contextvar = correlation_id_var.get()
+            # Wait for both threads to reach this point so their
+            # contexts overlap.
+            barrier.wait(timeout=2.0)
+            # Re-read contextvar after overlap to verify isolation
+            # holds under true concurrency.
+            post_barrier_contextvar = correlation_id_var.get()
+
+            pre_parity = req_context_value == pre_barrier_contextvar
+            post_parity = req_context_value == post_barrier_contextvar
+
+            middleware.process_response(
+                req,
+                resp,
+                resource=None,
+                req_succeeded=True,
+            )
+            return (
+                req_context_value,
+                pre_barrier_contextvar,
+                post_barrier_contextvar,
+                pre_parity,
+                post_parity,
+            )
+
+        return contextvars.copy_context().run(_inner)
+
+    @staticmethod
+    def _validate_concurrent_results(
+        request_ids: list[str],
+        results: list[tuple[str | None, str | None, str | None, bool, bool]],
+    ) -> None:
+        """Assert that each concurrent result shows correct parity.
+
+        Parameters
+        ----------
+        request_ids : list[str]
+            The correlation IDs that were sent.
+        results : list[tuple]
+            Worker results to validate, one per request ID.
+
+        """
+        for expected_id, (
+            req_ctx,
+            pre_ctx_var,
+            post_ctx_var,
+            pre_parity,
+            post_parity,
+        ) in zip(request_ids, results, strict=True):
+            assert req_ctx == expected_id, (
+                f"Expected req.context value {expected_id!r}, got {req_ctx!r}"
+            )
+            assert pre_ctx_var == expected_id, (
+                f"Expected pre-barrier contextvar {expected_id!r}, got {pre_ctx_var!r}"
+            )
+            assert post_ctx_var == expected_id, (
+                f"Expected post-barrier contextvar {expected_id!r}, "
+                f"got {post_ctx_var!r}"
+            )
+            assert pre_parity, f"Pre-barrier parity failed for {expected_id!r}"
+            assert post_parity, f"Post-barrier parity failed for {expected_id!r}"
+
     def test_dual_access_parity_across_concurrent_requests(
         self,
         request_response_factory: cabc.Callable[
@@ -175,78 +276,22 @@ class TestReqContextIntegration:
             keyword arguments such as ``correlation_id`` and
             ``remote_addr``.
 
-        Notes
-        -----
-        Each worker returns a five-element tuple:
-        ``(req_context_value, pre_barrier_contextvar,
-        post_barrier_contextvar, pre_parity, post_parity)``.  Both
-        parity flags must be ``True`` for the test to pass.
-
         """
         middleware = CorrelationIDMiddleware(trusted_sources=["127.0.0.1"])
         barrier = threading.Barrier(2)
-
-        def _worker(
-            correlation_id: str,
-        ) -> tuple[str | None, str | None, str | None, bool, bool]:
-            def _inner() -> tuple[str | None, str | None, str | None, bool, bool]:
-                req, resp = request_response_factory(
-                    correlation_id=correlation_id,
-                )
-
-                middleware.process_request(req, resp)
-                req_context_value = req.context.correlation_id
-                pre_barrier_contextvar = correlation_id_var.get()
-                # Wait for both threads to reach this point so their
-                # contexts overlap.
-                barrier.wait(timeout=2.0)
-                # Re-read contextvar after overlap to verify isolation
-                # holds under true concurrency.
-                post_barrier_contextvar = correlation_id_var.get()
-
-                pre_parity = req_context_value == pre_barrier_contextvar
-                post_parity = req_context_value == post_barrier_contextvar
-
-                middleware.process_response(
-                    req,
-                    resp,
-                    resource=None,
-                    req_succeeded=True,
-                )
-                return (
-                    req_context_value,
-                    pre_barrier_contextvar,
-                    post_barrier_contextvar,
-                    pre_parity,
-                    post_parity,
-                )
-
-            return contextvars.copy_context().run(_inner)
-
         request_ids = ["concurrent-a", "concurrent-b"]
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            results = list(executor.map(_worker, request_ids))
 
-        for expected_id, (
-            req_ctx,
-            pre_ctx_var,
-            post_ctx_var,
-            pre_parity,
-            post_parity,
-        ) in zip(
-            request_ids,
-            results,
-            strict=True,
-        ):
-            assert req_ctx == expected_id, (
-                f"Expected req.context value {expected_id!r}, got {req_ctx!r}"
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(
+                executor.map(
+                    lambda cid: self._execute_concurrent_request(
+                        middleware,
+                        barrier,
+                        request_response_factory,
+                        cid,
+                    ),
+                    request_ids,
+                ),
             )
-            assert pre_ctx_var == expected_id, (
-                f"Expected pre-barrier contextvar {expected_id!r}, got {pre_ctx_var!r}"
-            )
-            assert post_ctx_var == expected_id, (
-                f"Expected post-barrier contextvar {expected_id!r}, "
-                f"got {post_ctx_var!r}"
-            )
-            assert pre_parity, f"Pre-barrier parity failed for {expected_id!r}"
-            assert post_parity, f"Post-barrier parity failed for {expected_id!r}"
+
+        self._validate_concurrent_results(request_ids, results)
