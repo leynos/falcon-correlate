@@ -29,6 +29,57 @@ user_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "user_id", default=None
 )
 _CORRELATION_ID_RESET_TOKEN_ATTR = "_correlation_id_reset_token"  # noqa: S105  # FIXME: attribute-name string is not a secret
+_MISSING_CONTEXT_PLACEHOLDER = "-"
+
+
+class ContextualLogFilter(logging.Filter):
+    """Logging filter that injects correlation and user IDs into log records.
+
+    This filter reads ``correlation_id_var`` and ``user_id_var`` and copies
+    their values onto the ``LogRecord`` as ``correlation_id`` and ``user_id``
+    attributes. When a context variable is not set, the placeholder ``"-"``
+    is used.
+
+    The filter never suppresses records; it always returns ``True``.
+
+    Examples
+    --------
+    Attach to a handler::
+
+        import logging
+        from falcon_correlate import ContextualLogFilter
+
+        handler = logging.StreamHandler()
+        handler.addFilter(ContextualLogFilter())
+        handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s [%(correlation_id)s] "
+                "[%(user_id)s] %(message)s"
+            )
+        )
+
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Enrich *record* with correlation ID and user ID attributes.
+
+        Parameters
+        ----------
+        record : logging.LogRecord
+            The log record to enrich.
+
+        Returns
+        -------
+        bool
+            Always ``True`` — this filter enriches records but never
+            suppresses them.
+
+        """
+        cid = correlation_id_var.get()
+        record.correlation_id = cid if cid is not None else _MISSING_CONTEXT_PLACEHOLDER
+        uid = user_id_var.get()
+        record.user_id = uid if uid is not None else _MISSING_CONTEXT_PLACEHOLDER
+        return True
 
 
 def default_uuid7_generator() -> str:

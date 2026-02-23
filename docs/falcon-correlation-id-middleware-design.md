@@ -1129,6 +1129,30 @@ with the ASGI middleware variant (task 5.1). Generated IDs are not validated
 since the generator is trusted to produce valid output. Validation (task 2.3)
 applies only to incoming IDs from external sources.
 
+#### 4.6.8. ContextualLogFilter implementation
+
+The `ContextualLogFilter` class is defined in `middleware.py`, co-located with
+the context variables it reads (`correlation_id_var` and `user_id_var`). This
+follows the project's convention of grouping by feature rather than layer.
+
+The filter uses `"-"` as the placeholder string when a context variable is not
+set (i.e. its value is `None`). This is safer than forwarding `None`, which
+would render as `"None"` in `%(correlation_id)s` format expressions and could
+be mistaken for a literal value. A dash is a conventional log placeholder that
+clearly signals "not available".
+
+The placeholder is stored in the module-level constant
+`_MISSING_CONTEXT_PLACEHOLDER` to avoid magic strings. The underscore prefix
+indicates an internal implementation detail.
+
+The `filter` method uses an explicit `is not None` check rather than the `or`
+operator to avoid replacing an empty string with the placeholder. While the
+middleware never sets context variables to empty strings, the explicit check is
+more defensively correct.
+
+The filter always returns `True`. It enriches records with contextual
+attributes but never suppresses them, as specified in §3.4.1.
+
 ## 5. Conclusion and recommendations
 
 This report has detailed the design for a comprehensive correlation ID

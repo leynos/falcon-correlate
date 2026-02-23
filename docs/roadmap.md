@@ -114,14 +114,14 @@ Provide utilities for injecting correlation IDs into log records.
 
 ### 3.1. Standard logging filter
 
-- [ ] 3.1.1. Implement ContextualLogFilter. See design-doc §3.4.1.
-  - [ ] Create `ContextualLogFilter(logging.Filter)` class.
-  - [ ] Inject `correlation_id` attribute into log records.
-  - [ ] Inject `user_id` attribute into log records.
-  - [ ] Use placeholder value (e.g., `-`) when context is not set.
-  - [ ] Test filter adds attributes to log records.
-  - [ ] Test placeholder values when context is empty.
-  - [ ] Test filter integrates with standard logging configuration.
+- [x] 3.1.1. Implement ContextualLogFilter. See design-doc §3.4.1.
+  - [x] Create `ContextualLogFilter(logging.Filter)` class.
+  - [x] Inject `correlation_id` attribute into log records.
+  - [x] Inject `user_id` attribute into log records.
+  - [x] Use placeholder value (e.g., `-`) when context is not set.
+  - [x] Test filter adds attributes to log records.
+  - [x] Test placeholder values when context is empty.
+  - [x] Test filter integrates with standard logging configuration.
 - [ ] 3.1.2. Provide example logging configuration. See design-doc §3.4.2.
   - [ ] Document recommended format string.
   - [ ] Provide dictConfig example in docstrings.
