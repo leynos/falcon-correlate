@@ -1,4 +1,44 @@
-"""Step definitions for req_context_integration.feature."""
+"""BDD step definitions for req_context_integration.feature.
+
+This module provides the ``pytest-bdd`` step implementations that drive
+the ``req_context_integration.feature`` scenarios.  Each scenario
+verifies that ``req.context.correlation_id`` and
+``correlation_id_var.get()`` return the same value after
+``CorrelationIDMiddleware.process_request`` executes — both for single
+requests and under concurrent request handling.
+
+The step definitions use ``falcon.testing.TestClient`` to simulate HTTP
+requests against a minimal Falcon app wired with
+``CorrelationIDMiddleware``.
+
+Usage
+-----
+Run the BDD scenarios with pytest::
+
+    pytest tests/bdd/test_req_context_integration_steps.py -v
+
+Or run all BDD tests::
+
+    make test
+
+Examples
+--------
+The feature scenarios are registered via the ``scenarios()`` call at
+module level::
+
+    from pytest_bdd import scenarios
+
+    scenarios("req_context_integration.feature")
+
+Key symbols used in this module:
+
+- ``CorrelationIDMiddleware`` — the middleware under test.
+- ``correlation_id_var`` — the ``ContextVar`` that stores the
+  correlation ID.
+- ``scenarios()`` — ``pytest-bdd`` helper that collects all scenarios
+  from the linked feature file.
+
+"""
 
 from __future__ import annotations
 
@@ -87,6 +127,9 @@ def given_app_with_concurrent_req_context_parity() -> Context:
 def when_request_without_header(context: Context, path: str) -> None:
     """Send a request without an incoming correlation ID header."""
     context["response"] = context["client"].simulate_get(path)
+    assert context["response"].status == falcon.HTTP_200, (
+        f"Expected HTTP 200, got {context['response'].status}"
+    )
 
 
 @when(parsers.parse('I request "{path}" with correlation ID "{correlation_id}"'))
@@ -99,6 +142,9 @@ def when_request_with_correlation_id(
     context["response"] = context["client"].simulate_get(
         path,
         headers={"X-Correlation-ID": correlation_id},
+    )
+    assert context["response"].status == falcon.HTTP_200, (
+        f"Expected HTTP 200, got {context['response'].status}"
     )
 
 

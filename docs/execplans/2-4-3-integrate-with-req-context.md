@@ -9,11 +9,12 @@ Status: COMPLETE
 ## Purpose / big picture
 
 Task 2.4.2 added lifecycle management so that `correlation_id_var` is set
-during `process_request` and reset during `process_response`. The middleware
-also copies the correlation ID to `req.context.correlation_id` (line 529 of
-`src/falcon_correlate/middleware.py`), providing a convenient Falcon-native
-access method. Task 2.4.3 makes this dual-access pattern an explicit,
-documented, and independently tested feature of the library.
+during `CorrelationIDMiddleware.process_request` and reset during
+`CorrelationIDMiddleware.process_response`. The middleware also copies the
+correlation ID to `req.context.correlation_id` in `process_request`, providing
+a convenient Falcon-native access method. Task 2.4.3 makes this dual-access
+pattern an explicit, documented, and independently tested feature of the
+library.
 
 Success is observable when:
 
@@ -81,16 +82,17 @@ Success is observable when:
 - [x] (2026-02-21) Update `docs/falcon-correlation-id-middleware-design.md`
   with appendix A.4.
 - [x] (2026-02-21) Update `docs/roadmap.md` to mark 2.4.3 complete.
-- [x] (2026-02-21) Run all quality gates and capture logs.
+- [x] (2026-02-21) Run all quality gates.
 - [x] (2026-02-21) Update ExecPlan status to COMPLETE.
 
 ## Surprises & discoveries
 
-- The production code for `req.context.correlation_id` assignment (line 529 of
-  `middleware.py`) was already in place from task 2.4.2 or earlier. The
-  existing lifecycle tests in `test_contextvar_lifecycle.py` verified this as a
-  side-effect via the `_assert_contextvar_state` helper. This task therefore
-  required no production code changes — only dedicated tests and documentation.
+- The production code for `req.context.correlation_id` assignment in
+  `CorrelationIDMiddleware.process_request` was already in place from task
+  2.4.2 or earlier. The existing lifecycle tests in
+  `test_contextvar_lifecycle.py` verified this as a side effect via the
+  `_assert_contextvar_state` helper. This task therefore required no production
+  code changes — only dedicated tests and documentation.
 
 ## Decision log
 
@@ -102,11 +104,12 @@ Success is observable when:
   Dedicated files make the dual-access parity the explicit subject under test.
   Date/Author: 2026-02-21.
 
-- Decision: no production code changes. Rationale: `process_request` at line
-  529 of `middleware.py` already sets `req.context.correlation_id` from the
-  same `correlation_id` variable used to set `correlation_id_var` at line 530.
-  Both are set in the same code path, guaranteeing parity. This task documents
-  and tests that guarantee. Date/Author: 2026-02-21.
+- Decision: no production code changes. Rationale:
+  `CorrelationIDMiddleware.process_request` already sets
+  `req.context.correlation_id` from the same local `correlation_id` variable
+  used to set `correlation_id_var`. Both are set in the same code path,
+  guaranteeing parity. This task documents and tests that guarantee.
+  Date/Author: 2026-02-21.
 
 ## Outcomes & retrospective
 
@@ -143,14 +146,13 @@ All quality gates pass: `make check-fmt`, `make typecheck`, `make lint`,
 correlation IDs throughout the HTTP request lifecycle. The middleware lives in
 a single module at `src/falcon_correlate/middleware.py`.
 
-The `CorrelationIDMiddleware.process_request` method (lines 492-531) selects a
-correlation ID (from a trusted incoming header or by generation) and stores it
-in two places:
+The `CorrelationIDMiddleware.process_request` method selects a correlation ID
+(from a trusted incoming header or by generation) and stores it in two places:
 
-- `req.context.correlation_id` (line 529) — Falcon's per-request context
-  object, accessible within responders and hooks that have access to `req`.
-- `correlation_id_var` (line 530) — a `contextvars.ContextVar` instance,
-  accessible anywhere in the call stack without needing `req`.
+- `req.context.correlation_id` — Falcon's per-request context object,
+  accessible within responders and hooks that have access to `req`.
+- `correlation_id_var` — a `contextvars.ContextVar` instance, accessible
+  anywhere in the call stack without needing `req`.
 
 The design specification at section 3.3.3 of
 `docs/falcon-correlation-id-middleware-design.md` recommends this pattern:
@@ -164,8 +166,8 @@ convenience copy.
 - `src/falcon_correlate/__init__.py` — public API exports (no changes
   planned).
 - `src/falcon_correlate/unittests/test_contextvar_lifecycle.py` — existing
-  lifecycle unit tests; the `_assert_contextvar_state` helper at line 59
-  already verifies both access methods as a side-effect.
+  lifecycle unit tests; the `_assert_contextvar_state` helper already verifies
+  both access methods as a side effect.
 - `tests/bdd/contextvar_lifecycle.feature` — existing lifecycle BDD scenarios.
 - `tests/bdd/test_contextvar_lifecycle_steps.py` — existing lifecycle step
   definitions; `_LifecycleResource` reads both `req.context.correlation_id` and
@@ -176,7 +178,7 @@ convenience copy.
   section and status update).
 - `docs/falcon-correlation-id-middleware-design.md` — design document (needs
   appendix A.4).
-- `docs/roadmap.md` — completion checklist (lines 107-109 need marking).
+- `docs/roadmap.md` — completion checklist (task 2.4.3 entries need marking).
 
 ## Plan of work
 
@@ -199,8 +201,8 @@ Create `src/falcon_correlate/unittests/test_req_context_integration.py` with a
    `req.context.correlation_id` and `correlation_id_var.get()` for their own
    request.
 
-Reuse the fixture patterns from `test_contextvar_lifecycle.py`:
-`request_response_factory` (lines 22-43) and `isolated_context` (lines 46-53).
+Reuse the `request_response_factory` and `isolated_context` fixture patterns
+from `conftest.py`.
 
 Validate: `make test` passes and new tests appear in output.
 
@@ -325,3 +327,6 @@ documentation references existing public API exports (`correlation_id_var`,
 
 - 2026-02-21: Initial DRAFT created for roadmap item 2.4.3.
 - 2026-02-21: Updated to COMPLETE after implementation, tests, and docs.
+- 2026-02-23: Replaced hard-coded line numbers with symbol references;
+  changed "side-effect" to "side effect"; removed "capture logs" from progress
+  checklist (no durable artifact location).
