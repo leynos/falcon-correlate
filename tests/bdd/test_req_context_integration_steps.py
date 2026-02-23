@@ -144,30 +144,43 @@ def when_send_concurrent_req_context_requests(
 def then_req_context_and_contextvar_match(context: Context) -> None:
     """Verify that req.context and contextvar returned the same value."""
     payload = typ.cast("dict[str, typ.Any]", context["response"].json)
-    assert payload["parity"] is True
-    assert payload["req_context_value"] == payload["contextvar_value"]
+    assert payload["parity"] is True, f"Expected parity True, got {payload['parity']!r}"
+    assert payload["req_context_value"] == payload["contextvar_value"], (
+        f"Expected req_context_value == contextvar_value, "
+        f"got {payload['req_context_value']!r} != {payload['contextvar_value']!r}"
+    )
 
 
 @then("both values should be non-empty")
 def then_both_values_non_empty(context: Context) -> None:
     """Verify that both access methods returned a non-empty value."""
     payload = typ.cast("dict[str, typ.Any]", context["response"].json)
-    assert payload["req_context_value"]
-    assert payload["contextvar_value"]
+    assert payload["req_context_value"], (
+        f"Expected non-empty req_context_value, got {payload['req_context_value']!r}"
+    )
+    assert payload["contextvar_value"], (
+        f"Expected non-empty contextvar_value, got {payload['contextvar_value']!r}"
+    )
 
 
 @then(parsers.parse('req.context.correlation_id should be "{expected}"'))
 def then_req_context_value_is(context: Context, expected: str) -> None:
     """Verify the req.context correlation ID matches the expected value."""
     payload = typ.cast("dict[str, typ.Any]", context["response"].json)
-    assert payload["req_context_value"] == expected
+    assert payload["req_context_value"] == expected, (
+        f"Expected req_context_value == {expected!r}, "
+        f"got {payload['req_context_value']!r}"
+    )
 
 
 @then(parsers.parse('the contextvar value should be "{expected}"'))
 def then_contextvar_value_is(context: Context, expected: str) -> None:
     """Verify the contextvar value matches the expected value."""
     payload = typ.cast("dict[str, typ.Any]", context["response"].json)
-    assert payload["contextvar_value"] == expected
+    assert payload["contextvar_value"] == expected, (
+        f"Expected contextvar_value == {expected!r}, "
+        f"got {payload['contextvar_value']!r}"
+    )
 
 
 @then("each req-context response should confirm parity")
@@ -177,5 +190,11 @@ def then_each_response_confirms_parity(context: Context) -> None:
 
     for expected_id, payload in results.items():
         assert payload["parity"] is True, f"Expected parity for {expected_id!r}"
-        assert payload["req_context_value"] == expected_id
-        assert payload["contextvar_value"] == expected_id
+        assert payload["req_context_value"] == expected_id, (
+            f"Expected req_context_value == {expected_id!r}, "
+            f"got {payload['req_context_value']!r}"
+        )
+        assert payload["contextvar_value"] == expected_id, (
+            f"Expected contextvar_value == {expected_id!r}, "
+            f"got {payload['contextvar_value']!r}"
+        )

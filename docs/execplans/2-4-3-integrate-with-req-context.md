@@ -120,7 +120,7 @@ values in `process_request`.
 New tests were added in both unit and behavioural suites:
 
 - `src/falcon_correlate/unittests/test_req_context_integration.py` — five
-  unit tests covering parametrised parity across four selection paths plus
+  unit tests covering parametrized parity across four selection paths plus
   concurrent isolation.
 - `tests/bdd/req_context_integration.feature` — three BDD scenarios covering
   generated ID parity, trusted incoming ID parity, and concurrent parity.
@@ -185,7 +185,7 @@ convenience copy.
 Create `src/falcon_correlate/unittests/test_req_context_integration.py` with a
 `TestReqContextIntegration` class containing:
 
-1. A parametrised test covering four scenarios that verify
+1. A parametrized test covering four scenarios that verify
    `req.context.correlation_id == correlation_id_var.get()`:
    - Generated ID (no incoming header): both return the same generated value.
    - Trusted incoming ID: both return the incoming header value.
