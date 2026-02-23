@@ -55,6 +55,14 @@ from falcon_correlate import CorrelationIDMiddleware, correlation_id_var
 scenarios("req_context_integration.feature")
 
 
+class _ParityPayload(typ.TypedDict):
+    """Typed response payload from ``_ReqContextParityResource``."""
+
+    req_context_value: str | None
+    contextvar_value: str | None
+    parity: bool
+
+
 class _ReqContextParityResource:
     """Falcon resource that reports both req.context and contextvar values."""
 
@@ -87,7 +95,7 @@ class Context(typ.TypedDict, total=False):
     app: falcon.App
     client: falcon.testing.TestClient
     response: falcon.testing.Result
-    concurrent_results: dict[str, dict[str, typ.Any]]
+    concurrent_results: dict[str, _ParityPayload]
 
 
 def _build_context(*, delay_seconds: float = 0.0) -> Context:
@@ -168,7 +176,7 @@ def when_send_concurrent_req_context_requests(
 
     def _request(
         correlation_id: str,
-    ) -> tuple[str, dict[str, typ.Any]]:
+    ) -> tuple[str, _ParityPayload]:
         client = falcon.testing.TestClient(context["app"])
         result = client.simulate_get(
             "/req-context",
@@ -178,7 +186,7 @@ def when_send_concurrent_req_context_requests(
             f"Expected HTTP 200 for correlation ID {correlation_id!r}, "
             f"got {result.status}"
         )
-        return correlation_id, typ.cast("dict[str, typ.Any]", result.json)
+        return correlation_id, typ.cast("_ParityPayload", result.json)
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         pairs = list(executor.map(_request, [first_id, second_id]))
@@ -189,7 +197,7 @@ def when_send_concurrent_req_context_requests(
 @then("req.context.correlation_id and contextvar should match")
 def then_req_context_and_contextvar_match(context: Context) -> None:
     """Verify that req.context and contextvar returned the same value."""
-    payload = typ.cast("dict[str, typ.Any]", context["response"].json)
+    payload = typ.cast("_ParityPayload", context["response"].json)
     assert payload["parity"] is True, f"Expected parity True, got {payload['parity']!r}"
     assert payload["req_context_value"] == payload["contextvar_value"], (
         f"Expected req_context_value == contextvar_value, "
@@ -200,7 +208,7 @@ def then_req_context_and_contextvar_match(context: Context) -> None:
 @then("both values should be non-empty")
 def then_both_values_non_empty(context: Context) -> None:
     """Verify that both access methods returned a non-empty value."""
-    payload = typ.cast("dict[str, typ.Any]", context["response"].json)
+    payload = typ.cast("_ParityPayload", context["response"].json)
     assert payload["req_context_value"], (
         f"Expected non-empty req_context_value, got {payload['req_context_value']!r}"
     )
@@ -212,7 +220,7 @@ def then_both_values_non_empty(context: Context) -> None:
 @then(parsers.parse('req.context.correlation_id should be "{expected}"'))
 def then_req_context_value_is(context: Context, expected: str) -> None:
     """Verify the req.context correlation ID matches the expected value."""
-    payload = typ.cast("dict[str, typ.Any]", context["response"].json)
+    payload = typ.cast("_ParityPayload", context["response"].json)
     assert payload["req_context_value"] == expected, (
         f"Expected req_context_value == {expected!r}, "
         f"got {payload['req_context_value']!r}"
@@ -222,7 +230,7 @@ def then_req_context_value_is(context: Context, expected: str) -> None:
 @then(parsers.parse('the contextvar value should be "{expected}"'))
 def then_contextvar_value_is(context: Context, expected: str) -> None:
     """Verify the contextvar value matches the expected value."""
-    payload = typ.cast("dict[str, typ.Any]", context["response"].json)
+    payload = typ.cast("_ParityPayload", context["response"].json)
     assert payload["contextvar_value"] == expected, (
         f"Expected contextvar_value == {expected!r}, "
         f"got {payload['contextvar_value']!r}"

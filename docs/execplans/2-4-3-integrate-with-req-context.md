@@ -249,11 +249,13 @@ Validate: `make markdownlint` passes.
 
 Run all quality gates:
 
-    set -o pipefail
-    make check-fmt 2>&1 | tee /tmp/check-fmt.log
-    make typecheck 2>&1 | tee /tmp/typecheck.log
-    make lint 2>&1 | tee /tmp/lint.log
-    make test 2>&1 | tee /tmp/test.log
+```shell
+set -o pipefail
+make check-fmt 2>&1 | tee /tmp/check-fmt.log
+make typecheck 2>&1 | tee /tmp/typecheck.log
+make lint 2>&1 | tee /tmp/lint.log
+make test 2>&1 | tee /tmp/test.log
+```
 
 Fix any failures and rerun until all pass.
 
