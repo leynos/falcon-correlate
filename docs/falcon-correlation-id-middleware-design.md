@@ -1363,3 +1363,44 @@ using the `contextvars.Token` returned by `.set()`.
   in-request visibility, post-response cleanup, and concurrent isolation.
 - `tests/bdd/test_contextvar_lifecycle_steps.py` — BDD step definitions for
   lifecycle behaviour.
+
+### A.4. req.context integration (Task 2.4.3)
+
+**Decision:** Copy the correlation ID to `req.context.correlation_id` in
+`process_request`, providing dual access alongside `correlation_id_var.get()`.
+No additional production code was required because the assignment was already
+present at line 529 of `middleware.py`; this task adds dedicated tests and
+documentation.
+
+**Rationale:**
+
+1. **Design-spec alignment:** Section §3.3.3 recommends using `contextvars`
+   as the primary authoritative store while also copying values into
+   `req.context` for convenience. The middleware sets both in `process_request`
+   (lines 529-530 of `middleware.py`).
+
+2. **No additional lifecycle management needed:**
+   `req.context.correlation_id` is inherently request-scoped because
+   `req.context` is a per-request object managed by Falcon. Unlike
+   `correlation_id_var`, it does not require explicit cleanup in
+   `process_response`.
+
+3. **Parity guarantee:** Both access methods return the same value because
+   the middleware sets them from the same `correlation_id` variable in a single
+   code path. This is validated by dedicated unit and BDD tests.
+
+4. **Usage guidance:** `req.context.correlation_id` is preferred within
+   Falcon responders and hooks where `req` is available.
+   `correlation_id_var.get()` is preferred in library code, logging filters,
+   and downstream service clients where `req` is not accessible.
+
+**Files created/modified:**
+
+- `src/falcon_correlate/unittests/test_req_context_integration.py` — Unit
+  tests for dual-access parity across all correlation ID selection paths and
+  concurrent requests.
+- `tests/bdd/req_context_integration.feature` — BDD scenarios for req.context
+  access parity.
+- `tests/bdd/test_req_context_integration_steps.py` — BDD step definitions.
+- `docs/users-guide.md` — Added dual-access guidance section and updated
+  current status.

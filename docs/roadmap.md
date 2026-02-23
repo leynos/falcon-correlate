@@ -104,9 +104,9 @@ Implement ID retrieval, generation, validation, and contextual storage.
   - [x] Test context variable is set during request.
   - [x] Test context variable is cleared after response.
   - [x] Test context isolation between concurrent requests.
-- [ ] 2.4.3. Integrate with Falcon's req.context. See design-doc §3.3.3.
-  - [ ] Copy correlation ID to `req.context.correlation_id`.
-  - [ ] Provide both access methods in documentation.
+- [x] 2.4.3. Integrate with Falcon's req.context. See design-doc §3.3.3.
+  - [x] Copy correlation ID to `req.context.correlation_id`.
+  - [x] Provide both access methods in documentation.
 
 ## 3. Logging integration
 
