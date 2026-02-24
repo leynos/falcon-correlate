@@ -199,33 +199,30 @@ class TestContextualLogFilterPreservesExistingAttributes:
     """Tests for preserving pre-existing record attributes."""
 
     @pytest.mark.parametrize(
-        ("context_var", "attr_name", "existing_value", "contextvar_value"),
+        ("attr_name", "record_value", "contextvar", "contextvar_value"),
         [
-            (correlation_id_var, "correlation_id", "caller-cid", "contextvar-cid"),
-            (user_id_var, "user_id", "caller-uid", "contextvar-uid"),
+            ("correlation_id", "caller-cid", correlation_id_var, "contextvar-cid"),
+            ("user_id", "caller-uid", user_id_var, "contextvar-uid"),
         ],
         ids=["correlation_id", "user_id"],
     )
     def test_preserves_existing_attribute(  # noqa: PLR0913 — pytest parametrize injection
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-        context_var: contextvars.ContextVar[str | None],
         attr_name: str,
-        existing_value: str,
+        record_value: str,
+        contextvar: contextvars.ContextVar[str | None],
         contextvar_value: str,
     ) -> None:
         """Verify filter does not overwrite a pre-existing attribute."""
         f = ContextualLogFilter()
         record = _make_log_record()
-        setattr(record, attr_name, existing_value)
+        setattr(record, attr_name, record_value)
 
         def test_logic() -> None:
-            context_var.set(contextvar_value)
+            contextvar.set(contextvar_value)
             f.filter(record)
-            actual = getattr(record, attr_name)
-            assert actual == existing_value, (
-                f"expected {attr_name}={existing_value!r}, got {actual!r}"
-            )
+            assert getattr(record, attr_name) == record_value
 
         isolated_context(test_logic)
 
