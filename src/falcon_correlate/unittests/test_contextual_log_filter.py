@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import io
 import logging
 import logging.config
@@ -18,6 +19,34 @@ from falcon_correlate import (
     correlation_id_var,
     user_id_var,
 )
+
+
+class _HasCorrelationID(typ.Protocol):
+    correlation_id: str
+
+
+class _HasUserID(typ.Protocol):
+    user_id: str
+
+
+class _HasContextIDs(_HasCorrelationID, _HasUserID, typ.Protocol):
+    """LogRecord enriched by ContextualLogFilter with both IDs."""
+
+
+@dataclasses.dataclass(frozen=True)
+class PreservationTestCase:
+    """Encapsulates parameters for attribute preservation tests."""
+
+    context_var: contextvars.ContextVar[str | None]
+    attr_name: str
+    existing_value: str
+    contextvar_value: str
+
+
+@pytest.fixture
+def preservation_case(request: pytest.FixtureRequest) -> PreservationTestCase:
+    """Fixture to receive parametrised PreservationTestCase instances."""
+    return request.param
 
 
 def _make_log_record(msg: str = "test message") -> logging.LogRecord:
@@ -92,12 +121,13 @@ class TestContextualLogFilterAttributeInjection:
             correlation_id_var.set("both-cid")
             user_id_var.set("both-uid")
             f.filter(record)
-            assert (
-                record.correlation_id == "both-cid"  # type: ignore[attr-defined]
-            ), f"expected correlation_id='both-cid', got {record.correlation_id!r}"  # type: ignore[attr-defined]
-            assert (
-                record.user_id == "both-uid"  # type: ignore[attr-defined]
-            ), f"expected user_id='both-uid', got {record.user_id!r}"  # type: ignore[attr-defined]
+            rec = typ.cast("_HasContextIDs", record)
+            assert rec.correlation_id == "both-cid", (
+                f"expected correlation_id='both-cid', got {rec.correlation_id!r}"
+            )
+            assert rec.user_id == "both-uid", (
+                f"expected user_id='both-uid', got {rec.user_id!r}"
+            )
 
         isolated_context(test_logic)
 
@@ -199,30 +229,42 @@ class TestContextualLogFilterPreservesExistingAttributes:
     """Tests for preserving pre-existing record attributes."""
 
     @pytest.mark.parametrize(
-        ("attr_name", "record_value", "contextvar", "contextvar_value"),
+        "preservation_case",
         [
-            ("correlation_id", "caller-cid", correlation_id_var, "contextvar-cid"),
-            ("user_id", "caller-uid", user_id_var, "contextvar-uid"),
+            PreservationTestCase(
+                context_var=correlation_id_var,
+                attr_name="correlation_id",
+                existing_value="caller-cid",
+                contextvar_value="contextvar-cid",
+            ),
+            PreservationTestCase(
+                context_var=user_id_var,
+                attr_name="user_id",
+                existing_value="caller-uid",
+                contextvar_value="contextvar-uid",
+            ),
         ],
         ids=["correlation_id", "user_id"],
+        indirect=True,
     )
-    def test_preserves_existing_attribute(  # noqa: PLR0913 — pytest parametrize injection
+    def test_preserves_existing_attribute(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-        attr_name: str,
-        record_value: str,
-        contextvar: contextvars.ContextVar[str | None],
-        contextvar_value: str,
+        preservation_case: PreservationTestCase,
     ) -> None:
         """Verify filter does not overwrite a pre-existing attribute."""
         f = ContextualLogFilter()
         record = _make_log_record()
-        setattr(record, attr_name, record_value)
+        setattr(record, preservation_case.attr_name, preservation_case.existing_value)
 
         def test_logic() -> None:
-            contextvar.set(contextvar_value)
+            preservation_case.context_var.set(preservation_case.contextvar_value)
             f.filter(record)
-            assert getattr(record, attr_name) == record_value
+            actual = getattr(record, preservation_case.attr_name)
+            expected = preservation_case.existing_value
+            assert actual == expected, (
+                f"expected {preservation_case.attr_name}={expected!r}, got {actual!r}"
+            )
 
         isolated_context(test_logic)
 
@@ -237,12 +279,13 @@ class TestContextualLogFilterPreservesExistingAttributes:
 
         def test_logic() -> None:
             f.filter(record)
-            assert (
-                record.correlation_id == "explicit-cid"  # type: ignore[attr-defined]
-            ), f"expected correlation_id='explicit-cid', got {record.correlation_id!r}"  # type: ignore[attr-defined]
-            assert (
-                record.user_id == "explicit-uid"  # type: ignore[attr-defined]
-            ), f"expected user_id='explicit-uid', got {record.user_id!r}"  # type: ignore[attr-defined]
+            rec = typ.cast("_HasContextIDs", record)
+            assert rec.correlation_id == "explicit-cid", (
+                f"expected correlation_id='explicit-cid', got {rec.correlation_id!r}"
+            )
+            assert rec.user_id == "explicit-uid", (
+                f"expected user_id='explicit-uid', got {rec.user_id!r}"
+            )
 
         isolated_context(test_logic)
 
@@ -257,12 +300,13 @@ class TestContextualLogFilterPreservesExistingAttributes:
         def test_logic() -> None:
             user_id_var.set("contextvar-uid")
             f.filter(record)
-            assert (
-                record.correlation_id == "caller-cid"  # type: ignore[attr-defined]
-            ), f"expected correlation_id='caller-cid', got {record.correlation_id!r}"  # type: ignore[attr-defined]
-            assert (
-                record.user_id == "contextvar-uid"  # type: ignore[attr-defined]
-            ), f"expected user_id='contextvar-uid', got {record.user_id!r}"  # type: ignore[attr-defined]
+            rec = typ.cast("_HasContextIDs", record)
+            assert rec.correlation_id == "caller-cid", (
+                f"expected correlation_id='caller-cid', got {rec.correlation_id!r}"
+            )
+            assert rec.user_id == "contextvar-uid", (
+                f"expected user_id='contextvar-uid', got {rec.user_id!r}"
+            )
 
         isolated_context(test_logic)
 

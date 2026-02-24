@@ -64,6 +64,7 @@ class ContextualLogFilter(logging.Filter):
 
     """
 
+    @typ.override
     def filter(self, record: logging.LogRecord) -> bool:
         """Enrich *record* with correlation ID and user ID attributes.
 
