@@ -8,6 +8,8 @@ import logging
 import logging.config
 import typing as typ
 
+import pytest
+
 from falcon_correlate import (
     ContextualLogFilter,
     correlation_id_var,
@@ -53,29 +55,28 @@ class TestContextualLogFilterIsLoggingFilter:
 class TestContextualLogFilterAttributeInjection:
     """Tests for attribute injection from context variables."""
 
-    def test_injects_correlation_id_from_context(
-        self, isolated_context: object
+    @pytest.mark.parametrize(
+        ("context_var", "context_value", "attr_name"),
+        [
+            (correlation_id_var, "test-cid-123", "correlation_id"),
+            (user_id_var, "test-uid-456", "user_id"),
+        ],
+    )
+    def test_injects_attribute_from_context(
+        self,
+        isolated_context: object,
+        context_var: contextvars.ContextVar[str | None],
+        context_value: str,
+        attr_name: str,
     ) -> None:
-        """Verify filter injects correlation_id from context variable."""
+        """Verify filter injects attributes from context variables."""
         f = ContextualLogFilter()
         record = _make_log_record()
 
         def test_logic() -> None:
-            correlation_id_var.set("test-cid-123")
+            context_var.set(context_value)
             f.filter(record)
-            assert record.correlation_id == "test-cid-123"  # type: ignore[attr-defined]
-
-        _run_in_isolated_context(test_logic)
-
-    def test_injects_user_id_from_context(self, isolated_context: object) -> None:
-        """Verify filter injects user_id from context variable."""
-        f = ContextualLogFilter()
-        record = _make_log_record()
-
-        def test_logic() -> None:
-            user_id_var.set("test-uid-456")
-            f.filter(record)
-            assert record.user_id == "test-uid-456"  # type: ignore[attr-defined]
+            assert getattr(record, attr_name) == context_value
 
         _run_in_isolated_context(test_logic)
 
@@ -99,37 +100,24 @@ class TestContextualLogFilterAttributeInjection:
 class TestContextualLogFilterPlaceholder:
     """Tests for placeholder values when context is empty."""
 
-    def test_placeholder_for_correlation_id_when_not_set(self) -> None:
-        """Verify placeholder used for correlation_id when not set."""
+    @pytest.mark.parametrize(
+        "check_attrs",
+        [
+            ["correlation_id"],
+            ["user_id"],
+            ["correlation_id", "user_id"],
+        ],
+        ids=["correlation_id_only", "user_id_only", "both_attrs"],
+    )
+    def test_placeholder_when_context_not_set(self, check_attrs: list[str]) -> None:
+        """Verify placeholder used for attributes when context not set."""
         f = ContextualLogFilter()
         record = _make_log_record()
 
         def test_logic() -> None:
             f.filter(record)
-            assert record.correlation_id == "-"  # type: ignore[attr-defined]
-
-        _run_in_isolated_context(test_logic)
-
-    def test_placeholder_for_user_id_when_not_set(self) -> None:
-        """Verify placeholder used for user_id when not set."""
-        f = ContextualLogFilter()
-        record = _make_log_record()
-
-        def test_logic() -> None:
-            f.filter(record)
-            assert record.user_id == "-"  # type: ignore[attr-defined]
-
-        _run_in_isolated_context(test_logic)
-
-    def test_placeholder_for_both_when_not_set(self) -> None:
-        """Verify placeholder used for both attributes when not set."""
-        f = ContextualLogFilter()
-        record = _make_log_record()
-
-        def test_logic() -> None:
-            f.filter(record)
-            assert record.correlation_id == "-"  # type: ignore[attr-defined]
-            assert record.user_id == "-"  # type: ignore[attr-defined]
+            for attr in check_attrs:
+                assert getattr(record, attr) == "-"
 
         _run_in_isolated_context(test_logic)
 
@@ -137,25 +125,25 @@ class TestContextualLogFilterPlaceholder:
 class TestContextualLogFilterReturnValue:
     """Tests for filter method return value."""
 
-    def test_filter_returns_true(self) -> None:
-        """Verify filter() returns True when context is empty."""
+    @pytest.mark.parametrize(
+        "setup_context",
+        [
+            "empty",
+            "populated",
+        ],
+        ids=["empty_context", "populated_context"],
+    )
+    def test_filter_always_returns_true(
+        self, isolated_context: object, setup_context: str
+    ) -> None:
+        """Verify filter() always returns True regardless of context state."""
         f = ContextualLogFilter()
         record = _make_log_record()
 
         def test_logic() -> None:
-            result = f.filter(record)
-            assert result is True
-
-        _run_in_isolated_context(test_logic)
-
-    def test_filter_returns_true_when_context_set(self) -> None:
-        """Verify filter() returns True when context variables are set."""
-        f = ContextualLogFilter()
-        record = _make_log_record()
-
-        def test_logic() -> None:
-            correlation_id_var.set("cid")
-            user_id_var.set("uid")
+            if setup_context == "populated":
+                correlation_id_var.set("cid")
+                user_id_var.set("uid")
             result = f.filter(record)
             assert result is True
 
