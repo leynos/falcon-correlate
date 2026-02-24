@@ -137,17 +137,21 @@ def when_log_message_emitted(context: Context, message: str) -> Context:
 @then(parsers.parse('the log record should have correlation_id "{expected}"'))
 def then_record_has_correlation_id(context: Context, expected: str) -> None:
     """Verify the log record has the expected correlation_id."""
-    assert context["record"].correlation_id == expected  # type: ignore[attr-defined]
+    actual = context["record"].correlation_id  # type: ignore[attr-defined]
+    assert actual == expected, f"expected correlation_id {expected!r}, got {actual!r}"
 
 
 @then(parsers.parse('the log record should have user_id "{expected}"'))
 def then_record_has_user_id(context: Context, expected: str) -> None:
     """Verify the log record has the expected user_id."""
-    assert context["record"].user_id == expected  # type: ignore[attr-defined]
+    actual = context["record"].user_id  # type: ignore[attr-defined]
+    assert actual == expected, f"expected user_id {expected!r}, got {actual!r}"
 
 
 @then(parsers.parse('the formatted output should contain "{expected}"'))
 def then_output_contains(context: Context, expected: str) -> None:
     """Verify the formatted log output contains the expected string."""
     output = context["stream"].getvalue()
-    assert expected in output
+    assert expected in output, (
+        f"formatted output did not contain {expected!r}: {output!r}"
+    )

@@ -449,7 +449,6 @@ The following functionality is now implemented:
 
 The following functionality will be added in future releases:
 
-- Example logging configuration documentation (task 3.1.2).
 - Structlog integration documentation (task 3.2).
 
 See the [roadmap](roadmap.md) for the full implementation plan.

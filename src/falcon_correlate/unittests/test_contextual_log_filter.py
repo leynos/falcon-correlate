@@ -38,12 +38,16 @@ class TestContextualLogFilterIsLoggingFilter:
 
     def test_is_logging_filter_subclass(self) -> None:
         """Verify ContextualLogFilter is a subclass of logging.Filter."""
-        assert issubclass(ContextualLogFilter, logging.Filter)
+        assert issubclass(ContextualLogFilter, logging.Filter), (
+            "ContextualLogFilter should be a subclass of logging.Filter"
+        )
 
     def test_can_be_instantiated(self) -> None:
         """Verify the filter can be instantiated with no arguments."""
         f = ContextualLogFilter()
-        assert isinstance(f, logging.Filter)
+        assert isinstance(f, logging.Filter), (
+            "instantiated object should be an instance of logging.Filter"
+        )
 
 
 class TestContextualLogFilterAttributeInjection:
@@ -70,7 +74,10 @@ class TestContextualLogFilterAttributeInjection:
         def test_logic() -> None:
             context_var.set(context_value)
             f.filter(record)
-            assert getattr(record, attr_name) == context_value
+            actual = getattr(record, attr_name)
+            assert actual == context_value, (
+                f"expected {attr_name}={context_value!r}, got {actual!r}"
+            )
 
         isolated_context(test_logic)
 
@@ -85,8 +92,12 @@ class TestContextualLogFilterAttributeInjection:
             correlation_id_var.set("both-cid")
             user_id_var.set("both-uid")
             f.filter(record)
-            assert record.correlation_id == "both-cid"  # type: ignore[attr-defined]
-            assert record.user_id == "both-uid"  # type: ignore[attr-defined]
+            assert (
+                record.correlation_id == "both-cid"  # type: ignore[attr-defined]
+            ), f"expected correlation_id='both-cid', got {record.correlation_id!r}"  # type: ignore[attr-defined]
+            assert (
+                record.user_id == "both-uid"  # type: ignore[attr-defined]
+            ), f"expected user_id='both-uid', got {record.user_id!r}"  # type: ignore[attr-defined]
 
         isolated_context(test_logic)
 
@@ -97,16 +108,16 @@ class TestContextualLogFilterPlaceholder:
     @pytest.mark.parametrize(
         "check_attrs",
         [
-            ["correlation_id"],
-            ["user_id"],
-            ["correlation_id", "user_id"],
+            ("correlation_id",),
+            ("user_id",),
+            ("correlation_id", "user_id"),
         ],
         ids=["correlation_id_only", "user_id_only", "both_attrs"],
     )
     def test_placeholder_when_context_not_set(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-        check_attrs: list[str],
+        check_attrs: tuple[str, ...],
     ) -> None:
         """Verify placeholder used for attributes when context not set."""
         f = ContextualLogFilter()
@@ -115,25 +126,26 @@ class TestContextualLogFilterPlaceholder:
         def test_logic() -> None:
             f.filter(record)
             for attr in check_attrs:
-                assert getattr(record, attr) == "-"
+                actual = getattr(record, attr)
+                assert actual == "-", f"expected {attr}='-', got {actual!r}"
 
         isolated_context(test_logic)
 
     @pytest.mark.parametrize(
         ("set_correlation", "set_user", "check_attrs"),
         [
-            ("correlation_id", "", ["correlation_id"]),
-            ("", "user_id", ["user_id"]),
-            ("correlation_id", "user_id", ["correlation_id", "user_id"]),
+            (True, False, ("correlation_id",)),
+            (False, True, ("user_id",)),
+            (True, True, ("correlation_id", "user_id")),
         ],
         ids=["correlation_id_none", "user_id_none", "both_none"],
     )
     def test_placeholder_when_context_explicit_none(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-        set_correlation: str,
-        set_user: str,
-        check_attrs: list[str],
+        set_correlation: bool,  # noqa: FBT001 — pytest parametrize injection
+        set_user: bool,  # noqa: FBT001 — pytest parametrize injection
+        check_attrs: tuple[str, ...],
     ) -> None:
         """Verify placeholder used when context vars are explicitly set to None."""
         f = ContextualLogFilter()
@@ -147,7 +159,8 @@ class TestContextualLogFilterPlaceholder:
 
             f.filter(record)
             for attr in check_attrs:
-                assert getattr(record, attr) == "-"
+                actual = getattr(record, attr)
+                assert actual == "-", f"expected {attr}='-', got {actual!r}"
 
         isolated_context(test_logic)
 
@@ -156,28 +169,28 @@ class TestContextualLogFilterReturnValue:
     """Tests for filter method return value."""
 
     @pytest.mark.parametrize(
-        "setup_context",
+        "populated",
         [
-            "empty",
-            "populated",
+            False,
+            True,
         ],
         ids=["empty_context", "populated_context"],
     )
     def test_filter_always_returns_true(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-        setup_context: str,
+        populated: bool,  # noqa: FBT001 — pytest parametrize injection
     ) -> None:
         """Verify filter() always returns True regardless of context state."""
         f = ContextualLogFilter()
         record = _make_log_record()
 
         def test_logic() -> None:
-            if setup_context == "populated":
+            if populated:
                 correlation_id_var.set("cid")
                 user_id_var.set("uid")
             result = f.filter(record)
-            assert result is True
+            assert result is True, f"expected filter() to return True, got {result!r}"
 
         isolated_context(test_logic)
 
@@ -185,33 +198,34 @@ class TestContextualLogFilterReturnValue:
 class TestContextualLogFilterPreservesExistingAttributes:
     """Tests for preserving pre-existing record attributes."""
 
-    def test_preserves_existing_correlation_id(
-        self, isolated_context: cabc.Callable[[cabc.Callable[[], None]], None]
+    @pytest.mark.parametrize(
+        ("context_var", "attr_name", "existing_value", "contextvar_value"),
+        [
+            (correlation_id_var, "correlation_id", "caller-cid", "contextvar-cid"),
+            (user_id_var, "user_id", "caller-uid", "contextvar-uid"),
+        ],
+        ids=["correlation_id", "user_id"],
+    )
+    def test_preserves_existing_attribute(  # noqa: PLR0913 — pytest parametrize injection
+        self,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+        context_var: contextvars.ContextVar[str | None],
+        attr_name: str,
+        existing_value: str,
+        contextvar_value: str,
     ) -> None:
-        """Verify filter does not overwrite a pre-existing correlation_id."""
+        """Verify filter does not overwrite a pre-existing attribute."""
         f = ContextualLogFilter()
         record = _make_log_record()
-        record.correlation_id = "caller-cid"
+        setattr(record, attr_name, existing_value)
 
         def test_logic() -> None:
-            correlation_id_var.set("contextvar-cid")
+            context_var.set(contextvar_value)
             f.filter(record)
-            assert record.correlation_id == "caller-cid"  # type: ignore[attr-defined]
-
-        isolated_context(test_logic)
-
-    def test_preserves_existing_user_id(
-        self, isolated_context: cabc.Callable[[cabc.Callable[[], None]], None]
-    ) -> None:
-        """Verify filter does not overwrite a pre-existing user_id."""
-        f = ContextualLogFilter()
-        record = _make_log_record()
-        record.user_id = "caller-uid"
-
-        def test_logic() -> None:
-            user_id_var.set("contextvar-uid")
-            f.filter(record)
-            assert record.user_id == "caller-uid"  # type: ignore[attr-defined]
+            actual = getattr(record, attr_name)
+            assert actual == existing_value, (
+                f"expected {attr_name}={existing_value!r}, got {actual!r}"
+            )
 
         isolated_context(test_logic)
 
@@ -226,8 +240,12 @@ class TestContextualLogFilterPreservesExistingAttributes:
 
         def test_logic() -> None:
             f.filter(record)
-            assert record.correlation_id == "explicit-cid"  # type: ignore[attr-defined]
-            assert record.user_id == "explicit-uid"  # type: ignore[attr-defined]
+            assert (
+                record.correlation_id == "explicit-cid"  # type: ignore[attr-defined]
+            ), f"expected correlation_id='explicit-cid', got {record.correlation_id!r}"  # type: ignore[attr-defined]
+            assert (
+                record.user_id == "explicit-uid"  # type: ignore[attr-defined]
+            ), f"expected user_id='explicit-uid', got {record.user_id!r}"  # type: ignore[attr-defined]
 
         isolated_context(test_logic)
 
@@ -242,8 +260,12 @@ class TestContextualLogFilterPreservesExistingAttributes:
         def test_logic() -> None:
             user_id_var.set("contextvar-uid")
             f.filter(record)
-            assert record.correlation_id == "caller-cid"  # type: ignore[attr-defined]
-            assert record.user_id == "contextvar-uid"  # type: ignore[attr-defined]
+            assert (
+                record.correlation_id == "caller-cid"  # type: ignore[attr-defined]
+            ), f"expected correlation_id='caller-cid', got {record.correlation_id!r}"  # type: ignore[attr-defined]
+            assert (
+                record.user_id == "contextvar-uid"  # type: ignore[attr-defined]
+            ), f"expected user_id='contextvar-uid', got {record.user_id!r}"  # type: ignore[attr-defined]
 
         isolated_context(test_logic)
 
@@ -266,20 +288,27 @@ class TestContextualLogFilterLoggingIntegration:
         test_logger.addHandler(handler)
         test_logger.setLevel(logging.INFO)
 
-        def test_logic() -> None:
-            correlation_id_var.set("log-cid-001")
-            user_id_var.set("log-uid-001")
-            test_logger.info("hello from test")
+        try:
 
-        isolated_context(test_logic)
+            def test_logic() -> None:
+                correlation_id_var.set("log-cid-001")
+                user_id_var.set("log-uid-001")
+                test_logger.info("hello from test")
 
-        output = stream.getvalue()
-        assert "[log-cid-001]" in output
-        assert "[log-uid-001]" in output
-        assert "hello from test" in output
+            isolated_context(test_logic)
 
-        # Clean up to avoid polluting other tests.
-        test_logger.removeHandler(handler)
+            output = stream.getvalue()
+            assert "[log-cid-001]" in output, (
+                f"expected '[log-cid-001]' in output, got {output!r}"
+            )
+            assert "[log-uid-001]" in output, (
+                f"expected '[log-uid-001]' in output, got {output!r}"
+            )
+            assert "hello from test" in output, (
+                f"expected 'hello from test' in output, got {output!r}"
+            )
+        finally:
+            test_logger.removeHandler(handler)
 
     def test_filter_works_with_dict_config(
         self, isolated_context: cabc.Callable[[cabc.Callable[[], None]], None]
@@ -319,22 +348,28 @@ class TestContextualLogFilterLoggingIntegration:
         stream = io.StringIO()
         # Replace the stdout handler with our string stream for capture.
         for h in test_logger.handlers:
-            h.stream = stream  # type: ignore[attr-defined]
+            if isinstance(h, logging.StreamHandler):
+                h.stream = stream
 
-        def test_logic() -> None:
-            correlation_id_var.set("dictcfg-cid")
-            user_id_var.set("dictcfg-uid")
-            test_logger.info("dictconfig test")
+        try:
 
-        isolated_context(test_logic)
+            def test_logic() -> None:
+                correlation_id_var.set("dictcfg-cid")
+                user_id_var.set("dictcfg-uid")
+                test_logger.info("dictconfig test")
 
-        output = stream.getvalue()
-        assert "[dictcfg-cid]" in output
-        assert "[dictcfg-uid]" in output
+            isolated_context(test_logic)
 
-        # Clean up handlers to avoid polluting other tests.
-        for h in list(test_logger.handlers):
-            test_logger.removeHandler(h)
+            output = stream.getvalue()
+            assert "[dictcfg-cid]" in output, (
+                f"expected '[dictcfg-cid]' in output, got {output!r}"
+            )
+            assert "[dictcfg-uid]" in output, (
+                f"expected '[dictcfg-uid]' in output, got {output!r}"
+            )
+        finally:
+            for h in list(test_logger.handlers):
+                test_logger.removeHandler(h)
 
     def test_extra_kwarg_preserved_over_contextvar(
         self, isolated_context: cabc.Callable[[cabc.Callable[[], None]], None]
@@ -351,21 +386,27 @@ class TestContextualLogFilterLoggingIntegration:
         test_logger.addHandler(handler)
         test_logger.setLevel(logging.INFO)
 
-        def test_logic() -> None:
-            correlation_id_var.set("contextvar-cid")
-            user_id_var.set("contextvar-uid")
-            test_logger.info(
-                "background job",
-                extra={"correlation_id": "explicit-cid"},
+        try:
+
+            def test_logic() -> None:
+                correlation_id_var.set("contextvar-cid")
+                user_id_var.set("contextvar-uid")
+                test_logger.info(
+                    "background job",
+                    extra={"correlation_id": "explicit-cid"},
+                )
+
+            isolated_context(test_logic)
+
+            output = stream.getvalue()
+            assert "[explicit-cid]" in output, (
+                f"expected '[explicit-cid]' in output, got {output!r}"
             )
-
-        isolated_context(test_logic)
-
-        output = stream.getvalue()
-        assert "[explicit-cid]" in output
-        assert "[contextvar-uid]" in output
-
-        test_logger.removeHandler(handler)
+            assert "[contextvar-uid]" in output, (
+                f"expected '[contextvar-uid]' in output, got {output!r}"
+            )
+        finally:
+            test_logger.removeHandler(handler)
 
 
 class TestContextualLogFilterExports:
@@ -375,10 +416,14 @@ class TestContextualLogFilterExports:
         """Verify ContextualLogFilter is listed in __all__."""
         import falcon_correlate
 
-        assert "ContextualLogFilter" in falcon_correlate.__all__
+        assert "ContextualLogFilter" in falcon_correlate.__all__, (
+            "ContextualLogFilter is missing from falcon_correlate.__all__"
+        )
 
     def test_contextual_log_filter_importable_from_root(self) -> None:
         """Verify ContextualLogFilter can be imported from package root."""
         from falcon_correlate import ContextualLogFilter as Clf
 
-        assert issubclass(Clf, logging.Filter)
+        assert issubclass(Clf, logging.Filter), (
+            "ContextualLogFilter is not a subclass of logging.Filter"
+        )

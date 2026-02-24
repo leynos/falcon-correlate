@@ -29,7 +29,7 @@ user_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "user_id", default=None
 )
 _CORRELATION_ID_RESET_TOKEN_ATTR = "_correlation_id_reset_token"  # noqa: S105  # FIXME: attribute-name string is not a secret
-_MISSING_CONTEXT_PLACEHOLDER = "-"
+_MISSING_CONTEXT_PLACEHOLDER: str = "-"
 
 
 class ContextualLogFilter(logging.Filter):
