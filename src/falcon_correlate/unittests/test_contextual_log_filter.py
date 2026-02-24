@@ -33,7 +33,7 @@ class _HasContextIDs(_HasCorrelationID, _HasUserID, typ.Protocol):
     """LogRecord enriched by ContextualLogFilter with both IDs."""
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(slots=True, frozen=True)
 class PreservationTestCase:
     """Encapsulates parameters for attribute preservation tests."""
 
@@ -315,41 +315,32 @@ class TestContextualLogFilterLoggingIntegration:
     """Tests for integration with standard logging configuration."""
 
     def test_filter_works_with_logger(
-        self, isolated_context: cabc.Callable[[cabc.Callable[[], None]], None]
+        self,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+        logger_with_capture: cabc.Callable[[str], tuple[logging.Logger, io.StringIO]],
     ) -> None:
         """Verify filter enriches records emitted through a logger."""
-        stream = io.StringIO()
-        handler = logging.StreamHandler(stream)
-        handler.setFormatter(
-            logging.Formatter("[%(correlation_id)s][%(user_id)s] %(message)s")
+        test_logger, stream = logger_with_capture(
+            "test_contextual_log_filter_integration",
         )
-        handler.addFilter(ContextualLogFilter())
 
-        test_logger = logging.getLogger("test_contextual_log_filter_integration")
-        test_logger.addHandler(handler)
-        test_logger.setLevel(logging.INFO)
+        def test_logic() -> None:
+            correlation_id_var.set("log-cid-001")
+            user_id_var.set("log-uid-001")
+            test_logger.info("hello from test")
 
-        try:
+        isolated_context(test_logic)
 
-            def test_logic() -> None:
-                correlation_id_var.set("log-cid-001")
-                user_id_var.set("log-uid-001")
-                test_logger.info("hello from test")
-
-            isolated_context(test_logic)
-
-            output = stream.getvalue()
-            assert "[log-cid-001]" in output, (
-                f"expected '[log-cid-001]' in output, got {output!r}"
-            )
-            assert "[log-uid-001]" in output, (
-                f"expected '[log-uid-001]' in output, got {output!r}"
-            )
-            assert "hello from test" in output, (
-                f"expected 'hello from test' in output, got {output!r}"
-            )
-        finally:
-            test_logger.removeHandler(handler)
+        output = stream.getvalue()
+        assert "[log-cid-001]" in output, (
+            f"expected '[log-cid-001]' in output, got {output!r}"
+        )
+        assert "[log-uid-001]" in output, (
+            f"expected '[log-uid-001]' in output, got {output!r}"
+        )
+        assert "hello from test" in output, (
+            f"expected 'hello from test' in output, got {output!r}"
+        )
 
     def test_filter_works_with_dict_config(
         self, isolated_context: cabc.Callable[[cabc.Callable[[], None]], None]
@@ -413,41 +404,32 @@ class TestContextualLogFilterLoggingIntegration:
                 test_logger.removeHandler(h)
 
     def test_extra_kwarg_preserved_over_contextvar(
-        self, isolated_context: cabc.Callable[[cabc.Callable[[], None]], None]
+        self,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+        logger_with_capture: cabc.Callable[[str], tuple[logging.Logger, io.StringIO]],
     ) -> None:
         """Verify extra= correlation_id is preserved when logging through a logger."""
-        stream = io.StringIO()
-        handler = logging.StreamHandler(stream)
-        handler.setFormatter(
-            logging.Formatter("[%(correlation_id)s][%(user_id)s] %(message)s")
+        test_logger, stream = logger_with_capture(
+            "test_contextual_extra_preserved",
         )
-        handler.addFilter(ContextualLogFilter())
 
-        test_logger = logging.getLogger("test_contextual_extra_preserved")
-        test_logger.addHandler(handler)
-        test_logger.setLevel(logging.INFO)
-
-        try:
-
-            def test_logic() -> None:
-                correlation_id_var.set("contextvar-cid")
-                user_id_var.set("contextvar-uid")
-                test_logger.info(
-                    "background job",
-                    extra={"correlation_id": "explicit-cid"},
-                )
-
-            isolated_context(test_logic)
-
-            output = stream.getvalue()
-            assert "[explicit-cid]" in output, (
-                f"expected '[explicit-cid]' in output, got {output!r}"
+        def test_logic() -> None:
+            correlation_id_var.set("contextvar-cid")
+            user_id_var.set("contextvar-uid")
+            test_logger.info(
+                "background job",
+                extra={"correlation_id": "explicit-cid"},
             )
-            assert "[contextvar-uid]" in output, (
-                f"expected '[contextvar-uid]' in output, got {output!r}"
-            )
-        finally:
-            test_logger.removeHandler(handler)
+
+        isolated_context(test_logic)
+
+        output = stream.getvalue()
+        assert "[explicit-cid]" in output, (
+            f"expected '[explicit-cid]' in output, got {output!r}"
+        )
+        assert "[contextvar-uid]" in output, (
+            f"expected '[contextvar-uid]' in output, got {output!r}"
+        )
 
 
 class TestContextualLogFilterExports:

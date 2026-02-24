@@ -12,6 +12,11 @@ request_response_factory
 isolated_context
     Runner callable that executes a zero-argument function inside a fresh
     ``contextvars.Context``, preventing cross-test leakage.
+logger_with_capture
+    Factory callable that creates a named logger with a
+    ``ContextualLogFilter``-equipped ``StreamHandler`` and yields the
+    ``(logging.Logger, io.StringIO)`` pair, cleaning up the handler on
+    exit.
 
 Usage
 -----
@@ -39,16 +44,27 @@ Run a callable in an isolated context to avoid contextvar bleed::
 
         isolated_context(_inner)
 
+Build a logger with contextual log capture::
+
+    def test_logger(logger_with_capture):
+        test_logger, stream = logger_with_capture("my_test_logger")
+        test_logger.info("hello")
+        assert "hello" in stream.getvalue()
+
 """
 
 from __future__ import annotations
 
 import contextvars
+import io
+import logging
 import typing as typ
 
 import falcon
 import falcon.testing
 import pytest
+
+from falcon_correlate import ContextualLogFilter
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -113,3 +129,47 @@ def isolated_context() -> cabc.Callable[[cabc.Callable[[], None]], None]:
         contextvars.copy_context().run(func)
 
     return runner
+
+
+_CTX_LOG_FORMAT = "[%(correlation_id)s][%(user_id)s] %(message)s"
+
+
+@pytest.fixture
+def logger_with_capture() -> cabc.Generator[
+    cabc.Callable[[str], tuple[logging.Logger, io.StringIO]],
+]:
+    """Provide a factory for loggers with ``ContextualLogFilter`` capture.
+
+    Each call to the returned factory creates a named logger backed by a
+    ``StreamHandler`` writing to a fresh ``io.StringIO``.  The handler
+    uses a ``ContextualLogFilter`` and the standard
+    ``[%(correlation_id)s][%(user_id)s] %(message)s`` format string.
+
+    All handlers added via the factory are removed automatically when
+    the fixture tears down, preventing inter-test handler leakage.
+
+    Yields
+    ------
+    cabc.Callable[[str], tuple[logging.Logger, io.StringIO]]
+        A factory accepting a logger *name* and returning a
+        ``(logging.Logger, io.StringIO)`` pair.
+
+    """
+    cleanup: list[tuple[logging.Logger, logging.Handler]] = []
+
+    def factory(name: str) -> tuple[logging.Logger, io.StringIO]:
+        stream = io.StringIO()
+        handler = logging.StreamHandler(stream)
+        handler.setFormatter(logging.Formatter(_CTX_LOG_FORMAT))
+        handler.addFilter(ContextualLogFilter())
+
+        test_logger = logging.getLogger(name)
+        test_logger.addHandler(handler)
+        test_logger.setLevel(logging.INFO)
+        cleanup.append((test_logger, handler))
+        return test_logger, stream
+
+    yield factory
+
+    for lgr, hdlr in cleanup:
+        lgr.removeHandler(hdlr)
