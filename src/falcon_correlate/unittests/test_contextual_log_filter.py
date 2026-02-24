@@ -6,6 +6,7 @@ import contextvars
 import io
 import logging
 import logging.config
+import typing as typ
 
 from falcon_correlate import (
     ContextualLogFilter,
@@ -25,6 +26,15 @@ def _make_log_record(msg: str = "test message") -> logging.LogRecord:
         args=None,
         exc_info=None,
     )
+
+
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
+
+
+def _run_in_isolated_context(test_fn: cabc.Callable[[], None]) -> None:
+    """Execute a callable in an isolated context to prevent cross-test pollution."""
+    contextvars.copy_context().run(test_fn)
 
 
 class TestContextualLogFilterIsLoggingFilter:
@@ -50,24 +60,24 @@ class TestContextualLogFilterAttributeInjection:
         f = ContextualLogFilter()
         record = _make_log_record()
 
-        def _inner() -> None:
+        def test_logic() -> None:
             correlation_id_var.set("test-cid-123")
             f.filter(record)
             assert record.correlation_id == "test-cid-123"  # type: ignore[attr-defined]
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(test_logic)
 
     def test_injects_user_id_from_context(self, isolated_context: object) -> None:
         """Verify filter injects user_id from context variable."""
         f = ContextualLogFilter()
         record = _make_log_record()
 
-        def _inner() -> None:
+        def test_logic() -> None:
             user_id_var.set("test-uid-456")
             f.filter(record)
             assert record.user_id == "test-uid-456"  # type: ignore[attr-defined]
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(test_logic)
 
     def test_injects_both_attributes_simultaneously(
         self, isolated_context: object
@@ -76,14 +86,14 @@ class TestContextualLogFilterAttributeInjection:
         f = ContextualLogFilter()
         record = _make_log_record()
 
-        def _inner() -> None:
+        def test_logic() -> None:
             correlation_id_var.set("both-cid")
             user_id_var.set("both-uid")
             f.filter(record)
             assert record.correlation_id == "both-cid"  # type: ignore[attr-defined]
             assert record.user_id == "both-uid"  # type: ignore[attr-defined]
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(test_logic)
 
 
 class TestContextualLogFilterPlaceholder:
@@ -94,34 +104,34 @@ class TestContextualLogFilterPlaceholder:
         f = ContextualLogFilter()
         record = _make_log_record()
 
-        def _inner() -> None:
+        def test_logic() -> None:
             f.filter(record)
             assert record.correlation_id == "-"  # type: ignore[attr-defined]
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(test_logic)
 
     def test_placeholder_for_user_id_when_not_set(self) -> None:
         """Verify placeholder used for user_id when not set."""
         f = ContextualLogFilter()
         record = _make_log_record()
 
-        def _inner() -> None:
+        def test_logic() -> None:
             f.filter(record)
             assert record.user_id == "-"  # type: ignore[attr-defined]
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(test_logic)
 
     def test_placeholder_for_both_when_not_set(self) -> None:
         """Verify placeholder used for both attributes when not set."""
         f = ContextualLogFilter()
         record = _make_log_record()
 
-        def _inner() -> None:
+        def test_logic() -> None:
             f.filter(record)
             assert record.correlation_id == "-"  # type: ignore[attr-defined]
             assert record.user_id == "-"  # type: ignore[attr-defined]
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(test_logic)
 
 
 class TestContextualLogFilterReturnValue:
@@ -132,24 +142,24 @@ class TestContextualLogFilterReturnValue:
         f = ContextualLogFilter()
         record = _make_log_record()
 
-        def _inner() -> None:
+        def test_logic() -> None:
             result = f.filter(record)
             assert result is True
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(test_logic)
 
     def test_filter_returns_true_when_context_set(self) -> None:
         """Verify filter() returns True when context variables are set."""
         f = ContextualLogFilter()
         record = _make_log_record()
 
-        def _inner() -> None:
+        def test_logic() -> None:
             correlation_id_var.set("cid")
             user_id_var.set("uid")
             result = f.filter(record)
             assert result is True
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(test_logic)
 
 
 class TestContextualLogFilterLoggingIntegration:
@@ -168,12 +178,12 @@ class TestContextualLogFilterLoggingIntegration:
         test_logger.addHandler(handler)
         test_logger.setLevel(logging.INFO)
 
-        def _inner() -> None:
+        def test_logic() -> None:
             correlation_id_var.set("log-cid-001")
             user_id_var.set("log-uid-001")
             test_logger.info("hello from test")
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(test_logic)
 
         output = stream.getvalue()
         assert "[log-cid-001]" in output
@@ -221,12 +231,12 @@ class TestContextualLogFilterLoggingIntegration:
         for h in test_logger.handlers:
             h.stream = stream  # type: ignore[attr-defined]
 
-        def _inner() -> None:
+        def test_logic() -> None:
             correlation_id_var.set("dictcfg-cid")
             user_id_var.set("dictcfg-uid")
             test_logger.info("dictconfig test")
 
-        contextvars.copy_context().run(_inner)
+        _run_in_isolated_context(test_logic)
 
         output = stream.getvalue()
         assert "[dictcfg-cid]" in output
