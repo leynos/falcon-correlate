@@ -289,9 +289,9 @@ Create `tests/bdd/contextual_log_filter.feature`:
 
     Feature: Contextual log filter
       As a developer using falcon-correlate
-      I want a logging filter that injects correlation ID and user ID
+      a logging filter is needed that injects correlation ID and user ID
         into log records
-      So that my application logs include request context automatically
+      so that application logs include request context automatically
 
       Scenario: Filter injects correlation ID into log record
         Given a contextual log filter

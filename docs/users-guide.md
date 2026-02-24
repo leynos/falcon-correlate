@@ -298,12 +298,14 @@ middleware = CorrelationIDMiddleware(echo_header_in_response=False)
 ## Logging integration
 
 The library provides `ContextualLogFilter`, a `logging.Filter` subclass that
-automatically injects the current correlation ID and user ID into every log
-record. This allows standard `logging.Formatter` format strings to include
+automatically injects the current correlation ID and user ID into log records.
+This allows standard `logging.Formatter` format strings to include
 `%(correlation_id)s` and `%(user_id)s` without any manual per-call effort.
 
 When a context variable is not set (for example, outside a request), the
-placeholder string `"-"` is used instead.
+placeholder string `"-"` is used instead.  If the record already carries the
+attribute (e.g. attached via `extra=` or a `LoggerAdapter`), the existing value
+is preserved and the filter does not overwrite it.
 
 ### Basic usage
 
@@ -379,6 +381,23 @@ strings referencing `%(correlation_id)s` or `%(user_id)s` never raise a
 2026-02-23 12:00:01 [INFO] [abc123] [user42] myapp: Handling request
 ```
 
+### Preserving explicit metadata
+
+The filter only fills in attributes that are **missing** from the record. If a
+caller already attached `correlation_id` or `user_id` via `extra=` or a
+`LoggerAdapter`, the filter preserves those values.  This is useful for
+background jobs or other non-request code paths that want to supply their own
+traceability IDs:
+
+```python
+logger.info(
+    "Running background job",
+    extra={"correlation_id": "job-abc-123"},
+)
+# The filter will NOT overwrite "job-abc-123" with the contextvar
+# value (or the "-" placeholder).
+```
+
 ## Full Configuration Example
 
 ```python
@@ -426,6 +445,7 @@ The following functionality is now implemented:
   `correlation_id_var.get()`, both always in sync during request handling.
 - `ContextualLogFilter` for injecting correlation ID and user ID into standard
   library log records, with `"-"` placeholder when context is not set.
+  Pre-existing record attributes (e.g. from `extra=`) are preserved.
 
 The following functionality will be added in future releases:
 

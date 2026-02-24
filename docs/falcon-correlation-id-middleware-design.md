@@ -1150,6 +1150,13 @@ operator to avoid replacing an empty string with the placeholder. While the
 middleware never sets context variables to empty strings, the explicit check is
 more defensively correct.
 
+The `filter` method only sets `correlation_id` and `user_id` when the record
+does not already carry those attributes.  Attributes attached by the caller
+(e.g. via `extra=` or a `LoggerAdapter`) are preserved, preventing the filter
+from clobbering explicit metadata that is especially useful for background jobs
+and other non-request logging paths.  This "fill, don't overwrite" strategy is
+implemented with a `hasattr` guard before each assignment.
+
 The filter always returns `True`. It enriches records with contextual
 attributes but never suppresses them, as specified in §3.4.1.
 

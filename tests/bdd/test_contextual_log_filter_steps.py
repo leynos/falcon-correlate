@@ -65,7 +65,7 @@ def given_contextual_log_filter() -> Context:
     "a logger configured with the contextual log filter",
     target_fixture="context",
 )
-def given_logger_with_filter() -> Context:
+def given_logger_with_filter(request: pytest.FixtureRequest) -> Context:
     """Create a logger with the contextual log filter attached."""
     stream = io.StringIO()
     handler = logging.StreamHandler(stream)
@@ -78,6 +78,9 @@ def given_logger_with_filter() -> Context:
     test_logger = logging.getLogger("bdd_contextual_log_filter_test")
     test_logger.addHandler(handler)
     test_logger.setLevel(logging.INFO)
+
+    # Remove the handler at teardown to prevent accumulation across scenarios.
+    request.addfinalizer(lambda: test_logger.removeHandler(handler))
 
     return {
         "log_filter": log_filter,

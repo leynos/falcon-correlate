@@ -37,8 +37,12 @@ class ContextualLogFilter(logging.Filter):
 
     This filter reads ``correlation_id_var`` and ``user_id_var`` and copies
     their values onto the ``LogRecord`` as ``correlation_id`` and ``user_id``
-    attributes. When a context variable is not set, the placeholder ``"-"``
+    attributes.  When a context variable is not set, the placeholder ``"-"``
     is used.
+
+    Attributes already present on the record (e.g. attached via
+    ``extra=`` or a ``LoggerAdapter``) are preserved; the filter only
+    fills in missing attributes, never overwrites existing ones.
 
     The filter never suppresses records; it always returns ``True``.
 
@@ -63,6 +67,12 @@ class ContextualLogFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         """Enrich *record* with correlation ID and user ID attributes.
 
+        Attributes already present on the record (e.g. set via
+        ``extra=`` or a ``LoggerAdapter``) are preserved.  Context
+        variable values are only applied when the record does not
+        already carry the attribute, avoiding accidental clobbering
+        of explicit caller-provided metadata.
+
         Parameters
         ----------
         record : logging.LogRecord
@@ -75,10 +85,14 @@ class ContextualLogFilter(logging.Filter):
             suppresses them.
 
         """
-        cid = correlation_id_var.get()
-        record.correlation_id = cid if cid is not None else _MISSING_CONTEXT_PLACEHOLDER
-        uid = user_id_var.get()
-        record.user_id = uid if uid is not None else _MISSING_CONTEXT_PLACEHOLDER
+        if not hasattr(record, "correlation_id"):
+            cid = correlation_id_var.get()
+            record.correlation_id = (
+                cid if cid is not None else _MISSING_CONTEXT_PLACEHOLDER
+            )
+        if not hasattr(record, "user_id"):
+            uid = user_id_var.get()
+            record.user_id = uid if uid is not None else _MISSING_CONTEXT_PLACEHOLDER
         return True
 
 
