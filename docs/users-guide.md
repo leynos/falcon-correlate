@@ -329,6 +329,44 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 ```
 
+### Recommended format string
+
+The library exports `RECOMMENDED_LOG_FORMAT`, a ready-made format string that
+includes a timestamp, log level, correlation ID, user ID, logger name, and
+message:
+
+```python
+from falcon_correlate import RECOMMENDED_LOG_FORMAT
+
+# Value:
+# "%(asctime)s - [%(levelname)s] - [%(correlation_id)s] - "
+# "[%(user_id)s] - %(name)s - %(message)s"
+```
+
+This produces output like:
+
+```plaintext
+2026-02-25 14:30:00,123 - [INFO] - [abc123] - [user42] - myapp: Handling request
+```
+
+Use it with a handler:
+
+```python
+import logging
+from falcon_correlate import ContextualLogFilter, RECOMMENDED_LOG_FORMAT
+
+handler = logging.StreamHandler()
+handler.addFilter(ContextualLogFilter())
+handler.setFormatter(logging.Formatter(RECOMMENDED_LOG_FORMAT))
+
+logger = logging.getLogger("myapp")
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+```
+
+The constant is provided as a convenience; you can always supply your own
+format string if the recommended layout does not suit your needs.
+
 ### Using `dictConfig`
 
 For applications that configure logging via `logging.config.dictConfig`, the
@@ -446,6 +484,8 @@ The following functionality is now implemented:
 - `ContextualLogFilter` for injecting correlation ID and user ID into standard
   library log records, with `"-"` placeholder when context is not set.
   Pre-existing record attributes (e.g. from `extra=`) are preserved.
+- `RECOMMENDED_LOG_FORMAT` constant providing a ready-made format string for
+  use with `logging.Formatter` or `dictConfig`.
 
 The following functionality will be added in future releases:
 
