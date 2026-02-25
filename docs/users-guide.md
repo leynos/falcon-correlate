@@ -295,6 +295,109 @@ Whether to include the correlation ID in response headers.
 middleware = CorrelationIDMiddleware(echo_header_in_response=False)
 ```
 
+## Logging integration
+
+The library provides `ContextualLogFilter`, a `logging.Filter` subclass that
+automatically injects the current correlation ID and user ID into log records.
+This allows standard `logging.Formatter` format strings to include
+`%(correlation_id)s` and `%(user_id)s` without any manual per-call effort.
+
+When a context variable is not set (for example, outside a request), the
+placeholder string `"-"` is used instead.  If the record already carries the
+attribute (e.g. attached via `extra=` or a `LoggerAdapter`), the existing value
+is preserved and the filter does not overwrite it.
+
+### Basic usage
+
+Attach the filter to a handler or logger:
+
+```python
+import logging
+from falcon_correlate import ContextualLogFilter
+
+handler = logging.StreamHandler()
+handler.addFilter(ContextualLogFilter())
+handler.setFormatter(
+    logging.Formatter(
+        "%(asctime)s [%(correlation_id)s] [%(user_id)s] "
+        "%(name)s - %(message)s"
+    )
+)
+
+logger = logging.getLogger("myapp")
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+```
+
+### Using `dictConfig`
+
+For applications that configure logging via `logging.config.dictConfig`, the
+filter can be referenced by its dotted path:
+
+```python
+import logging.config
+
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "contextual": {
+            "()": "falcon_correlate.ContextualLogFilter",
+        },
+    },
+    "formatters": {
+        "standard": {
+            "format": (
+                "%(asctime)s [%(levelname)s] [%(correlation_id)s] "
+                "[%(user_id)s] %(name)s: %(message)s"
+            ),
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+            "filters": ["contextual"],
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+}
+
+logging.config.dictConfig(LOGGING_CONFIG)
+```
+
+### Placeholder behaviour
+
+When the correlation ID or user ID context variable is not set, the filter
+substitutes the string `"-"` on the log record. This ensures that format
+strings referencing `%(correlation_id)s` or `%(user_id)s` never raise a
+`KeyError` and produce clean output even outside request handling:
+
+```plaintext
+2026-02-23 12:00:00 [INFO] [-] [-] myapp: Application started
+2026-02-23 12:00:01 [INFO] [abc123] [user42] myapp: Handling request
+```
+
+### Preserving explicit metadata
+
+The filter only fills in attributes that are **missing** from the record. If a
+caller already attached `correlation_id` or `user_id` via `extra=` or a
+`LoggerAdapter`, the filter preserves those values.  This is useful for
+background jobs or other non-request code paths that want to supply their own
+traceability IDs:
+
+```python
+logger.info(
+    "Running background job",
+    extra={"correlation_id": "job-abc-123"},
+)
+# The filter will NOT overwrite "job-abc-123" with the contextvar
+# value (or the "-" placeholder).
+```
+
 ## Full Configuration Example
 
 ```python
@@ -340,9 +443,12 @@ The following functionality is now implemented:
   set during request processing and reset during response cleanup.
 - Dual access to the correlation ID via `req.context.correlation_id` and
   `correlation_id_var.get()`, both always in sync during request handling.
+- `ContextualLogFilter` for injecting correlation ID and user ID into standard
+  library log records, with `"-"` placeholder when context is not set.
+  Pre-existing record attributes (e.g. from `extra=`) are preserved.
 
 The following functionality will be added in future releases:
 
-- Logging integration (task 3.1).
+- Structlog integration documentation (task 3.2).
 
 See the [roadmap](roadmap.md) for the full implementation plan.

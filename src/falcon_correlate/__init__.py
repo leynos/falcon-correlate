@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .middleware import (
+    ContextualLogFilter,
     CorrelationIDConfig,
     CorrelationIDMiddleware,
     correlation_id_var,
@@ -20,6 +21,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python fallback
     from .pure import hello
 
 __all__ = [
+    "ContextualLogFilter",
     "CorrelationIDConfig",
     "CorrelationIDMiddleware",
     "correlation_id_var",
