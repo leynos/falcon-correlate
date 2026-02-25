@@ -176,5 +176,6 @@ def logger_with_capture() -> cabc.Generator[
 
     for lgr, hdlr, orig_propagate, orig_level in cleanup:
         lgr.removeHandler(hdlr)
+        hdlr.close()
         lgr.propagate = orig_propagate
         lgr.setLevel(orig_level)
