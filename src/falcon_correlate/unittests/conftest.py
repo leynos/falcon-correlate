@@ -13,10 +13,10 @@ isolated_context
     Runner callable that executes a zero-argument function inside a fresh
     ``contextvars.Context``, preventing cross-test leakage.
 logger_with_capture
-    Factory callable that creates a named logger with a
-    ``ContextualLogFilter``-equipped ``StreamHandler`` and yields the
-    ``(logging.Logger, io.StringIO)`` pair, cleaning up the handler on
-    exit.
+    Yields a factory callable that, when called with a logger name,
+    returns a ``(logging.Logger, io.StringIO)`` pair configured with a
+    ``ContextualLogFilter``-equipped ``StreamHandler``.  All handlers
+    created via the factory are cleaned up on fixture teardown.
 
 Usage
 -----
