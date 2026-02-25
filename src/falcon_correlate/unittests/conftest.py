@@ -136,7 +136,7 @@ _CTX_LOG_FORMAT = "[%(correlation_id)s][%(user_id)s] %(message)s"
 
 @pytest.fixture
 def logger_with_capture() -> cabc.Generator[
-    cabc.Callable[[str], tuple[logging.Logger, io.StringIO]],
+    cabc.Callable[[str], tuple[logging.Logger, io.StringIO]], None, None
 ]:
     """Provide a factory for loggers with ``ContextualLogFilter`` capture.
 
@@ -155,7 +155,7 @@ def logger_with_capture() -> cabc.Generator[
         ``(logging.Logger, io.StringIO)`` pair.
 
     """
-    cleanup: list[tuple[logging.Logger, logging.Handler, bool]] = []
+    cleanup: list[tuple[logging.Logger, logging.Handler, bool, int]] = []
 
     def factory(name: str) -> tuple[logging.Logger, io.StringIO]:
         stream = io.StringIO()
@@ -165,14 +165,16 @@ def logger_with_capture() -> cabc.Generator[
 
         test_logger = logging.getLogger(name)
         original_propagate = test_logger.propagate
+        original_level = test_logger.level
         test_logger.addHandler(handler)
         test_logger.setLevel(logging.INFO)
         test_logger.propagate = False
-        cleanup.append((test_logger, handler, original_propagate))
+        cleanup.append((test_logger, handler, original_propagate, original_level))
         return test_logger, stream
 
     yield factory
 
-    for lgr, hdlr, orig_propagate in cleanup:
+    for lgr, hdlr, orig_propagate, orig_level in cleanup:
         lgr.removeHandler(hdlr)
         lgr.propagate = orig_propagate
+        lgr.setLevel(orig_level)
