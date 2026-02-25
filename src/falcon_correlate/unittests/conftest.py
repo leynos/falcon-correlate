@@ -155,7 +155,7 @@ def logger_with_capture() -> cabc.Generator[
         ``(logging.Logger, io.StringIO)`` pair.
 
     """
-    cleanup: list[tuple[logging.Logger, logging.Handler]] = []
+    cleanup: list[tuple[logging.Logger, logging.Handler, bool]] = []
 
     def factory(name: str) -> tuple[logging.Logger, io.StringIO]:
         stream = io.StringIO()
@@ -164,12 +164,15 @@ def logger_with_capture() -> cabc.Generator[
         handler.addFilter(ContextualLogFilter())
 
         test_logger = logging.getLogger(name)
+        original_propagate = test_logger.propagate
         test_logger.addHandler(handler)
         test_logger.setLevel(logging.INFO)
-        cleanup.append((test_logger, handler))
+        test_logger.propagate = False
+        cleanup.append((test_logger, handler, original_propagate))
         return test_logger, stream
 
     yield factory
 
-    for lgr, hdlr in cleanup:
+    for lgr, hdlr, orig_propagate in cleanup:
         lgr.removeHandler(hdlr)
+        lgr.propagate = orig_propagate

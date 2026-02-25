@@ -22,10 +22,14 @@ from falcon_correlate import (
 
 
 class _HasCorrelationID(typ.Protocol):
+    """Protocol for objects exposing a ``correlation_id`` attribute."""
+
     correlation_id: str
 
 
 class _HasUserID(typ.Protocol):
+    """Protocol for objects exposing a ``user_id`` attribute."""
+
     user_id: str
 
 
@@ -173,8 +177,8 @@ class TestContextualLogFilterPlaceholder:
     def test_placeholder_when_context_explicit_none(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-        set_correlation: bool,  # noqa: FBT001 — pytest parametrize injection
-        set_user: bool,  # noqa: FBT001 — pytest parametrize injection
+        set_correlation: bool,  # noqa: FBT001 — FIXME: bool param injected by pytest parametrize; remove when ruff supports parametrize-aware FBT001 exemption
+        set_user: bool,  # noqa: FBT001 — FIXME: bool param injected by pytest parametrize; remove when ruff supports parametrize-aware FBT001 exemption
         check_attrs: tuple[str, ...],
     ) -> None:
         """Verify placeholder used when context vars are explicitly set to None."""
@@ -209,7 +213,7 @@ class TestContextualLogFilterReturnValue:
     def test_filter_always_returns_true(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-        populated: bool,  # noqa: FBT001 — pytest parametrize injection
+        populated: bool,  # noqa: FBT001 — FIXME: bool param injected by pytest parametrize; remove when ruff supports parametrize-aware FBT001 exemption
     ) -> None:
         """Verify filter() always returns True regardless of context state."""
         f = ContextualLogFilter()
