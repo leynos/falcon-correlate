@@ -30,3 +30,21 @@ Feature: Contextual log filter
     When a log message "test entry" is emitted
     Then the formatted output should contain "req-789"
     And the formatted output should contain "admin"
+
+  Scenario: Recommended format string produces expected output
+    Given a logger configured with the recommended log format
+    And the correlation ID is set to "fmt-cid-001"
+    And the user ID is set to "fmt-uid-001"
+    When a log message "format test" is emitted
+    Then the formatted output should contain "fmt-cid-001"
+    And the formatted output should contain "fmt-uid-001"
+    And the formatted output should contain "format test"
+
+  Scenario: Filter integrates with dictConfig using recommended format
+    Given a logger configured via dictConfig with the recommended format
+    And the correlation ID is set to "dict-cid-001"
+    And the user ID is set to "dict-uid-001"
+    When a log message "dictconfig format test" is emitted
+    Then the formatted output should contain "dict-cid-001"
+    And the formatted output should contain "dict-uid-001"
+    And the formatted output should contain "dictconfig format test"

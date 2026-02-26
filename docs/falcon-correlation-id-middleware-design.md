@@ -1160,6 +1160,26 @@ implemented with a `hasattr` guard before each assignment.
 The filter always returns `True`. It enriches records with contextual
 attributes but never suppresses them, as specified in §3.4.1.
 
+#### 4.6.9. Recommended format string constant
+
+The recommended format string from §3.4.2 is exposed as a public constant
+`RECOMMENDED_LOG_FORMAT` in `middleware.py`, importable from the package root.
+Its value is:
+
+```plaintext
+%(asctime)s - [%(levelname)s] - [%(correlation_id)s] - [%(user_id)s] - %(name)s - %(message)s
+```
+
+The constant lets users `from falcon_correlate import RECOMMENDED_LOG_FORMAT`
+and pass it directly to `logging.Formatter` or embed it in a `dictConfig`
+dictionary, eliminating copy-paste transcription errors. This follows the
+project's pattern of defining module-level constants for shared values (e.g.
+`DEFAULT_HEADER_NAME`, `_MISSING_CONTEXT_PLACEHOLDER`).
+
+The `ContextualLogFilter` class docstring includes both a handler-level example
+using the constant and a complete `dictConfig` example, providing
+copy-pasteable configurations for the two most common logging setup patterns.
+
 ## 5. Conclusion and recommendations
 
 This report has detailed the design for a comprehensive correlation ID

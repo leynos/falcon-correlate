@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import logging
+import logging.config
 import typing as typ
 
 import pytest
@@ -13,6 +14,7 @@ if typ.TYPE_CHECKING:
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from falcon_correlate import (
+    RECOMMENDED_LOG_FORMAT,
     ContextualLogFilter,
     correlation_id_var,
     user_id_var,
@@ -155,3 +157,91 @@ def then_output_contains(context: Context, expected: str) -> None:
     assert expected in output, (
         f"formatted output did not contain {expected!r}: {output!r}"
     )
+
+
+@given(
+    "a logger configured with the recommended log format",
+    target_fixture="context",
+)
+def given_logger_with_recommended_format(
+    request: pytest.FixtureRequest,
+) -> Context:
+    """Create a logger using RECOMMENDED_LOG_FORMAT."""
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(
+        logging.Formatter(RECOMMENDED_LOG_FORMAT),
+    )
+    handler.addFilter(ContextualLogFilter())
+
+    test_logger = logging.getLogger(
+        "bdd_recommended_log_format_test",
+    )
+    test_logger.addHandler(handler)
+    test_logger.setLevel(logging.INFO)
+
+    request.addfinalizer(
+        lambda: test_logger.removeHandler(handler),
+    )
+
+    return {
+        "logger": test_logger,
+        "stream": stream,
+    }
+
+
+@given(
+    "a logger configured via dictConfig with the recommended format",
+    target_fixture="context",
+)
+def given_logger_via_dictconfig_with_recommended_format(
+    request: pytest.FixtureRequest,
+) -> Context:
+    """Create a logger via dictConfig using RECOMMENDED_LOG_FORMAT."""
+    logger_name = "bdd_recommended_dictconfig_test"
+    config = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "filters": {
+            "contextual": {
+                "()": "falcon_correlate.ContextualLogFilter",
+            },
+        },
+        "formatters": {
+            "recommended": {
+                "format": RECOMMENDED_LOG_FORMAT,
+            },
+        },
+        "handlers": {
+            "bdd_stream": {
+                "class": "logging.StreamHandler",
+                "stream": "ext://sys.stdout",
+                "formatter": "recommended",
+                "filters": ["contextual"],
+            },
+        },
+        "loggers": {
+            logger_name: {
+                "handlers": ["bdd_stream"],
+                "level": "INFO",
+            },
+        },
+    }
+    logging.config.dictConfig(config)
+    test_logger = logging.getLogger(logger_name)
+
+    stream = io.StringIO()
+    for h in test_logger.handlers:
+        if isinstance(h, logging.StreamHandler):
+            h.stream = stream
+
+    def _cleanup() -> None:
+        for h in list(test_logger.handlers):
+            test_logger.removeHandler(h)
+
+    request.addfinalizer(_cleanup)
+
+    return {
+        "logger": test_logger,
+        "stream": stream,
+    }

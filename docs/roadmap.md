@@ -122,9 +122,9 @@ Provide utilities for injecting correlation IDs into log records.
   - [x] Test filter adds attributes to log records.
   - [x] Test placeholder values when context is empty.
   - [x] Test filter integrates with standard logging configuration.
-- [ ] 3.1.2. Provide example logging configuration. See design-doc §3.4.2.
-  - [ ] Document recommended format string.
-  - [ ] Provide dictConfig example in docstrings.
+- [x] 3.1.2. Provide example logging configuration. See design-doc §3.4.2.
+  - [x] Document recommended format string.
+  - [x] Provide dictConfig example in docstrings.
 
 ### 3.2. Structlog integration (optional)
 

@@ -31,6 +31,11 @@ user_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 _CORRELATION_ID_RESET_TOKEN_ATTR = "_correlation_id_reset_token"  # noqa: S105  # FIXME: attribute-name string is not a secret
 _MISSING_CONTEXT_PLACEHOLDER: str = "-"
 
+RECOMMENDED_LOG_FORMAT: str = (
+    "%(asctime)s - [%(levelname)s] - [%(correlation_id)s] - "
+    "[%(user_id)s] - %(name)s - %(message)s"
+)
+
 
 class ContextualLogFilter(logging.Filter):
     """Logging filter that injects correlation and user IDs into log records.
@@ -45,6 +50,15 @@ class ContextualLogFilter(logging.Filter):
     fills in missing attributes, never overwrites existing ones.
 
     The filter never suppresses records; it always returns ``True``.
+
+    The library provides a recommended format string as the constant
+    ``RECOMMENDED_LOG_FORMAT``::
+
+        from falcon_correlate import RECOMMENDED_LOG_FORMAT
+
+        # Value:
+        # "%(asctime)s - [%(levelname)s] - [%(correlation_id)s] - "
+        # "[%(user_id)s] - %(name)s - %(message)s"
 
     Examples
     --------
@@ -61,6 +75,53 @@ class ContextualLogFilter(logging.Filter):
                 "[%(user_id)s] %(message)s"
             )
         )
+
+    Using the recommended format constant::
+
+        import logging
+        from falcon_correlate import (
+            ContextualLogFilter,
+            RECOMMENDED_LOG_FORMAT,
+        )
+
+        handler = logging.StreamHandler()
+        handler.addFilter(ContextualLogFilter())
+        handler.setFormatter(
+            logging.Formatter(RECOMMENDED_LOG_FORMAT),
+        )
+
+    Configure via ``logging.config.dictConfig``::
+
+        import logging.config
+        from falcon_correlate import RECOMMENDED_LOG_FORMAT
+
+        LOGGING_CONFIG = {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "filters": {
+                "contextual": {
+                    "()": "falcon_correlate.ContextualLogFilter",
+                },
+            },
+            "formatters": {
+                "standard": {
+                    "format": RECOMMENDED_LOG_FORMAT,
+                },
+            },
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "standard",
+                    "filters": ["contextual"],
+                },
+            },
+            "root": {
+                "handlers": ["console"],
+                "level": "INFO",
+            },
+        }
+
+        logging.config.dictConfig(LOGGING_CONFIG)
 
     """
 
