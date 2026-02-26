@@ -172,8 +172,7 @@ def given_logger_with_recommended_format(
     handler.setFormatter(
         logging.Formatter(RECOMMENDED_LOG_FORMAT),
     )
-    log_filter = ContextualLogFilter()
-    handler.addFilter(log_filter)
+    handler.addFilter(ContextualLogFilter())
 
     test_logger = logging.getLogger(
         "bdd_recommended_log_format_test",
@@ -186,7 +185,6 @@ def given_logger_with_recommended_format(
     )
 
     return {
-        "log_filter": log_filter,
         "logger": test_logger,
         "stream": stream,
     }
@@ -244,7 +242,6 @@ def given_logger_via_dictconfig_with_recommended_format(
     request.addfinalizer(_cleanup)
 
     return {
-        "log_filter": ContextualLogFilter(),
         "logger": test_logger,
         "stream": stream,
     }

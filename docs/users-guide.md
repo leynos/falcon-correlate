@@ -346,7 +346,7 @@ from falcon_correlate import RECOMMENDED_LOG_FORMAT
 This produces output like:
 
 ```plaintext
-2026-02-25 14:30:00,123 - [INFO] - [abc123] - [user42] - myapp: Handling request
+2026-02-25 14:30:00,123 - [INFO] - [abc123] - [user42] - myapp - Handling request
 ```
 
 Use it with a handler:
@@ -364,8 +364,8 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 ```
 
-The constant is provided as a convenience; you can always supply your own
-format string if the recommended layout does not suit your needs.
+The constant is provided as a convenience; callers may supply a custom format
+string if the recommended layout does not suit their needs.
 
 ### Using `dictConfig`
 

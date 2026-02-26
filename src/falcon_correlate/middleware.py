@@ -93,6 +93,7 @@ class ContextualLogFilter(logging.Filter):
     Configure via ``logging.config.dictConfig``::
 
         import logging.config
+        from falcon_correlate import RECOMMENDED_LOG_FORMAT
 
         LOGGING_CONFIG = {
             "version": 1,
@@ -104,12 +105,7 @@ class ContextualLogFilter(logging.Filter):
             },
             "formatters": {
                 "standard": {
-                    "format": (
-                        "%(asctime)s - [%(levelname)s] "
-                        "- [%(correlation_id)s] "
-                        "- [%(user_id)s] "
-                        "- %(name)s - %(message)s"
-                    ),
+                    "format": RECOMMENDED_LOG_FORMAT,
                 },
             },
             "handlers": {

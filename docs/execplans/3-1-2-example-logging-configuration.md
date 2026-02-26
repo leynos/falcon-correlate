@@ -15,7 +15,7 @@ already attach the filter to handlers, but the library does not yet ship a
 recommended format string or a copy-pasteable `dictConfig` example in the class
 docstring. Task 3.1.2 fills this gap.
 
-After this change a developer can:
+After this change, a developer can:
 
 1. Import `RECOMMENDED_LOG_FORMAT` from `falcon_correlate` and pass it
    directly to `logging.Formatter` or embed it in a `dictConfig` dictionary,
@@ -36,7 +36,7 @@ Success is observable when:
   constant and its integration with `logging.Formatter` and `dictConfig`.
 - `docs/roadmap.md` shows task 3.1.2 as complete.
 - All quality gates pass (`make check-fmt`, `make typecheck`, `make lint`,
-  `make test`, `make markdownlint`).
+  `make test`, `make markdownlint`, `make nixie`).
 
 ## Constraints
 
@@ -102,7 +102,8 @@ Success is observable when:
 - [x] (2026-02-25 00:25Z) Record design decisions in design document.
 - [x] (2026-02-25 00:25Z) Mark task 3.1.2 complete in `docs/roadmap.md`.
 - [x] (2026-02-25 00:30Z) Run all quality gates (`make check-fmt`,
-  `make typecheck`, `make lint`, `make test`, `make markdownlint`).
+  `make typecheck`, `make lint`, `make test`, `make markdownlint`,
+  `make nixie`).
 
 ## Surprises & discoveries
 
@@ -138,7 +139,7 @@ Success is observable when:
   ```
 
   The existing users-guide examples use slightly different formats (simpler,
-  without `%(levelname)s`); these remain as-is to show customisation options,
+  without `%(levelname)s`); these remain as-is to show customization options,
   while the constant provides the "batteries-included" default. Date/Author:
   2026-02-25.
 
@@ -157,7 +158,7 @@ recommended-format output and `dictConfig` integration. Total test suite: 261
 passed, 11 skipped.
 
 All quality gates passed: `make check-fmt`, `make typecheck`, `make lint`,
-`make test`, `make markdownlint`.
+`make test`, `make markdownlint`, `make nixie`.
 
 Key lesson: ruff's `RUF022` rule enforces isort-style sorting of `__all__`,
 which places all-uppercase names before title-case names. Use
@@ -175,11 +176,11 @@ When a context variable is not set, the placeholder `"-"` (stored in
 `_MISSING_CONTEXT_PLACEHOLDER`) is used.
 
 The class is exported from `src/falcon_correlate/__init__.py` and listed in
-`__all__`. The `__all__` list is sorted case-sensitively: uppercase names first
-(`ContextualLogFilter`, `CorrelationIDConfig`, `CorrelationIDMiddleware`, then
-the future `RECOMMENDED_LOG_FORMAT`), followed by lowercase names
-(`correlation_id_var`, `default_uuid7_generator`, `default_uuid_validator`,
-`hello`, `user_id_var`).
+`__all__`. The `__all__` list is sorted case-sensitively (isort-style) in three
+tiers: SCREAMING_CASE constants first (`RECOMMENDED_LOG_FORMAT`), then
+CamelCase classes (`ContextualLogFilter`, `CorrelationIDConfig`,
+`CorrelationIDMiddleware`), followed by lowercase names (`correlation_id_var`,
+`default_uuid7_generator`, `default_uuid_validator`, `hello`, `user_id_var`).
 
 Unit tests are co-located in `src/falcon_correlate/unittests/` and follow a
 class-based pattern with descriptive docstrings. Shared unit-test fixtures
@@ -351,6 +352,7 @@ make typecheck 2>&1 | tee /tmp/falcon-correlate-typecheck.log
 make lint 2>&1 | tee /tmp/falcon-correlate-lint.log
 make test 2>&1 | tee /tmp/falcon-correlate-test.log
 make markdownlint 2>&1 | tee /tmp/falcon-correlate-markdownlint.log
+make nixie 2>&1 | tee /tmp/falcon-correlate-nixie.log
 ```
 
 ## Validation and acceptance
@@ -365,6 +367,7 @@ Quality criteria:
 - Formatting: `make check-fmt` passes.
 - Type checking: `make typecheck` passes.
 - Markdown: `make markdownlint` passes.
+- Mermaid diagrams: `make nixie` passes.
 
 Behavioural acceptance:
 
@@ -395,6 +398,7 @@ Keep the log files created via `tee` for evidence of passing checks:
 - `/tmp/falcon-correlate-lint.log`
 - `/tmp/falcon-correlate-test.log`
 - `/tmp/falcon-correlate-markdownlint.log`
+- `/tmp/falcon-correlate-nixie.log`
 
 ## Interfaces and dependencies
 
