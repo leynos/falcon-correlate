@@ -155,8 +155,8 @@ After this change:
 
 ## Outcomes & retrospective
 
-The structlog integration documentation and validation are complete. The
-users' guide now contains a "Structlog integration" section with two bridging
+The structlog integration documentation and validation are complete. The users'
+guide now contains a "Structlog integration" section with two bridging
 approaches: a custom processor (recommended) and a `bind_contextvars`
 middleware (alternative). The design document appendix A.5 records the finding
 that `merge_contextvars` does not pick up arbitrary `ContextVar` instances.
@@ -171,9 +171,9 @@ All quality gates passed: `make check-fmt`, `make lint`, `make typecheck`,
 `make test`, `make markdownlint`.
 
 Key lesson: `pytest.importorskip()` at module level causes imports after it to
-trigger E402 (module-level import not at top of file). These require `# noqa:
-E402` suppression since the import order is intentional — the `importorskip`
-call must precede imports that depend on the skipped package.
+trigger E402 (module-level import not at top of file). These require
+`# noqa: E402` suppression since the import order is intentional — the
+`importorskip` call must precede imports that depend on the skipped package.
 
 ## Context and orientation
 

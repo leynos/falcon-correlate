@@ -92,6 +92,35 @@ def _configure_structlog_with_capture(
     )
 
 
+def _run_isolated_structlog_test(
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    setup_and_log: cabc.Callable[[list[dict[str, object]]], None],
+) -> list[dict[str, object]]:
+    """Run a structlog test in isolated context.
+
+    Parameters
+    ----------
+    isolated_context : Callable
+        The isolated_context fixture.
+    setup_and_log : Callable
+        A function that receives the captured list, sets up context
+        variables, configures structlog, and logs a test message.
+
+    Returns
+    -------
+    list[dict[str, object]]
+        The captured log events.
+
+    """
+    captured: list[dict[str, object]] = []
+
+    def test_logic() -> None:
+        setup_and_log(captured)
+
+    isolated_context(test_logic)
+    return captured
+
+
 class TestMergeContextvarsLimitation:
     """Tests proving merge_contextvars does not pick up library variables.
 
@@ -107,15 +136,15 @@ class TestMergeContextvarsLimitation:
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify merge_contextvars does not pick up correlation_id_var."""
-        captured: list[dict[str, object]] = []
 
-        def test_logic() -> None:
+        def setup_and_log(
+            captured: list[dict[str, object]],
+        ) -> None:
             correlation_id_var.set("should-not-appear")
             _configure_structlog_with_capture(captured)
-            log = structlog.get_logger()
-            log.info("test")
+            structlog.get_logger().info("test")
 
-        isolated_context(test_logic)
+        captured = _run_isolated_structlog_test(isolated_context, setup_and_log)
 
         assert len(captured) == 1
         assert "correlation_id" not in captured[0], (
@@ -128,15 +157,15 @@ class TestMergeContextvarsLimitation:
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify merge_contextvars does not pick up user_id_var."""
-        captured: list[dict[str, object]] = []
 
-        def test_logic() -> None:
+        def setup_and_log(
+            captured: list[dict[str, object]],
+        ) -> None:
             user_id_var.set("should-not-appear")
             _configure_structlog_with_capture(captured)
-            log = structlog.get_logger()
-            log.info("test")
+            structlog.get_logger().info("test")
 
-        isolated_context(test_logic)
+        captured = _run_isolated_structlog_test(isolated_context, setup_and_log)
 
         assert len(captured) == 1
         assert "user_id" not in captured[0], (
@@ -157,16 +186,16 @@ class TestCustomProcessorApproach:
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify custom processor injects both IDs from context variables."""
-        captured: list[dict[str, object]] = []
 
-        def test_logic() -> None:
+        def setup_and_log(
+            captured: list[dict[str, object]],
+        ) -> None:
             correlation_id_var.set("proc-cid-001")
             user_id_var.set("proc-uid-001")
             _configure_structlog_with_capture(captured, include_custom_processor=True)
-            log = structlog.get_logger()
-            log.info("test")
+            structlog.get_logger().info("test")
 
-        isolated_context(test_logic)
+        captured = _run_isolated_structlog_test(isolated_context, setup_and_log)
 
         assert len(captured) == 1
         assert captured[0]["correlation_id"] == "proc-cid-001", (
@@ -181,14 +210,14 @@ class TestCustomProcessorApproach:
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify custom processor uses '-' placeholder when context is empty."""
-        captured: list[dict[str, object]] = []
 
-        def test_logic() -> None:
+        def setup_and_log(
+            captured: list[dict[str, object]],
+        ) -> None:
             _configure_structlog_with_capture(captured, include_custom_processor=True)
-            log = structlog.get_logger()
-            log.info("test")
+            structlog.get_logger().info("test")
 
-        isolated_context(test_logic)
+        captured = _run_isolated_structlog_test(isolated_context, setup_and_log)
 
         assert len(captured) == 1
         assert captured[0]["correlation_id"] == "-", (
