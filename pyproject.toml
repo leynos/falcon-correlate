@@ -17,6 +17,7 @@ dev = [
     "pytest-asyncio",
     "pytest-xdist",
     "ruff",
+    "structlog",
     "pyright",
     "ty",
     "pytest-timeout",

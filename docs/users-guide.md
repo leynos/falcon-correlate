@@ -436,6 +436,112 @@ logger.info(
 # value (or the "-" placeholder).
 ```
 
+## Structlog integration
+
+For applications using [structlog](https://www.structlog.org/) for structured
+logging, the correlation ID and user ID context variables can be included in
+structured log output without any additional library code.
+
+### How it works
+
+The `falcon-correlate` middleware stores the correlation ID and user ID in
+standard `contextvars.ContextVar` instances (`correlation_id_var` and
+`user_id_var`). Structlog provides a `merge_contextvars` processor that merges
+context variables into the log event dictionary, but this processor only picks
+up variables bound via `structlog.contextvars.bind_contextvars()` — it does not
+automatically read arbitrary `ContextVar` instances such as
+`correlation_id_var` and `user_id_var`.
+
+To bridge this gap, add a small custom processor to your structlog
+configuration that reads directly from `falcon-correlate`'s context variables.
+
+### Custom processor (recommended)
+
+Define a processor function that reads from the library's context variables and
+adds them to the structlog event dictionary:
+
+```python
+from falcon_correlate import correlation_id_var, user_id_var
+
+
+def inject_correlation_context(
+    logger: object,
+    method_name: str,
+    event_dict: dict[str, object],
+) -> dict[str, object]:
+    """Inject correlation ID and user ID into structlog event dict."""
+    event_dict.setdefault("correlation_id", correlation_id_var.get() or "-")
+    event_dict.setdefault("user_id", user_id_var.get() or "-")
+    return event_dict
+```
+
+Then include it in your structlog processor chain at application startup:
+
+```python
+import structlog
+
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        inject_correlation_context,
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.dev.ConsoleRenderer(),
+    ],
+    logger_factory=structlog.PrintLoggerFactory(),
+)
+```
+
+This produces structured output like:
+
+```plaintext
+2026-02-27T12:00:00Z [info     ] Handling request    correlation_id=abc123 user_id=user42
+```
+
+The processor uses `setdefault` so that values explicitly bound via
+`structlog.contextvars.bind_contextvars()` or passed as keyword arguments to
+the logger are preserved, matching the "fill, don't overwrite" behaviour of
+`ContextualLogFilter`.
+
+### Alternative: `bind_contextvars` in middleware
+
+As an alternative to the custom processor, you can bridge the context variables
+by calling `structlog.contextvars.bind_contextvars()` in a second Falcon
+middleware that runs after `CorrelationIDMiddleware`:
+
+```python
+import structlog
+from falcon_correlate import correlation_id_var, user_id_var
+
+
+class StructlogContextMiddleware:
+    """Bridge falcon-correlate context variables into structlog."""
+
+    def process_request(self, req, resp):
+        cid = correlation_id_var.get()
+        uid = user_id_var.get()
+        structlog.contextvars.bind_contextvars(
+            correlation_id=cid or "-",
+            user_id=uid or "-",
+        )
+
+    def process_response(self, req, resp, resource, req_succeeded):
+        structlog.contextvars.clear_contextvars()
+```
+
+This approach works with `structlog.contextvars.merge_contextvars()` in the
+processor chain without needing a custom processor. However, the custom
+processor approach above is preferred because it requires no additional
+middleware and no per-request bridging calls.
+
+### Note on `merge_contextvars`
+
+`structlog.contextvars.merge_contextvars()` only merges context variables bound
+via `structlog.contextvars.bind_contextvars()`. It does not automatically pick
+up arbitrary `contextvars.ContextVar` instances such as `correlation_id_var`
+and `user_id_var`. This is why a bridging step — either the custom processor or
+the middleware approach above — is required.
+
 ## Full Configuration Example
 
 ```python
@@ -486,9 +592,7 @@ The following functionality is now implemented:
   Pre-existing record attributes (e.g. from `extra=`) are preserved.
 - `RECOMMENDED_LOG_FORMAT` constant providing a ready-made format string for
   use with `logging.Formatter` or `dictConfig`.
-
-The following functionality will be added in future releases:
-
-- Structlog integration documentation (task 3.2).
+- Structlog integration documentation with custom processor and
+  `bind_contextvars` bridging approaches (task 3.2).
 
 See the [roadmap](roadmap.md) for the full implementation plan.

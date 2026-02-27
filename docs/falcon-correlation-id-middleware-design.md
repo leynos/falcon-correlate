@@ -1455,3 +1455,53 @@ documentation.
 - `tests/bdd/test_req_context_integration_steps.py` — BDD step definitions.
 - `docs/users-guide.md` — Added dual-access guidance section and updated
   current status.
+
+### A.5. Structlog integration pattern (Task 3.2.1)
+
+**Decision:** Document structlog integration as user-side code (a custom
+processor function and an alternative `bind_contextvars` bridging middleware),
+with no new library code added.
+
+**Finding:** The design document section 3.4.3 states that context variables
+set by the middleware "would be automatically picked up if `merge_contextvars`
+is in the processor chain." Investigation during implementation revealed this
+is inaccurate: `structlog.contextvars.merge_contextvars()` only reads
+`ContextVar` instances whose internal name starts with the prefix
+`"structlog_"`, which is set by `structlog.contextvars.bind_contextvars()`. The
+library's `correlation_id_var` (name `"correlation_id"`) and `user_id_var`
+(name `"user_id"`) are not prefixed and are therefore invisible to
+`merge_contextvars`.
+
+**Rationale:**
+
+1. **Two bridging approaches documented:** A custom structlog processor
+   (recommended) that reads from `correlation_id_var` and `user_id_var`
+   directly, and an alternative Falcon middleware that calls
+   `structlog.contextvars.bind_contextvars()` to bridge the values. The custom
+   processor is preferred because it is a "configure once" solution that
+   requires no per-request middleware calls.
+
+2. **No library code added:** The bridging code is trivial (~6 lines) and
+   belongs in user configuration, not the library. Adding a processor to the
+   library would create a runtime import path that touches `structlog`, which
+   is not a runtime dependency. The documentation-only approach keeps the
+   dependency surface clean.
+
+3. **`setdefault` pattern:** The custom processor uses
+   `event_dict.setdefault()` to avoid overwriting values explicitly bound by
+   the caller, consistent with the "fill, don't overwrite" pattern used by
+   `ContextualLogFilter` (see §A.4).
+
+4. **Dev dependency only:** `structlog` is added to the dev dependency group
+   for running validation tests. It is not a runtime dependency.
+
+**Files created/modified:**
+
+- `src/falcon_correlate/unittests/test_structlog_integration.py` — Unit tests
+  validating the custom processor approach, the `bind_contextvars` approach,
+  and a negative test proving the `merge_contextvars` limitation.
+- `tests/bdd/structlog_integration.feature` — BDD scenarios for structlog
+  integration.
+- `tests/bdd/test_structlog_integration_steps.py` — BDD step definitions.
+- `docs/users-guide.md` — Added "Structlog integration" section and updated
+  current status.
