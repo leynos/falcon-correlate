@@ -77,11 +77,12 @@ After this change:
   use module-level `pytest.importorskip` which is the standard pattern and
   works correctly with xdist.
 
-- Risk: BDD step definitions that import structlog at module level will cause
-  import errors when structlog is not installed, even for unrelated tests.
-  Severity: medium. Likelihood: medium. Mitigation: use
-  `pytest.importorskip("structlog")` at module level in the step definition
-  file, causing the entire module and its scenarios to be skipped.
+- Risk: behaviour-driven development (BDD) step definitions that import
+  structlog at module level will cause import errors when structlog is not
+  installed, even for unrelated tests. Severity: medium. Likelihood: medium.
+  Mitigation: use `pytest.importorskip("structlog")` at module level in the
+  step definition file, causing the entire module and its scenarios to be
+  skipped.
 
 ## Progress
 
@@ -165,7 +166,7 @@ New tests: 6 unit tests in `test_structlog_integration.py` covering three
 categories (merge_contextvars limitation, custom processor approach, and
 bind_contextvars approach) plus 2 BDD scenarios in
 `structlog_integration.feature`. Total test suite: 269 passed, 11 skipped
-(CI-only workflow tests).
+(continuous integration (CI)-only workflow tests).
 
 All quality gates passed: `make check-fmt`, `make lint`, `make typecheck`,
 `make test`, `make markdownlint`.

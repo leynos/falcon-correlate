@@ -1303,9 +1303,9 @@ with method stubs, deferring full functionality to subsequent tasks.
 3. **Type safety:** Full type hints using `falcon.Request` and `falcon.Response`
    from Falcon's public API ensure type checker compatibility and IDE support.
 
-4. **Test-driven development:** Unit tests and BDD behavioural tests are written
-   alongside the skeleton to validate the interface before functionality is
-   added.
+4. **Test-driven development:** Unit tests and behaviour-driven development
+   (BDD) behavioural tests are written alongside the skeleton to validate the
+   interface before functionality is added.
 
 **Files created:**
 

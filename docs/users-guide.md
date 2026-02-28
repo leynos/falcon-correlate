@@ -452,7 +452,7 @@ up variables bound via `structlog.contextvars.bind_contextvars()` — it does no
 automatically read arbitrary `ContextVar` instances such as
 `correlation_id_var` and `user_id_var`.
 
-To bridge this gap, add a small custom processor to your structlog
+To bridge this gap, a small custom processor can be added to the structlog
 configuration that reads directly from `falcon-correlate`'s context variables.
 
 ### Custom processor (recommended)
@@ -475,14 +475,14 @@ def inject_correlation_context(
     return event_dict
 ```
 
-Then include it in your structlog processor chain at application startup:
+Then include it in the structlog processor chain at application startup:
 
 ```python
 import structlog
 
 structlog.configure(
     processors=[
-        structlog.contextvars.merge_contextvars,
+        structlog.contextvars.merge_contextvars,  # optional, see note below
         inject_correlation_context,
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso"),
@@ -491,6 +491,13 @@ structlog.configure(
     logger_factory=structlog.PrintLoggerFactory(),
 )
 ```
+
+`merge_contextvars` is not required by `inject_correlation_context` — the
+custom processor reads directly from `falcon-correlate`'s context variables.
+However, including `merge_contextvars` allows any additional values bound via
+`structlog.contextvars.bind_contextvars()` elsewhere in the application to
+appear in the log output as well. It can safely be omitted if that capability
+is not needed.
 
 This produces structured output like:
 
@@ -505,7 +512,7 @@ the logger are preserved, matching the "fill, don't overwrite" behaviour of
 
 ### Alternative: `bind_contextvars` in middleware
 
-As an alternative to the custom processor, you can bridge the context variables
+As an alternative to the custom processor, the context variables can be bridged
 by calling `structlog.contextvars.bind_contextvars()` in a second Falcon
 middleware that runs after `CorrelationIDMiddleware`:
 

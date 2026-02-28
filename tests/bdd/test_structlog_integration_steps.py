@@ -14,6 +14,9 @@ if typ.TYPE_CHECKING:
 from pytest_bdd import given, parsers, scenarios, then, when  # noqa: E402
 
 from falcon_correlate import correlation_id_var, user_id_var  # noqa: E402
+from falcon_correlate.unittests.test_structlog_integration import (  # noqa: E402
+    inject_correlation_context,
+)
 
 scenarios("structlog_integration.feature")
 
@@ -24,17 +27,6 @@ class Context(typ.TypedDict, total=False):
     captured_events: list[dict[str, object]]
     correlation_id_token: contextvars.Token[str | None]
     user_id_token: contextvars.Token[str | None]
-
-
-def _inject_correlation_context(
-    logger: object,
-    method_name: str,
-    event_dict: dict[str, object],
-) -> dict[str, object]:
-    """Inject correlation ID and user ID into structlog event dict."""
-    event_dict.setdefault("correlation_id", correlation_id_var.get() or "-")
-    event_dict.setdefault("user_id", user_id_var.get() or "-")
-    return event_dict
 
 
 @pytest.fixture(autouse=True)
@@ -72,7 +64,7 @@ def given_structlog_configured() -> Context:
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
-            _inject_correlation_context,
+            inject_correlation_context,
             _capture,
         ],
         wrapper_class=structlog.make_filtering_bound_logger(0),
