@@ -1490,7 +1490,7 @@ library's `correlation_id_var` (name `"correlation_id"`) and `user_id_var`
 3. **`setdefault` pattern:** The custom processor uses
    `event_dict.setdefault()` to avoid overwriting values explicitly bound by
    the caller, consistent with the "fill, don't overwrite" pattern used by
-   `ContextualLogFilter` (see §A.4).
+   `ContextualLogFilter` (see §4.6.8).
 
 4. **Dev dependency only:** `structlog` is added to the dev dependency group
    for running validation tests. It is not a runtime dependency.

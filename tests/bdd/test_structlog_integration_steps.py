@@ -98,6 +98,9 @@ def given_user_id_set(context: Context, value: str) -> Context:
 @given("no context variables are set")
 def given_no_context_variables_set() -> None:
     """Ensure no context variables are set (default state)."""
+    correlation_id_var.set(None)
+    user_id_var.set(None)
+    structlog.contextvars.clear_contextvars()
 
 
 @when(
