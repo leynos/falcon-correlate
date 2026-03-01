@@ -31,7 +31,9 @@ class Context(typ.TypedDict, total=False):
 
 @pytest.fixture(autouse=True)
 def _reset_context_variables() -> typ.Generator[None, None, None]:
-    """Reset context variables after each scenario to prevent leakage."""
+    """Reset context variables before and after each scenario."""
+    correlation_id_var.set(None)
+    user_id_var.set(None)
     yield
     correlation_id_var.set(None)
     user_id_var.set(None)
@@ -39,7 +41,9 @@ def _reset_context_variables() -> typ.Generator[None, None, None]:
 
 @pytest.fixture(autouse=True)
 def _reset_structlog() -> typ.Generator[None, None, None]:
-    """Reset structlog configuration after each scenario."""
+    """Reset structlog configuration before and after each scenario."""
+    structlog.contextvars.clear_contextvars()
+    structlog.reset_defaults()
     yield
     structlog.contextvars.clear_contextvars()
     structlog.reset_defaults()
