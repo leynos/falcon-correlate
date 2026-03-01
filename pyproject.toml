@@ -12,15 +12,16 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "pytest",
-    "pytest-bdd",
-    "pytest-asyncio",
-    "pytest-xdist",
-    "ruff",
-    "pyright",
-    "ty",
-    "pytest-timeout",
-    "pyyaml",
+    "pytest>=9.0,<10",
+    "pytest-bdd>=8.1,<9",
+    "pytest-asyncio>=1.0,<2",
+    "pytest-xdist>=3.5,<4",
+    "ruff>=0.6,<1",
+    "structlog>=24.1,<26",
+    "pyright>=1.1,<2",
+    "ty>=0.0.6,<1",
+    "pytest-timeout>=2.3,<3",
+    "pyyaml>=6.0,<7",
 ]
 
 [tool.ruff]
