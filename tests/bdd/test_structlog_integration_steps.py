@@ -14,9 +14,7 @@ if typ.TYPE_CHECKING:
 from pytest_bdd import given, parsers, scenarios, then, when  # noqa: E402
 
 from falcon_correlate import correlation_id_var, user_id_var  # noqa: E402
-from falcon_correlate.unittests.test_structlog_integration import (  # noqa: E402
-    inject_correlation_context,
-)
+from tests.structlog_helpers import inject_correlation_context  # noqa: E402
 
 scenarios("structlog_integration.feature")
 
