@@ -128,13 +128,14 @@ Provide utilities for injecting correlation IDs into log records.
 
 ### 3.2. Structlog integration (optional)
 
-- [ ] 3.2.1. Document structlog integration pattern. See design-doc §3.4.3.
-  - [ ] Explain `merge_contextvars` processor usage.
-  - [ ] Provide configuration example.
-  - [ ] Note that no additional code is required if contextvars are used.
-- [ ] 3.2.2. Validate structlog integration
-  - [ ] Test correlation ID appears in structured log output.
-  - [ ] Mark test as skipped if structlog is not installed.
+- [x] 3.2.1. Document structlog integration pattern. See design-doc §3.4.3.
+  - [x] Explain `merge_contextvars` processor usage.
+  - [x] Provide configuration example.
+  - [x] Note that structlog needs a bridging step (custom processor or
+        `bind_contextvars`) to expose `correlation_id` and `user_id`.
+- [x] 3.2.2. Validate structlog integration
+  - [x] Test correlation ID appears in structured log output.
+  - [x] Mark test as skipped if structlog is not installed.
 
 ## 4. Downstream propagation
 
