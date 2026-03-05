@@ -1505,3 +1505,60 @@ library's `correlation_id_var` (name `"correlation_id"`) and `user_id_var`
 - `tests/bdd/test_structlog_integration_steps.py` — BDD step definitions.
 - `docs/users-guide.md` — Added "Structlog integration" section and updated
   current status.
+
+### A.6. httpx wrapper functions (Task 4.1.1)
+
+**Decision:** Create `request_with_correlation_id` and
+`async_request_with_correlation_id` wrapper functions in a new module
+`src/falcon_correlate/httpx.py`, with `httpx` as an optional dependency
+imported lazily at call time.
+
+**Rationale:**
+
+1. **Separate module:** httpx propagation is a distinct feature domain
+   from the Falcon middleware, logging filter, and context variables in
+   `middleware.py`. A dedicated `httpx.py` module follows the "group by
+   feature, not layer" convention and isolates the optional dependency.
+
+2. **Lazy imports:** Each wrapper function performs `import httpx as
+   _httpx` inside its body. The module itself can be imported (and
+   re-exported from `__init__.py`) without `httpx` installed. Users who
+   do not need httpx propagation pay no import cost. An `ImportError` is
+   raised only when a wrapper function is actually called without `httpx`
+   installed. This mirrors the structlog pattern where the library
+   provides documentation and test validation, but defers the actual
+   `import` to the consumer.
+
+3. **`_prepare_headers` helper:** The header preparation logic (pop
+   headers from `kwargs`, convert to mutable dict, inject correlation ID)
+   is identical between the sync and async variants. Extracting it into a
+   private `_prepare_headers` function eliminates duplication and keeps
+   both public functions focused on their `httpx` call semantics.
+
+4. **`DEFAULT_HEADER_NAME` constant:** The wrapper uses the
+   `DEFAULT_HEADER_NAME` constant from `middleware.py` rather than
+   hardcoding `"X-Correlation-ID"`, keeping the header name in sync with
+   the middleware default.
+
+5. **Function names:** The roadmap names `request_with_correlation_id` and
+   `async_request_with_correlation_id` were used rather than the design
+   document's `client_request_with_correlation_id` and
+   `async_client_request_with_correlation_id`. The roadmap represents the
+   accepted requirements; the design document names are illustrative
+   examples.
+
+**Files created/modified:**
+
+- `src/falcon_correlate/httpx.py` — New module with wrapper functions and
+  `_prepare_headers` helper.
+- `src/falcon_correlate/__init__.py` — Added imports and `__all__` entries
+  for both wrapper functions.
+- `src/falcon_correlate/unittests/test_httpx_wrapper.py` — Unit tests
+  covering header injection, preservation, async behaviour, kwargs
+  pass-through, and public API exports.
+- `tests/bdd/httpx_propagation.feature` — BDD scenarios for httpx
+  propagation.
+- `tests/bdd/test_httpx_propagation_steps.py` — BDD step definitions.
+- `docs/users-guide.md` — Added "httpx propagation" section and updated
+  current status.
+- `pyproject.toml` — Added `httpx` to dev dependency group.
