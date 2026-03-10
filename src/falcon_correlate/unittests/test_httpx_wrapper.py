@@ -33,6 +33,72 @@ from falcon_correlate.httpx import (  # noqa: E402
 _EXPECTED_TIMEOUT = 5
 
 
+# -- helpers & fixtures ------------------------------------------------------
+
+
+@pytest.fixture
+def mock_async_client() -> typ.Generator[mock.AsyncMock, None, None]:
+    """Provide a pre-configured httpx.AsyncClient mock."""
+    with mock.patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client = mock.AsyncMock()
+        mock_client.request.return_value = httpx.Response(200)
+        mock_client_cls.return_value.__aenter__ = mock.AsyncMock(
+            return_value=mock_client
+        )
+        mock_client_cls.return_value.__aexit__ = mock.AsyncMock(return_value=False)
+        yield mock_client
+
+
+def _run_sync(
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    correlation_id: str | None = None,
+    method: str = "GET",
+    url: str = "http://example.com",
+    **kwargs: typ.Any,  # noqa: ANN401
+) -> dict[str, typ.Any]:
+    """Run ``request_with_correlation_id`` in an isolated context.
+
+    Returns the keyword arguments captured from the mocked
+    ``httpx.request`` call.
+    """
+    captured: dict[str, typ.Any] = {}
+
+    def _logic() -> None:
+        if correlation_id is not None:
+            correlation_id_var.set(correlation_id)
+        with mock.patch("httpx.request") as mock_request:
+            mock_request.return_value = httpx.Response(200)
+            request_with_correlation_id(method, url, **kwargs)
+            captured.update(mock_request.call_args.kwargs)
+
+    isolated_context(_logic)
+    return captured
+
+
+def _run_prepare_headers(
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    kwargs: dict[str, typ.Any],
+    correlation_id: str | None = None,
+) -> tuple[dict[str, typ.Any], dict[str, typ.Any]]:
+    """Run ``_prepare_headers`` in an isolated context.
+
+    Returns ``(headers, remaining_kwargs)`` where *remaining_kwargs*
+    is the mutated input dict after ``headers`` has been popped.
+    """
+    result: dict[str, typ.Any] = {}
+
+    def _logic() -> None:
+        if correlation_id is not None:
+            correlation_id_var.set(correlation_id)
+        result["headers"] = _prepare_headers(kwargs)
+
+    isolated_context(_logic)
+    return result.get("headers", {}), kwargs
+
+
+# -- sync wrapper tests -------------------------------------------------------
+
+
 class TestRequestWithCorrelationId:
     """Tests for the synchronous ``request_with_correlation_id`` wrapper."""
 
@@ -41,57 +107,31 @@ class TestRequestWithCorrelationId:
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify the wrapper injects the correlation ID header."""
-        captured_kwargs: dict[str, typ.Any] = {}
+        captured = _run_sync(isolated_context, correlation_id="sync-cid-001")
 
-        def test_logic() -> None:
-            correlation_id_var.set("sync-cid-001")
-            with mock.patch("httpx.request") as mock_request:
-                mock_request.return_value = httpx.Response(200)
-                request_with_correlation_id("GET", "http://example.com")
-                captured_kwargs.update(mock_request.call_args.kwargs)
-
-        isolated_context(test_logic)
-
-        assert captured_kwargs["headers"]["X-Correlation-ID"] == ("sync-cid-001")
+        assert captured["headers"]["X-Correlation-ID"] == ("sync-cid-001")
 
     def test_does_not_add_header_when_context_is_empty(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify no header is added when the context variable is unset."""
-        captured_kwargs: dict[str, typ.Any] = {}
+        captured = _run_sync(isolated_context)
 
-        def test_logic() -> None:
-            with mock.patch("httpx.request") as mock_request:
-                mock_request.return_value = httpx.Response(200)
-                request_with_correlation_id("GET", "http://example.com")
-                captured_kwargs.update(mock_request.call_args.kwargs)
-
-        isolated_context(test_logic)
-
-        assert "X-Correlation-ID" not in captured_kwargs["headers"]
+        assert "X-Correlation-ID" not in captured["headers"]
 
     def test_preserves_existing_caller_headers(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify caller-supplied headers are preserved."""
-        captured_kwargs: dict[str, typ.Any] = {}
+        captured = _run_sync(
+            isolated_context,
+            correlation_id="sync-cid-002",
+            headers={"Authorization": "Bearer token"},
+        )
 
-        def test_logic() -> None:
-            correlation_id_var.set("sync-cid-002")
-            with mock.patch("httpx.request") as mock_request:
-                mock_request.return_value = httpx.Response(200)
-                request_with_correlation_id(
-                    "GET",
-                    "http://example.com",
-                    headers={"Authorization": "Bearer token"},
-                )
-                captured_kwargs.update(mock_request.call_args.kwargs)
-
-        isolated_context(test_logic)
-
-        headers = captured_kwargs["headers"]
+        headers = captured["headers"]
         assert headers["Authorization"] == "Bearer token"
         assert headers["X-Correlation-ID"] == "sync-cid-002"
 
@@ -100,70 +140,47 @@ class TestRequestWithCorrelationId:
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify headers=None does not cause an error."""
-        captured_kwargs: dict[str, typ.Any] = {}
+        captured = _run_sync(
+            isolated_context,
+            correlation_id="sync-cid-003",
+            headers=None,
+        )
 
-        def test_logic() -> None:
-            correlation_id_var.set("sync-cid-003")
-            with mock.patch("httpx.request") as mock_request:
-                mock_request.return_value = httpx.Response(200)
-                request_with_correlation_id(
-                    "GET",
-                    "http://example.com",
-                    headers=None,
-                )
-                captured_kwargs.update(mock_request.call_args.kwargs)
-
-        isolated_context(test_logic)
-
-        assert captured_kwargs["headers"]["X-Correlation-ID"] == ("sync-cid-003")
+        assert captured["headers"]["X-Correlation-ID"] == ("sync-cid-003")
 
     def test_passes_through_additional_kwargs(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify extra keyword arguments are forwarded to httpx."""
-        captured_kwargs: dict[str, typ.Any] = {}
+        captured = _run_sync(
+            isolated_context,
+            method="POST",
+            json={"key": "val"},
+            timeout=_EXPECTED_TIMEOUT,
+        )
 
-        def test_logic() -> None:
-            with mock.patch("httpx.request") as mock_request:
-                mock_request.return_value = httpx.Response(200)
-                request_with_correlation_id(
-                    "POST",
-                    "http://example.com",
-                    json={"key": "val"},
-                    timeout=_EXPECTED_TIMEOUT,
-                )
-                captured_kwargs.update(mock_request.call_args.kwargs)
-
-        isolated_context(test_logic)
-
-        assert captured_kwargs["json"] == {"key": "val"}
-        assert captured_kwargs["timeout"] == _EXPECTED_TIMEOUT
+        assert captured["json"] == {"key": "val"}
+        assert captured["timeout"] == _EXPECTED_TIMEOUT
 
     def test_converts_immutable_headers_to_mutable(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify immutable mapping headers are converted without error."""
-        captured_kwargs: dict[str, typ.Any] = {}
         immutable = types.MappingProxyType({"Accept": "text/html"})
+        captured = _run_sync(
+            isolated_context,
+            correlation_id="sync-cid-004",
+            headers=immutable,
+        )
 
-        def test_logic() -> None:
-            correlation_id_var.set("sync-cid-004")
-            with mock.patch("httpx.request") as mock_request:
-                mock_request.return_value = httpx.Response(200)
-                request_with_correlation_id(
-                    "GET",
-                    "http://example.com",
-                    headers=immutable,
-                )
-                captured_kwargs.update(mock_request.call_args.kwargs)
-
-        isolated_context(test_logic)
-
-        headers = captured_kwargs["headers"]
+        headers = captured["headers"]
         assert headers["Accept"] == "text/html"
         assert headers["X-Correlation-ID"] == "sync-cid-004"
+
+
+# -- async wrapper tests -------------------------------------------------------
 
 
 class TestAsyncRequestWithCorrelationId:
@@ -172,137 +189,88 @@ class TestAsyncRequestWithCorrelationId:
     @pytest.mark.asyncio
     async def test_adds_correlation_id_header_when_set(
         self,
+        mock_async_client: mock.AsyncMock,
     ) -> None:
         """Verify the async wrapper injects the correlation ID header."""
         token = correlation_id_var.set("async-cid-001")
         try:
-            mock_response = httpx.Response(200)
-            with mock.patch(
-                "httpx.AsyncClient",
-            ) as mock_client_cls:
-                mock_client = mock.AsyncMock()
-                mock_client.request.return_value = mock_response
-                mock_client_cls.return_value.__aenter__ = mock.AsyncMock(
-                    return_value=mock_client
-                )
-                mock_client_cls.return_value.__aexit__ = mock.AsyncMock(
-                    return_value=False
-                )
+            await async_request_with_correlation_id("GET", "http://example.com")
 
-                await async_request_with_correlation_id("GET", "http://example.com")
-
-                call_kwargs = mock_client.request.call_args.kwargs
-                assert call_kwargs["headers"]["X-Correlation-ID"] == ("async-cid-001")
+            call_kwargs = mock_async_client.request.call_args.kwargs
+            assert call_kwargs["headers"]["X-Correlation-ID"] == ("async-cid-001")
         finally:
             correlation_id_var.reset(token)
 
     @pytest.mark.asyncio
     async def test_does_not_add_header_when_context_is_empty(
         self,
+        mock_async_client: mock.AsyncMock,
     ) -> None:
         """Verify no header is added when the context variable is unset."""
-        mock_response = httpx.Response(200)
-        with mock.patch("httpx.AsyncClient") as mock_client_cls:
-            mock_client = mock.AsyncMock()
-            mock_client.request.return_value = mock_response
-            mock_client_cls.return_value.__aenter__ = mock.AsyncMock(
-                return_value=mock_client
-            )
-            mock_client_cls.return_value.__aexit__ = mock.AsyncMock(return_value=False)
+        await async_request_with_correlation_id("GET", "http://example.com")
 
-            await async_request_with_correlation_id("GET", "http://example.com")
-
-            call_kwargs = mock_client.request.call_args.kwargs
-            assert "X-Correlation-ID" not in call_kwargs["headers"]
+        call_kwargs = mock_async_client.request.call_args.kwargs
+        assert "X-Correlation-ID" not in call_kwargs["headers"]
 
     @pytest.mark.asyncio
     async def test_preserves_existing_caller_headers(
         self,
+        mock_async_client: mock.AsyncMock,
     ) -> None:
         """Verify caller-supplied headers are preserved."""
         token = correlation_id_var.set("async-cid-002")
         try:
-            mock_response = httpx.Response(200)
-            with mock.patch(
-                "httpx.AsyncClient",
-            ) as mock_client_cls:
-                mock_client = mock.AsyncMock()
-                mock_client.request.return_value = mock_response
-                mock_client_cls.return_value.__aenter__ = mock.AsyncMock(
-                    return_value=mock_client
-                )
-                mock_client_cls.return_value.__aexit__ = mock.AsyncMock(
-                    return_value=False
-                )
+            await async_request_with_correlation_id(
+                "GET",
+                "http://example.com",
+                headers={"Authorization": "Bearer token"},
+            )
 
-                await async_request_with_correlation_id(
-                    "GET",
-                    "http://example.com",
-                    headers={"Authorization": "Bearer token"},
-                )
-
-                call_kwargs = mock_client.request.call_args.kwargs
-                headers = call_kwargs["headers"]
-                assert headers["Authorization"] == "Bearer token"
-                assert headers["X-Correlation-ID"] == "async-cid-002"
+            call_kwargs = mock_async_client.request.call_args.kwargs
+            headers = call_kwargs["headers"]
+            assert headers["Authorization"] == "Bearer token"
+            assert headers["X-Correlation-ID"] == "async-cid-002"
         finally:
             correlation_id_var.reset(token)
 
     @pytest.mark.asyncio
     async def test_handles_none_headers_argument(
         self,
+        mock_async_client: mock.AsyncMock,
     ) -> None:
         """Verify headers=None does not cause an error."""
         token = correlation_id_var.set("async-cid-003")
         try:
-            mock_response = httpx.Response(200)
-            with mock.patch(
-                "httpx.AsyncClient",
-            ) as mock_client_cls:
-                mock_client = mock.AsyncMock()
-                mock_client.request.return_value = mock_response
-                mock_client_cls.return_value.__aenter__ = mock.AsyncMock(
-                    return_value=mock_client
-                )
-                mock_client_cls.return_value.__aexit__ = mock.AsyncMock(
-                    return_value=False
-                )
+            await async_request_with_correlation_id(
+                "GET",
+                "http://example.com",
+                headers=None,
+            )
 
-                await async_request_with_correlation_id(
-                    "GET",
-                    "http://example.com",
-                    headers=None,
-                )
-
-                call_kwargs = mock_client.request.call_args.kwargs
-                assert call_kwargs["headers"]["X-Correlation-ID"] == ("async-cid-003")
+            call_kwargs = mock_async_client.request.call_args.kwargs
+            assert call_kwargs["headers"]["X-Correlation-ID"] == ("async-cid-003")
         finally:
             correlation_id_var.reset(token)
 
     @pytest.mark.asyncio
     async def test_passes_through_additional_kwargs(
         self,
+        mock_async_client: mock.AsyncMock,
     ) -> None:
         """Verify extra keyword arguments are forwarded to httpx."""
-        mock_response = httpx.Response(200)
-        with mock.patch("httpx.AsyncClient") as mock_client_cls:
-            mock_client = mock.AsyncMock()
-            mock_client.request.return_value = mock_response
-            mock_client_cls.return_value.__aenter__ = mock.AsyncMock(
-                return_value=mock_client
-            )
-            mock_client_cls.return_value.__aexit__ = mock.AsyncMock(return_value=False)
+        await async_request_with_correlation_id(
+            "POST",
+            "http://example.com",
+            json={"key": "val"},
+            timeout=_EXPECTED_TIMEOUT,
+        )
 
-            await async_request_with_correlation_id(
-                "POST",
-                "http://example.com",
-                json={"key": "val"},
-                timeout=_EXPECTED_TIMEOUT,
-            )
+        call_kwargs = mock_async_client.request.call_args.kwargs
+        assert call_kwargs["json"] == {"key": "val"}
+        assert call_kwargs["timeout"] == _EXPECTED_TIMEOUT
 
-            call_kwargs = mock_client.request.call_args.kwargs
-            assert call_kwargs["json"] == {"key": "val"}
-            assert call_kwargs["timeout"] == _EXPECTED_TIMEOUT
+
+# -- _prepare_headers tests ----------------------------------------------------
 
 
 class TestPrepareHeaders:
@@ -313,68 +281,50 @@ class TestPrepareHeaders:
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify headers are popped from kwargs and returned."""
-        result: dict[str, typ.Any] = {}
+        kwargs: dict[str, typ.Any] = {
+            "headers": {"Accept": "text/html"},
+            "timeout": _EXPECTED_TIMEOUT,
+        }
+        headers, remaining = _run_prepare_headers(isolated_context, kwargs)
 
-        def test_logic() -> None:
-            kwargs: dict[str, typ.Any] = {
-                "headers": {"Accept": "text/html"},
-                "timeout": _EXPECTED_TIMEOUT,
-            }
-            headers = _prepare_headers(kwargs)
-            result["headers"] = headers
-            result["kwargs"] = kwargs
-
-        isolated_context(test_logic)
-
-        assert result["headers"]["Accept"] == "text/html"
-        assert "headers" not in result["kwargs"]
-        assert result["kwargs"]["timeout"] == _EXPECTED_TIMEOUT
+        assert headers["Accept"] == "text/html"
+        assert "headers" not in remaining
+        assert remaining["timeout"] == _EXPECTED_TIMEOUT
 
     def test_returns_empty_dict_when_no_headers(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify an empty dict is returned when no headers are passed."""
-        result: dict[str, typ.Any] = {}
+        kwargs: dict[str, typ.Any] = {"timeout": _EXPECTED_TIMEOUT}
+        headers, _remaining = _run_prepare_headers(isolated_context, kwargs)
 
-        def test_logic() -> None:
-            kwargs: dict[str, typ.Any] = {"timeout": _EXPECTED_TIMEOUT}
-            result["headers"] = _prepare_headers(kwargs)
-
-        isolated_context(test_logic)
-
-        assert result["headers"] == {}
+        assert headers == {}
 
     def test_injects_correlation_id(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify the correlation ID is injected into headers."""
-        result: dict[str, typ.Any] = {}
+        kwargs: dict[str, typ.Any] = {}
+        headers, _remaining = _run_prepare_headers(
+            isolated_context, kwargs, correlation_id="prep-cid-001"
+        )
 
-        def test_logic() -> None:
-            correlation_id_var.set("prep-cid-001")
-            kwargs: dict[str, typ.Any] = {}
-            result["headers"] = _prepare_headers(kwargs)
-
-        isolated_context(test_logic)
-
-        assert result["headers"]["X-Correlation-ID"] == "prep-cid-001"
+        assert headers["X-Correlation-ID"] == "prep-cid-001"
 
     def test_does_not_inject_when_no_correlation_id(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify no header is added when the context variable is unset."""
-        result: dict[str, typ.Any] = {}
+        kwargs: dict[str, typ.Any] = {}
+        headers, _remaining = _run_prepare_headers(isolated_context, kwargs)
 
-        def test_logic() -> None:
-            kwargs: dict[str, typ.Any] = {}
-            result["headers"] = _prepare_headers(kwargs)
+        assert "X-Correlation-ID" not in headers
 
-        isolated_context(test_logic)
 
-        assert "X-Correlation-ID" not in result["headers"]
+# -- export tests (no duplication — left as-is) ---------------------------------
 
 
 class TestHttpxWrapperExports:
