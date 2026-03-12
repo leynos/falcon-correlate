@@ -52,8 +52,6 @@ def mock_async_client() -> typ.Generator[mock.AsyncMock, None, None]:
 def _run_sync(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     correlation_id: str | None = None,
-    method: str = "GET",
-    url: str = "http://example.com",
     **kwargs: typ.Any,  # noqa: ANN401
 ) -> dict[str, typ.Any]:
     """Run ``request_with_correlation_id`` in an isolated context.
@@ -61,6 +59,8 @@ def _run_sync(
     Returns the keyword arguments captured from the mocked
     ``httpx.request`` call.
     """
+    method: str = kwargs.pop("method", "GET")
+    url: str = kwargs.pop("url", "http://example.com")
     captured: dict[str, typ.Any] = {}
 
     def _logic() -> None:
@@ -73,6 +73,27 @@ def _run_sync(
 
     isolated_context(_logic)
     return captured
+
+
+async def _run_async(
+    mock_async_client: mock.AsyncMock,
+    correlation_id: str | None = None,
+    **kwargs: typ.Any,  # noqa: ANN401
+) -> dict[str, typ.Any]:
+    """Run ``async_request_with_correlation_id`` in a managed correlation context.
+
+    Returns the keyword arguments captured from the mocked
+    ``httpx.AsyncClient.request`` call.
+    """
+    token = (
+        correlation_id_var.set(correlation_id) if correlation_id is not None else None
+    )
+    try:
+        await async_request_with_correlation_id("GET", "http://example.com", **kwargs)
+        return mock_async_client.request.call_args.kwargs
+    finally:
+        if token is not None:
+            correlation_id_var.reset(token)
 
 
 def _run_prepare_headers(
@@ -192,14 +213,10 @@ class TestAsyncRequestWithCorrelationId:
         mock_async_client: mock.AsyncMock,
     ) -> None:
         """Verify the async wrapper injects the correlation ID header."""
-        token = correlation_id_var.set("async-cid-001")
-        try:
-            await async_request_with_correlation_id("GET", "http://example.com")
-
-            call_kwargs = mock_async_client.request.call_args.kwargs
-            assert call_kwargs["headers"]["X-Correlation-ID"] == ("async-cid-001")
-        finally:
-            correlation_id_var.reset(token)
+        call_kwargs = await _run_async(
+            mock_async_client, correlation_id="async-cid-001"
+        )
+        assert call_kwargs["headers"]["X-Correlation-ID"] == ("async-cid-001")
 
     @pytest.mark.asyncio
     async def test_does_not_add_header_when_context_is_empty(
@@ -218,20 +235,14 @@ class TestAsyncRequestWithCorrelationId:
         mock_async_client: mock.AsyncMock,
     ) -> None:
         """Verify caller-supplied headers are preserved."""
-        token = correlation_id_var.set("async-cid-002")
-        try:
-            await async_request_with_correlation_id(
-                "GET",
-                "http://example.com",
-                headers={"Authorization": "Bearer token"},
-            )
-
-            call_kwargs = mock_async_client.request.call_args.kwargs
-            headers = call_kwargs["headers"]
-            assert headers["Authorization"] == "Bearer token"
-            assert headers["X-Correlation-ID"] == "async-cid-002"
-        finally:
-            correlation_id_var.reset(token)
+        call_kwargs = await _run_async(
+            mock_async_client,
+            correlation_id="async-cid-002",
+            headers={"Authorization": "Bearer token"},
+        )
+        headers = call_kwargs["headers"]
+        assert headers["Authorization"] == "Bearer token"
+        assert headers["X-Correlation-ID"] == "async-cid-002"
 
     @pytest.mark.asyncio
     async def test_handles_none_headers_argument(
@@ -239,18 +250,12 @@ class TestAsyncRequestWithCorrelationId:
         mock_async_client: mock.AsyncMock,
     ) -> None:
         """Verify headers=None does not cause an error."""
-        token = correlation_id_var.set("async-cid-003")
-        try:
-            await async_request_with_correlation_id(
-                "GET",
-                "http://example.com",
-                headers=None,
-            )
-
-            call_kwargs = mock_async_client.request.call_args.kwargs
-            assert call_kwargs["headers"]["X-Correlation-ID"] == ("async-cid-003")
-        finally:
-            correlation_id_var.reset(token)
+        call_kwargs = await _run_async(
+            mock_async_client,
+            correlation_id="async-cid-003",
+            headers=None,
+        )
+        assert call_kwargs["headers"]["X-Correlation-ID"] == ("async-cid-003")
 
     @pytest.mark.asyncio
     async def test_passes_through_additional_kwargs(
