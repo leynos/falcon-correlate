@@ -123,14 +123,27 @@ def _run_prepare_headers(
 class TestRequestWithCorrelationId:
     """Tests for the synchronous ``request_with_correlation_id`` wrapper."""
 
-    def test_adds_correlation_id_header_when_set(
+    @pytest.mark.parametrize(
+        ("extra_kwargs", "correlation_id"),
+        [
+            ({}, "sync-cid-001"),
+            ({"headers": None}, "sync-cid-003"),
+        ],
+        ids=["plain", "headers_none"],
+    )
+    def test_injects_correlation_id_header(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+        extra_kwargs: dict[str, typ.Any],
+        correlation_id: str,
     ) -> None:
-        """Verify the wrapper injects the correlation ID header."""
-        captured = _run_sync(isolated_context, correlation_id="sync-cid-001")
-
-        assert captured["headers"]["X-Correlation-ID"] == ("sync-cid-001")
+        """Verify the wrapper injects the correlation ID header when set."""
+        captured = _run_sync(
+            isolated_context,
+            correlation_id=correlation_id,
+            **extra_kwargs,
+        )
+        assert captured["headers"]["X-Correlation-ID"] == correlation_id
 
     def test_does_not_add_header_when_context_is_empty(
         self,
@@ -155,19 +168,6 @@ class TestRequestWithCorrelationId:
         headers = captured["headers"]
         assert headers["Authorization"] == "Bearer token"
         assert headers["X-Correlation-ID"] == "sync-cid-002"
-
-    def test_handles_none_headers_argument(
-        self,
-        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-    ) -> None:
-        """Verify headers=None does not cause an error."""
-        captured = _run_sync(
-            isolated_context,
-            correlation_id="sync-cid-003",
-            headers=None,
-        )
-
-        assert captured["headers"]["X-Correlation-ID"] == ("sync-cid-003")
 
     def test_passes_through_additional_kwargs(
         self,
@@ -208,15 +208,36 @@ class TestAsyncRequestWithCorrelationId:
     """Tests for the async ``async_request_with_correlation_id`` wrapper."""
 
     @pytest.mark.asyncio
-    async def test_adds_correlation_id_header_when_set(
+    @pytest.mark.parametrize(
+        ("extra_kwargs", "correlation_id", "expected_extra_headers"),
+        [
+            ({}, "async-cid-001", {}),
+            ({"headers": None}, "async-cid-003", {}),
+            (
+                {"headers": {"Authorization": "Bearer token"}},
+                "async-cid-002",
+                {"Authorization": "Bearer token"},
+            ),
+        ],
+        ids=["plain", "headers_none", "preserves_headers"],
+    )
+    async def test_injects_correlation_id_header(
         self,
         mock_async_client: mock.AsyncMock,
+        extra_kwargs: dict[str, typ.Any],
+        correlation_id: str,
+        expected_extra_headers: dict[str, str],
     ) -> None:
-        """Verify the async wrapper injects the correlation ID header."""
+        """Verify the async wrapper injects the correlation ID header when set."""
         call_kwargs = await _run_async(
-            mock_async_client, correlation_id="async-cid-001"
+            mock_async_client,
+            correlation_id=correlation_id,
+            **extra_kwargs,
         )
-        assert call_kwargs["headers"]["X-Correlation-ID"] == ("async-cid-001")
+        headers = call_kwargs["headers"]
+        assert headers["X-Correlation-ID"] == correlation_id
+        for key, value in expected_extra_headers.items():
+            assert headers[key] == value
 
     @pytest.mark.asyncio
     async def test_does_not_add_header_when_context_is_empty(
@@ -228,34 +249,6 @@ class TestAsyncRequestWithCorrelationId:
 
         call_kwargs = mock_async_client.request.call_args.kwargs
         assert "X-Correlation-ID" not in call_kwargs["headers"]
-
-    @pytest.mark.asyncio
-    async def test_preserves_existing_caller_headers(
-        self,
-        mock_async_client: mock.AsyncMock,
-    ) -> None:
-        """Verify caller-supplied headers are preserved."""
-        call_kwargs = await _run_async(
-            mock_async_client,
-            correlation_id="async-cid-002",
-            headers={"Authorization": "Bearer token"},
-        )
-        headers = call_kwargs["headers"]
-        assert headers["Authorization"] == "Bearer token"
-        assert headers["X-Correlation-ID"] == "async-cid-002"
-
-    @pytest.mark.asyncio
-    async def test_handles_none_headers_argument(
-        self,
-        mock_async_client: mock.AsyncMock,
-    ) -> None:
-        """Verify headers=None does not cause an error."""
-        call_kwargs = await _run_async(
-            mock_async_client,
-            correlation_id="async-cid-003",
-            headers=None,
-        )
-        assert call_kwargs["headers"]["X-Correlation-ID"] == ("async-cid-003")
 
     @pytest.mark.asyncio
     async def test_passes_through_additional_kwargs(
