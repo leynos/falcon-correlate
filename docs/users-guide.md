@@ -549,6 +549,70 @@ up arbitrary `contextvars.ContextVar` instances such as `correlation_id_var`
 and `user_id_var`. This is why a bridging step — either the custom processor or
 the middleware approach above — is required.
 
+## httpx propagation
+
+When making outgoing HTTP calls to downstream services, the correlation ID
+should be propagated so that the entire request chain can be traced. The
+library provides wrapper functions around `httpx` that handle this
+automatically.
+
+**Note**: `httpx` is an optional dependency. Install it separately:
+
+```bash
+pip install httpx
+```
+
+### Synchronous usage
+
+Use `request_with_correlation_id` as a drop-in replacement for
+`httpx.request`:
+
+```python
+from falcon_correlate import request_with_correlation_id
+
+# The correlation ID header is injected automatically
+# when correlation_id_var is set (e.g. during a Falcon request).
+response = request_with_correlation_id(
+    "GET", "https://api.example.com/data"
+)
+```
+
+All keyword arguments are passed through to `httpx.request`:
+
+```python
+response = request_with_correlation_id(
+    "POST",
+    "https://api.example.com/submit",
+    json={"key": "value"},
+    headers={"Authorization": "Bearer token"},
+    timeout=10,
+)
+```
+
+### Asynchronous usage
+
+Use `async_request_with_correlation_id` for async code:
+
+```python
+from falcon_correlate import async_request_with_correlation_id
+
+response = await async_request_with_correlation_id(
+    "GET", "https://api.example.com/data"
+)
+```
+
+The async variant creates a temporary `httpx.AsyncClient` for each call.
+
+### Behaviour
+
+- When `correlation_id_var` is set (i.e. during a Falcon request handled
+  by `CorrelationIDMiddleware`), the `X-Correlation-ID` header is added
+  to the outgoing request.
+- When `correlation_id_var` is not set (e.g. outside request handling),
+  no header is added.
+- Existing headers passed by the caller are always preserved. The
+  correlation ID header is added alongside them, never replacing them.
+
 ## Full Configuration Example
 
 ```python
@@ -601,5 +665,8 @@ The following functionality is now implemented:
   use with `logging.Formatter` or `dictConfig`.
 - Structlog integration documentation with custom processor and
   `bind_contextvars` bridging approaches (task 3.2).
+- httpx propagation wrapper functions (`request_with_correlation_id` and
+  `async_request_with_correlation_id`) for injecting the correlation ID
+  into outgoing HTTP requests (task 4.1.1).
 
 See the [roadmap](roadmap.md) for the full implementation plan.

@@ -143,13 +143,13 @@ Enable correlation ID propagation to downstream HTTP services and Celery tasks.
 
 ### 4.1. httpx propagation utilities
 
-- [ ] 4.1.1. Implement wrapper function. See design-doc §3.5.1.4.
-  - [ ] Create `request_with_correlation_id(method, url, **kwargs)` function.
-  - [ ] Create async variant `async_request_with_correlation_id`.
-  - [ ] Inject correlation ID header if context variable is set.
-  - [ ] Preserve existing headers passed by caller.
-  - [ ] Test wrapper function adds header.
-  - [ ] Test existing headers are preserved.
+- [x] 4.1.1. Implement wrapper function. See design-doc §3.5.1.4.
+  - [x] Create `request_with_correlation_id(method, url, **kwargs)` function.
+  - [x] Create async variant `async_request_with_correlation_id`.
+  - [x] Inject correlation ID header if context variable is set.
+  - [x] Preserve existing headers passed by caller.
+  - [x] Test wrapper function adds header.
+  - [x] Test existing headers are preserved.
 - [ ] 4.1.2. Implement custom transport. See design-doc §3.5.1.3.
   - [ ] Create `CorrelationIDTransport(httpx.BaseTransport)` class.
   - [ ] Create async variant `AsyncCorrelationIDTransport`.
