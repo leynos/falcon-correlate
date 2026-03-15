@@ -23,3 +23,14 @@ Feature: httpx correlation ID propagation
     Given the correlation ID is set to "bdd-cid-003"
     When I send an async request using the correlation ID wrapper
     Then the outgoing request should contain header "X-Correlation-ID" with value "bdd-cid-003"
+
+  Scenario: Async wrapper preserves existing caller headers
+    Given the correlation ID is set to "bdd-cid-004"
+    When I send an async request with existing header "Authorization" set to "Bearer token"
+    Then the outgoing request should contain header "X-Correlation-ID" with value "bdd-cid-004"
+    And the outgoing request should contain header "Authorization" with value "Bearer token"
+
+  Scenario: Async wrapper does not add header when context is empty
+    Given no correlation ID is set
+    When I send an async request using the correlation ID wrapper
+    Then the outgoing request should not contain header "X-Correlation-ID"

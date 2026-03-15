@@ -56,8 +56,8 @@ def _run_sync(
 ) -> dict[str, typ.Any]:
     """Run ``request_with_correlation_id`` in an isolated context.
 
-    Returns the keyword arguments captured from the mocked
-    ``httpx.request`` call.
+    Returns the keyword arguments and positional arguments (method, url)
+    captured from the mocked ``httpx.request`` call.
     """
     method: str = kwargs.pop("method", "GET")
     url: str = kwargs.pop("url", "http://example.com")
@@ -70,6 +70,8 @@ def _run_sync(
             mock_request.return_value = httpx.Response(200)
             request_with_correlation_id(method, url, **kwargs)
             captured.update(mock_request.call_args.kwargs)
+            captured["method"] = mock_request.call_args.args[0]
+            captured["url"] = mock_request.call_args.args[1]
 
     isolated_context(_logic)
     return captured
@@ -144,6 +146,8 @@ class TestRequestWithCorrelationId:
             **extra_kwargs,
         )
         assert captured["headers"]["X-Correlation-ID"] == correlation_id
+        assert captured["method"] == "GET"
+        assert captured["url"] == "http://example.com"
 
     def test_does_not_add_header_when_context_is_empty(
         self,
@@ -199,6 +203,22 @@ class TestRequestWithCorrelationId:
         headers = captured["headers"]
         assert headers["Accept"] == "text/html"
         assert headers["X-Correlation-ID"] == "sync-cid-004"
+
+    def test_accepts_sequence_style_headers(
+        self,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    ) -> None:
+        """Verify sequence-style headers (list/tuple of pairs) are handled."""
+        sequence_headers = [("Accept", "text/html")]
+        captured = _run_sync(
+            isolated_context,
+            correlation_id="sync-cid-005",
+            headers=sequence_headers,
+        )
+
+        headers = captured["headers"]
+        assert headers["Accept"] == "text/html"
+        assert headers["X-Correlation-ID"] == "sync-cid-005"
 
 
 # -- async wrapper tests -------------------------------------------------------
@@ -310,6 +330,20 @@ class TestPrepareHeaders:
         )
 
         assert headers["X-Correlation-ID"] == "prep-cid-001"
+
+    def test_preserves_caller_supplied_correlation_id_header(
+        self,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    ) -> None:
+        """Verify caller-supplied correlation ID header is preserved."""
+        kwargs: dict[str, typ.Any] = {
+            "headers": {"X-Correlation-ID": "caller-cid-123"},
+        }
+        headers, _remaining = _run_prepare_headers(
+            isolated_context, kwargs, correlation_id="prep-cid-001"
+        )
+
+        assert headers["X-Correlation-ID"] == "caller-cid-123"
 
     def test_does_not_inject_when_no_correlation_id(
         self,

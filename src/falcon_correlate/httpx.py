@@ -89,11 +89,12 @@ async def async_request_with_correlation_id(
 
 def _prepare_headers(
     kwargs: dict[str, typ.Any],
-) -> dict[str, str]:
+) -> dict[str, str] | httpx.Headers:
     """Extract and enrich headers with the correlation ID.
 
-    Pops ``headers`` from *kwargs*, converts to a mutable ``dict``,
+    Pops ``headers`` from *kwargs*, converts to a mutable structure,
     and injects the correlation ID when the context variable is set.
+    Preserves duplicate header entries when present.
 
     Parameters
     ----------
@@ -103,13 +104,25 @@ def _prepare_headers(
 
     Returns
     -------
-    dict[str, str]
-        The enriched headers dict.
+    dict[str, str] | httpx.Headers
+        The enriched headers dict or Headers instance.
 
     """
+    import httpx as _httpx  # lazy: optional dependency
+
     raw_headers = kwargs.pop("headers", None)
-    headers: dict[str, str] = dict(raw_headers) if raw_headers else {}
+    # Use httpx.Headers to preserve duplicate entries
+    if raw_headers is not None:
+        headers = (
+            raw_headers
+            if isinstance(raw_headers, _httpx.Headers)
+            else _httpx.Headers(raw_headers)
+        )
+    else:
+        headers = _httpx.Headers()
+
     cid = correlation_id_var.get()
-    if cid:
+    # Only inject correlation ID if caller hasn't already provided it
+    if cid and DEFAULT_HEADER_NAME not in headers:
         headers[DEFAULT_HEADER_NAME] = cid
     return headers

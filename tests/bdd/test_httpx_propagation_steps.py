@@ -107,6 +107,40 @@ def when_send_async_request(context: Context) -> Context:
     return context
 
 
+@when(
+    parsers.parse(
+        'I send an async request with existing header "{name}" set to "{value}"'
+    ),
+    target_fixture="context",
+)
+def when_send_async_request_with_header(
+    context: Context, name: str, value: str
+) -> Context:
+    """Send an async request with an existing header."""
+    import asyncio
+
+    async def _run() -> dict[str, str]:
+        mock_response = httpx.Response(200)
+        with mock.patch("httpx.AsyncClient") as mock_cls:
+            mock_client = mock.AsyncMock()
+            mock_client.request.return_value = mock_response
+            mock_cls.return_value.__aenter__ = mock.AsyncMock(return_value=mock_client)
+            mock_cls.return_value.__aexit__ = mock.AsyncMock(return_value=False)
+            await async_request_with_correlation_id(
+                "GET",
+                "http://example.com",
+                headers={name: value},
+            )
+            return dict(mock_client.request.call_args.kwargs["headers"])
+
+    loop = asyncio.new_event_loop()
+    try:
+        context["captured_headers"] = loop.run_until_complete(_run())
+    finally:
+        loop.close()
+    return context
+
+
 @then(
     parsers.parse(
         'the outgoing request should contain header "{name}" with value "{value}"'
@@ -115,8 +149,12 @@ def when_send_async_request(context: Context) -> Context:
 def then_header_present(context: Context, name: str, value: str) -> None:
     """Verify the outgoing request contains the expected header."""
     headers = context["captured_headers"]
-    assert name in headers, f"header {name!r} not found in {headers!r}"
-    assert headers[name] == value, f"expected {name}={value!r}, got {headers[name]!r}"
+    # HTTP headers are case-insensitive; httpx.Headers normalizes to lowercase
+    header_key = next((k for k in headers if k.lower() == name.lower()), None)
+    assert header_key is not None, f"header {name!r} not found in {headers!r}"
+    assert headers[header_key] == value, (
+        f"expected {name}={value!r}, got {headers[header_key]!r}"
+    )
 
 
 @then(
@@ -125,4 +163,6 @@ def then_header_present(context: Context, name: str, value: str) -> None:
 def then_header_absent(context: Context, name: str) -> None:
     """Verify the outgoing request does not contain the header."""
     headers = context["captured_headers"]
-    assert name not in headers, f"header {name!r} unexpectedly found in {headers!r}"
+    # HTTP headers are case-insensitive
+    header_key = next((k for k in headers if k.lower() == name.lower()), None)
+    assert header_key is None, f"header {name!r} unexpectedly found in {headers!r}"

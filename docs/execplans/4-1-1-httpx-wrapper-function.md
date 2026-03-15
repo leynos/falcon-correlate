@@ -319,11 +319,9 @@ following test classes and methods:
 Create `tests/bdd/httpx_propagation.feature`:
 
     Feature: httpx correlation ID propagation
-      As a developer using falcon-correlate
-      I want wrapper functions for httpx that propagate
-        the correlation ID
-      So that downstream services receive the correlation
-        ID automatically
+      The httpx wrapper functions propagate the correlation ID
+        to downstream services automatically by injecting it
+        as a header in outgoing requests
 
       Scenario: Wrapper injects correlation ID header
       Scenario: Wrapper preserves existing caller headers
