@@ -89,7 +89,7 @@ async def async_request_with_correlation_id(
 
 def _prepare_headers(
     kwargs: dict[str, typ.Any],
-) -> dict[str, str] | httpx.Headers:
+) -> httpx.Headers:
     """Extract and enrich headers with the correlation ID.
 
     Pops ``headers`` from *kwargs*, converts to a mutable structure,
@@ -104,8 +104,8 @@ def _prepare_headers(
 
     Returns
     -------
-    dict[str, str] | httpx.Headers
-        The enriched headers dict or Headers instance.
+    httpx.Headers
+        The enriched headers.
 
     """
     import httpx as _httpx  # lazy: optional dependency
