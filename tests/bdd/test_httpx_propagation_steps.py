@@ -21,6 +21,32 @@ from falcon_correlate.httpx import (  # noqa: E402
 scenarios("httpx_propagation.feature")
 
 
+def _run_async_request(**kwargs: typ.Any) -> dict[str, str]:  # noqa: ANN401
+    """Run ``async_request_with_correlation_id`` with a mocked AsyncClient.
+
+    Returns the headers dict captured from the mocked request call.
+    """
+    import asyncio
+
+    async def _run() -> dict[str, str]:
+        mock_response = httpx.Response(200)
+        with mock.patch("httpx.AsyncClient") as mock_cls:
+            mock_client = mock.AsyncMock()
+            mock_client.request.return_value = mock_response
+            mock_cls.return_value.__aenter__ = mock.AsyncMock(return_value=mock_client)
+            mock_cls.return_value.__aexit__ = mock.AsyncMock(return_value=False)
+            await async_request_with_correlation_id(
+                "GET", "http://example.com", **kwargs
+            )
+            return dict(mock_client.request.call_args.kwargs["headers"])
+
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(_run())
+    finally:
+        loop.close()
+
+
 class Context(typ.TypedDict, total=False):
     """Type definition for test context."""
 
@@ -81,35 +107,13 @@ def when_send_request_with_header(context: Context, name: str, value: str) -> Co
     return context
 
 
-def create_async_client_mock() -> tuple[mock.AsyncMock, httpx.Response]:
-    """Create a configured async httpx client mock and response."""
-    mock_response = httpx.Response(200)
-    mock_client = mock.AsyncMock()
-    mock_client.request.return_value = mock_response
-    return mock_client, mock_response
-
-
 @when(
     "I send an async request using the correlation ID wrapper",
     target_fixture="context",
 )
 def when_send_async_request(context: Context) -> Context:
     """Send an async request using the wrapper and capture headers."""
-    import asyncio
-
-    async def _run() -> dict[str, str]:
-        with mock.patch("httpx.AsyncClient") as mock_cls:
-            mock_client, _ = create_async_client_mock()
-            mock_cls.return_value.__aenter__ = mock.AsyncMock(return_value=mock_client)
-            mock_cls.return_value.__aexit__ = mock.AsyncMock(return_value=False)
-            await async_request_with_correlation_id("GET", "http://example.com")
-            return dict(mock_client.request.call_args.kwargs["headers"])
-
-    loop = asyncio.new_event_loop()
-    try:
-        context["captured_headers"] = loop.run_until_complete(_run())
-    finally:
-        loop.close()
+    context["captured_headers"] = _run_async_request()
     return context
 
 
@@ -123,25 +127,7 @@ def when_send_async_request_with_header(
     context: Context, name: str, value: str
 ) -> Context:
     """Send an async request with an existing header."""
-    import asyncio
-
-    async def _run() -> dict[str, str]:
-        with mock.patch("httpx.AsyncClient") as mock_cls:
-            mock_client, _ = create_async_client_mock()
-            mock_cls.return_value.__aenter__ = mock.AsyncMock(return_value=mock_client)
-            mock_cls.return_value.__aexit__ = mock.AsyncMock(return_value=False)
-            await async_request_with_correlation_id(
-                "GET",
-                "http://example.com",
-                headers={name: value},
-            )
-            return dict(mock_client.request.call_args.kwargs["headers"])
-
-    loop = asyncio.new_event_loop()
-    try:
-        context["captured_headers"] = loop.run_until_complete(_run())
-    finally:
-        loop.close()
+    context["captured_headers"] = _run_async_request(headers={name: value})
     return context
 
 
