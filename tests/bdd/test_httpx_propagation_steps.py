@@ -40,11 +40,7 @@ def _run_async_request(**kwargs: typ.Any) -> dict[str, str]:  # noqa: ANN401
             )
             return dict(mock_client.request.call_args.kwargs["headers"])
 
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(_run())
-    finally:
-        loop.close()
+    return asyncio.run(_run())
 
 
 class Context(typ.TypedDict, total=False):
