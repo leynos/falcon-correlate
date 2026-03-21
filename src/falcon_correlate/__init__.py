@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from .httpx import (
+    async_request_with_correlation_id,
+    request_with_correlation_id,
+)
 from .middleware import (
     RECOMMENDED_LOG_FORMAT,
     ContextualLogFilter,
@@ -26,9 +30,11 @@ __all__ = [
     "ContextualLogFilter",
     "CorrelationIDConfig",
     "CorrelationIDMiddleware",
+    "async_request_with_correlation_id",
     "correlation_id_var",
     "default_uuid7_generator",
     "default_uuid_validator",
     "hello",
+    "request_with_correlation_id",
     "user_id_var",
 ]
