@@ -1520,32 +1520,31 @@ imported lazily at call time.
    `middleware.py`. A dedicated `httpx.py` module follows the "group by
    feature, not layer" convention and isolates the optional dependency.
 
-2. **Lazy imports:** Each wrapper function performs `import httpx as
-   _httpx` inside its body. The module itself can be imported (and
-   re-exported from `__init__.py`) without `httpx` installed. Users who
-   do not need httpx propagation pay no import cost. An `ImportError` is
-   raised only when a wrapper function is actually called without `httpx`
-   installed. This mirrors the structlog pattern where the library
-   provides documentation and test validation, but defers the actual
-   `import` to the consumer.
+2. **Lazy imports:** Each wrapper function performs
+   `import httpx as _httpx` inside its body. The module itself can be
+   imported (and re-exported from `__init__.py`) without `httpx`
+   installed. Users who do not need httpx propagation pay no import
+   cost. An `ImportError` is raised only when a wrapper function is
+   actually called without `httpx` installed. This mirrors the
+   structlog pattern where the library provides documentation and test
+   validation, but defers the actual import to the consumer.
 
 3. **`_prepare_headers` helper:** The header preparation logic (pop
-   headers from `kwargs`, convert to mutable dict, inject correlation ID)
-   is identical between the sync and async variants. Extracting it into a
-   private `_prepare_headers` function eliminates duplication and keeps
-   both public functions focused on their `httpx` call semantics.
+   headers from `kwargs`, convert to mutable dict, inject correlation ID) is
+   identical between the sync and async variants. Extracting it into a private
+   `_prepare_headers` function eliminates duplication and keeps both public
+   functions focused on their `httpx` call semantics.
 
 4. **`DEFAULT_HEADER_NAME` constant:** The wrapper uses the
-   `DEFAULT_HEADER_NAME` constant from `middleware.py` rather than
-   hardcoding `"X-Correlation-ID"`, keeping the header name in sync with
-   the middleware default.
+   `DEFAULT_HEADER_NAME` constant from `middleware.py` rather than hardcoding
+   `"X-Correlation-ID"`, keeping the header name in sync with the middleware
+   default.
 
 5. **Function names:** The roadmap names `request_with_correlation_id` and
    `async_request_with_correlation_id` were used rather than the design
    document's `client_request_with_correlation_id` and
    `async_client_request_with_correlation_id`. The roadmap represents the
-   accepted requirements; the design document names are illustrative
-   examples.
+   accepted requirements; the design document names are illustrative examples.
 
 **Files created/modified:**
 
@@ -1562,3 +1561,59 @@ imported lazily at call time.
 - `docs/users-guide.md` — Added "httpx propagation" section and updated
   current status.
 - `pyproject.toml` — Added `httpx` to dev dependency group.
+
+### A.7. httpx custom transport classes (Task 4.1.2)
+
+**Decision:** Add `CorrelationIDTransport` and `AsyncCorrelationIDTransport` to
+`src/falcon_correlate/httpx.py`, wrapping an existing `httpx` transport
+instance and injecting the current correlation ID into each outgoing request
+before delegation.
+
+**Rationale:**
+
+1. **Shared helper and policy:** The wrapper functions and the transport
+   classes now share a single `_inject_correlation_id_header` helper. This
+   keeps the "fill, do not overwrite" policy consistent across all `httpx`
+   propagation paths.
+
+2. **Optional dependency preserved:** The module still imports safely without
+   `httpx` installed. Runtime availability is checked only when a wrapper is
+   called or a transport is instantiated, preserving the optional integration
+   contract established in Task 4.1.1.
+
+3. **Transport composition over inheritance from concrete transports:** The new
+   classes accept a wrapped `httpx.BaseTransport` or
+   `httpx.AsyncBaseTransport`. This lets callers keep using standard transports
+   such as `httpx.HTTPTransport()` and `httpx.AsyncHTTPTransport()` while
+   adding correlation behaviour in a thin decorator layer.
+
+4. **Caller-supplied header wins:** If the outgoing request already includes
+   the configured correlation header, the transport classes leave it unchanged.
+   This matches the wrapper-function contract and avoids surprising callers who
+   intentionally override the propagated value.
+
+5. **Lifecycle delegation required:** For `httpx 0.28.1`, the relevant public
+   transport lifecycle hooks are `close()` and `aclose()`. The transport
+   classes delegate these methods to the wrapped transport so client shutdown
+   behaviour remains correct.
+
+6. **Public package exports:** Both transport classes are re-exported from
+   `falcon_correlate.__init__` and added to `__all__`, matching the existing
+   ergonomics of the wrapper functions and making the transport API easy to
+   discover.
+
+**Files created/modified:**
+
+- `src/falcon_correlate/httpx.py` — Added sync and async transport classes,
+  the shared header-injection helper, and optional-dependency runtime checks.
+- `src/falcon_correlate/__init__.py` — Re-exported the transport classes from
+  the package root.
+- `src/falcon_correlate/unittests/test_httpx_transport.py` — Added unit tests
+  for sync and async transport behaviour, request delegation, lifecycle
+  delegation, and public exports.
+- `tests/bdd/httpx_transport.feature` — Added transport-focused behavioural
+  scenarios.
+- `tests/bdd/test_httpx_transport_steps.py` — Added BDD step definitions for
+  configured sync and async `httpx` clients.
+- `docs/users-guide.md` — Documented when to choose wrapper functions versus
+  transports and added sync and async transport configuration examples.

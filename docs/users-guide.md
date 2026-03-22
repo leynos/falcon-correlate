@@ -553,8 +553,8 @@ the middleware approach above — is required.
 
 When making outgoing HTTP calls to downstream services, the correlation ID
 should be propagated so that the entire request chain can be traced. The
-library provides wrapper functions around `httpx` that handle this
-automatically.
+library provides both wrapper functions and reusable transports for `httpx`
+that handle this automatically.
 
 **Note**: `httpx` is an optional dependency. Install it separately:
 
@@ -562,10 +562,17 @@ automatically.
 pip install httpx
 ```
 
-### Synchronous usage
+### Choosing an approach
 
-Use `request_with_correlation_id` as a drop-in replacement for
-`httpx.request`:
+Use the wrapper functions when requests are made ad hoc and the call site
+already controls the `httpx.request(...)` invocation. Use the transport classes
+when the application relies on shared `httpx.Client` or `httpx.AsyncClient`
+instances and wants correlation header injection to happen transparently for
+every request sent through that client.
+
+### Synchronous wrapper usage
+
+Use `request_with_correlation_id` as a drop-in replacement for `httpx.request`:
 
 ```python
 from falcon_correlate import request_with_correlation_id
@@ -589,7 +596,7 @@ response = request_with_correlation_id(
 )
 ```
 
-### Asynchronous usage
+### Asynchronous wrapper usage
 
 Use `async_request_with_correlation_id` for async code:
 
@@ -603,15 +610,51 @@ response = await async_request_with_correlation_id(
 
 The async variant creates a temporary `httpx.AsyncClient` for each call.
 
+### Transport usage with shared clients
+
+Use `CorrelationIDTransport` when you want a reusable synchronous client:
+
+```python
+import httpx
+from falcon_correlate import CorrelationIDTransport
+
+base_transport = httpx.HTTPTransport()
+
+with httpx.Client(
+    transport=CorrelationIDTransport(base_transport)
+) as client:
+    response = client.get("https://api.example.com/data")
+```
+
+Use `AsyncCorrelationIDTransport` for a reusable async client:
+
+```python
+import httpx
+from falcon_correlate import AsyncCorrelationIDTransport
+
+base_transport = httpx.AsyncHTTPTransport()
+
+async with httpx.AsyncClient(
+    transport=AsyncCorrelationIDTransport(base_transport)
+) as client:
+    response = await client.get("https://api.example.com/data")
+```
+
+The transport classes preserve an explicitly supplied correlation header on the
+outgoing request. If the caller already set `X-Correlation-ID`,
+`falcon-correlate` leaves that value unchanged.
+
 ### Behaviour
 
 - When `correlation_id_var` is set (i.e. during a Falcon request handled
-  by `CorrelationIDMiddleware`), the `X-Correlation-ID` header is added
-  to the outgoing request.
+  by `CorrelationIDMiddleware`), the `X-Correlation-ID` header is added to the
+  outgoing request.
 - When `correlation_id_var` is not set (e.g. outside request handling),
   no header is added.
-- Existing headers passed by the caller are always preserved. The
-  correlation ID header is added alongside them, never replacing them.
+- Existing headers passed by the caller are always preserved. The correlation
+  ID header is added alongside them, never replacing them.
+- If the caller explicitly sets the correlation header itself, both the wrapper
+  functions and the transport classes keep the caller's value.
 
 ## Full Configuration Example
 
@@ -666,7 +709,10 @@ The following functionality is now implemented:
 - Structlog integration documentation with custom processor and
   `bind_contextvars` bridging approaches (task 3.2).
 - httpx propagation wrapper functions (`request_with_correlation_id` and
-  `async_request_with_correlation_id`) for injecting the correlation ID
-  into outgoing HTTP requests (task 4.1.1).
+  `async_request_with_correlation_id`) for injecting the correlation ID into
+  outgoing HTTP requests (task 4.1.1).
+- httpx transport classes (`CorrelationIDTransport` and
+  `AsyncCorrelationIDTransport`) for shared client configuration that injects
+  the correlation ID into outgoing HTTP requests (task 4.1.2).
 
 See the [roadmap](roadmap.md) for the full implementation plan.

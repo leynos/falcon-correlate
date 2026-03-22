@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from .httpx import (
+    AsyncCorrelationIDTransport,
+    CorrelationIDTransport,
     async_request_with_correlation_id,
     request_with_correlation_id,
 )
@@ -27,9 +29,11 @@ except ModuleNotFoundError:  # pragma: no cover - Python fallback
 
 __all__ = [
     "RECOMMENDED_LOG_FORMAT",
+    "AsyncCorrelationIDTransport",
     "ContextualLogFilter",
     "CorrelationIDConfig",
     "CorrelationIDMiddleware",
+    "CorrelationIDTransport",
     "async_request_with_correlation_id",
     "correlation_id_var",
     "default_uuid7_generator",

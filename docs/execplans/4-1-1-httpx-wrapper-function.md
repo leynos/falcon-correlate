@@ -9,17 +9,15 @@ Status: COMPLETE
 
 ## Purpose / big picture
 
-The middleware stores correlation IDs in a `ContextVar`
-(`correlation_id_var`) during Falcon request handling. Task 4.1.1 adds
-wrapper functions around `httpx.request` that automatically inject this
-correlation ID as an outgoing `X-Correlation-ID` header, enabling
-downstream service traceability without manual header management. This is
-the first step in the "downstream propagation" milestone (roadmap
-section 4).
+The middleware stores correlation IDs in a `ContextVar` (`correlation_id_var`)
+during Falcon request handling. Task 4.1.1 adds wrapper functions around
+`httpx.request` that automatically inject this correlation ID as an outgoing
+`X-Correlation-ID` header, enabling downstream service traceability without
+manual header management. This is the first step in the "downstream
+propagation" milestone (roadmap section 4).
 
-The design specification[^1] describes the wrapper function approach in
-section 3.5.1.4 and provides a reference implementation in section 4.3
-(lines 879-921).
+The design specification[^1] describes the wrapper function approach in section
+3.5.1.4 and provides a reference implementation in section 4.3 (lines 879-921).
 
 Success is observable when:
 
@@ -49,8 +47,8 @@ Success is observable when:
 - Follow test-driven development (TDD): write tests first, then implement.
 - Do not change existing public function signatures or existing tests.
 - `httpx` is an optional dependency, not a runtime requirement. The wrapper
-  module must be importable without `httpx` installed. Use lazy imports
-  inside function bodies.
+  module must be importable without `httpx` installed. Use lazy imports inside
+  function bodies.
 - Use `DEFAULT_HEADER_NAME` from `middleware.py` rather than hardcoding the
   header string.
 - Use the roadmap function names (`request_with_correlation_id` and
@@ -74,35 +72,33 @@ Success is observable when:
 - Iterations: if tests still fail after two fix attempts for the same root
   cause, stop and escalate with findings.
 - Ambiguity: if the lazy import of `httpx` inside
-  `falcon_correlate/httpx.py` causes a self-import conflict, rename the
-  module and escalate the naming decision.
+  `falcon_correlate/httpx.py` causes a self-import conflict, rename the module
+  and escalate the naming decision.
 
 ## Risks
 
 - Risk: naming conflict between module `falcon_correlate/httpx.py` and the
-  third-party `httpx` package when `import httpx` is called inside the
-  module. Severity: high. Likelihood: low (Python 3 uses absolute imports
-  by default; the module is `falcon_correlate.httpx`, not `httpx`).
-  Mitigation: use `import httpx as _httpx` inside function bodies for
-  clarity. Verify with a test that the import resolves to the third-party
-  package.
+  third-party `httpx` package when `import httpx` is called inside the module.
+  Severity: high. Likelihood: low (Python 3 uses absolute imports by default;
+  the module is `falcon_correlate.httpx`, not `httpx`). Mitigation: use
+  `import httpx as _httpx` inside function bodies for clarity. Verify with a
+  test that the import resolves to the third-party package.
 
 - Risk: test isolation -- context variables set in tests may leak between
-  tests. Severity: medium. Likelihood: medium. Mitigation: all unit tests
-  that call `.set()` on context variables must run inside
-  `contextvars.copy_context().run()` via the `isolated_context` fixture.
-  BDD steps must include a `_reset_context_variables` autouse fixture.
+  tests. Severity: medium. Likelihood: medium. Mitigation: all unit tests that
+  call `.set()` on context variables must run inside
+  `contextvars.copy_context().run()` via the `isolated_context` fixture. BDD
+  steps must include a `_reset_context_variables` autouse fixture.
 
 - Risk: `ANN401` ruff rule triggers on `**kwargs: typ.Any`. Severity: low.
-  Likelihood: certain. Mitigation: suppress with `# noqa: ANN401` --
-  the wrapper passes through arbitrary httpx keyword arguments and cannot
-  narrow the type.
+  Likelihood: certain. Mitigation: suppress with `# noqa: ANN401` -- the
+  wrapper passes through arbitrary httpx keyword arguments and cannot narrow
+  the type.
 
 - Risk: type checker cannot resolve `httpx.Response` return annotation
-  when `httpx` is only conditionally imported. Severity: low.
-  Likelihood: low. Mitigation: `httpx` is imported under
-  `if typ.TYPE_CHECKING:` at module level, and `from __future__ import
-  annotations` defers annotation evaluation.
+  when `httpx` is only conditionally imported. Severity: low. Likelihood: low.
+  Mitigation: `httpx` is imported under `if typ.TYPE_CHECKING:` at module
+  level, and `from __future__ import annotations` defers annotation evaluation.
 
 ## Progress
 
@@ -124,34 +120,34 @@ Success is observable when:
   (Appendix A.6).
 - [x] (2026-03-05) Mark task 4.1.1 complete in `docs/roadmap.md`.
 - [x] (2026-03-05) Run all quality gates (`make check-fmt`,
-  `make typecheck`, `make lint`, `make test`). `make markdownlint`
-  skipped (tool not available in this environment; CI-only).
+  `make typecheck`, `make lint`, `make test`). `make markdownlint` skipped
+  (tool not available in this environment; CI-only).
 
 ## Surprises & discoveries
 
 - Observation: ruff rule PLR0402 flags `import unittest.mock as mock`
-  and wants `from unittest import mock`. The project's `banned-from`
-  list bans `from unittest.mock import ...` (direct submodule imports),
-  but `from unittest import mock` is fine because it imports from
-  `unittest`, not from `unittest.mock`. The existing test files
-  (`test_validation_integration.py`, `test_generator_invocation.py`)
-  already use `from unittest import mock`. Impact: used the `from
-  unittest import mock` pattern in all new test files.
+  and wants `from unittest import mock`. The project's `banned-from` list bans
+  `from unittest.mock import ...` (direct submodule imports), but
+  `from unittest import mock` is fine because it imports from `unittest`, not
+  from `unittest.mock`. The existing test files
+  (`test_validation_integration.py`, `test_generator_invocation.py`) already
+  use `from unittest import mock`. Impact: used the `from unittest import mock`
+  pattern in all new test files.
 
 - Observation: ruff PLR2004 (magic value in comparison) triggered on
-  `assert captured_kwargs["timeout"] == 5`. Impact: extracted a
-  module-level `_EXPECTED_TIMEOUT = 5` constant for test assertions.
+  `assert captured_kwargs["timeout"] == 5`. Impact: extracted a module-level
+  `_EXPECTED_TIMEOUT = 5` constant for test assertions.
 
 - Observation: `asyncio.get_event_loop()` in the BDD async step caused
   a `DeprecationWarning` in Python 3.12. Impact: replaced with
-  `asyncio.new_event_loop()` / `loop.run_until_complete()` /
-  `loop.close()` pattern to avoid the warning.
+  `asyncio.new_event_loop()` / `loop.run_until_complete()` / `loop.close()`
+  pattern to avoid the warning.
 
 - Observation: the module naming of `falcon_correlate/httpx.py` did not
-  cause any self-import conflict. Python 3 absolute imports correctly
-  resolve `import httpx` to the third-party package, not to the module
-  itself (`falcon_correlate.httpx`). The `import httpx as _httpx` alias
-  was kept for additional clarity.
+  cause any self-import conflict. Python 3 absolute imports correctly resolve
+  `import httpx` to the third-party package, not to the module itself
+  (`falcon_correlate.httpx`). The `import httpx as _httpx` alias was kept for
+  additional clarity.
 
 ## Decision log
 
@@ -159,8 +155,8 @@ Success is observable when:
   adding functions to `middleware.py`. Rationale: httpx propagation is a
   distinct feature domain. `middleware.py` already encapsulates middleware
   configuration, validation, UUID generation, the log filter, and the
-  middleware class. A separate module follows the "group by feature, not
-  layer" convention (AGENTS.md) and isolates the httpx optional dependency.
+  middleware class. A separate module follows the "group by feature, not layer"
+  convention (AGENTS.md) and isolates the httpx optional dependency.
 
 - Decision: Use lazy `import httpx as _httpx` inside function bodies.
   Rationale: `httpx` is not a runtime dependency. The module itself can be
@@ -170,69 +166,64 @@ Success is observable when:
   (mirrors the structlog approach for dev-only testing).
 
 - Decision: Extract a private `_prepare_headers` helper function.
-  Rationale: the header preparation logic (pop headers from kwargs,
-  convert to mutable dict, inject correlation ID) is identical between
-  the sync and async variants. Extracting it eliminates duplication and
-  makes both public functions thinner and easier to read.
+  Rationale: the header preparation logic (pop headers from kwargs, convert to
+  mutable dict, inject correlation ID) is identical between the sync and async
+  variants. Extracting it eliminates duplication and makes both public
+  functions thinner and easier to read.
 
 - Decision: Use `DEFAULT_HEADER_NAME` constant from `middleware.py`.
-  Rationale: keeps the header name in sync with the middleware default.
-  The wrapper provides the common case; users needing a custom header name
-  can use the custom transport approach (task 4.1.2) or write their own
-  wrapper.
+  Rationale: keeps the header name in sync with the middleware default. The
+  wrapper provides the common case; users needing a custom header name can use
+  the custom transport approach (task 4.1.2) or write their own wrapper.
 
 - Decision: Use roadmap function names (`request_with_correlation_id`,
   `async_request_with_correlation_id`) rather than the design doc names
   (`client_request_with_correlation_id`,
   `async_client_request_with_correlation_id`). Rationale: the roadmap
-  represents the accepted requirements; the design doc names are
-  illustrative examples.
+  represents the accepted requirements; the design doc names are illustrative
+  examples.
 
 ## Outcomes & retrospective
 
-The httpx wrapper function implementation is complete. Two public
-functions (`request_with_correlation_id` and
-`async_request_with_correlation_id`) are defined in
-`src/falcon_correlate/httpx.py` alongside a private `_prepare_headers`
-helper, and exported via `__init__.py` as part of the public API.
+The httpx wrapper function implementation is complete. Two public functions
+(`request_with_correlation_id` and `async_request_with_correlation_id`) are
+defined in `src/falcon_correlate/httpx.py` alongside a private
+`_prepare_headers` helper, and exported via `__init__.py` as part of the public
+API.
 
-New tests: 19 unit tests in `test_httpx_wrapper.py` covering four
-categories (sync wrapper, async wrapper, `_prepare_headers` helper, and
-public API exports) plus 4 BDD scenarios in
-`httpx_propagation.feature`. Total test suite: 292 passed, 11 skipped
-(CI-only workflow tests).
+New tests: 19 unit tests in `test_httpx_wrapper.py` covering four categories
+(sync wrapper, async wrapper, `_prepare_headers` helper, and public API
+exports) plus 4 BDD scenarios in `httpx_propagation.feature`. Total test suite:
+292 passed, 11 skipped (CI-only workflow tests).
 
-All quality gates passed: `make check-fmt`, `make lint`,
-`make typecheck`, `make test`.
+All quality gates passed: `make check-fmt`, `make lint`, `make typecheck`,
+`make test`.
 
-Key lessons: (1) The `from unittest import mock` pattern is the correct
-one for this project, not `import unittest.mock as mock`. (2) Python 3
-absolute imports handle the `falcon_correlate/httpx.py` vs third-party
-`httpx` naming without conflict. (3) Use `asyncio.new_event_loop()`
-instead of deprecated `asyncio.get_event_loop()` in non-async test
-contexts.
+Key lessons: (1) The `from unittest import mock` pattern is the correct one for
+this project, not `import unittest.mock as mock`. (2) Python 3 absolute imports
+handle the `falcon_correlate/httpx.py` vs third-party `httpx` naming without
+conflict. (3) Use `asyncio.new_event_loop()` instead of deprecated
+`asyncio.get_event_loop()` in non-async test contexts.
 
 ## Context and orientation
 
-The project is `falcon-correlate`, a correlation ID middleware for the
-Falcon web framework. The package source lives under
-`src/falcon_correlate/`. The middleware class (`CorrelationIDMiddleware`)
-and the two context variables (`correlation_id_var`, `user_id_var`) are
-defined in `src/falcon_correlate/middleware.py`. The public API is exported
-from `src/falcon_correlate/__init__.py` via an `__all__` list.
+The project is `falcon-correlate`, a correlation ID middleware for the Falcon
+web framework. The package source lives under `src/falcon_correlate/`. The
+middleware class (`CorrelationIDMiddleware`) and the two context variables
+(`correlation_id_var`, `user_id_var`) are defined in
+`src/falcon_correlate/middleware.py`. The public API is exported from
+`src/falcon_correlate/__init__.py` via an `__all__` list.
 
-Unit tests are co-located in `src/falcon_correlate/unittests/` and follow
-a class-based pattern with descriptive docstrings (one test file per
-concern). Shared unit-test fixtures (`request_response_factory`,
-`isolated_context`, `logger_with_capture`) live in
-`src/falcon_correlate/unittests/conftest.py`. Behavioural tests live in
-`tests/bdd/` as Gherkin `.feature` files with accompanying
-`test_*_steps.py` step definition files using `pytest-bdd`. Step
-definition files use a `Context` TypedDict for passing state between
-steps.
+Unit tests are co-located in `src/falcon_correlate/unittests/` and follow a
+class-based pattern with descriptive docstrings (one test file per concern).
+Shared unit-test fixtures (`request_response_factory`, `isolated_context`,
+`logger_with_capture`) live in `src/falcon_correlate/unittests/conftest.py`.
+Behavioural tests live in `tests/bdd/` as Gherkin `.feature` files with
+accompanying `test_*_steps.py` step definition files using `pytest-bdd`. Step
+definition files use a `Context` TypedDict for passing state between steps.
 
-The design specification[^1] describes the wrapper function approach in
-section 3.5.1.4 and provides a reference implementation in section 4.3.
+The design specification[^1] describes the wrapper function approach in section
+3.5.1.4 and provides a reference implementation in section 4.3.
 
 [^1]: `docs/falcon-correlation-id-middleware-design.md`
 
@@ -258,13 +249,12 @@ section 3.5.1.4 and provides a reference implementation in section 4.3.
 - Unit test structure: class-based tests with descriptive docstrings, as
   in `test_context_variables.py` and `test_structlog_integration.py`.
 - `isolated_context` fixture from
-  `src/falcon_correlate/unittests/conftest.py` for context variable
-  isolation.
+  `src/falcon_correlate/unittests/conftest.py` for context variable isolation.
 - `pytest.importorskip("structlog")` pattern at module level for optional
   dependency tests, as in `test_structlog_integration.py`.
 - BDD step definitions: `Context` TypedDict,
-  `scenarios("feature_name.feature")`, `@given`/`@when`/`@then`
-  decorators, as in `test_context_variables_steps.py`.
+  `scenarios("feature_name.feature")`, `@given`/`@when`/`@then` decorators, as
+  in `test_context_variables_steps.py`.
 - Public export test pattern from `test_context_variables.py`.
 
 ## Plan of work
@@ -282,8 +272,8 @@ following test classes and methods:
 **1. `TestRequestWithCorrelationId`** -- sync wrapper:
 
 - `test_adds_correlation_id_header_when_set` -- Set `correlation_id_var`
-  in an isolated context, mock `httpx.request`, call wrapper, assert
-  headers contain `X-Correlation-ID`.
+  in an isolated context, mock `httpx.request`, call wrapper, assert headers
+  contain `X-Correlation-ID`.
 - `test_does_not_add_header_when_context_is_empty` -- Context var at
   default, assert header absent.
 - `test_preserves_existing_caller_headers` -- Pass existing headers,
@@ -389,10 +379,10 @@ Behavioural acceptance:
 
 ## Idempotence and recovery
 
-All steps are safe to re-run. If a test fails after implementation, adjust
-the implementation or tests and re-run `make test`. If formatting fails,
-run `make fmt` and re-run `make check-fmt`. The quality gate commands can
-be repeated without side effects.
+All steps are safe to re-run. If a test fails after implementation, adjust the
+implementation or tests and re-run `make test`. If formatting fails, run
+`make fmt` and re-run `make check-fmt`. The quality gate commands can be
+repeated without side effects.
 
 ## Artifacts and notes
 
@@ -415,8 +405,8 @@ New internal name (not exported):
 
 - `_prepare_headers` -- private helper for header enrichment.
 
-Dependencies: `httpx` (optional, dev-only). Not a runtime dependency.
-Added to `[dependency-groups] dev` in `pyproject.toml`.
+Dependencies: `httpx` (optional, dev-only). Not a runtime dependency. Added to
+`[dependency-groups] dev` in `pyproject.toml`.
 
 ## Files to modify
 
@@ -438,10 +428,8 @@ Added to `[dependency-groups] dev` in `pyproject.toml`.
 ## Revision note (required when editing an ExecPlan)
 
 2026-03-05: Initial draft created to cover roadmap task 4.1.1 -- implement
-httpx wrapper functions with unit tests, BDD tests, and documentation
-updates.
+httpx wrapper functions with unit tests, BDD tests, and documentation updates.
 
-2026-03-05: Marked plan complete. Updated progress, surprises,
-decisions, and outcomes to reflect the implemented wrapper functions,
-quality gate results, and lessons about import patterns and async event
-loops.
+2026-03-05: Marked plan complete. Updated progress, surprises, decisions, and
+outcomes to reflect the implemented wrapper functions, quality gate results,
+and lessons about import patterns and async event loops.
