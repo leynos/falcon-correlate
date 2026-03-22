@@ -1,13 +1,11 @@
 # Implement custom httpx transport (4.1.2)
 
 This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises &
-Discoveries`, `Decision log`, and `Outcomes & retrospective` must be kept up
-to date as work proceeds.
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
+proceeds.
 
-Status: DRAFT
-
-Implementation must not begin until the user explicitly approves this plan.
+Status: COMPLETED
 
 ## Purpose / big picture
 
@@ -15,8 +13,8 @@ Task 4.1.2 adds a second downstream HTTP propagation mechanism alongside the
 existing wrapper functions in `src/falcon_correlate/httpx.py`. After this work,
 library consumers will be able to configure `httpx.Client` and
 `httpx.AsyncClient` with transport objects that automatically inject the
-current correlation ID from `correlation_id_var` into outgoing requests.
-Unlike the wrapper functions, this transport-based approach works even when the
+current correlation ID from `correlation_id_var` into outgoing requests. Unlike
+the wrapper functions, this transport-based approach works even when the
 calling code is built around shared client instances.
 
 Success is observable when:
@@ -241,8 +239,8 @@ especially:
 - whether the classes are re-exported from the package root
 - whether close/aclose delegation was required
 
-Update `docs/roadmap.md` by checking off 4.1.2 and its sub-items only after
-the code and tests are complete.
+Update `docs/roadmap.md` by checking off 4.1.2 and its sub-items only after the
+code and tests are complete.
 
 ### Milestone 4: run full validation
 
@@ -273,18 +271,24 @@ changes so the next fix is based on the real failure rather than guesswork.
   the documentation style guide, the complexity guidance, and the existing
   4.1.1 ExecPlan.
 - [x] (2026-03-21) Drafted this ExecPlan.
-- [ ] Await user approval.
-- [ ] Sync the development environment and confirm the local `httpx` transport
-  API.
-- [ ] Add failing unit tests for sync and async transport behaviour.
-- [ ] Add failing BDD scenarios for sync and async client configuration.
-- [ ] Implement `CorrelationIDTransport` and
+- [x] (2026-03-22) User approved implementation.
+- [x] (2026-03-22) Synced the development environment and confirmed the local
+  `httpx` transport API for `httpx 0.28.1`: `handle_request`,
+  `handle_async_request`, `close`, and `aclose`.
+- [x] (2026-03-22) Added failing unit tests for sync and async transport
+  behaviour.
+- [x] (2026-03-22) Added failing BDD scenarios for sync and async client
+  configuration.
+- [x] (2026-03-22) Implemented `CorrelationIDTransport` and
   `AsyncCorrelationIDTransport`.
-- [ ] Export the transport classes if they are part of the public API.
-- [ ] Update `docs/users-guide.md`.
-- [ ] Update `docs/falcon-correlation-id-middleware-design.md`.
-- [ ] Mark roadmap item 4.1.2 complete in `docs/roadmap.md`.
-- [ ] Run all required quality gates and inspect the tee logs.
+- [x] (2026-03-22) Exported the transport classes from the package root.
+- [x] (2026-03-22) Updated `docs/users-guide.md`.
+- [x] (2026-03-22) Updated
+  `docs/falcon-correlation-id-middleware-design.md`.
+- [x] (2026-03-22) Marked roadmap item 4.1.2 complete in `docs/roadmap.md`.
+- [x] (2026-03-22) Ran and inspected all required quality gates:
+  `make check-fmt`, `make typecheck`, `make lint`, `make test`,
+  `make markdownlint`, and `make nixie`.
 
 ## Surprises & discoveries
 
@@ -300,6 +304,9 @@ changes so the next fix is based on the real failure rather than guesswork.
   async base class almost certainly uses a different method name. The
   implementation must follow the real local `httpx` API rather than this
   shorthand roadmap wording.
+- The installed `httpx 0.28.1` transport API uses `handle_async_request` for
+  async delegation and exposes public `close()` / `aclose()` hooks that should
+  be forwarded to the wrapped transport.
 
 ## Decision log
 
@@ -315,15 +322,33 @@ changes so the next fix is based on the real failure rather than guesswork.
   this matches the existing `_prepare_headers` behaviour and avoids surprising
   callers. If `httpx` transport usage makes overwrite semantics necessary, this
   must be escalated because it changes the public contract.
+- Decision: re-export `CorrelationIDTransport` and
+  `AsyncCorrelationIDTransport` from `falcon_correlate.__init__`. Rationale:
+  the wrapper functions are already available from the package root, and the
+  transport classes are likewise intended as consumer-facing utilities.
+- Decision: delegate `close()` and `aclose()` to the wrapped transport.
+  Rationale: `httpx 0.28.1` includes public lifecycle hooks on its base
+  transport classes, so the decorator transport must preserve shutdown
+  behaviour.
 
 ## Outcomes & retrospective
 
-This section is intentionally incomplete because implementation has not started.
+Implemented sync and async custom `httpx` transport decorators in
+`src/falcon_correlate/httpx.py`, exported them from the package root, and kept
+the optional-dependency contract intact by checking for `httpx` availability at
+runtime rather than import time.
 
-When the task is complete, replace this paragraph with a concise summary of:
+Transport behaviour is now covered by dedicated unit tests in
+`src/falcon_correlate/unittests/test_httpx_transport.py` and BDD scenarios in
+`tests/bdd/httpx_transport.feature` plus
+`tests/bdd/test_httpx_transport_steps.py`. The red phase failed on missing
+transport symbols, and the focused green phase passed after implementation.
 
-- what shipped
-- which files changed
-- how success was verified
-- what design lessons should inform later roadmap items such as Celery
-  propagation
+Documentation now explains when to choose wrapper functions versus transports,
+shows both sync and async client configuration, records the transport design
+decisions in the design appendix, and marks roadmap item 4.1.2 complete.
+
+The main design lesson for later propagation work is that thin decorator-style
+adapters work well when the downstream library already has a stable lifecycle
+contract. Future integrations such as Celery should similarly preserve caller
+intent and delegate lifecycle behaviour rather than replacing it.
