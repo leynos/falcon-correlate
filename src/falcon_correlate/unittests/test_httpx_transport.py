@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import typing as typ
 
 import pytest
@@ -20,6 +21,21 @@ from falcon_correlate.httpx import (  # noqa: E402
 )
 
 _OK_STATUS = 200
+
+
+@contextlib.contextmanager
+def _cid_context(cid: str) -> typ.Generator[None, None, None]:
+    """Set *cid* on ``correlation_id_var`` for the duration of the block."""
+    token = correlation_id_var.set(cid)
+    try:
+        yield
+    finally:
+        correlation_id_var.reset(token)
+
+
+def _make_delegation_request() -> httpx.Request:
+    """Return a fresh GET request suitable for delegation tests."""
+    return httpx.Request("GET", "http://example.com")
 
 
 class RecordingTransport(httpx.BaseTransport):
@@ -108,19 +124,17 @@ def test_sync_transport_preserves_existing_correlation_header(
 
 def test_sync_transport_delegates_same_request_object() -> None:
     """Sync transport should delegate exactly once with the mutated request."""
-    request = httpx.Request("GET", "http://example.com")
+    cid = "delegated-sync-cid"
+    request = _make_delegation_request()
     transport = mock.Mock(spec=httpx.BaseTransport)
     transport.handle_request.return_value = httpx.Response(200, request=request)
     wrapped_transport = CorrelationIDTransport(transport)
 
-    token = correlation_id_var.set("delegated-sync-cid")
-    try:
+    with _cid_context(cid):
         wrapped_transport.handle_request(request)
-    finally:
-        correlation_id_var.reset(token)
 
     transport.handle_request.assert_called_once_with(request)
-    assert request.headers["X-Correlation-ID"] == "delegated-sync-cid"
+    assert request.headers["X-Correlation-ID"] == cid
 
 
 def test_sync_transport_delegates_close() -> None:
@@ -139,12 +153,9 @@ async def test_async_transport_injects_header_when_context_is_set() -> None:
     transport = RecordingAsyncTransport()
     wrapped_transport = AsyncCorrelationIDTransport(transport)
 
-    token = correlation_id_var.set("async-transport-cid")
-    try:
+    with _cid_context("async-transport-cid"):
         async with httpx.AsyncClient(transport=wrapped_transport) as client:
             response = await client.get("http://example.com")
-    finally:
-        correlation_id_var.reset(token)
 
     assert response.status_code == _OK_STATUS
     assert len(transport.requests) == 1
@@ -170,15 +181,12 @@ async def test_async_transport_preserves_existing_correlation_header() -> None:
     transport = RecordingAsyncTransport()
     wrapped_transport = AsyncCorrelationIDTransport(transport)
 
-    token = correlation_id_var.set("ignored-async-context-cid")
-    try:
+    with _cid_context("ignored-async-context-cid"):
         async with httpx.AsyncClient(transport=wrapped_transport) as client:
             await client.get(
                 "http://example.com",
                 headers={"X-Correlation-ID": "caller-async-cid"},
             )
-    finally:
-        correlation_id_var.reset(token)
 
     assert transport.requests[0].headers["X-Correlation-ID"] == "caller-async-cid"
 
@@ -186,19 +194,17 @@ async def test_async_transport_preserves_existing_correlation_header() -> None:
 @pytest.mark.asyncio
 async def test_async_transport_delegates_same_request_object() -> None:
     """Async transport should delegate exactly once with the mutated request."""
-    request = httpx.Request("GET", "http://example.com")
+    cid = "delegated-async-cid"
+    request = _make_delegation_request()
     transport = mock.AsyncMock(spec=httpx.AsyncBaseTransport)
     transport.handle_async_request.return_value = httpx.Response(200, request=request)
     wrapped_transport = AsyncCorrelationIDTransport(transport)
 
-    token = correlation_id_var.set("delegated-async-cid")
-    try:
+    with _cid_context(cid):
         await wrapped_transport.handle_async_request(request)
-    finally:
-        correlation_id_var.reset(token)
 
     transport.handle_async_request.assert_awaited_once_with(request)
-    assert request.headers["X-Correlation-ID"] == "delegated-async-cid"
+    assert request.headers["X-Correlation-ID"] == cid
 
 
 @pytest.mark.asyncio
