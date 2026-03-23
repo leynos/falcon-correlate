@@ -339,8 +339,8 @@ the optional-dependency contract intact by checking for `httpx` availability at
 runtime rather than import time.
 
 Transport behaviour is now covered by dedicated unit tests in
-`src/falcon_correlate/unittests/test_httpx_transport.py` and BDD scenarios in
-`tests/bdd/httpx_transport.feature` plus
+`src/falcon_correlate/unittests/test_httpx_transport.py` and behaviour-driven
+development (BDD) scenarios in `tests/bdd/httpx_transport.feature` plus
 `tests/bdd/test_httpx_transport_steps.py`. The red phase failed on missing
 transport symbols, and the focused green phase passed after implementation.
 

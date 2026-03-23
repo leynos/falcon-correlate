@@ -16,30 +16,19 @@ import typing as typ
 
 from .middleware import DEFAULT_HEADER_NAME, correlation_id_var
 
-_httpx: typ.Any = None
-
 if typ.TYPE_CHECKING:
     import httpx
-else:
-    try:
-        import httpx as _httpx
-    except ImportError:  # pragma: no cover - exercised in environments without httpx
-        _httpx = None
-
-if _httpx is None:  # pragma: no cover - import-time fallback
-    _SyncBaseTransport = object
-    _AsyncBaseTransport = object
-else:
-    _SyncBaseTransport = _httpx.BaseTransport
-    _AsyncBaseTransport = _httpx.AsyncBaseTransport
 
 
 def _require_httpx() -> typ.Any:  # noqa: ANN401
     """Return the optional ``httpx`` module or raise ``ImportError``."""
-    if _httpx is None:
+    try:
+        import httpx
+    except ImportError as exc:
         msg = "httpx is required to use falcon_correlate.httpx"
-        raise ImportError(msg)
-    return _httpx
+        raise ImportError(msg) from exc
+    else:
+        return httpx
 
 
 def _inject_correlation_id_header(
@@ -52,7 +41,7 @@ def _inject_correlation_id_header(
         headers[header_name] = correlation_id
 
 
-class CorrelationIDTransport(_SyncBaseTransport):
+class CorrelationIDTransport:
     """Inject correlation IDs into sync requests before transport delegation."""
 
     def __init__(
@@ -65,7 +54,10 @@ class CorrelationIDTransport(_SyncBaseTransport):
         self._wrapped_transport = wrapped_transport
         self._header_name = header_name
 
-    def handle_request(self, request: httpx.Request) -> httpx.Response:
+    def handle_request(
+        self,
+        request: httpx.Request,
+    ) -> httpx.Response:
         """Add the correlation ID header and delegate the request."""
         _inject_correlation_id_header(request.headers, self._header_name)
         return self._wrapped_transport.handle_request(request)
@@ -74,8 +66,17 @@ class CorrelationIDTransport(_SyncBaseTransport):
         """Delegate transport shutdown to the wrapped transport."""
         self._wrapped_transport.close()
 
+    def __enter__(self) -> CorrelationIDTransport:
+        """Enter the transport context (required by httpx.Client)."""
+        self._wrapped_transport.__enter__()
+        return self
 
-class AsyncCorrelationIDTransport(_AsyncBaseTransport):
+    def __exit__(self, *args: typ.Any) -> None:  # noqa: ANN401
+        """Exit the transport context (required by httpx.Client)."""
+        self._wrapped_transport.__exit__(*args)
+
+
+class AsyncCorrelationIDTransport:
     """Inject correlation IDs into async requests before transport delegation."""
 
     def __init__(
@@ -88,7 +89,10 @@ class AsyncCorrelationIDTransport(_AsyncBaseTransport):
         self._wrapped_transport = wrapped_transport
         self._header_name = header_name
 
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+    async def handle_async_request(
+        self,
+        request: httpx.Request,
+    ) -> httpx.Response:
         """Add the correlation ID header and delegate the request."""
         _inject_correlation_id_header(request.headers, self._header_name)
         return await self._wrapped_transport.handle_async_request(request)
@@ -96,6 +100,15 @@ class AsyncCorrelationIDTransport(_AsyncBaseTransport):
     async def aclose(self) -> None:
         """Delegate transport shutdown to the wrapped transport."""
         await self._wrapped_transport.aclose()
+
+    async def __aenter__(self) -> AsyncCorrelationIDTransport:
+        """Enter the async transport context (required by httpx.AsyncClient)."""
+        await self._wrapped_transport.__aenter__()
+        return self
+
+    async def __aexit__(self, *args: typ.Any) -> None:  # noqa: ANN401
+        """Exit the async transport context (required by httpx.AsyncClient)."""
+        await self._wrapped_transport.__aexit__(*args)
 
 
 def request_with_correlation_id(
@@ -126,9 +139,9 @@ def request_with_correlation_id(
         The HTTP response.
 
     """
-    _httpx = _require_httpx()
+    httpx = _require_httpx()
     headers = _prepare_headers(kwargs)
-    return _httpx.request(method, url, headers=headers, **kwargs)
+    return httpx.request(method, url, headers=headers, **kwargs)
 
 
 async def async_request_with_correlation_id(
@@ -157,9 +170,9 @@ async def async_request_with_correlation_id(
         The HTTP response.
 
     """
-    _httpx = _require_httpx()
+    httpx = _require_httpx()
     headers = _prepare_headers(kwargs)
-    async with _httpx.AsyncClient() as client:
+    async with httpx.AsyncClient() as client:
         return await client.request(method, url, headers=headers, **kwargs)
 
 
@@ -184,17 +197,17 @@ def _prepare_headers(
         The enriched headers.
 
     """
-    _httpx = _require_httpx()
+    httpx = _require_httpx()
     raw_headers = kwargs.pop("headers", None)
     # Use httpx.Headers to preserve duplicate entries
     if raw_headers is not None:
         headers = (
             raw_headers
-            if isinstance(raw_headers, _httpx.Headers)
-            else _httpx.Headers(raw_headers)
+            if isinstance(raw_headers, httpx.Headers)
+            else httpx.Headers(raw_headers)
         )
     else:
-        headers = _httpx.Headers()
+        headers = httpx.Headers()
 
     _inject_correlation_id_header(headers)
     return headers

@@ -612,7 +612,7 @@ The async variant creates a temporary `httpx.AsyncClient` for each call.
 
 ### Transport usage with shared clients
 
-Use `CorrelationIDTransport` when you want a reusable synchronous client:
+Use `CorrelationIDTransport` for a reusable synchronous client:
 
 ```python
 import httpx
