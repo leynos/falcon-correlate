@@ -87,7 +87,9 @@ def when_send_request_with_transport(context: Context) -> Context:
     with httpx.Client(transport=CorrelationIDTransport(transport)) as client:
         client.get("http://example.com")
 
-    assert transport.request is not None
+    assert transport.request is not None, (
+        "expected RecordingTransport to have captured a request"
+    )
     context["captured_headers"] = dict(transport.request.headers)
     return context
 
@@ -106,7 +108,12 @@ def when_send_async_request_with_transport(context: Context) -> Context:
         ) as client:
             await client.get("http://example.com")
 
-        assert transport.request is not None
+        assert transport.request is not None, (
+            "expected RecordingAsyncTransport to have captured a request"
+        )
+        assert transport.request.headers is not None, (
+            "expected transport.request.headers to be present"
+        )
         return dict(transport.request.headers)
 
     context["captured_headers"] = asyncio.run(_run())
