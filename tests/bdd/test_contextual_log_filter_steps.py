@@ -23,7 +23,7 @@ from falcon_correlate import (
 scenarios("contextual_log_filter.feature")
 
 
-class EnrichedLogRecord(typ.Protocol):
+class _EnrichedLogRecord(typ.Protocol):
     """Protocol for LogRecord objects enriched with correlation/user IDs."""
 
     correlation_id: str
@@ -146,7 +146,7 @@ def when_log_message_emitted(context: Context, message: str) -> Context:
 @then(parsers.parse('the log record should have correlation_id "{expected}"'))
 def then_record_has_correlation_id(context: Context, expected: str) -> None:
     """Verify the log record has the expected correlation_id."""
-    record = typ.cast("EnrichedLogRecord", context["record"])
+    record = typ.cast("_EnrichedLogRecord", context["record"])
     actual = record.correlation_id
     assert actual == expected, f"expected correlation_id {expected!r}, got {actual!r}"
 
@@ -154,7 +154,7 @@ def then_record_has_correlation_id(context: Context, expected: str) -> None:
 @then(parsers.parse('the log record should have user_id "{expected}"'))
 def then_record_has_user_id(context: Context, expected: str) -> None:
     """Verify the log record has the expected user_id."""
-    record = typ.cast("EnrichedLogRecord", context["record"])
+    record = typ.cast("_EnrichedLogRecord", context["record"])
     actual = record.user_id
     assert actual == expected, f"expected user_id {expected!r}, got {actual!r}"
 

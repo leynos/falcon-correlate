@@ -453,8 +453,9 @@ class CorrelationIDConfig:
 
 
 # Derive valid kwargs from dataclass fields to ensure synchronization
+# Only include fields that are initialized at construction (init=True)
 _VALID_CONFIG_KWARGS = frozenset(
-    field.name for field in dataclasses.fields(CorrelationIDConfig)
+    field.name for field in dataclasses.fields(CorrelationIDConfig) if field.init
 )
 
 
