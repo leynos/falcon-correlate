@@ -130,7 +130,10 @@ def then_header_present(context: Context, name: str, value: str) -> None:
     headers = context["captured_headers"]
     header_key = next((key for key in headers if key.lower() == name.lower()), None)
     assert header_key is not None, f"header {name!r} not found in {headers!r}"
-    assert headers[header_key] == value
+    actual = headers[header_key]
+    assert actual == value, (
+        f"Expected header {header_key!r} to be {value!r} but was {actual!r}"
+    )
 
 
 @then(parsers.parse('the outgoing request should not contain header "{name}"'))
