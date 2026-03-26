@@ -1,4 +1,34 @@
-"""Step definitions for httpx_transport.feature."""
+"""Step definitions for httpx_transport.feature.
+
+This module provides pytest-bdd step definitions that verify correlation ID
+propagation through httpx transport wrappers. It tests both sync
+(CorrelationIDTransport) and async (AsyncCorrelationIDTransport) transport
+classes to ensure they correctly inject correlation IDs into outgoing HTTP
+requests and preserve explicitly-set headers.
+
+Usage
+-----
+Run the BDD scenarios with pytest::
+
+    pytest tests/bdd/test_httpx_transport_steps.py
+
+Or run the entire BDD suite::
+
+    pytest tests/bdd/
+
+Example:
+-------
+A typical scenario from httpx_transport.feature::
+
+    Given the correlation ID is set to "test-correlation-id"
+    When I send a request using an httpx client with the correlation transport
+    Then the outgoing request should contain header "X-Correlation-ID"
+         with value "test-correlation-id"
+
+The steps defined here handle context setup (Given), request execution (When),
+and header verification (Then).
+
+"""
 
 from __future__ import annotations
 
@@ -7,6 +37,12 @@ import typing as typ
 
 import pytest
 
+# Skip the entire test module if httpx is not installed (optional dependency).
+# This MUST happen before importing falcon_correlate.httpx, which requires httpx.
+# The E402 warnings below are unavoidable: pytest.importorskip() is executable
+# code that validates the dependency before we can safely import modules that
+# depend on it. Without this ordering, the test module would fail to collect
+# in environments where httpx is not available.
 httpx = pytest.importorskip("httpx")
 
 from pytest_bdd import given, parsers, scenarios, then, when  # noqa: E402

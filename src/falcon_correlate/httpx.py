@@ -41,7 +41,13 @@ def _inject_correlation_id_header(
         headers[header_name] = correlation_id
 
 
-class CorrelationIDTransport:
+if typ.TYPE_CHECKING:
+    _SyncBaseTransport = httpx.BaseTransport
+else:
+    _SyncBaseTransport = object
+
+
+class CorrelationIDTransport(_SyncBaseTransport):
     """Inject correlation IDs into sync requests before transport delegation."""
 
     def __init__(
@@ -71,12 +77,23 @@ class CorrelationIDTransport:
         self._wrapped_transport.__enter__()
         return self
 
-    def __exit__(self, *args: typ.Any) -> None:  # noqa: ANN401
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None = None,
+        exc_value: BaseException | None = None,
+        traceback: typ.Any = None,  # noqa: ANN401
+    ) -> None:
         """Exit the transport context (required by httpx.Client)."""
-        self._wrapped_transport.__exit__(*args)
+        self._wrapped_transport.__exit__(exc_type, exc_value, traceback)
 
 
-class AsyncCorrelationIDTransport:
+if typ.TYPE_CHECKING:
+    _AsyncBaseTransport = httpx.AsyncBaseTransport
+else:
+    _AsyncBaseTransport = object
+
+
+class AsyncCorrelationIDTransport(_AsyncBaseTransport):
     """Inject correlation IDs into async requests before transport delegation."""
 
     def __init__(
@@ -106,9 +123,14 @@ class AsyncCorrelationIDTransport:
         await self._wrapped_transport.__aenter__()
         return self
 
-    async def __aexit__(self, *args: typ.Any) -> None:  # noqa: ANN401
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None = None,
+        exc_value: BaseException | None = None,
+        traceback: typ.Any = None,  # noqa: ANN401
+    ) -> None:
         """Exit the async transport context (required by httpx.AsyncClient)."""
-        await self._wrapped_transport.__aexit__(*args)
+        await self._wrapped_transport.__aexit__(exc_type, exc_value, traceback)
 
 
 def request_with_correlation_id(

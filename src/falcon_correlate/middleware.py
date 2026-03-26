@@ -524,7 +524,10 @@ class CorrelationIDMiddleware:
             if unknown_keys:
                 msg = f"Unknown keyword arguments: {', '.join(sorted(unknown_keys))}"
                 raise TypeError(msg)
-            self._config = CorrelationIDConfig.from_kwargs(**kwargs)  # type: ignore[arg-type]
+            # Cast kwargs to Any after validation - the runtime will verify types
+            self._config = CorrelationIDConfig.from_kwargs(
+                **typ.cast(typ.Any, kwargs)  # noqa: TC006
+            )
 
     # @CodeScene(disable:"Bumpy Road Ahead")
     @property
