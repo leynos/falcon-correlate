@@ -17,6 +17,8 @@ import typing as typ
 from .middleware import DEFAULT_HEADER_NAME, correlation_id_var
 
 if typ.TYPE_CHECKING:
+    from types import TracebackType
+
     import httpx
 
 
@@ -42,12 +44,14 @@ def _inject_correlation_id_header(
 class _CorrelationIDTransportBase:
     """Shared initialisation for sync and async correlation ID transports."""
 
+    # Intentionally Any: this base stores either sync or async httpx transports;
+    # concrete subclasses enforce the specific transport type.
     _wrapped_transport: typ.Any
     _header_name: str
 
     def __init__(
         self,
-        wrapped_transport: typ.Any,  # noqa: ANN401
+        wrapped_transport: typ.Any,  # noqa: ANN401 - shared base accepts BaseTransport or AsyncBaseTransport; subclasses enforce the concrete type.
         header_name: str = DEFAULT_HEADER_NAME,
     ) -> None:
         """Store the wrapped transport and configured outbound header name."""
@@ -91,7 +95,7 @@ class CorrelationIDTransport(_CorrelationIDTransportBase, _SyncBaseTransport):
         self,
         exc_type: type[BaseException] | None = None,
         exc_value: BaseException | None = None,
-        traceback: typ.Any = None,  # noqa: ANN401
+        traceback: TracebackType | None = None,
     ) -> None:
         """Exit the transport context (required by httpx.Client)."""
         self._wrapped_transport.__exit__(exc_type, exc_value, traceback)
