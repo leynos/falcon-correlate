@@ -7,6 +7,12 @@ import typing as typ
 
 import pytest
 
+# Skip the entire test module if httpx is not installed (optional dependency).
+# This MUST happen before importing falcon_correlate.httpx, which requires httpx.
+# The E402 warnings below are unavoidable: pytest.importorskip() is executable
+# code that validates the dependency before we can safely import modules that
+# depend on it. Without this ordering, the test module would fail to collect
+# in environments where httpx is not available.
 httpx = pytest.importorskip("httpx")
 
 from unittest import mock  # noqa: E402
