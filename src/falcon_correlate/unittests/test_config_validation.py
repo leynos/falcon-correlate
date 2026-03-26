@@ -41,9 +41,13 @@ class TestCorrelationIDConfigValidation:
     def test_config_non_callable_generator_raises_type_error(self) -> None:
         """Verify non-callable generator on CorrelationIDConfig raises TypeError."""
         with pytest.raises(TypeError, match="generator must be callable"):
-            CorrelationIDConfig(generator=typ.cast(typ.Any, "not-a-callable"))  # noqa: TC006
+            CorrelationIDConfig(
+                generator=typ.cast("typ.Callable[[], str]", "not-a-callable")
+            )
 
     def test_config_non_callable_validator_raises_type_error(self) -> None:
         """Verify non-callable validator on CorrelationIDConfig raises TypeError."""
         with pytest.raises(TypeError, match="validator must be callable"):
-            CorrelationIDConfig(validator=typ.cast(typ.Any, "not-a-callable"))  # noqa: TC006
+            CorrelationIDConfig(
+                validator=typ.cast("typ.Callable[[str], bool]", "not-a-callable")
+            )

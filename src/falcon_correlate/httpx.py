@@ -57,6 +57,9 @@ class CorrelationIDTransport(_SyncBaseTransport):
     ) -> None:
         """Store the wrapped transport and configured outbound header name."""
         _require_httpx()
+        if not header_name or not header_name.strip():
+            msg = "header_name must not be empty or whitespace"
+            raise ValueError(msg)
         self._wrapped_transport = wrapped_transport
         self._header_name = header_name
 
@@ -103,6 +106,9 @@ class AsyncCorrelationIDTransport(_AsyncBaseTransport):
     ) -> None:
         """Store the wrapped transport and configured outbound header name."""
         _require_httpx()
+        if not header_name or not header_name.strip():
+            msg = "header_name must not be empty or whitespace"
+            raise ValueError(msg)
         self._wrapped_transport = wrapped_transport
         self._header_name = header_name
 
