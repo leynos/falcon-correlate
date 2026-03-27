@@ -154,6 +154,22 @@ def test_sync_transport_delegates_close() -> None:
     transport.close.assert_called_once_with()
 
 
+def test_sync_transport_preserves_exit_return_value() -> None:
+    """Sync transport should preserve wrapped exception-suppression behavior."""
+    transport = mock.MagicMock(spec=httpx.BaseTransport)
+    transport.__exit__.return_value = True
+    wrapped_transport = CorrelationIDTransport(transport)
+
+    result = wrapped_transport.__exit__(RuntimeError, RuntimeError("boom"), None)
+
+    transport.__exit__.assert_called_once_with(
+        RuntimeError,
+        mock.ANY,
+        None,
+    )
+    assert result is True
+
+
 def test_sync_transport_uses_custom_header_name(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
 ) -> None:
@@ -265,6 +281,27 @@ async def test_async_transport_delegates_aclose() -> None:
     await wrapped_transport.aclose()
 
     transport.aclose.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_async_transport_preserves_exit_return_value() -> None:
+    """Async transport should preserve wrapped exception-suppression behavior."""
+    transport = mock.AsyncMock(spec=httpx.AsyncBaseTransport)
+    transport.__aexit__.return_value = True
+    wrapped_transport = AsyncCorrelationIDTransport(transport)
+
+    result = await wrapped_transport.__aexit__(
+        RuntimeError,
+        RuntimeError("boom"),
+        None,
+    )
+
+    transport.__aexit__.assert_awaited_once_with(
+        RuntimeError,
+        mock.ANY,
+        None,
+    )
+    assert result is True
 
 
 @pytest.mark.asyncio

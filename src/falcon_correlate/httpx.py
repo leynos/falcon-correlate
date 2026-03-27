@@ -21,6 +21,28 @@ if typ.TYPE_CHECKING:
 
     import httpx
 
+    class _SupportsSyncExit(typ.Protocol):
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None = None,
+            exc_value: BaseException | None = None,
+            traceback: TracebackType | None = None,
+        ) -> object: ...
+
+    class _SupportsAsyncExit(typ.Protocol):
+        async def __aexit__(
+            self,
+            exc_type: type[BaseException] | None = None,
+            exc_value: BaseException | None = None,
+            traceback: TracebackType | None = None,
+        ) -> object: ...
+
+    _SyncWrappedTransport = httpx.BaseTransport
+    _AsyncWrappedTransport = httpx.AsyncBaseTransport
+else:
+    _SyncWrappedTransport = object
+    _AsyncWrappedTransport = object
+
 
 def _require_httpx() -> None:
     """Raise ``ImportError`` if the optional ``httpx`` module is unavailable."""
@@ -41,17 +63,15 @@ def _inject_correlation_id_header(
         headers[header_name] = correlation_id
 
 
-class _CorrelationIDTransportBase:
+class _CorrelationIDTransportBase[WrappedTransportT]:
     """Shared initialisation for sync and async correlation ID transports."""
 
-    # Intentionally Any: this base stores either sync or async httpx transports;
-    # concrete subclasses enforce the specific transport type.
-    _wrapped_transport: typ.Any
+    _wrapped_transport: WrappedTransportT
     _header_name: str
 
     def __init__(
         self,
-        wrapped_transport: typ.Any,  # noqa: ANN401 - shared base accepts BaseTransport or AsyncBaseTransport; subclasses enforce the concrete type.
+        wrapped_transport: WrappedTransportT,
         header_name: str = DEFAULT_HEADER_NAME,
     ) -> None:
         """Store the wrapped transport and configured outbound header name."""
@@ -69,7 +89,10 @@ else:
     _SyncBaseTransport = object
 
 
-class CorrelationIDTransport(_CorrelationIDTransportBase, _SyncBaseTransport):
+class CorrelationIDTransport(
+    _CorrelationIDTransportBase[_SyncWrappedTransport],
+    _SyncBaseTransport,
+):
     """Inject correlation IDs into sync requests before transport delegation."""
 
     # __init__ inherited from _CorrelationIDTransportBase
@@ -98,7 +121,11 @@ class CorrelationIDTransport(_CorrelationIDTransportBase, _SyncBaseTransport):
         traceback: TracebackType | None = None,
     ) -> None:
         """Exit the transport context (required by httpx.Client)."""
-        self._wrapped_transport.__exit__(exc_type, exc_value, traceback)
+        wrapped_transport = typ.cast("_SupportsSyncExit", self._wrapped_transport)
+        return typ.cast(
+            "None",
+            wrapped_transport.__exit__(exc_type, exc_value, traceback),
+        )
 
 
 if typ.TYPE_CHECKING:
@@ -107,7 +134,10 @@ else:
     _AsyncBaseTransport = object
 
 
-class AsyncCorrelationIDTransport(_CorrelationIDTransportBase, _AsyncBaseTransport):
+class AsyncCorrelationIDTransport(
+    _CorrelationIDTransportBase[_AsyncWrappedTransport],
+    _AsyncBaseTransport,
+):
     """Inject correlation IDs into async requests before transport delegation."""
 
     # __init__ inherited from _CorrelationIDTransportBase
@@ -133,10 +163,18 @@ class AsyncCorrelationIDTransport(_CorrelationIDTransportBase, _AsyncBaseTranspo
         self,
         exc_type: type[BaseException] | None = None,
         exc_value: BaseException | None = None,
-        traceback: typ.Any = None,  # noqa: ANN401
+        traceback: TracebackType | None = None,
     ) -> None:
         """Exit the async transport context (required by httpx.AsyncClient)."""
-        await self._wrapped_transport.__aexit__(exc_type, exc_value, traceback)
+        wrapped_transport = typ.cast("_SupportsAsyncExit", self._wrapped_transport)
+        return typ.cast(
+            "None",
+            await wrapped_transport.__aexit__(
+                exc_type,
+                exc_value,
+                traceback,
+            ),
+        )
 
 
 def request_with_correlation_id(
