@@ -5,28 +5,23 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import typing as typ
+from unittest import mock
 
 import pytest
-
-# Skip the entire test module if httpx is not installed (optional dependency).
-# This MUST happen before importing falcon_correlate.httpx, which requires httpx.
-# The E402 warnings below are unavoidable: pytest.importorskip() is executable
-# code that validates the dependency before we can safely import modules that
-# depend on it. Without this ordering, the test module would fail to collect
-# in environments where httpx is not available.
-httpx = pytest.importorskip("httpx")
-
-from unittest import mock  # noqa: E402
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
-from falcon_correlate import correlation_id_var  # noqa: E402
-from falcon_correlate.httpx import (  # noqa: E402
+from falcon_correlate import correlation_id_var
+from falcon_correlate.httpx import (
     AsyncCorrelationIDTransport,
     CorrelationIDTransport,
 )
-from falcon_correlate.middleware import DEFAULT_HEADER_NAME  # noqa: E402
+from falcon_correlate.middleware import DEFAULT_HEADER_NAME
+
+# falcon_correlate.httpx is import-safe without optional httpx installed;
+# importorskip only guards direct use of the optional httpx package below.
+httpx = pytest.importorskip("httpx")
 
 _OK_STATUS = 200
 
