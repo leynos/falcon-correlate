@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import typing as typ
 
@@ -154,22 +155,6 @@ def test_sync_transport_delegates_close() -> None:
     transport.close.assert_called_once_with()
 
 
-def test_sync_transport_preserves_exit_return_value() -> None:
-    """Sync transport should preserve wrapped exception-suppression behavior."""
-    transport = mock.MagicMock(spec=httpx.BaseTransport)
-    transport.__exit__.return_value = True
-    wrapped_transport = CorrelationIDTransport(transport)
-
-    result = wrapped_transport.__exit__(RuntimeError, RuntimeError("boom"), None)
-
-    transport.__exit__.assert_called_once_with(
-        RuntimeError,
-        mock.ANY,
-        None,
-    )
-    assert result is True
-
-
 def test_sync_transport_uses_custom_header_name(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
 ) -> None:
@@ -283,24 +268,49 @@ async def test_async_transport_delegates_aclose() -> None:
     transport.aclose.assert_awaited_once_with()
 
 
+@pytest.mark.parametrize(
+    ("mock_factory", "transport_spec", "wrapped_cls", "exit_attr"),
+    [
+        pytest.param(
+            mock.MagicMock,
+            httpx.BaseTransport,
+            CorrelationIDTransport,
+            "__exit__",
+            id="sync",
+        ),
+        pytest.param(
+            mock.AsyncMock,
+            httpx.AsyncBaseTransport,
+            AsyncCorrelationIDTransport,
+            "__aexit__",
+            id="async",
+        ),
+    ],
+)
 @pytest.mark.asyncio
-async def test_async_transport_preserves_exit_return_value() -> None:
-    """Async transport should preserve wrapped exception-suppression behavior."""
-    transport = mock.AsyncMock(spec=httpx.AsyncBaseTransport)
-    transport.__aexit__.return_value = True
-    wrapped_transport = AsyncCorrelationIDTransport(transport)
+async def test_transport_preserves_exit_return_value(
+    mock_factory: type,
+    transport_spec: type,
+    wrapped_cls: type,
+    exit_attr: str,
+) -> None:
+    """Transport should preserve wrapped exception-suppression behavior."""
+    transport = mock_factory(spec=transport_spec)
+    getattr(transport, exit_attr).return_value = True
+    wrapped_transport = wrapped_cls(transport)
 
-    result = await wrapped_transport.__aexit__(
+    raw = getattr(wrapped_transport, exit_attr)(
         RuntimeError,
         RuntimeError("boom"),
         None,
     )
+    result = await raw if asyncio.iscoroutine(raw) else raw
 
-    transport.__aexit__.assert_awaited_once_with(
-        RuntimeError,
-        mock.ANY,
-        None,
-    )
+    exit_mock = getattr(transport, exit_attr)
+    if isinstance(transport, mock.AsyncMock):
+        exit_mock.assert_awaited_once_with(RuntimeError, mock.ANY, None)
+    else:
+        exit_mock.assert_called_once_with(RuntimeError, mock.ANY, None)
     assert result is True
 
 

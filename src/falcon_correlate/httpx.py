@@ -37,6 +37,12 @@ if typ.TYPE_CHECKING:
             traceback: TracebackType | None = None,
         ) -> object: ...
 
+    _ExitArgs = tuple[
+        type[BaseException] | None,
+        BaseException | None,
+        TracebackType | None,
+    ]
+
     _SyncWrappedTransport = httpx.BaseTransport
     _AsyncWrappedTransport = httpx.AsyncBaseTransport
 else:
@@ -82,6 +88,11 @@ class _CorrelationIDTransportBase[WrappedTransportT]:
         self._wrapped_transport = wrapped_transport
         self._header_name = header_name.strip()
 
+    @staticmethod
+    def _cast_to_none(result: object) -> None:
+        """Forward an exit return value while satisfying the type checker."""
+        return typ.cast("None", result)
+
 
 if typ.TYPE_CHECKING:
     _SyncBaseTransport = httpx.BaseTransport
@@ -121,11 +132,8 @@ class CorrelationIDTransport(
         traceback: TracebackType | None = None,
     ) -> None:
         """Exit the transport context (required by httpx.Client)."""
-        wrapped_transport = typ.cast("_SupportsSyncExit", self._wrapped_transport)
-        return typ.cast(
-            "None",
-            wrapped_transport.__exit__(exc_type, exc_value, traceback),
-        )
+        wrapped = typ.cast("_SupportsSyncExit", self._wrapped_transport)
+        return self._cast_to_none(wrapped.__exit__(exc_type, exc_value, traceback))
 
 
 if typ.TYPE_CHECKING:
@@ -166,14 +174,9 @@ class AsyncCorrelationIDTransport(
         traceback: TracebackType | None = None,
     ) -> None:
         """Exit the async transport context (required by httpx.AsyncClient)."""
-        wrapped_transport = typ.cast("_SupportsAsyncExit", self._wrapped_transport)
-        return typ.cast(
-            "None",
-            await wrapped_transport.__aexit__(
-                exc_type,
-                exc_value,
-                traceback,
-            ),
+        wrapped = typ.cast("_SupportsAsyncExit", self._wrapped_transport)
+        return self._cast_to_none(
+            await wrapped.__aexit__(exc_type, exc_value, traceback)
         )
 
 
