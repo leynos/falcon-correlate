@@ -14,9 +14,8 @@ if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
     import falcon
-    from typing_extensions import TypedDict
 
-    class _CorrelationIDConfigKwargs(TypedDict, total=False):
+    class _CorrelationIDConfigKwargs(typ.TypedDict, total=False):
         """Type definition for CorrelationIDConfig keyword arguments."""
 
         header_name: str

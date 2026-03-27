@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import typing as typ
 
@@ -265,6 +266,52 @@ async def test_async_transport_delegates_aclose() -> None:
     await wrapped_transport.aclose()
 
     transport.aclose.assert_awaited_once_with()
+
+
+@pytest.mark.parametrize(
+    ("mock_factory", "transport_spec", "wrapped_cls", "exit_attr"),
+    [
+        pytest.param(
+            mock.MagicMock,
+            httpx.BaseTransport,
+            CorrelationIDTransport,
+            "__exit__",
+            id="sync",
+        ),
+        pytest.param(
+            mock.AsyncMock,
+            httpx.AsyncBaseTransport,
+            AsyncCorrelationIDTransport,
+            "__aexit__",
+            id="async",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_transport_preserves_exit_return_value(
+    mock_factory: type,
+    transport_spec: type,
+    wrapped_cls: type,
+    exit_attr: str,
+) -> None:
+    """Transport should preserve wrapped exception-suppression behavior."""
+    transport = mock_factory(spec=transport_spec)
+    getattr(transport, exit_attr).return_value = True
+    wrapped_transport = wrapped_cls(transport)
+
+    raw = getattr(wrapped_transport, exit_attr)(
+        RuntimeError,
+        RuntimeError("boom"),
+        None,
+    )
+    result = await raw if asyncio.iscoroutine(raw) else raw
+
+    exit_mock = getattr(transport, exit_attr)
+    if isinstance(transport, mock.AsyncMock):
+        exit_mock.assert_awaited_once_with(RuntimeError, mock.ANY, None)
+    else:
+        exit_mock.assert_called_once_with(RuntimeError, mock.ANY, None)
+    assert result is True
 
 
 @pytest.mark.asyncio
