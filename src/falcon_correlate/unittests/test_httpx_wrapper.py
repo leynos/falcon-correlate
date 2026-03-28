@@ -244,6 +244,7 @@ class TestRequestWithCorrelationId:
 
         assert first_headers is not shared_headers
         assert second_headers is not shared_headers
+        assert first_headers is not second_headers
         assert first_headers["Accept"] == "text/html"
         assert second_headers["Accept"] == "text/html"
         assert first_headers[DEFAULT_HEADER_NAME] == "sync-cid-006"
