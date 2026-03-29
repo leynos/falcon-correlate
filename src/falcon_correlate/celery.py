@@ -32,10 +32,6 @@ _BEFORE_TASK_PUBLISH_DISPATCH_UID = (
 
 
 def propagate_correlation_id_to_celery(
-    sender: object | None = None,
-    headers: cabc.MutableMapping[str, typ.Any] | None = None,
-    body: object | None = None,
-    properties: cabc.MutableMapping[str, typ.Any] | None = None,
     **kwargs: object,
 ) -> None:
     """Copy the ambient correlation ID into Celery publish properties.
@@ -45,8 +41,15 @@ def propagate_correlation_id_to_celery(
     handler intentionally overwrites that publish-time value so downstream
     workers can trace the task back to the originating request.
     """
+    properties = typ.cast(
+        "cabc.MutableMapping[str, typ.Any] | None",
+        kwargs.get("properties"),
+    )
     correlation_id = correlation_id_var.get()
-    if not correlation_id or properties is None:
+    if not correlation_id:
+        return
+
+    if properties is None:
         return
 
     properties["correlation_id"] = correlation_id

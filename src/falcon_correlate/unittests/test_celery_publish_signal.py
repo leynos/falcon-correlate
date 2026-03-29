@@ -34,44 +34,40 @@ def _count_connected_receivers(dispatch_uid: str) -> int:
     )
 
 
-def test_handler_overwrites_publish_correlation_id_when_context_is_set(
+@pytest.mark.parametrize(
+    ("context_value", "expected_correlation_id"),
+    [
+        pytest.param(
+            "request-correlation-id",
+            "request-correlation-id",
+            id="overwrites_when_context_is_set",
+        ),
+        pytest.param(
+            None,
+            "celery-task-id",
+            id="leaves_unchanged_when_context_is_empty",
+        ),
+    ],
+)
+def test_handler_updates_publish_correlation_id(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    context_value: str | None,
+    expected_correlation_id: str,
 ) -> None:
-    """Ambient request correlation ID should replace Celery's publish value."""
-    properties = {
+    """Publish properties should reflect the ambient correlation ID policy."""
+    properties: dict[str, str] = {
         "correlation_id": "celery-task-id",
         "reply_to": "reply-queue",
     }
 
     def _logic() -> None:
-        correlation_id_var.set("request-correlation-id")
+        correlation_id_var.set(context_value)
         propagate_correlation_id_to_celery(properties=properties)
 
     isolated_context(_logic)
 
     assert properties == {
-        "correlation_id": "request-correlation-id",
-        "reply_to": "reply-queue",
-    }
-
-
-def test_handler_leaves_properties_unchanged_when_context_is_empty(
-    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-) -> None:
-    """No ambient correlation ID should leave Celery publish properties alone."""
-    properties = {
-        "correlation_id": "celery-task-id",
-        "reply_to": "reply-queue",
-    }
-
-    def _logic() -> None:
-        correlation_id_var.set(None)
-        propagate_correlation_id_to_celery(properties=properties)
-
-    isolated_context(_logic)
-
-    assert properties == {
-        "correlation_id": "celery-task-id",
+        "correlation_id": expected_correlation_id,
         "reply_to": "reply-queue",
     }
 
