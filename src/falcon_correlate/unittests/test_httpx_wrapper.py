@@ -29,6 +29,7 @@ from falcon_correlate.httpx import (  # noqa: E402
     async_request_with_correlation_id,
     request_with_correlation_id,
 )
+from falcon_correlate.middleware import DEFAULT_HEADER_NAME  # noqa: E402
 
 _EXPECTED_TIMEOUT = 5
 
@@ -219,6 +220,36 @@ class TestRequestWithCorrelationId:
         headers = captured["headers"]
         assert headers["Accept"] == "text/html"
         assert headers["X-Correlation-ID"] == "sync-cid-005"
+
+    def test_copies_httpx_headers_before_injecting_correlation_id(
+        self,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    ) -> None:
+        """Reused caller ``httpx.Headers`` must not retain injected IDs."""
+        shared_headers = httpx.Headers({"Accept": "text/html"})
+
+        first_call = _run_sync(
+            isolated_context,
+            correlation_id="sync-cid-006",
+            headers=shared_headers,
+        )
+        second_call = _run_sync(
+            isolated_context,
+            correlation_id="sync-cid-007",
+            headers=shared_headers,
+        )
+
+        first_headers = first_call["headers"]
+        second_headers = second_call["headers"]
+
+        assert first_headers is not shared_headers
+        assert second_headers is not shared_headers
+        assert first_headers is not second_headers
+        assert first_headers["Accept"] == "text/html"
+        assert second_headers["Accept"] == "text/html"
+        assert first_headers[DEFAULT_HEADER_NAME] == "sync-cid-006"
+        assert second_headers[DEFAULT_HEADER_NAME] == "sync-cid-007"
+        assert DEFAULT_HEADER_NAME not in shared_headers
 
 
 # -- async wrapper tests -------------------------------------------------------

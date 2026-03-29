@@ -12,6 +12,7 @@ wrapper function is called or a transport is instantiated without
 
 from __future__ import annotations
 
+import importlib
 import typing as typ
 
 from .middleware import DEFAULT_HEADER_NAME, correlation_id_var
@@ -53,7 +54,7 @@ else:
 def _require_httpx() -> None:
     """Raise ``ImportError`` if the optional ``httpx`` module is unavailable."""
     try:
-        import httpx  # noqa: F401
+        importlib.import_module("httpx")
     except ImportError as exc:
         msg = "httpx is required to use falcon_correlate.httpx"
         raise ImportError(msg) from exc
@@ -72,6 +73,8 @@ def _inject_correlation_id_header(
 class _CorrelationIDTransportBase[WrappedTransportT]:
     """Shared initialisation for sync and async correlation ID transports."""
 
+    # Intentionally Any: this base stores either sync or async httpx transports;
+    # concrete subclasses enforce the specific transport type.
     _wrapped_transport: WrappedTransportT
     _header_name: str
 
@@ -275,14 +278,7 @@ def _prepare_headers(
 
     raw_headers = kwargs.pop("headers", None)
     # Use httpx.Headers to preserve duplicate entries
-    if raw_headers is not None:
-        headers = (
-            raw_headers
-            if isinstance(raw_headers, httpx.Headers)
-            else httpx.Headers(raw_headers)
-        )
-    else:
-        headers = httpx.Headers()
+    headers = httpx.Headers(raw_headers) if raw_headers is not None else httpx.Headers()
 
     _inject_correlation_id_header(headers)
     return headers
