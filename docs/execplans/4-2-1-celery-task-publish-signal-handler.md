@@ -5,7 +5,7 @@ This Execution Plan (ExecPlan) is a living document. The sections
 `Decision log`, and `Outcomes & retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 This plan is for the draft phase only. Do not begin implementation until the
 user explicitly approves the plan.
@@ -313,15 +313,15 @@ item can be marked complete with evidence.
 - [x] (2026-03-29) Review roadmap, design document, existing execplans, and
   current optional-integration patterns.
 - [x] (2026-03-29) Draft this ExecPlan.
-- [ ] Add Celery optional dependency and dev dependency; inspect the concrete
+- [x] Add Celery optional dependency and dev dependency; inspect the concrete
   signal contract.
-- [ ] Add failing unit tests for the publish signal handler.
-- [ ] Add failing behavioural tests for the publish path.
-- [ ] Implement `propagate_correlation_id_to_celery` and connect it to
+- [x] Add failing unit tests for the publish signal handler.
+- [x] Add failing behavioural tests for the publish path.
+- [x] Implement `propagate_correlation_id_to_celery` and connect it to
   `before_task_publish`.
-- [ ] Update consumer and design documentation.
-- [ ] Mark roadmap item 4.2.1 complete.
-- [ ] Run `make check-fmt`, `make typecheck`, `make lint`, `make test`,
+- [x] Update consumer and design documentation.
+- [x] Mark roadmap item 4.2.1 complete.
+- [x] Run `make check-fmt`, `make typecheck`, `make lint`, `make test`,
   `make markdownlint`, and `make nixie`.
 
 ## Surprises & discoveries
@@ -333,6 +333,14 @@ item can be marked complete with evidence.
   is not automatically safe, because rebinding a local variable does not prove
   that Celery will publish the new mapping. The implementation turn must verify
   the actual signal contract before encoding that behaviour.
+- Implementation discovery: on Celery 5.6.3, `before_task_publish` receives a
+  mutable `properties` dictionary and Celery has already populated
+  `properties["correlation_id"]` with the task ID before the signal fires. A
+  "preserve existing value" policy would therefore disable request-context
+  propagation for ordinary publishes.
+- Implementation discovery: patching `kombu.Producer.publish` is a reliable
+  behavioural-test seam for asserting the final broker `correlation_id` without
+  needing an external broker service.
 
 ## Decision log
 
@@ -340,26 +348,34 @@ item can be marked complete with evidence.
   `src/falcon_correlate/celery.py` module rather than mixing it into
   `middleware.py` or `httpx.py`. Rationale: this keeps the optional dependency
   isolated by feature and follows the existing package structure.
-- Draft decision: add Celery as both an optional project extra and a dev
+- Final decision: add Celery as both an optional project extra and a dev
   dependency. Rationale: consumers should opt into the integration, while the
   repository still needs Celery installed locally to run unit and BDD tests.
-- Draft decision: write the behavioural test against the real Celery publish
+- Final decision: write the behavioural test against the real Celery publish
   path, not just direct handler invocation. Rationale: the user requirement is
   about task message behaviour, and a publish-path test is the smallest way to
   prove that the signal connection actually works.
-- Open decision for implementation: whether the handler overwrites an explicit
-  pre-existing `properties["correlation_id"]` value or preserves it. The plan
-  assumes this will be settled in red tests first and then documented in the
-  design appendix.
+- Final decision: when `correlation_id_var` is set, the handler overwrites the
+  current publish-time `properties["correlation_id"]` value. Rationale:
+  Celery's signal contract does not distinguish between the default task-id
+  correlation ID and an explicit caller-provided value, so overwriting is the
+  only way to guarantee request-to-task propagation via `before_task_publish`.
+- Final decision: connect the signal with a stable `dispatch_uid` so module
+  reloads do not register duplicate receivers.
 
 ## Outcomes & retrospective
 
-Pending implementation. A complete outcome for this task will include:
+Implemented:
 
-- a working `propagate_correlation_id_to_celery` implementation;
-- automated proof that publishing a task injects the correlation ID when one
-  exists in context;
-- updated consumer documentation for the Celery integration path;
-- an updated design appendix capturing the final decisions; and
-- a green repository across format, type, lint, test, and Markdown validation
-  gates.
+- `src/falcon_correlate/celery.py` now provides
+  `propagate_correlation_id_to_celery` and connects it to `before_task_publish`
+  when Celery is installed.
+- Unit tests cover handler behaviour, idempotent signal registration, and the
+  package-root export.
+- Behavioural tests publish real Celery tasks and assert the final broker
+  `correlation_id` seen by `kombu.Producer.publish`.
+- `docs/users-guide.md`, `docs/falcon-correlation-id-middleware-design.md`,
+  and `docs/roadmap.md` were updated to reflect the delivered feature.
+- Full repository validation is green: `make check-fmt`, `make typecheck`,
+  `make lint`, `make test`, `make markdownlint`, and `make nixie` all pass on
+  the completed implementation.

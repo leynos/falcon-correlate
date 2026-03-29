@@ -1616,3 +1616,58 @@ before delegation.
   configured sync and async `httpx` clients.
 - `docs/users-guide.md` — Documented when to choose wrapper functions versus
   transports and added sync and async transport configuration examples.
+
+### A.8. Celery task publish signal handler (Task 4.2.1)
+
+**Decision:** Add a dedicated optional-integration module at
+`src/falcon_correlate/celery.py` that defines
+`propagate_correlation_id_to_celery` and connects it to Celery's
+`before_task_publish` signal at import time.
+
+**Rationale:**
+
+1. **Feature isolation and import safety:** Keeping the implementation in its
+   own module mirrors the existing `httpx` integration and preserves
+   `import falcon_correlate` when Celery is not installed. The module loads the
+   signal dynamically and becomes a no-op when the optional dependency is
+   absent.
+
+2. **Idempotent signal registration:** The signal connection uses a stable
+   `dispatch_uid`
+   (`falcon_correlate.celery.propagate_correlation_id_to_celery`) so module
+   reloads do not create duplicate receivers.
+
+3. **Ambient request value wins:** Celery 5.6.3 populates
+   `properties["correlation_id"]` with the task ID before firing
+   `before_task_publish`. To guarantee propagation from the active Falcon
+   request, the handler overwrites any existing publish-time correlation ID
+   when `correlation_id_var` is set. This policy also applies if a caller
+   explicitly supplied `apply_async(correlation_id=...)`, because the signal
+   does not expose whether the current value was defaulted or caller-provided.
+
+4. **No-op when Celery does not provide mutable properties:** The implemented
+   handler only mutates the publish state when Celery passes a mutable
+   `properties` mapping. If `properties` is `None`, the handler returns without
+   rebinding local variables that Celery would not observe.
+
+5. **Public package export:** The handler is re-exported from
+   `falcon_correlate.__init__` so consumers can discover the integration from
+   the package root while still getting automatic registration on import.
+
+**Files created/modified:**
+
+- `pyproject.toml` — Added Celery as an optional extra and dev dependency.
+- `uv.lock` — Recorded the resolved Celery dependency set used for local
+  validation.
+- `src/falcon_correlate/celery.py` — Added the publish signal handler and
+  idempotent connection helper.
+- `src/falcon_correlate/__init__.py` — Re-exported
+  `propagate_correlation_id_to_celery` from the package root.
+- `src/falcon_correlate/unittests/test_celery_publish_signal.py` — Added unit
+  coverage for handler behaviour, signal registration, and root export.
+- `tests/bdd/celery_publish_signal.feature` — Added publish-path behavioural
+  scenarios.
+- `tests/bdd/test_celery_publish_signal_steps.py` — Added BDD steps that patch
+  the Kombu publish boundary and assert the final broker correlation ID.
+- `docs/users-guide.md` — Documented installation, automatic registration, and
+  the publish-path overwrite policy.

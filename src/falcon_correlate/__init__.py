@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .celery import propagate_correlation_id_to_celery
 from .httpx import (
     AsyncCorrelationIDTransport,
     CorrelationIDTransport,
@@ -39,6 +40,7 @@ __all__ = [
     "default_uuid7_generator",
     "default_uuid_validator",
     "hello",
+    "propagate_correlation_id_to_celery",
     "request_with_correlation_id",
     "user_id_var",
 ]
