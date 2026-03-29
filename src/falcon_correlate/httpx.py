@@ -94,6 +94,9 @@ class _CorrelationIDTransportBase[WrappedTransportT]:
     @staticmethod
     def _cast_to_none(result: object) -> None:
         """Forward an exit return value while satisfying the type checker."""
+        # `typ.cast()` only changes the static type view; it intentionally keeps
+        # the original runtime value so callers can forward `_wrapped_transport`
+        # `__exit__` / `__aexit__` return values without changing behaviour.
         return typ.cast("None", result)
 
 
