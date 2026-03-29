@@ -150,12 +150,12 @@ Enable correlation ID propagation to downstream HTTP services and Celery tasks.
   - [x] Preserve existing headers passed by caller.
   - [x] Test wrapper function adds header.
   - [x] Test existing headers are preserved.
-- [ ] 4.1.2. Implement custom transport. See design-doc §3.5.1.3.
-  - [ ] Create `CorrelationIDTransport(httpx.BaseTransport)` class.
-  - [ ] Create async variant `AsyncCorrelationIDTransport`.
-  - [ ] Inject header in `handle_request` method.
-  - [ ] Test custom transport adds header.
-  - [ ] Test header is not added when context is empty.
+- [x] 4.1.2. Implement custom transport. See design-doc §3.5.1.3.
+  - [x] Create `CorrelationIDTransport(httpx.BaseTransport)` class.
+  - [x] Create async variant `AsyncCorrelationIDTransport`.
+  - [x] Inject header in `handle_request` method.
+  - [x] Test custom transport adds header.
+  - [x] Test header is not added when context is empty.
 
 ### 4.2. Celery propagation utilities
 

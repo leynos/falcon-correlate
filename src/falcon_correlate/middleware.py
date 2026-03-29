@@ -15,6 +15,16 @@ if typ.TYPE_CHECKING:
 
     import falcon
 
+    class _CorrelationIDConfigKwargs(typ.TypedDict, total=False):
+        """Type definition for CorrelationIDConfig keyword arguments."""
+
+        header_name: str
+        trusted_sources: cabc.Iterable[str] | None
+        generator: cabc.Callable[[], str] | None
+        validator: cabc.Callable[[str], bool] | None
+        echo_header_in_response: bool
+
+
 # Type alias for parsed network objects
 _NetworkType = ipaddress.IPv4Network | ipaddress.IPv6Network
 
@@ -442,8 +452,9 @@ class CorrelationIDConfig:
 
 
 # Derive valid kwargs from dataclass fields to ensure synchronization
+# Only include fields that are initialized at construction (init=True)
 _VALID_CONFIG_KWARGS = frozenset(
-    field.name for field in dataclasses.fields(CorrelationIDConfig)
+    field.name for field in dataclasses.fields(CorrelationIDConfig) if field.init
 )
 
 
@@ -524,7 +535,9 @@ class CorrelationIDMiddleware:
             if unknown_keys:
                 msg = f"Unknown keyword arguments: {', '.join(sorted(unknown_keys))}"
                 raise TypeError(msg)
-            self._config = CorrelationIDConfig.from_kwargs(**kwargs)  # type: ignore[arg-type]
+            # Cast to TypedDict after validating keys - runtime will verify values
+            typed_kwargs = typ.cast("_CorrelationIDConfigKwargs", kwargs)
+            self._config = CorrelationIDConfig.from_kwargs(**typed_kwargs)
 
     # @CodeScene(disable:"Bumpy Road Ahead")
     @property

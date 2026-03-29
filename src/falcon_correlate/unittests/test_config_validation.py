@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import typing as typ
+
 import pytest
 
 from falcon_correlate import CorrelationIDConfig
@@ -39,9 +41,13 @@ class TestCorrelationIDConfigValidation:
     def test_config_non_callable_generator_raises_type_error(self) -> None:
         """Verify non-callable generator on CorrelationIDConfig raises TypeError."""
         with pytest.raises(TypeError, match="generator must be callable"):
-            CorrelationIDConfig(generator="not-a-callable")  # type: ignore[arg-type]
+            CorrelationIDConfig(
+                generator=typ.cast("typ.Callable[[], str]", "not-a-callable")
+            )
 
     def test_config_non_callable_validator_raises_type_error(self) -> None:
         """Verify non-callable validator on CorrelationIDConfig raises TypeError."""
         with pytest.raises(TypeError, match="validator must be callable"):
-            CorrelationIDConfig(validator="not-a-callable")  # type: ignore[arg-type]
+            CorrelationIDConfig(
+                validator=typ.cast("typ.Callable[[str], bool]", "not-a-callable")
+            )

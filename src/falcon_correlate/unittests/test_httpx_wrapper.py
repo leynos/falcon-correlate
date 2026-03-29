@@ -29,6 +29,7 @@ from falcon_correlate.httpx import (  # noqa: E402
     async_request_with_correlation_id,
     request_with_correlation_id,
 )
+from falcon_correlate.middleware import DEFAULT_HEADER_NAME  # noqa: E402
 
 _EXPECTED_TIMEOUT = 5
 
@@ -145,7 +146,7 @@ class TestRequestWithCorrelationId:
             correlation_id=correlation_id,
             **extra_kwargs,
         )
-        assert captured["headers"]["X-Correlation-ID"] == correlation_id
+        assert captured["headers"][DEFAULT_HEADER_NAME] == correlation_id
         assert captured["method"] == "GET"
         assert captured["url"] == "http://example.com"
 
@@ -156,7 +157,7 @@ class TestRequestWithCorrelationId:
         """Verify no header is added when the context variable is unset."""
         captured = _run_sync(isolated_context)
 
-        assert "X-Correlation-ID" not in captured["headers"]
+        assert DEFAULT_HEADER_NAME not in captured["headers"]
 
     def test_preserves_existing_caller_headers(
         self,
@@ -171,7 +172,7 @@ class TestRequestWithCorrelationId:
 
         headers = captured["headers"]
         assert headers["Authorization"] == "Bearer token"
-        assert headers["X-Correlation-ID"] == "sync-cid-002"
+        assert headers[DEFAULT_HEADER_NAME] == "sync-cid-002"
 
     def test_passes_through_additional_kwargs(
         self,
@@ -202,7 +203,7 @@ class TestRequestWithCorrelationId:
 
         headers = captured["headers"]
         assert headers["Accept"] == "text/html"
-        assert headers["X-Correlation-ID"] == "sync-cid-004"
+        assert headers[DEFAULT_HEADER_NAME] == "sync-cid-004"
 
     def test_accepts_sequence_style_headers(
         self,
@@ -218,7 +219,37 @@ class TestRequestWithCorrelationId:
 
         headers = captured["headers"]
         assert headers["Accept"] == "text/html"
-        assert headers["X-Correlation-ID"] == "sync-cid-005"
+        assert headers[DEFAULT_HEADER_NAME] == "sync-cid-005"
+
+    def test_copies_httpx_headers_before_injecting_correlation_id(
+        self,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    ) -> None:
+        """Reused caller ``httpx.Headers`` must not retain injected IDs."""
+        shared_headers = httpx.Headers({"Accept": "text/html"})
+
+        first_call = _run_sync(
+            isolated_context,
+            correlation_id="sync-cid-006",
+            headers=shared_headers,
+        )
+        second_call = _run_sync(
+            isolated_context,
+            correlation_id="sync-cid-007",
+            headers=shared_headers,
+        )
+
+        first_headers = first_call["headers"]
+        second_headers = second_call["headers"]
+
+        assert first_headers is not shared_headers
+        assert second_headers is not shared_headers
+        assert first_headers is not second_headers
+        assert first_headers["Accept"] == "text/html"
+        assert second_headers["Accept"] == "text/html"
+        assert first_headers[DEFAULT_HEADER_NAME] == "sync-cid-006"
+        assert second_headers[DEFAULT_HEADER_NAME] == "sync-cid-007"
+        assert DEFAULT_HEADER_NAME not in shared_headers
 
 
 # -- async wrapper tests -------------------------------------------------------
@@ -255,7 +286,7 @@ class TestAsyncRequestWithCorrelationId:
             **extra_kwargs,
         )
         headers = call_kwargs["headers"]
-        assert headers["X-Correlation-ID"] == correlation_id
+        assert headers[DEFAULT_HEADER_NAME] == correlation_id
         for key, value in expected_extra_headers.items():
             assert headers[key] == value
 
@@ -268,7 +299,7 @@ class TestAsyncRequestWithCorrelationId:
         await async_request_with_correlation_id("GET", "http://example.com")
 
         call_kwargs = mock_async_client.request.call_args.kwargs
-        assert "X-Correlation-ID" not in call_kwargs["headers"]
+        assert DEFAULT_HEADER_NAME not in call_kwargs["headers"]
 
     @pytest.mark.asyncio
     async def test_passes_through_additional_kwargs(
@@ -329,7 +360,7 @@ class TestPrepareHeaders:
             isolated_context, kwargs, correlation_id="prep-cid-001"
         )
 
-        assert headers["X-Correlation-ID"] == "prep-cid-001"
+        assert headers[DEFAULT_HEADER_NAME] == "prep-cid-001"
 
     def test_preserves_caller_supplied_correlation_id_header(
         self,
@@ -337,13 +368,13 @@ class TestPrepareHeaders:
     ) -> None:
         """Verify caller-supplied correlation ID header is preserved."""
         kwargs: dict[str, typ.Any] = {
-            "headers": {"X-Correlation-ID": "caller-cid-123"},
+            "headers": {DEFAULT_HEADER_NAME: "caller-cid-123"},
         }
         headers, _remaining = _run_prepare_headers(
             isolated_context, kwargs, correlation_id="prep-cid-001"
         )
 
-        assert headers["X-Correlation-ID"] == "caller-cid-123"
+        assert headers[DEFAULT_HEADER_NAME] == "caller-cid-123"
 
     def test_does_not_inject_when_no_correlation_id(
         self,
@@ -353,7 +384,7 @@ class TestPrepareHeaders:
         kwargs: dict[str, typ.Any] = {}
         headers, _remaining = _run_prepare_headers(isolated_context, kwargs)
 
-        assert "X-Correlation-ID" not in headers
+        assert DEFAULT_HEADER_NAME not in headers
 
 
 # -- export tests (no duplication — left as-is) ---------------------------------
