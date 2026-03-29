@@ -1521,13 +1521,12 @@ imported lazily at call time.
    feature, not layer" convention and isolates the optional dependency.
 
 2. **Lazy imports:** Each wrapper function performs
-   `import httpx as _httpx` inside its body. The module itself can be
-   imported (and re-exported from `__init__.py`) without `httpx`
-   installed. Users who do not need httpx propagation pay no import
-   cost. An `ImportError` is raised only when a wrapper function is
-   actually called without `httpx` installed. This mirrors the
-   structlog pattern where the library provides documentation and test
-   validation, but defers the actual import to the consumer.
+   `import httpx as _httpx` inside its body. The module itself can be imported
+   (and re-exported from `__init__.py`) without `httpx` installed. Users who do
+   not need httpx propagation pay no import cost. An `ImportError` is raised
+   only when a wrapper function is actually called without `httpx` installed.
+   This mirrors the structlog pattern where the library provides documentation
+   and test validation, but defers the actual import to the consumer.
 
 3. **`_prepare_headers` helper:** The header preparation logic (pop
    headers from `kwargs`, convert to mutable dict, inject correlation ID) is
