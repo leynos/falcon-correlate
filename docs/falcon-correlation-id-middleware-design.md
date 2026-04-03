@@ -1637,13 +1637,14 @@ before delegation.
    (`falcon_correlate.celery.propagate_correlation_id_to_celery`) so module
    reloads do not create duplicate receivers.
 
-3. **Ambient request value wins:** Celery 5.6.3 populates
-   `properties["correlation_id"]` with the task ID before firing
-   `before_task_publish`. To guarantee propagation from the active Falcon
-   request, the handler overwrites any existing publish-time correlation ID
-   when `correlation_id_var` is set. This policy also applies if a caller
-   explicitly supplied `apply_async(correlation_id=...)`, because the signal
-   does not expose whether the current value was defaulted or caller-provided.
+3. **Ambient request value wins except for the RPC result backend:** Celery
+   5.6.3 populates `properties["correlation_id"]` with the task ID before
+   firing `before_task_publish`. The handler overwrites that value when
+   `correlation_id_var` is set so request-to-task propagation works for the
+   normal publish path, but it skips the overwrite when the active result
+   backend is `rpc://`. Celery's RPC backend routes replies using
+   `request.correlation_id or task_id`, so preserving the task-id correlation
+   contract is required to keep `AsyncResult(task_id)` working in that mode.
 
 4. **No-op when Celery does not provide mutable properties:** The implemented
    handler only mutates the publish state when Celery passes a mutable

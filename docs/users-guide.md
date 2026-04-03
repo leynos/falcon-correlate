@@ -644,7 +644,7 @@ The transport classes preserve an explicitly supplied correlation header on the
 outgoing request. If the caller already set `X-Correlation-ID`,
 `falcon-correlate` leaves that value unchanged.
 
-### Celery behaviour
+### HTTP client behaviour
 
 - When `correlation_id_var` is set (i.e. during a Falcon request handled
   by `CorrelationIDMiddleware`), the `X-Correlation-ID` header is added to the
@@ -659,8 +659,8 @@ outgoing request. If the caller already set `X-Correlation-ID`,
 ## Celery propagation
 
 When Falcon request-handling code publishes Celery tasks, the current
-correlation ID can be copied into the outgoing task message's AMQP
-`correlation_id` property.
+correlation ID can be copied into the outgoing task message's Advanced Message
+Queuing Protocol (AMQP) `correlation_id` property.
 
 **Note**: Celery is an optional dependency. Install the package with the Celery
 extra in any process that publishes tasks:
@@ -672,7 +672,7 @@ pip install "falcon-correlate[celery]"
 ### Enabling the publish signal handler
 
 Importing `falcon_correlate` registers the Celery `before_task_publish` handler
-automatically when Celery is installed. If your publisher process already
+automatically when Celery is installed. If the publisher process already
 imports anything from the package root, no extra registration call is needed.
 
 ```python
@@ -700,8 +700,9 @@ def enqueue_invoice_email(user_id: str) -> None:
 
 ### Behaviour
 
-- When `correlation_id_var` is set, the outgoing Celery message uses that
-  value as its publish-time `correlation_id`.
+- When `correlation_id_var` is set and the active Celery result backend is not
+  `rpc://`, the outgoing Celery message uses that value as its publish-time
+  `correlation_id`.
 - When `correlation_id_var` is not set, `falcon-correlate` leaves Celery's
   generated publish value unchanged.
 - If the caller passes `apply_async(correlation_id=...)` while a request
@@ -709,6 +710,9 @@ def enqueue_invoice_email(user_id: str) -> None:
   fills `correlation_id` by default, so overwriting the publish value is the
   only way to guarantee request-to-task propagation through
   `before_task_publish`.
+- If the active Celery result backend is `rpc://`, `falcon-correlate`
+  preserves Celery's task-id correlation contract and does not overwrite the
+  publish `correlation_id`.
 - This release covers only the publish path. Worker-side setup and cleanup of
   `correlation_id_var` inside Celery tasks will be added separately.
 

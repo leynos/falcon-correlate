@@ -12,25 +12,20 @@ celery = pytest.importorskip("celery")
 from celery.signals import before_task_publish  # noqa: E402
 
 from falcon_correlate import correlation_id_var  # noqa: E402
-from falcon_correlate.celery import (  # noqa: E402
-    _BEFORE_TASK_PUBLISH_DISPATCH_UID,
-    propagate_correlation_id_to_celery,
-)
+from falcon_correlate.celery import propagate_correlation_id_to_celery  # noqa: E402
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
-    _SignalReceiverEntry = tuple[tuple[object, object], object]
 
-
-def _count_connected_receivers(dispatch_uid: str) -> int:
-    """Return how many signal receivers are connected for *dispatch_uid*."""
-    receivers = typ.cast(
-        "list[_SignalReceiverEntry]",
-        before_task_publish.receivers or [],
-    )
+def _count_connected_publish_handlers() -> int:
+    """Return how many live Celery publish handlers are registered."""
+    receivers = typ.cast("list[object]", before_task_publish._live_receivers(None))
     return sum(
-        1 for (lookup_key, _receiver) in receivers if lookup_key[0] == dispatch_uid
+        1
+        for receiver in receivers
+        if getattr(receiver, "__module__", None) == "falcon_correlate.celery"
+        and getattr(receiver, "__name__", None) == "propagate_correlation_id_to_celery"
     )
 
 
@@ -46,6 +41,11 @@ def _count_connected_receivers(dispatch_uid: str) -> int:
             None,
             "celery-task-id",
             id="leaves_unchanged_when_context_is_empty",
+        ),
+        pytest.param(
+            "",
+            "celery-task-id",
+            id="leaves_unchanged_when_context_is_empty_string",
         ),
     ],
 )
@@ -72,6 +72,33 @@ def test_handler_updates_publish_correlation_id(
     }
 
 
+def test_handler_preserves_task_id_correlation_for_rpc_result_backend(
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """RPC result backends must keep Celery's task-id correlation contract."""
+    properties: dict[str, str] = {
+        "correlation_id": "celery-task-id",
+        "reply_to": "reply-queue",
+    }
+
+    monkeypatch.setattr(
+        "falcon_correlate.celery._current_result_backend_uses_rpc",
+        lambda: True,
+    )
+
+    def _logic() -> None:
+        correlation_id_var.set("request-correlation-id")
+        propagate_correlation_id_to_celery(properties=properties)
+
+    isolated_context(_logic)
+
+    assert properties == {
+        "correlation_id": "celery-task-id",
+        "reply_to": "reply-queue",
+    }
+
+
 def test_handler_tolerates_missing_properties_mapping(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
 ) -> None:
@@ -86,18 +113,18 @@ def test_handler_tolerates_missing_properties_mapping(
 
 def test_signal_handler_is_connected_to_before_task_publish() -> None:
     """Importing the module should register the publish signal handler once."""
-    assert _count_connected_receivers(_BEFORE_TASK_PUBLISH_DISPATCH_UID) == 1
+    assert _count_connected_publish_handlers() == 1
 
 
 def test_signal_connection_is_idempotent_across_reload() -> None:
     """Reloading the module should not duplicate the signal registration."""
-    assert _count_connected_receivers(_BEFORE_TASK_PUBLISH_DISPATCH_UID) == 1
+    assert _count_connected_publish_handlers() == 1
 
     import falcon_correlate.celery as celery_integration
 
     importlib.reload(celery_integration)
 
-    assert _count_connected_receivers(_BEFORE_TASK_PUBLISH_DISPATCH_UID) == 1
+    assert _count_connected_publish_handlers() == 1
 
 
 def test_publish_signal_handler_is_exported_from_package_root() -> None:

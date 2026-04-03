@@ -52,6 +52,9 @@ def propagate_correlation_id_to_celery(
     if properties is None:
         return
 
+    if _current_result_backend_uses_rpc():
+        return
+
     properties["correlation_id"] = correlation_id
 
 
@@ -62,7 +65,33 @@ def _load_before_task_publish_signal() -> _SupportsSignalConnect | None:
     except ImportError:
         return None
 
-    return typ.cast("_SupportsSignalConnect", celery_signals.before_task_publish)
+    before_task_publish = getattr(celery_signals, "before_task_publish", None)
+    if before_task_publish is None:
+        return None
+
+    return typ.cast("_SupportsSignalConnect", before_task_publish)
+
+
+def _current_result_backend_uses_rpc() -> bool:
+    """Return ``True`` when the active Celery app uses the RPC result backend."""
+    try:
+        celery_module = importlib.import_module("celery")
+    except ImportError:
+        return False
+
+    current_app = getattr(celery_module, "current_app", None)
+    if current_app is None:
+        return False
+
+    backend = getattr(current_app, "backend", None)
+    if backend is None:
+        return False
+
+    as_uri = getattr(backend, "as_uri", None)
+    if not callable(as_uri):
+        return False
+
+    return str(as_uri()).startswith("rpc://")
 
 
 def _connect_before_task_publish_signal() -> None:

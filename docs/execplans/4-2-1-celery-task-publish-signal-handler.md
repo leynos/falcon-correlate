@@ -7,9 +7,6 @@ proceeds.
 
 Status: COMPLETE
 
-This plan is for the draft phase only. Do not begin implementation until the
-user explicitly approves the plan.
-
 ## Purpose / big picture
 
 Task 4.2.1 closes the first Celery propagation gap in roadmap section 4.2.
@@ -27,7 +24,8 @@ Success is observable when:
 - publishing a Celery task with no correlation ID in context leaves the
   message properties unchanged;
 - the behaviour is covered by unit tests written with `pytest` and
-  behavioural tests written with `pytest-bdd`;
+  behavioural tests written using behaviour-driven development (BDD) with
+  `pytest-bdd`;
 - `docs/users-guide.md` documents how a consumer enables and uses the Celery
   publish integration;
 - `docs/falcon-correlation-id-middleware-design.md` records the concrete
@@ -335,9 +333,10 @@ item can be marked complete with evidence.
   the actual signal contract before encoding that behaviour.
 - Implementation discovery: on Celery 5.6.3, `before_task_publish` receives a
   mutable `properties` dictionary and Celery has already populated
-  `properties["correlation_id"]` with the task ID before the signal fires. A
-  "preserve existing value" policy would therefore disable request-context
-  propagation for ordinary publishes.
+  `properties["correlation_id"]` with the task ID before the signal fires. That
+  default value must be overwritten for normal publish propagation, but it must
+  be preserved when the active result backend is `rpc://` so Celery's task-id
+  reply routing contract still works.
 - Implementation discovery: patching `kombu.Producer.publish` is a reliable
   behavioural-test seam for asserting the final broker `correlation_id` without
   needing an external broker service.
@@ -356,10 +355,14 @@ item can be marked complete with evidence.
   about task message behaviour, and a publish-path test is the smallest way to
   prove that the signal connection actually works.
 - Final decision: when `correlation_id_var` is set, the handler overwrites the
-  current publish-time `properties["correlation_id"]` value. Rationale:
-  Celery's signal contract does not distinguish between the default task-id
-  correlation ID and an explicit caller-provided value, so overwriting is the
-  only way to guarantee request-to-task propagation via `before_task_publish`.
+  current publish-time `properties["correlation_id"]` value for normal publish
+  paths, but it preserves Celery's existing task-id value when the active
+  result backend is `rpc://`. Rationale: Celery's signal contract does not
+  distinguish between the default task-id correlation ID and an explicit
+  caller-provided value, so overwriting is the only way to guarantee
+  request-to-task propagation via `before_task_publish`; however, the RPC
+  result backend uses `request.correlation_id or task_id` to route replies, so
+  it must retain the task-id correlation contract.
 - Final decision: connect the signal with a stable `dispatch_uid` so module
   reloads do not register duplicate receivers.
 
