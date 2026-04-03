@@ -18,17 +18,6 @@ if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
 
-def _count_connected_publish_handlers() -> int:
-    """Return how many live Celery publish handlers are registered."""
-    receivers = typ.cast("list[object]", before_task_publish._live_receivers(None))
-    return sum(
-        1
-        for receiver in receivers
-        if getattr(receiver, "__module__", None) == "falcon_correlate.celery"
-        and getattr(receiver, "__name__", None) == "propagate_correlation_id_to_celery"
-    )
-
-
 @pytest.mark.parametrize(
     ("context_value", "expected_correlation_id"),
     [
@@ -113,18 +102,77 @@ def test_handler_tolerates_missing_properties_mapping(
 
 def test_signal_handler_is_connected_to_before_task_publish() -> None:
     """Importing the module should register the publish signal handler once."""
-    assert _count_connected_publish_handlers() == 1
+    assert before_task_publish.has_listeners(None)
 
 
-def test_signal_connection_is_idempotent_across_reload() -> None:
+def test_signal_connection_is_idempotent_across_reload(
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+) -> None:
     """Reloading the module should not duplicate the signal registration."""
-    assert _count_connected_publish_handlers() == 1
-
     import falcon_correlate.celery as celery_integration
 
-    importlib.reload(celery_integration)
+    probe_calls: list[str] = []
+    probe_dispatch_uid = "test_probe_publish_receiver"
 
-    assert _count_connected_publish_handlers() == 1
+    def probe_receiver(**kwargs: object) -> None:
+        properties = typ.cast("dict[str, str] | None", kwargs.get("properties"))
+        if properties is None:
+            return
+
+        probe_calls.append(properties["correlation_id"])
+
+    def _send_signal() -> tuple[dict[str, str], list[tuple[object, object]]]:
+        properties = {
+            "correlation_id": "celery-task-id",
+            "reply_to": "reply-queue",
+        }
+        signal_responses: list[tuple[object, object]] = []
+
+        def _logic() -> None:
+            correlation_id_var.set("request-correlation-id")
+            nonlocal signal_responses
+            signal_responses = before_task_publish.send(
+                sender="test-sender",
+                headers={},
+                body=(),
+                properties=properties,
+            )
+
+        isolated_context(_logic)
+        return properties, signal_responses
+
+    before_task_publish.connect(
+        probe_receiver,
+        dispatch_uid=probe_dispatch_uid,
+        weak=False,
+    )
+
+    def _count_integration_receivers(
+        signal_responses: list[tuple[object, object]],
+    ) -> int:
+        return sum(
+            1
+            for receiver, _ in signal_responses
+            if getattr(receiver, "__module__", None) == "falcon_correlate.celery"
+            and getattr(receiver, "__name__", None)
+            == "propagate_correlation_id_to_celery"
+        )
+
+    try:
+        initial_properties, initial_responses = _send_signal()
+        assert initial_properties["correlation_id"] == "request-correlation-id"
+        assert probe_calls == ["request-correlation-id"]
+        assert _count_integration_receivers(initial_responses) == 1
+
+        importlib.reload(celery_integration)
+
+        probe_calls.clear()
+        reloaded_properties, reloaded_responses = _send_signal()
+        assert reloaded_properties["correlation_id"] == "request-correlation-id"
+        assert probe_calls == ["request-correlation-id"]
+        assert _count_integration_receivers(reloaded_responses) == 1
+    finally:
+        before_task_publish.disconnect(dispatch_uid=probe_dispatch_uid)
 
 
 def test_publish_signal_handler_is_exported_from_package_root() -> None:

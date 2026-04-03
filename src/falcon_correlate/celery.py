@@ -33,7 +33,7 @@ def propagate_correlation_id_to_celery(
     workers can trace the task back to the originating request.
     """
     properties = typ.cast(
-        "cabc.MutableMapping[str, typ.Any] | None",
+        "cabc.MutableMapping[str, object] | None",
         kwargs.get("properties"),
     )
     correlation_id = correlation_id_var.get()
