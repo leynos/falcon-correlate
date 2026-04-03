@@ -16,15 +16,6 @@ from .middleware import correlation_id_var
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
-    class _SupportsSignalConnect(typ.Protocol):
-        def connect(
-            self,
-            receiver: cabc.Callable[..., object],
-            *,
-            dispatch_uid: str,
-            weak: bool,
-        ) -> object: ...
-
 
 _BEFORE_TASK_PUBLISH_DISPATCH_UID = (
     "falcon_correlate.celery.propagate_correlation_id_to_celery"
@@ -58,20 +49,6 @@ def propagate_correlation_id_to_celery(
     properties["correlation_id"] = correlation_id
 
 
-def _load_before_task_publish_signal() -> _SupportsSignalConnect | None:
-    """Return Celery's publish signal when the optional dependency exists."""
-    try:
-        celery_signals = importlib.import_module("celery.signals")
-    except ImportError:
-        return None
-
-    before_task_publish = getattr(celery_signals, "before_task_publish", None)
-    if before_task_publish is None:
-        return None
-
-    return typ.cast("_SupportsSignalConnect", before_task_publish)
-
-
 def _current_result_backend_uses_rpc() -> bool:
     """Return ``True`` when the active Celery app uses the RPC result backend."""
     try:
@@ -94,19 +71,28 @@ def _current_result_backend_uses_rpc() -> bool:
     return str(as_uri()).startswith("rpc://")
 
 
-def _connect_before_task_publish_signal() -> None:
+def _maybe_connect_celery_publish_signal() -> None:
     """Register the Celery publish handler once when Celery is installed."""
-    before_task_publish = _load_before_task_publish_signal()
+    try:
+        celery_signals = importlib.import_module("celery.signals")
+    except ImportError:
+        return
+
+    before_task_publish = getattr(celery_signals, "before_task_publish", None)
     if before_task_publish is None:
         return
 
-    before_task_publish.connect(
+    connect = getattr(before_task_publish, "connect", None)
+    if not callable(connect):
+        return
+
+    connect(
         propagate_correlation_id_to_celery,
         dispatch_uid=_BEFORE_TASK_PUBLISH_DISPATCH_UID,
         weak=False,
     )
 
 
-_connect_before_task_publish_signal()
+_maybe_connect_celery_publish_signal()
 
 __all__ = ["propagate_correlation_id_to_celery"]
