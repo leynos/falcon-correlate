@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import typing as typ
 
 import pytest
@@ -12,7 +11,10 @@ celery = pytest.importorskip("celery")
 from celery.signals import before_task_publish  # noqa: E402
 
 from falcon_correlate import correlation_id_var  # noqa: E402
-from falcon_correlate.celery import propagate_correlation_id_to_celery  # noqa: E402
+from falcon_correlate.celery import (  # noqa: E402
+    _maybe_connect_celery_publish_signal,
+    propagate_correlation_id_to_celery,
+)
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -101,16 +103,23 @@ def test_handler_tolerates_missing_properties_mapping(
 
 
 def test_signal_handler_is_connected_to_before_task_publish() -> None:
-    """Importing the module should register the publish signal handler once."""
-    assert before_task_publish.has_listeners(None)
+    """Calling the connection helper should register the signal handler."""
+    _maybe_connect_celery_publish_signal()
+
+    receivers = typ.cast(
+        "list[tuple[object, object]]",
+        before_task_publish.receivers,
+    )
+    assert any(
+        receiver_func is propagate_correlation_id_to_celery
+        for _, receiver_func in receivers
+    ), "propagate_correlation_id_to_celery not found in before_task_publish receivers"
 
 
 def test_signal_connection_is_idempotent_across_reload(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
 ) -> None:
-    """Reloading the module should not duplicate the signal registration."""
-    import falcon_correlate.celery as celery_integration
-
+    """Test idempotency of the connection helper."""
     probe_calls: list[str] = []
     probe_dispatch_uid = "test_probe_publish_receiver"
 
@@ -159,12 +168,13 @@ def test_signal_connection_is_idempotent_across_reload(
         )
 
     try:
+        _maybe_connect_celery_publish_signal()
         initial_properties, initial_responses = _send_signal()
         assert initial_properties["correlation_id"] == "request-correlation-id"
         assert probe_calls == ["request-correlation-id"]
         assert _count_integration_receivers(initial_responses) == 1
 
-        importlib.reload(celery_integration)
+        _maybe_connect_celery_publish_signal()
 
         probe_calls.clear()
         reloaded_properties, reloaded_responses = _send_signal()

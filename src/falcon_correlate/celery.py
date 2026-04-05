@@ -1,8 +1,8 @@
 """Celery publish integration for correlation ID propagation.
 
 This module is import-safe when the optional ``celery`` dependency is not
-installed. If Celery is available, importing this module connects
-``propagate_correlation_id_to_celery`` to Celery's
+installed. Use ``_maybe_connect_celery_publish_signal`` during application
+start-up to register ``propagate_correlation_id_to_celery`` with Celery's
 ``before_task_publish`` signal.
 """
 
@@ -31,6 +31,27 @@ def propagate_correlation_id_to_celery(
     default. When a Falcon request correlation ID exists in context, this
     handler intentionally overwrites that publish-time value so downstream
     workers can trace the task back to the originating request.
+
+    Parameters
+    ----------
+    **kwargs : dict
+        Celery signal keyword arguments. Must contain a ``properties`` key
+        mapping to a mutable mapping (typically :class:`dict`) that holds
+        AMQP message properties, including ``correlation_id``.
+
+    Returns
+    -------
+    None
+        This function mutates the ``properties`` mapping in place when the
+        ambient correlation ID is set and the result backend does not use
+        RPC, overwriting Celery's default ``correlation_id`` value.
+
+    Notes
+    -----
+    When the active Celery application uses the ``rpc://`` result backend,
+    this handler preserves the task ID in ``correlation_id`` to maintain
+    Celery's result retrieval contract.
+
     """
     properties = typ.cast(
         "cabc.MutableMapping[str, object] | None",
@@ -93,6 +114,7 @@ def _maybe_connect_celery_publish_signal() -> None:
     )
 
 
-_maybe_connect_celery_publish_signal()
-
-__all__ = ["propagate_correlation_id_to_celery"]
+__all__ = [
+    "_maybe_connect_celery_publish_signal",
+    "propagate_correlation_id_to_celery",
+]

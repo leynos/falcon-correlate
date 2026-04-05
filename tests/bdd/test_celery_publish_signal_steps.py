@@ -12,8 +12,10 @@ celery = pytest.importorskip("celery")
 from celery import Celery  # noqa: E402
 from pytest_bdd import given, parsers, scenarios, then, when  # noqa: E402
 
-import falcon_correlate.celery as _celery_integration  # noqa: F401, E402
 from falcon_correlate import correlation_id_var  # noqa: E402
+from falcon_correlate.celery import (  # noqa: E402
+    _maybe_connect_celery_publish_signal,
+)
 
 scenarios("celery_publish_signal.feature")
 
@@ -23,6 +25,12 @@ class Context(typ.TypedDict, total=False):
 
     published_correlation_id: str
     task_id: str
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _connect_celery_signal() -> None:
+    """Connect the Celery publish signal handler once for all BDD scenarios."""
+    _maybe_connect_celery_publish_signal()
 
 
 @pytest.fixture(autouse=True)
