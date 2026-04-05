@@ -644,7 +644,7 @@ The transport classes preserve an explicitly supplied correlation header on the
 outgoing request. If the caller already set `X-Correlation-ID`,
 `falcon-correlate` leaves that value unchanged.
 
-### Behaviour
+### HTTP client behaviour
 
 - When `correlation_id_var` is set (i.e. during a Falcon request handled
   by `CorrelationIDMiddleware`), the `X-Correlation-ID` header is added to the
@@ -655,6 +655,66 @@ outgoing request. If the caller already set `X-Correlation-ID`,
   ID header is added alongside them, never replacing them.
 - If the caller explicitly sets the correlation header itself, both the wrapper
   functions and the transport classes keep the caller's value.
+
+## Celery propagation
+
+When Falcon request-handling code publishes Celery tasks, the current
+correlation ID can be copied into the outgoing task message's Advanced Message
+Queuing Protocol (AMQP) `correlation_id` property.
+
+**Note**: Celery is an optional dependency. Install the package with the Celery
+extra in any process that publishes tasks:
+
+```bash
+pip install "falcon-correlate[celery]"
+```
+
+### Enabling the publish signal handler
+
+Importing `falcon_correlate` registers the Celery `before_task_publish` handler
+automatically when Celery is installed. If the publisher process already
+imports anything from the package root, no extra registration call is needed.
+
+```python
+from celery import Celery
+from falcon_correlate import CorrelationIDMiddleware
+
+celery_app = Celery("myapp", broker="redis://localhost:6379/0")
+middleware = CorrelationIDMiddleware()
+```
+
+Once the package is imported in the publisher process, normal task publishing
+APIs such as `delay()` and `apply_async()` propagate the request correlation ID
+automatically.
+
+```python
+from falcon_correlate import correlation_id_var
+
+
+def enqueue_invoice_email(user_id: str) -> None:
+    # During request handling, CorrelationIDMiddleware has already populated
+    # correlation_id_var for the current context.
+    send_invoice_email.delay(user_id)
+    assert correlation_id_var.get() is not None
+```
+
+### Behaviour
+
+- When `correlation_id_var` is set and the active Celery result backend is not
+  `rpc://`, the outgoing Celery message uses that value as its publish-time
+  `correlation_id`.
+- When `correlation_id_var` is not set, `falcon-correlate` leaves Celery's
+  generated publish value unchanged.
+- If the caller passes `apply_async(correlation_id=...)` while a request
+  correlation ID is present, the ambient request value wins. Celery already
+  fills `correlation_id` by default, so overwriting the publish value is the
+  only way to guarantee request-to-task propagation through
+  `before_task_publish`.
+- If the active Celery result backend is `rpc://`, `falcon-correlate`
+  preserves Celery's task-id correlation contract and does not overwrite the
+  publish `correlation_id`.
+- This release covers only the publish path. Worker-side setup and cleanup of
+  `correlation_id_var` inside Celery tasks will be added separately.
 
 ## Full Configuration Example
 
@@ -714,5 +774,8 @@ The following functionality is now implemented:
 - httpx transport classes (`CorrelationIDTransport` and
   `AsyncCorrelationIDTransport`) for shared client configuration that injects
   the correlation ID into outgoing HTTP requests (task 4.1.2).
+- Celery publish propagation via `propagate_correlation_id_to_celery`, which
+  injects the ambient request correlation ID into outgoing task message
+  properties (task 4.2.1).
 
 See the [roadmap](roadmap.md) for the full implementation plan.

@@ -1521,13 +1521,12 @@ imported lazily at call time.
    feature, not layer" convention and isolates the optional dependency.
 
 2. **Lazy imports:** Each wrapper function performs
-   `import httpx as _httpx` inside its body. The module itself can be
-   imported (and re-exported from `__init__.py`) without `httpx`
-   installed. Users who do not need httpx propagation pay no import
-   cost. An `ImportError` is raised only when a wrapper function is
-   actually called without `httpx` installed. This mirrors the
-   structlog pattern where the library provides documentation and test
-   validation, but defers the actual import to the consumer.
+   `import httpx as _httpx` inside its body. The module itself can be imported
+   (and re-exported from `__init__.py`) without `httpx` installed. Users who do
+   not need httpx propagation pay no import cost. An `ImportError` is raised
+   only when a wrapper function is actually called without `httpx` installed.
+   This mirrors the structlog pattern where the library provides documentation
+   and test validation, but defers the actual import to the consumer.
 
 3. **`_prepare_headers` helper:** The header preparation logic (pop
    headers from `kwargs`, convert to mutable dict, inject correlation ID) is
@@ -1617,3 +1616,59 @@ before delegation.
   configured sync and async `httpx` clients.
 - `docs/users-guide.md` — Documented when to choose wrapper functions versus
   transports and added sync and async transport configuration examples.
+
+### A.8. Celery task publish signal handler (Task 4.2.1)
+
+**Decision:** Add a dedicated optional-integration module at
+`src/falcon_correlate/celery.py` that defines
+`propagate_correlation_id_to_celery` and connects it to Celery's
+`before_task_publish` signal at import time.
+
+**Rationale:**
+
+1. **Feature isolation and import safety:** Keeping the implementation in its
+   own module mirrors the existing `httpx` integration and preserves
+   `import falcon_correlate` when Celery is not installed. The module loads the
+   signal dynamically and becomes a no-op when the optional dependency is
+   absent.
+
+2. **Idempotent signal registration:** The signal connection uses a stable
+   `dispatch_uid`
+   (`falcon_correlate.celery.propagate_correlation_id_to_celery`) so module
+   reloads do not create duplicate receivers.
+
+3. **Ambient request value wins except for the RPC result backend:** Celery
+   5.6.3 populates `properties["correlation_id"]` with the task ID before
+   firing `before_task_publish`. The handler overwrites that value when
+   `correlation_id_var` is set so request-to-task propagation works for the
+   normal publish path, but it skips the overwrite when the active result
+   backend is `rpc://`. Celery's RPC backend routes replies using
+   `request.correlation_id or task_id`, so preserving the task-id correlation
+   contract is required to keep `AsyncResult(task_id)` working in that mode.
+
+4. **No-op when Celery does not provide mutable properties:** The implemented
+   handler only mutates the publish state when Celery passes a mutable
+   `properties` mapping. If `properties` is `None`, the handler returns without
+   rebinding local variables that Celery would not observe.
+
+5. **Public package export:** The handler is re-exported from
+   `falcon_correlate.__init__` so consumers can discover the integration from
+   the package root while still getting automatic registration on import.
+
+**Files created/modified:**
+
+- `pyproject.toml` — Added Celery as an optional extra and dev dependency.
+- `uv.lock` — Recorded the resolved Celery dependency set used for local
+  validation.
+- `src/falcon_correlate/celery.py` — Added the publish signal handler and
+  idempotent connection helper.
+- `src/falcon_correlate/__init__.py` — Re-exported
+  `propagate_correlation_id_to_celery` from the package root.
+- `src/falcon_correlate/unittests/test_celery_publish_signal.py` — Added unit
+  coverage for handler behaviour, signal registration, and root export.
+- `tests/bdd/celery_publish_signal.feature` — Added publish-path behavioural
+  scenarios.
+- `tests/bdd/test_celery_publish_signal_steps.py` — Added BDD steps that patch
+  the Kombu publish boundary and assert the final broker correlation ID.
+- `docs/users-guide.md` — Documented installation, automatic registration, and
+  the publish-path overwrite policy.

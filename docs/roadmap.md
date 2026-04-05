@@ -159,11 +159,11 @@ Enable correlation ID propagation to downstream HTTP services and Celery tasks.
 
 ### 4.2. Celery propagation utilities
 
-- [ ] 4.2.1. Implement task publish signal handler. See design-doc §3.5.2.2.
-  - [ ] Create `propagate_correlation_id_to_celery` signal handler.
-  - [ ] Connect to `before_task_publish` signal.
-  - [ ] Inject correlation ID into message properties.
-  - [ ] Test correlation ID is injected into task message.
+- [x] 4.2.1. Implement task publish signal handler. See design-doc §3.5.2.2.
+  - [x] Create `propagate_correlation_id_to_celery` signal handler.
+  - [x] Connect to `before_task_publish` signal.
+  - [x] Inject correlation ID into message properties.
+  - [x] Test correlation ID is injected into task message.
 - [ ] 4.2.2. Implement worker signal handlers. See design-doc §3.5.2.4.
   - [ ] Create `setup_correlation_id_in_worker` for `task_prerun`.
   - [ ] Create `clear_correlation_id_in_worker` for `task_postrun`.
