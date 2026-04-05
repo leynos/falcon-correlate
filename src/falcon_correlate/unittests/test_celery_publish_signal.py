@@ -150,12 +150,6 @@ def test_signal_connection_is_idempotent_across_reload(
         isolated_context(_logic)
         return properties, signal_responses
 
-    before_task_publish.connect(
-        probe_receiver,
-        dispatch_uid=probe_dispatch_uid,
-        weak=False,
-    )
-
     def _count_integration_receivers(
         signal_responses: list[tuple[object, object]],
     ) -> int:
@@ -169,6 +163,11 @@ def test_signal_connection_is_idempotent_across_reload(
 
     try:
         _maybe_connect_celery_publish_signal()
+        before_task_publish.connect(
+            probe_receiver,
+            dispatch_uid=probe_dispatch_uid,
+            weak=False,
+        )
         initial_properties, initial_responses = _send_signal()
         assert initial_properties["correlation_id"] == "request-correlation-id"
         assert probe_calls == ["request-correlation-id"]
