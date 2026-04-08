@@ -1,13 +1,11 @@
 # Implement Celery worker signal handlers (4.2.2)
 
 This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises &
-Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up
-to date as work proceeds.
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+proceeds.
 
-Status: DRAFT
-
-Implementation must not begin until this plan is explicitly approved.
+Status: COMPLETED
 
 ## Purpose / big picture
 
@@ -45,8 +43,8 @@ Success is observable when all of the following are true:
 
 The current publish-path integration already exists in
 `src/falcon_correlate/celery.py`. That module is the correct starting point for
-this task because it already isolates the optional Celery dependency,
-registers signals idempotently, and is re-exported safely from
+this task because it already isolates the optional Celery dependency, registers
+signals idempotently, and is re-exported safely from
 `src/falcon_correlate/__init__.py`.
 
 The current tests for Celery publish propagation live in
@@ -263,8 +261,7 @@ IDs for `task_prerun` and `task_postrun`, and keep the helper idempotent.
 If the package root already re-exports public Celery helpers, extend
 `src/falcon_correlate/__init__.py` and `__all__` to include the new worker
 handlers so the public API stays coherent. If implementation reveals a reason
-not to expose them publicly, stop and confirm that API choice before
-proceeding.
+not to expose them publicly, stop and confirm that API choice before proceeding.
 
 After implementation, rerun the targeted tests:
 
@@ -333,14 +330,19 @@ worker tests remain green inside the full suite.
   wording, and the complexity guidance.
 - [x] 2026-04-08: Drafted this ExecPlan in
   `docs/execplans/4-2-2-celery-worker-signal-handlers.md`.
-- [ ] After approval: run Milestone 1 and choose the final worker test
-  boundary.
-- [ ] After approval: add failing unit and behavioural tests for worker setup
-  and cleanup.
-- [ ] After approval: implement the worker handlers and idempotent signal
-  registration.
-- [ ] After approval: update the design doc, user guide, and roadmap.
-- [ ] After approval: run the full validation suite and capture the evidence.
+- [x] 2026-04-08: Ran Milestone 1. Confirmed Celery eager execution fires
+  `task_prerun` / `task_postrun` but leaves `task.request.correlation_id` unset
+  for `task.apply(..., correlation_id=...)`.
+- [x] 2026-04-08: Chose an explicit signal-driven behavioural boundary using a
+  real Celery task object plus `push_request()`, `task_prerun`, and
+  `task_postrun`.
+- [x] 2026-04-08: Added failing unit and behavioural tests for worker setup,
+  cleanup, idempotent registration, and package-root exports.
+- [x] 2026-04-08: Implemented the worker handlers, reset-token storage,
+  import-time signal registration, and public exports.
+- [x] 2026-04-08: Updated the design doc, user guide, and roadmap for the
+  completed worker path.
+- [x] 2026-04-08: Ran the full validation suite and captured the evidence.
 
 ## Surprises & Discoveries
 
@@ -354,6 +356,10 @@ worker tests remain green inside the full suite.
   including an internal `_celery_context_tokens` store. The implementation
   should stay aligned with that unless a tested Celery constraint proves the
   sketch wrong.
+- Celery eager mode is not a valid behavioural boundary for this feature on
+  Celery 5.6.3 because `task.apply(..., correlation_id=...)` does not populate
+  `task.request.correlation_id` during eager execution, even though
+  `task_prerun` and `task_postrun` still fire.
 
 ## Decision Log
 
@@ -368,9 +374,43 @@ worker tests remain green inside the full suite.
   behavioural test boundary. Celery eager execution may or may not expose the
   same request metadata as a real worker, and that should be proven before the
   tests are committed.
+- 2026-04-08: The executed implementation uses a signal-driven task request in
+  the behavioural test instead of eager execution because that is the smallest
+  local boundary that exposes `task.request.correlation_id` without requiring
+  an external broker or long-running worker.
 
 ## Outcomes & Retrospective
 
-No implementation has started. Populate this section after the plan is
-approved and executed, including the final test boundary chosen, the commands
-run, and any follow-up work that should feed roadmap item 4.2.3.
+Implemented worker-side Celery correlation propagation in
+`src/falcon_correlate/celery.py` with:
+
+- `setup_correlation_id_in_worker` for `task_prerun`
+- `clear_correlation_id_in_worker` for `task_postrun`
+- internal reset-token storage in `_celery_context_tokens`
+- import-time registration for publish and worker signals
+- package-root exports for the worker handlers
+
+The final behavioural boundary uses a real Celery task object with
+`push_request(correlation_id=...)` and explicit `task_prerun` / `task_postrun`
+dispatch. This was chosen because eager execution does not surface
+`task.request.correlation_id` even when those signals fire.
+
+Evidence captured so far:
+
+- `make build | tee /tmp/4-2-2-build.log`
+- `uv run pytest -v src/falcon_correlate/unittests/test_celery_worker_signal.py`
+  `tests/bdd/test_celery_worker_signal_steps.py | tee`
+  `/tmp/4-2-2-red-tests.log`
+- `uv run pytest -v src/falcon_correlate/unittests/test_celery_worker_signal.py`
+  `tests/bdd/test_celery_worker_signal_steps.py | tee`
+  `/tmp/4-2-2-green-tests.log`
+
+Full validation evidence:
+
+- `make fmt | tee /tmp/4-2-2-fmt.log`
+- `make check-fmt | tee /tmp/4-2-2-check-fmt.log`
+- `make typecheck | tee /tmp/4-2-2-typecheck.log`
+- `make lint | tee /tmp/4-2-2-lint.log`
+- `make test | tee /tmp/4-2-2-test.log`
+- `make markdownlint | tee /tmp/4-2-2-markdownlint.log`
+- `make nixie | tee /tmp/4-2-2-nixie.log`

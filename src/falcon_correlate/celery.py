@@ -1,13 +1,13 @@
-"""Celery publish integration for correlation ID propagation.
+"""Celery signal integration for correlation ID propagation.
 
 This module is import-safe when the optional ``celery`` dependency is not
-installed. Use ``_maybe_connect_celery_publish_signal`` during application
-start-up to register ``propagate_correlation_id_to_celery`` with Celery's
-``before_task_publish`` signal.
+installed. Importing this module opportunistically registers handlers for
+Celery's publish and worker task signals when Celery is available.
 """
 
 from __future__ import annotations
 
+import contextvars
 import importlib
 import typing as typ
 
@@ -19,6 +19,15 @@ if typ.TYPE_CHECKING:
 
 _BEFORE_TASK_PUBLISH_DISPATCH_UID = (
     "falcon_correlate.celery.propagate_correlation_id_to_celery"
+)
+_TASK_PRERUN_DISPATCH_UID = "falcon_correlate.celery.setup_correlation_id_in_worker"
+_TASK_POSTRUN_DISPATCH_UID = "falcon_correlate.celery.clear_correlation_id_in_worker"
+_CORRELATION_ID_CONTEXT_KEY = "correlation_id"
+
+_ContextToken = contextvars.Token[str | None]
+_CeleryContextTokens = dict[str, _ContextToken]
+_celery_context_tokens: contextvars.ContextVar[_CeleryContextTokens | None] = (
+    contextvars.ContextVar("celery_context_tokens", default=None)
 )
 
 
@@ -92,6 +101,38 @@ def _current_result_backend_uses_rpc() -> bool:
     return str(as_uri()).startswith("rpc://")
 
 
+def setup_correlation_id_in_worker(*, task: object | None = None, **_: object) -> None:
+    """Expose the task request correlation ID during worker execution."""
+    correlation_id = _get_task_request_correlation_id(task)
+    if not correlation_id:
+        return
+
+    token = correlation_id_var.set(correlation_id)
+    stored_tokens = dict(_celery_context_tokens.get({}) or {})
+    stored_tokens[_CORRELATION_ID_CONTEXT_KEY] = token
+    _celery_context_tokens.set(stored_tokens)
+
+
+def clear_correlation_id_in_worker(**_: object) -> None:
+    """Restore the pre-task correlation ID context after worker execution."""
+    stored_tokens = _celery_context_tokens.get(None)
+    if not stored_tokens:
+        return
+
+    correlation_id_token = stored_tokens.get(_CORRELATION_ID_CONTEXT_KEY)
+    if correlation_id_token is not None:
+        correlation_id_var.reset(correlation_id_token)
+
+    _celery_context_tokens.set(None)
+
+
+def _get_task_request_correlation_id(task: object | None) -> str | None:
+    """Return the correlation ID carried by a Celery task request, if any."""
+    request = getattr(task, "request", None)
+    correlation_id = getattr(request, "correlation_id", None)
+    return correlation_id if isinstance(correlation_id, str) else None
+
+
 def _maybe_connect_celery_publish_signal() -> None:
     """Register the Celery publish handler once when Celery is installed."""
     try:
@@ -114,7 +155,43 @@ def _maybe_connect_celery_publish_signal() -> None:
     )
 
 
+def _maybe_connect_celery_worker_signals() -> None:
+    """Register the Celery worker handlers once when Celery is installed."""
+    try:
+        celery_signals = importlib.import_module("celery.signals")
+    except ImportError:
+        return
+
+    task_prerun = getattr(celery_signals, "task_prerun", None)
+    task_postrun = getattr(celery_signals, "task_postrun", None)
+    if task_prerun is None or task_postrun is None:
+        return
+
+    prerun_connect = getattr(task_prerun, "connect", None)
+    postrun_connect = getattr(task_postrun, "connect", None)
+    if not callable(prerun_connect) or not callable(postrun_connect):
+        return
+
+    prerun_connect(
+        setup_correlation_id_in_worker,
+        dispatch_uid=_TASK_PRERUN_DISPATCH_UID,
+        weak=False,
+    )
+    postrun_connect(
+        clear_correlation_id_in_worker,
+        dispatch_uid=_TASK_POSTRUN_DISPATCH_UID,
+        weak=False,
+    )
+
+
+_maybe_connect_celery_publish_signal()
+_maybe_connect_celery_worker_signals()
+
+
 __all__ = [
     "_maybe_connect_celery_publish_signal",
+    "_maybe_connect_celery_worker_signals",
+    "clear_correlation_id_in_worker",
     "propagate_correlation_id_to_celery",
+    "setup_correlation_id_in_worker",
 ]

@@ -164,12 +164,12 @@ Enable correlation ID propagation to downstream HTTP services and Celery tasks.
   - [x] Connect to `before_task_publish` signal.
   - [x] Inject correlation ID into message properties.
   - [x] Test correlation ID is injected into task message.
-- [ ] 4.2.2. Implement worker signal handlers. See design-doc §3.5.2.4.
-  - [ ] Create `setup_correlation_id_in_worker` for `task_prerun`.
-  - [ ] Create `clear_correlation_id_in_worker` for `task_postrun`.
-  - [ ] Store reset tokens for cleanup.
-  - [ ] Test correlation ID is available in worker context.
-  - [ ] Test context is cleared after task execution.
+- [x] 4.2.2. Implement worker signal handlers. See design-doc §3.5.2.4.
+  - [x] Create `setup_correlation_id_in_worker` for `task_prerun`.
+  - [x] Create `clear_correlation_id_in_worker` for `task_postrun`.
+  - [x] Store reset tokens for cleanup.
+  - [x] Test correlation ID is available in worker context.
+  - [x] Test context is cleared after task execution.
 - [ ] 4.2.3. Provide Celery configuration utilities
   - [ ] Create `configure_celery_correlation(app)` helper function.
   - [ ] Connect all signal handlers in one call.
