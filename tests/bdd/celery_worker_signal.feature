@@ -8,3 +8,10 @@ Feature: Celery worker correlation ID propagation
     When the Celery worker lifecycle runs the task
     Then the task body should observe correlation ID "bdd-worker-cid-001"
     And the ambient correlation ID should be cleared after the task finishes
+
+  Scenario: Running a task restores a pre-existing ambient correlation ID
+    Given the ambient correlation ID is set to "ambient-worker-cid-001"
+    And a Celery worker task request with correlation ID "bdd-worker-cid-002"
+    When the Celery worker lifecycle runs the task
+    Then the task body should observe correlation ID "bdd-worker-cid-002"
+    And the ambient correlation ID should be restored to "ambient-worker-cid-001" after the task finishes

@@ -626,15 +626,16 @@ used. This signal is dispatched before a task is executed by a worker. The
 handler:
 
 1. Retrieve `task.request.correlation_id`.
-2. Calls `correlation_id_var.set(...)` and stores the returned reset token in
-   an internal `_celery_context_tokens` `ContextVar`.
+2. Calls `correlation_id_var.set(...)` and pushes the returned reset token onto
+   an internal `_celery_context_tokens` `ContextVar` stack.
 3. Leaves the context untouched when the task request does not carry a
    correlation ID.
 
 A corresponding `task_postrun` signal handler then restores the prior context
-using `correlation_id_var.reset(token)` and clears the token store. Reset
-tokens are required here; bluntly assigning `None` would lose any pre-existing
-ambient value already present in the worker execution context.
+using `correlation_id_var.reset(token)` and pops the token stack. A stack is
+required here so nested worker execution unwinds in LIFO order. Reset tokens
+are required here; bluntly assigning `None` would lose any pre-existing ambient
+value already present in the worker execution context.
 
 This end-to-end flow ensures that:
 
@@ -953,9 +954,9 @@ def setup_correlation_id_in_worker(sender=None, task=None, **kwargs):
     if not cid:
         return
 
-    _celery_context_tokens.set(
-        {"correlation_id": correlation_id_var.set(cid)}
-    )
+    tokens = _celery_context_tokens.get() or {"correlation_id": []}
+    tokens["correlation_id"].append(correlation_id_var.set(cid))
+    _celery_context_tokens.set(tokens)
 
 
 @task_postrun.connect
@@ -964,10 +965,12 @@ def clear_correlation_id_in_worker(sender=None, **kwargs):
     if not tokens:
         return
 
-    token = tokens.get("correlation_id")
-    if token is not None:
-        correlation_id_var.reset(token)
-    _celery_context_tokens.set(None)
+    correlation_tokens = tokens.get("correlation_id", [])
+    if not correlation_tokens:
+        return
+
+    correlation_id_var.reset(correlation_tokens.pop())
+    _celery_context_tokens.set(tokens or None)
 ```
 
 ### 4.5. Middleware configuration
@@ -1663,9 +1666,11 @@ signals.
 
 2. **Reset tokens preserve ambient state safely:** The implementation stores
    `ContextVar.set()` tokens in an internal `_celery_context_tokens`
-   `ContextVar` keyed by context name. `task_postrun` then restores the prior
-   value with `reset(token)` and clears the token store, which is safe even if
-   the worker execution context already had an ambient correlation ID.
+   `ContextVar` keyed by context name, with a LIFO stack for each propagated
+   value. `task_postrun` restores the prior value with `reset(token)` and pops
+   that stack, which is safe even if the worker execution context already had
+   an ambient correlation ID or nested worker execution occurs in the same
+   context.
 
 3. **Registration stays idempotent:** Stable dispatch UIDs are used for both
    worker signals so repeated imports or reloads do not create duplicate

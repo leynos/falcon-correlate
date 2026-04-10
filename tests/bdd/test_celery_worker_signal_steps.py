@@ -35,9 +35,12 @@ def _connect_celery_worker_signals() -> None:
 
 @pytest.fixture(autouse=True)
 def _reset_context_variables() -> typ.Generator[None, None, None]:
-    """Reset context variables after each scenario."""
-    yield
-    correlation_id_var.set(None)
+    """Reset context variables around each scenario using token-based reset."""
+    token = correlation_id_var.set(None)
+    try:
+        yield
+    finally:
+        correlation_id_var.reset(token)
 
 
 @given(
@@ -60,6 +63,12 @@ def given_task_request_with_correlation_id(value: str) -> Context:
         "observed": observed,
         "task_correlation_id_seen": observed.get("task_correlation_id_seen"),
     }
+
+
+@given(parsers.parse('the ambient correlation ID is set to "{value}"'))
+def given_ambient_correlation_id(value: str) -> None:
+    """Set a pre-existing ambient correlation ID before worker execution."""
+    correlation_id_var.set(value)
 
 
 @when("the Celery worker lifecycle runs the task", target_fixture="context")
@@ -91,10 +100,27 @@ def when_worker_runs_task(context: Context) -> Context:
 @then(parsers.parse('the task body should observe correlation ID "{value}"'))
 def then_task_body_observes_correlation_id(context: Context, value: str) -> None:
     """Assert the task body received the worker correlation ID context."""
-    assert context["task_correlation_id_seen"] == value
+    assert context["task_correlation_id_seen"] == value, (
+        "Task body did not observe the expected correlation ID"
+    )
 
 
 @then("the ambient correlation ID should be cleared after the task finishes")
 def then_ambient_correlation_id_is_cleared(context: Context) -> None:
     """Assert worker cleanup restored a clean ambient context."""
-    assert context["correlation_id_after_task"] is None
+    assert context["correlation_id_after_task"] is None, (
+        "Ambient correlation ID leaked after task completion"
+    )
+
+
+@then(
+    parsers.parse(
+        'the ambient correlation ID should be restored to "{value}" after the '
+        "task finishes"
+    )
+)
+def then_ambient_correlation_id_is_restored(value: str) -> None:
+    """Assert worker cleanup restores a pre-existing ambient correlation ID."""
+    assert correlation_id_var.get() == value, (
+        "Ambient correlation ID was not restored after task completion"
+    )

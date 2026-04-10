@@ -25,7 +25,7 @@ _TASK_POSTRUN_DISPATCH_UID = "falcon_correlate.celery.clear_correlation_id_in_wo
 _CORRELATION_ID_CONTEXT_KEY = "correlation_id"
 
 _ContextToken = contextvars.Token[str | None]
-_CeleryContextTokens = dict[str, _ContextToken]
+_CeleryContextTokens = dict[str, list[_ContextToken]]
 _celery_context_tokens: contextvars.ContextVar[_CeleryContextTokens | None] = (
     contextvars.ContextVar("celery_context_tokens", default=None)
 )
@@ -108,8 +108,10 @@ def setup_correlation_id_in_worker(*, task: object | None = None, **_: object) -
         return
 
     token = correlation_id_var.set(correlation_id)
-    stored_tokens = dict(_celery_context_tokens.get({}) or {})
-    stored_tokens[_CORRELATION_ID_CONTEXT_KEY] = token
+    stored_tokens = dict(_celery_context_tokens.get() or {})
+    correlation_id_tokens = list(stored_tokens.get(_CORRELATION_ID_CONTEXT_KEY, []))
+    correlation_id_tokens.append(token)
+    stored_tokens[_CORRELATION_ID_CONTEXT_KEY] = correlation_id_tokens
     _celery_context_tokens.set(stored_tokens)
 
 
@@ -119,11 +121,17 @@ def clear_correlation_id_in_worker(**_: object) -> None:
     if not stored_tokens:
         return
 
-    correlation_id_token = stored_tokens.get(_CORRELATION_ID_CONTEXT_KEY)
-    if correlation_id_token is not None:
-        correlation_id_var.reset(correlation_id_token)
+    correlation_id_tokens = list(stored_tokens.get(_CORRELATION_ID_CONTEXT_KEY, []))
+    if not correlation_id_tokens:
+        return
 
-    _celery_context_tokens.set(None)
+    correlation_id_var.reset(correlation_id_tokens.pop())
+    if correlation_id_tokens:
+        stored_tokens[_CORRELATION_ID_CONTEXT_KEY] = correlation_id_tokens
+    else:
+        stored_tokens.pop(_CORRELATION_ID_CONTEXT_KEY, None)
+
+    _celery_context_tokens.set(stored_tokens or None)
 
 
 def _get_task_request_correlation_id(task: object | None) -> str | None:
@@ -133,6 +141,24 @@ def _get_task_request_correlation_id(task: object | None) -> str | None:
     return correlation_id if isinstance(correlation_id, str) else None
 
 
+def _safe_connect_signal(
+    signal_module: object,
+    signal_name: str,
+    handler: cabc.Callable[..., object],
+    dispatch_uid: str,
+) -> None:
+    """Connect a Celery signal when the signal object exposes ``connect``."""
+    signal = getattr(signal_module, signal_name, None)
+    if signal is None:
+        return
+
+    connect = getattr(signal, "connect", None)
+    if not callable(connect):
+        return
+
+    connect(handler, dispatch_uid=dispatch_uid, weak=False)
+
+
 def _maybe_connect_celery_publish_signal() -> None:
     """Register the Celery publish handler once when Celery is installed."""
     try:
@@ -140,18 +166,11 @@ def _maybe_connect_celery_publish_signal() -> None:
     except ImportError:
         return
 
-    before_task_publish = getattr(celery_signals, "before_task_publish", None)
-    if before_task_publish is None:
-        return
-
-    connect = getattr(before_task_publish, "connect", None)
-    if not callable(connect):
-        return
-
-    connect(
+    _safe_connect_signal(
+        celery_signals,
+        "before_task_publish",
         propagate_correlation_id_to_celery,
-        dispatch_uid=_BEFORE_TASK_PUBLISH_DISPATCH_UID,
-        weak=False,
+        _BEFORE_TASK_PUBLISH_DISPATCH_UID,
     )
 
 
@@ -162,25 +181,17 @@ def _maybe_connect_celery_worker_signals() -> None:
     except ImportError:
         return
 
-    task_prerun = getattr(celery_signals, "task_prerun", None)
-    task_postrun = getattr(celery_signals, "task_postrun", None)
-    if task_prerun is None or task_postrun is None:
-        return
-
-    prerun_connect = getattr(task_prerun, "connect", None)
-    postrun_connect = getattr(task_postrun, "connect", None)
-    if not callable(prerun_connect) or not callable(postrun_connect):
-        return
-
-    prerun_connect(
+    _safe_connect_signal(
+        celery_signals,
+        "task_prerun",
         setup_correlation_id_in_worker,
-        dispatch_uid=_TASK_PRERUN_DISPATCH_UID,
-        weak=False,
+        _TASK_PRERUN_DISPATCH_UID,
     )
-    postrun_connect(
+    _safe_connect_signal(
+        celery_signals,
+        "task_postrun",
         clear_correlation_id_in_worker,
-        dispatch_uid=_TASK_POSTRUN_DISPATCH_UID,
-        weak=False,
+        _TASK_POSTRUN_DISPATCH_UID,
     )
 
 

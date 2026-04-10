@@ -10,12 +10,13 @@ Status: COMPLETED
 ## Purpose / big picture
 
 Task 4.2.2 closes the worker-side gap in roadmap section 4.2. After this work,
-Celery tasks that arrive with a propagated AMQP `correlation_id` will expose
-that value through `falcon_correlate.correlation_id_var` while the task body is
-running, and the worker process will clear that context again after the task
-finishes. That gives logging filters and downstream propagation utilities the
-same correlation context inside Celery workers that Falcon request handlers
-already have inside web requests.
+Celery tasks that arrive with a propagated Advanced Message Queuing Protocol
+(AMQP) `correlation_id` will expose that value through
+`falcon_correlate.correlation_id_var` while the task body is running, and the
+worker process will clear that context again after the task finishes. That
+gives logging filters and downstream propagation utilities the same correlation
+context inside Celery workers that Falcon request handlers already have inside
+web requests.
 
 Success is observable when all of the following are true:
 
@@ -140,7 +141,7 @@ easy to read and test.
 
 ## Proposed implementation
 
-### Milestone 1: characterise the worker boundary before changing code
+### Milestone 1: characterize the worker boundary before changing code
 
 Start by confirming the smallest realistic Celery execution path that exposes
 `task.request.correlation_id` and fires `task_prerun` and `task_postrun`. The

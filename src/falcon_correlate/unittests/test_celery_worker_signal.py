@@ -83,6 +83,35 @@ def test_clear_handler_resets_context_to_previous_value(
     isolated_context(_logic)
 
 
+def test_nested_worker_cleanup_restores_outer_then_ambient_context(
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+) -> None:
+    """Nested worker runs should unwind correlation IDs in LIFO order."""
+    outer_task = _build_task(correlation_id="outer-worker-correlation-id")
+    inner_task = _build_task(correlation_id="inner-worker-correlation-id")
+
+    def _logic() -> None:
+        correlation_id_var.set("ambient-correlation-id")
+        setup_correlation_id_in_worker(task=outer_task)
+        setup_correlation_id_in_worker(task=inner_task)
+
+        assert correlation_id_var.get() == "inner-worker-correlation-id"
+
+        clear_correlation_id_in_worker(task=inner_task)
+
+        stored_tokens = _celery_context_tokens.get(None)
+        assert correlation_id_var.get() == "outer-worker-correlation-id"
+        assert stored_tokens is not None
+        assert len(stored_tokens[_CORRELATION_ID_CONTEXT_KEY]) == 1
+
+        clear_correlation_id_in_worker(task=outer_task)
+
+        assert correlation_id_var.get() == "ambient-correlation-id"
+        assert _celery_context_tokens.get(None) is None
+
+    isolated_context(_logic)
+
+
 def test_clear_handler_is_noop_without_stored_token(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
 ) -> None:
