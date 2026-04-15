@@ -13,7 +13,10 @@ from celery.signals import task_postrun, task_prerun  # noqa: E402
 from pytest_bdd import given, parsers, scenarios, then, when  # noqa: E402
 
 from falcon_correlate import correlation_id_var  # noqa: E402
-from falcon_correlate.celery import _maybe_connect_celery_worker_signals  # noqa: E402
+from falcon_correlate.celery import (  # noqa: E402
+    _celery_context_tokens,
+    _maybe_connect_celery_worker_signals,
+)
 
 scenarios("celery_worker_signal.feature")
 
@@ -36,11 +39,13 @@ def _connect_celery_worker_signals() -> None:
 @pytest.fixture(autouse=True)
 def _reset_context_variables() -> typ.Generator[None, None, None]:
     """Reset context variables around each scenario using token-based reset."""
-    token = correlation_id_var.set(None)
+    celery_tokens_token = _celery_context_tokens.set(None)
+    correlation_token = correlation_id_var.set(None)
     try:
         yield
     finally:
-        correlation_id_var.reset(token)
+        _celery_context_tokens.reset(celery_tokens_token)
+        correlation_id_var.reset(correlation_token)
 
 
 @given(

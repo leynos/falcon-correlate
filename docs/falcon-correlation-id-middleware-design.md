@@ -950,12 +950,15 @@ def propagate_correlation_id_to_celery(
 
 @task_prerun.connect
 def setup_correlation_id_in_worker(sender=None, task=None, **kwargs):
-    cid = getattr(task.request, "correlation_id", None)
+    request = getattr(task, "request", None)
+    cid = getattr(request, "correlation_id", None)
     if not cid:
         return
 
-    tokens = _celery_context_tokens.get() or {"correlation_id": []}
-    tokens["correlation_id"].append(correlation_id_var.set(cid))
+    tokens = dict(_celery_context_tokens.get() or {})
+    correlation_tokens = list(tokens.get("correlation_id", []))
+    correlation_tokens.append(correlation_id_var.set(cid))
+    tokens["correlation_id"] = correlation_tokens
     _celery_context_tokens.set(tokens)
 
 
@@ -965,11 +968,16 @@ def clear_correlation_id_in_worker(sender=None, **kwargs):
     if not tokens:
         return
 
-    correlation_tokens = tokens.get("correlation_id", [])
+    correlation_tokens = list(tokens.get("correlation_id", []))
     if not correlation_tokens:
         return
 
     correlation_id_var.reset(correlation_tokens.pop())
+    if correlation_tokens:
+        tokens["correlation_id"] = correlation_tokens
+    else:
+        tokens.pop("correlation_id", None)
+
     _celery_context_tokens.set(tokens or None)
 ```
 
