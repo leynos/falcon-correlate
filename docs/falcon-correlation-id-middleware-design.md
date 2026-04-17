@@ -633,9 +633,9 @@ handler:
 
 A corresponding `task_postrun` signal handler then restores the prior context
 using `correlation_id_var.reset(token)` and pops the token stack. A stack is
-required here so nested worker execution unwinds in LIFO order. Reset tokens
-are required here; bluntly assigning `None` would lose any pre-existing ambient
-value already present in the worker execution context.
+required here so nested worker execution unwinds in last-in, first-out (LIFO)
+order. Reset tokens are required here; bluntly assigning `None` would lose any
+pre-existing ambient value already present in the worker execution context.
 
 This end-to-end flow ensures that:
 

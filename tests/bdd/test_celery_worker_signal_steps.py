@@ -84,6 +84,7 @@ def when_worker_runs_task(context: Context) -> Context:
     try:
         task_prerun.send(sender=task, task=task, args=("payload",), kwargs={})
         task.run("payload")
+    finally:
         task_postrun.send(
             sender=task,
             task=task,
@@ -92,7 +93,6 @@ def when_worker_runs_task(context: Context) -> Context:
             retval="payload",
             state="SUCCESS",
         )
-    finally:
         task.pop_request()
 
     return {
