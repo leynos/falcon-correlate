@@ -616,20 +616,26 @@ task definitions.
 Once a task message with a correlation_id is received by a Celery worker, the
 ID is available in the task's request context as `task.request.correlation_id`.
 
+The implemented library integration uses Celery's `task_prerun` and
+`task_postrun` signals in `src/falcon_correlate/celery.py` to bridge that
+request value into `falcon_correlate.correlation_id_var`.[^25]
+
 To make this ID available for logging within the task's execution (and for any
-further downstream calls made by the task), a `task_prerun` signal handler
-should be used.[^25] This signal is dispatched before a task is executed by a
-worker. The handler would:
+further downstream calls made by the task), a `task_prerun` signal handler is
+used. This signal is dispatched before a task is executed by a worker. The
+handler:
 
 1. Retrieve `task.request.correlation_id`.
-2. Set this ID into `correlation_id_var` (the same `ContextVar` used in the web
-   application) using `correlation_id_var.set(task.request.correlation_id)`.
-3. Optionally, if the user ID was also propagated (e.g., in task arguments or
-   headers), set `user_id_var` as well.
+2. Calls `correlation_id_var.set(...)` and pushes the returned reset token onto
+   an internal `_celery_context_tokens` `ContextVar` stack.
+3. Leaves the context untouched when the task request does not carry a
+   correlation ID.
 
-A corresponding `task_postrun` signal handler should then be used to clear
-these `contextvars` (e.g., using `correlation_id_var.reset(token)`) to ensure
-context isolation between tasks executed by the same worker process.
+A corresponding `task_postrun` signal handler then restores the prior context
+using `correlation_id_var.reset(token)` and pops the token stack. A stack is
+required here so nested worker execution unwinds in last-in, first-out (LIFO)
+order. Reset tokens are required here; bluntly assigning `None` would lose any
+pre-existing ambient value already present in the worker execution context.
 
 This end-to-end flow ensures that:
 
@@ -924,14 +930,9 @@ async def async_client_request_with_correlation_id(
 
 ```python
 import contextvars
-from celery import Celery
 from celery.signals import before_task_publish, task_prerun, task_postrun
 
-# Assumes correlation_id_var and user_id_var are accessible
-# from .middleware import correlation_id_var, user_id_var  # Example import
-
-# This would typically be your Celery application instance
-# app = Celery('tasks', broker='redis://localhost:6379/0')
+from falcon_correlate.middleware import correlation_id_var
 
 _celery_context_tokens = contextvars.ContextVar(
     "celery_context_tokens", default=None
@@ -942,57 +943,42 @@ _celery_context_tokens = contextvars.ContextVar(
 def propagate_correlation_id_to_celery(
     sender=None, headers=None, body=None, properties=None, **kwargs
 ):
-    # 'properties' is the standard place for AMQP message properties
-    # 'headers' are application-level headers within the Celery message body
     cid = correlation_id_var.get()
-    if cid:
-        current_properties = properties if properties is not None else {}
-        current_properties["correlation_id"] = cid
-
-        # If you also want to propagate user_id, it could go into task headers
-        # current_headers = headers if headers is not None else {}
-        # uid = user_id_var.get()
-        # if uid:
-        #     current_headers["X-User-ID"] = uid  # Custom header for user ID
+    if cid and properties is not None:
+        properties["correlation_id"] = cid
 
 
 @task_prerun.connect
-def setup_correlation_id_in_worker(
-    sender=None, task_id=None, task=None, args=None, kwargs=None, **kw
-):
-    # task.request.correlation_id is where Celery puts the AMQP correlation_id
-    cid = task.request.correlation_id
-    tokens = {}
-    if cid:
-        tokens["correlation_id"] = correlation_id_var.set(cid)
+def setup_correlation_id_in_worker(sender=None, task=None, **kwargs):
+    request = getattr(task, "request", None)
+    cid = getattr(request, "correlation_id", None)
+    if not cid:
+        return
 
-    # Example: If user ID was propagated via task headers
-    # uid = task.request.get('X-User-ID')
-    # if uid:
-    #     tokens['user_id'] = user_id_var.set(uid)
-
-    if tokens:
-        _celery_context_tokens.set(tokens)
+    tokens = dict(_celery_context_tokens.get() or {})
+    correlation_tokens = list(tokens.get("correlation_id", []))
+    correlation_tokens.append(correlation_id_var.set(cid))
+    tokens["correlation_id"] = correlation_tokens
+    _celery_context_tokens.set(tokens)
 
 
 @task_postrun.connect
-def clear_correlation_id_in_worker(
-    sender=None,
-    task_id=None,
-    task=None,
-    args=None,
-    kwargs=None,
-    retval=None,
-    state=None,
-    **kw,
-):
+def clear_correlation_id_in_worker(sender=None, **kwargs):
     tokens = _celery_context_tokens.get()
-    if tokens:
-        if "correlation_id" in tokens:
-            correlation_id_var.reset(tokens["correlation_id"])
-        if "user_id" in tokens:
-            user_id_var.reset(tokens["user_id"])
-        _celery_context_tokens.set(None)  # Clear the tokens storage itself
+    if not tokens:
+        return
+
+    correlation_tokens = list(tokens.get("correlation_id", []))
+    if not correlation_tokens:
+        return
+
+    correlation_id_var.reset(correlation_tokens.pop())
+    if correlation_tokens:
+        tokens["correlation_id"] = correlation_tokens
+    else:
+        tokens.pop("correlation_id", None)
+
+    _celery_context_tokens.set(tokens or None)
 ```
 
 ### 4.5. Middleware configuration
@@ -1672,3 +1658,56 @@ before delegation.
   the Kombu publish boundary and assert the final broker correlation ID.
 - `docs/users-guide.md` — Documented installation, automatic registration, and
   the publish-path overwrite policy.
+
+### A.9. Celery worker signal handlers (Task 4.2.2)
+
+**Decision:** Extend `src/falcon_correlate/celery.py` with
+`setup_correlation_id_in_worker` and `clear_correlation_id_in_worker`, and
+register them at import time with Celery's `task_prerun` and `task_postrun`
+signals.
+
+**Rationale:**
+
+1. **Worker context uses the same `ContextVar`:** Reusing
+   `correlation_id_var` keeps worker logging and downstream propagation aligned
+   with Falcon request handling and the publish-path Celery integration.
+
+2. **Reset tokens preserve ambient state safely:** The implementation stores
+   `ContextVar.set()` tokens in an internal `_celery_context_tokens`
+   `ContextVar` keyed by context name, with a LIFO stack for each propagated
+   value. `task_postrun` restores the prior value with `reset(token)` and pops
+   that stack, which is safe even if the worker execution context already had
+   an ambient correlation ID or nested worker execution occurs in the same
+   context.
+
+3. **Registration stays idempotent:** Stable dispatch UIDs are used for both
+   worker signals so repeated imports or reloads do not create duplicate
+   receivers.
+
+4. **Behavioural testing uses explicit task signal dispatch:** Celery eager
+   execution fires `task_prerun` and `task_postrun`, but on Celery 5.6.3 it
+   does not populate `task.request.correlation_id` from
+   `task.apply(..., correlation_id=...)`. The behavioural test therefore uses a
+   real Celery task object, an explicit request via `push_request()`, and real
+   `task_prerun` / `task_postrun` signal dispatch to exercise the worker
+   contract without requiring an external broker or long-running worker.
+
+5. **Public package export:** The worker handlers are re-exported from
+   `falcon_correlate.__init__` so the publish and worker integration surface is
+   discoverable from the package root.
+
+**Files created/modified:**
+
+- `src/falcon_correlate/celery.py` — Added worker setup and cleanup handlers,
+  the internal token store, worker signal registration, and import-time
+  connection.
+- `src/falcon_correlate/__init__.py` — Re-exported
+  `setup_correlation_id_in_worker` and `clear_correlation_id_in_worker`.
+- `src/falcon_correlate/unittests/test_celery_worker_signal.py` — Added unit
+  coverage for setup, cleanup, idempotent registration, and package exports.
+- `tests/bdd/celery_worker_signal.feature` — Added worker lifecycle
+  behavioural coverage.
+- `tests/bdd/test_celery_worker_signal_steps.py` — Added a signal-driven worker
+  boundary using a real Celery task request.
+- `docs/users-guide.md` — Documented worker-side availability and cleanup of
+  `correlation_id_var` inside tasks.

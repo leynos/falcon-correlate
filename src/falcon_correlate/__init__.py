@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from .celery import propagate_correlation_id_to_celery
+from .celery import (
+    clear_correlation_id_in_worker,
+    propagate_correlation_id_to_celery,
+    setup_correlation_id_in_worker,
+)
 from .httpx import (
     AsyncCorrelationIDTransport,
     CorrelationIDTransport,
@@ -36,11 +40,13 @@ __all__ = [
     "CorrelationIDMiddleware",
     "CorrelationIDTransport",
     "async_request_with_correlation_id",
+    "clear_correlation_id_in_worker",
     "correlation_id_var",
     "default_uuid7_generator",
     "default_uuid_validator",
     "hello",
     "propagate_correlation_id_to_celery",
     "request_with_correlation_id",
+    "setup_correlation_id_in_worker",
     "user_id_var",
 ]

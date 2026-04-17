@@ -660,7 +660,9 @@ outgoing request. If the caller already set `X-Correlation-ID`,
 
 When Falcon request-handling code publishes Celery tasks, the current
 correlation ID can be copied into the outgoing task message's Advanced Message
-Queuing Protocol (AMQP) `correlation_id` property.
+Queuing Protocol (AMQP) `correlation_id` property. When a Celery worker later
+executes a task carrying that value, `falcon-correlate` also makes it available
+through `correlation_id_var` for the lifetime of the task body.
 
 **Note**: Celery is an optional dependency. Install the package with the Celery
 extra in any process that publishes tasks:
@@ -669,11 +671,12 @@ extra in any process that publishes tasks:
 pip install "falcon-correlate[celery]"
 ```
 
-### Enabling the publish signal handler
+### Enabling the publish and worker signal handlers
 
-Importing `falcon_correlate` registers the Celery `before_task_publish` handler
-automatically when Celery is installed. If the publisher process already
-imports anything from the package root, no extra registration call is needed.
+Importing `falcon_correlate` registers the Celery `before_task_publish`,
+`task_prerun`, and `task_postrun` handlers automatically when Celery is
+installed. If the publisher process or worker process already imports anything
+from the package root, no extra registration call is needed.
 
 ```python
 from celery import Celery
@@ -685,7 +688,8 @@ middleware = CorrelationIDMiddleware()
 
 Once the package is imported in the publisher process, normal task publishing
 APIs such as `delay()` and `apply_async()` propagate the request correlation ID
-automatically.
+automatically. When the worker process also imports the package, task execution
+sees that incoming value through `correlation_id_var.get()`.
 
 ```python
 from falcon_correlate import correlation_id_var
@@ -696,6 +700,16 @@ def enqueue_invoice_email(user_id: str) -> None:
     # correlation_id_var for the current context.
     send_invoice_email.delay(user_id)
     assert correlation_id_var.get() is not None
+```
+
+```python
+from falcon_correlate import correlation_id_var
+
+
+@celery_app.task(bind=True)
+def send_invoice_email(self, user_id: str) -> None:
+    task_correlation_id = correlation_id_var.get()
+    assert task_correlation_id == self.request.correlation_id
 ```
 
 ### Behaviour
@@ -713,8 +727,10 @@ def enqueue_invoice_email(user_id: str) -> None:
 - If the active Celery result backend is `rpc://`, `falcon-correlate`
   preserves Celery's task-id correlation contract and does not overwrite the
   publish `correlation_id`.
-- This release covers only the publish path. Worker-side setup and cleanup of
-  `correlation_id_var` inside Celery tasks will be added separately.
+- Inside a running Celery task, `correlation_id_var.get()` returns the
+  incoming task request correlation ID when one is present.
+- After the task finishes, `falcon-correlate` resets worker context
+  automatically so the next task does not inherit stale correlation data.
 
 ## Full Configuration Example
 
