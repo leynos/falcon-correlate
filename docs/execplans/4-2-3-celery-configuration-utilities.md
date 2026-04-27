@@ -116,9 +116,9 @@ The implementer should keep these references open while working:
 - Implement the helper in `src/falcon_correlate/celery.py` and keep it close
   to the existing signal registration code instead of creating a second Celery
   integration module.
-- Reuse the existing public handlers and stable dispatch UIDs. Do not create a
-  second copy of the publish or worker signal logic just to satisfy the helper
-  API.
+- Reuse the existing public handlers and stable dispatch unique identifiers
+  (UIDs). Do not create a second copy of the publish or worker signal logic
+  just to satisfy the helper API.
 - Connect all three supported handlers in one call:
   `before_task_publish`, `task_prerun`, and `task_postrun`.
 - Keep the helper idempotent. Repeated calls must not create duplicate
@@ -180,10 +180,10 @@ The implementer should keep these references open while working:
   change already-working publish or worker semantics. Mitigation: keep the new
   helper as a composition layer over the existing connection logic and rerun
   the existing targeted Celery tests.
-- Risk: BDD tests for the helper could become brittle if they duplicate too
-  much publish and worker setup. Mitigation: share small local fixtures or
-  helper functions, but keep the behavioural assertions focused on the public
-  configuration entry point.
+- Risk: Behaviour-Driven Development (BDD) tests for the helper could become
+  brittle if they duplicate too much publish and worker setup. Mitigation:
+  share small local fixtures or helper functions, but keep the behavioural
+  assertions focused on the public configuration entry point.
 
 ## Proposed implementation
 
