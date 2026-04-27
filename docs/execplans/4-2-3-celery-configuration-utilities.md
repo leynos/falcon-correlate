@@ -11,7 +11,7 @@ Status: COMPLETE
 
 Roadmap item 4.2.3 adds an explicit public entry point for Celery users who
 want one obvious configuration call instead of relying on import-time side
-effects. After this work, a consumer will be able to call
+effects. A consumer can now call
 `configure_celery_correlation(app)` once during Celery application setup and
 know that all supported correlation propagation handlers are connected:
 publish-time propagation through `before_task_publish`, and worker lifecycle
@@ -39,8 +39,12 @@ Success is observable when all of the following are true:
 - the repository passes `make check-fmt`, `make typecheck`, `make lint`,
   `make test`, `make markdownlint`, and `make nixie`.
 
-This document is a draft only. It must be approved before any implementation
-work begins.
+Implementation is complete in commit `7189e56` ("Add explicit Celery
+correlation configuration", 2026-04-27), with hook-environment validation
+stabilized in commit `fc92042` ("Make validation tools available to hooks",
+2026-04-27). Verification completed on 2026-04-27 with `make check-fmt`,
+`make typecheck`, `make lint`, `make test`, `make markdownlint`, and
+`make nixie`.
 
 ## Context and orientation
 
@@ -54,9 +58,10 @@ helpers, `_maybe_connect_celery_publish_signal()` and
 import time.
 
 The current package root in `src/falcon_correlate/__init__.py` re-exports the
-three public handlers, but there is no public configuration helper yet. The
-current user guide already documents automatic registration on import, so
-4.2.3 must be additive rather than a replacement for the existing behaviour.
+three public handlers and the public `configure_celery_correlation(app)`
+configuration helper. The current user guide documents both automatic
+registration on import and explicit configuration through the helper, so 4.2.3
+is additive rather than a replacement for the existing behaviour.
 
 The existing test suite already covers the publish and worker paths
 independently:
@@ -182,7 +187,7 @@ The implementer should keep these references open while working:
 
 ## Proposed implementation
 
-### Milestone 1: characterise the existing registration contract
+### Milestone 1: characterize the existing registration contract
 
 Start by confirming exactly how the current module registers Celery signals and
 what needs to be refactored to make that registration available through one
@@ -306,7 +311,7 @@ uv run pytest -v \
 Update `docs/users-guide.md` so the Celery section explains both supported
 activation styles:
 
-- implicit activation through package import, which remains supported; and
+- implicit activation through package import, which remains supported;
 - explicit activation through `configure_celery_correlation(app)`, which is
   the clearer option for application factories and worker bootstrap code.
 
@@ -453,3 +458,7 @@ environment did not include the user-local tool directories that provide
 `ruff`, `ty`, `uv`, `nixie`, and `markdownlint-cli2`. The Makefile now
 prepends `$(HOME)/.local/bin` and `$(HOME)/.bun/bin` to `PATH` so local and
 hook validation resolve the same project tools.
+
+Author/verification note: this ExecPlan was synchronized with the delivered
+implementation on 2026-04-27 after review of commits `7189e56` and `fc92042`,
+the updated user guide, design document, roadmap, unit tests, and BDD tests.
