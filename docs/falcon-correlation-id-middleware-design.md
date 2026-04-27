@@ -1711,3 +1711,56 @@ signals.
   boundary using a real Celery task request.
 - `docs/users-guide.md` — Documented worker-side availability and cleanup of
   `correlation_id_var` inside tasks.
+
+### A.10. Celery configuration helper (Task 4.2.3)
+
+**Decision:** Add `configure_celery_correlation(app)` to
+`src/falcon_correlate/celery.py`, re-export it from `falcon_correlate`, and
+implement it as a thin wrapper over the existing Celery signal registration
+helpers.
+
+**Rationale:**
+
+1. **Explicit application setup without a second registration model:** Celery's
+   signals are process-global in the integration used here. The helper accepts
+   the Celery app so application factories can expose their intent clearly,
+   but it does not store app-local state or duplicate signal logic.
+
+2. **Backwards compatibility:** Import-time registration remains in place, so
+   existing consumers that rely on `import falcon_correlate` continue to get
+   publish and worker propagation automatically.
+
+3. **Idempotence through existing dispatch UIDs:** The helper delegates to a
+   shared `_maybe_connect_celery_signals()` connector, which reuses the stable
+   dispatch UIDs for `before_task_publish`, `task_prerun`, and `task_postrun`.
+   Repeated calls therefore leave exactly one integration receiver connected to
+   each supported signal.
+
+4. **Application-factory ergonomics:** The helper returns the same app
+   instance it receives. Consumers can write
+   `celery_app = configure_celery_correlation(Celery(...))` without losing the
+   concrete app object or implying that the helper creates a new application.
+
+5. **Testing isolates import-time side effects:** Unit and behavioural tests
+   explicitly disconnect the known receivers by dispatch UID before calling the
+   helper. This prevents the existing import-time registration from hiding a
+   broken public configuration path.
+
+**Files created/modified:**
+
+- `src/falcon_correlate/celery.py` — Added
+  `configure_celery_correlation(app)` and the shared
+  `_maybe_connect_celery_signals()` connector.
+- `src/falcon_correlate/__init__.py` — Re-exported
+  `configure_celery_correlation` from the package root.
+- `src/falcon_correlate/unittests/test_celery_configuration.py` — Added unit
+  coverage for full-signal configuration, idempotence, return value, and root
+  export.
+- `tests/bdd/celery_configuration.feature` — Added behavioural scenarios for
+  explicit configuration of publish and worker propagation.
+- `tests/bdd/test_celery_configuration_steps.py` — Added BDD steps that
+  disconnect import-time receivers and prove the public helper reconnects the
+  publish and worker paths.
+- `docs/users-guide.md` — Documented the explicit helper, return contract,
+  idempotence, and relationship to import-time auto-registration.
+- `docs/roadmap.md` — Marked roadmap item 4.2.3 complete.

@@ -170,9 +170,9 @@ Enable correlation ID propagation to downstream HTTP services and Celery tasks.
   - [x] Store reset tokens for cleanup.
   - [x] Test correlation ID is available in worker context.
   - [x] Test context is cleared after task execution.
-- [ ] 4.2.3. Provide Celery configuration utilities
-  - [ ] Create `configure_celery_correlation(app)` helper function.
-  - [ ] Connect all signal handlers in one call.
+- [x] 4.2.3. Provide Celery configuration utilities
+  - [x] Create `configure_celery_correlation(app)` helper function.
+  - [x] Connect all signal handlers in one call.
 - [ ] 4.2.4. Validate optional Celery integration
   - [ ] Mark tests as skipped if Celery is not installed.
 

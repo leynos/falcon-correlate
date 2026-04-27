@@ -5,7 +5,7 @@ This Execution Plan (ExecPlan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -356,15 +356,32 @@ commands pass.
   tests to establish the real starting point for 4.2.3.
 - [x] 2026-04-21: Drafted this ExecPlan and recorded the proposed approach for
   approval before implementation.
-- [ ] Await explicit approval before implementing any code or documentation
-  changes beyond this plan document.
-- [ ] Write failing unit and behavioural tests for
+- [x] 2026-04-27: Resumed implementation on branch
+  `celery-correlation-propagation-5nogn4`; confirmed the worktree was clean
+  and the checked-in plan still represented the pre-implementation draft.
+- [x] 2026-04-27: Treated the user's continuation request as approval to
+  implement the planned functionality.
+- [x] 2026-04-27: Added targeted unit and behavioural tests for
   `configure_celery_correlation(app)`.
-- [ ] Implement the helper and any minimal internal refactor required to share
+- [x] 2026-04-27: Confirmed the targeted red phase failed during collection
+  because `configure_celery_correlation` was not yet importable from
+  `falcon_correlate.celery`.
+- [x] 2026-04-27: Implemented the helper as a thin public wrapper around a new
+  `_maybe_connect_celery_signals()` internal connector and re-exported it from
+  the package root.
+- [x] 2026-04-27: Ran the Celery-focused targeted suite; 27 tests passed,
+  covering the new configuration helper and existing publish and worker signal
+  behaviour.
+- [x] Implement the helper and any minimal internal refactor required to share
   signal connection logic.
-- [ ] Update the users' guide, design document, and roadmap as part of the
+- [x] 2026-04-27: Updated the users' guide, design document, and roadmap for
+  the explicit configuration helper and marked roadmap item 4.2.3 complete.
+- [x] Update the users' guide, design document, and roadmap as part of the
   implementation turn.
-- [ ] Run the full validation suite and record outcomes.
+- [x] 2026-04-27: Ran the full validation suite successfully:
+  `make check-fmt`, `make typecheck`, `make lint`, `make test`,
+  `make markdownlint`, and `make nixie`.
+- [x] Run the full validation suite and record outcomes.
 
 ## Surprises & Discoveries
 
@@ -378,6 +395,14 @@ commands pass.
 - The current users' guide already tells consumers that importing the package
   is enough. The helper documentation must therefore explain "why use this"
   rather than pretending there was no previous configuration path.
+- 2026-04-27: The resumed worktree did not contain the implementation
+  described in the previous task context. The only branch-local commit was the
+  ExecPlan draft, so implementation is proceeding from the documented starting
+  point rather than attempting to preserve unavailable edits.
+- 2026-04-27: Tests that prove the helper must disconnect the known
+  `before_task_publish`, `task_prerun`, and `task_postrun` receivers by
+  dispatch UID first; otherwise import-time registration can make a missing or
+  incomplete helper look correct.
 
 ## Decision Log
 
@@ -395,8 +420,30 @@ commands pass.
   a clean, chainable API. Rationale: the roadmap fixes the parameter name but
   not the return type, and returning the app is the most ergonomic public
   contract if it does not create type or import-safety problems.
+- 2026-04-27: Final decision: return the same `app` instance from
+  `configure_celery_correlation(app)`. Rationale: the helper does not need
+  app-local state because the existing integration uses Celery's global signal
+  registry, and returning the app keeps application-factory code concise.
 
 ## Outcomes & Retrospective
 
-No implementation has started. This draft exists to secure approval for the
-approach before any code, tests, or user-facing documentation are changed.
+Roadmap item 4.2.3 is complete. The package now exposes
+`configure_celery_correlation(app)` from both `falcon_correlate.celery` and
+the package root. The helper reuses the existing publish and worker signal
+registration helpers through `_maybe_connect_celery_signals()`, returns the
+same app instance, and remains idempotent through the existing Celery dispatch
+UIDs.
+
+The main implementation lesson is that tests for explicit configuration must
+first disconnect the import-time receivers by dispatch UID. Without that setup,
+automatic registration can mask a broken helper because the signals are
+already connected before the test exercises the public API.
+
+Validation completed successfully on 2026-04-27:
+
+- `make check-fmt`
+- `make typecheck`
+- `make lint`
+- `make test` (`345 passed, 11 skipped`)
+- `make markdownlint`
+- `make nixie`
