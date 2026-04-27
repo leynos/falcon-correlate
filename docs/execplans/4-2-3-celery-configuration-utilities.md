@@ -447,3 +447,9 @@ Validation completed successfully on 2026-04-27:
 - `make test` (`345 passed, 11 skipped`)
 - `make markdownlint`
 - `make nixie`
+
+Post-turn hook validation initially failed because the non-interactive hook
+environment did not include the user-local tool directories that provide
+`ruff`, `ty`, `uv`, `nixie`, and `markdownlint-cli2`. The Makefile now
+prepends `$(HOME)/.local/bin` and `$(HOME)/.bun/bin` to `PATH` so local and
+hook validation resolve the same project tools.
