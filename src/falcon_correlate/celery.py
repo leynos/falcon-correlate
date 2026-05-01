@@ -195,14 +195,32 @@ def _maybe_connect_celery_worker_signals() -> None:
     )
 
 
-_maybe_connect_celery_publish_signal()
-_maybe_connect_celery_worker_signals()
+def _maybe_connect_celery_signals() -> None:
+    """Register all supported Celery signal handlers when Celery is installed."""
+    _maybe_connect_celery_publish_signal()
+    _maybe_connect_celery_worker_signals()
+
+
+def configure_celery_correlation[CeleryAppT](app: CeleryAppT) -> CeleryAppT:
+    """Configure Celery correlation ID propagation for an application.
+
+    The current integration uses Celery's global signal registry, so the
+    ``app`` parameter is returned unchanged for application-factory ergonomics.
+    Stable dispatch UIDs keep repeated calls idempotent.
+    """
+    _maybe_connect_celery_signals()
+    return app
+
+
+_maybe_connect_celery_signals()
 
 
 __all__ = [
     "_maybe_connect_celery_publish_signal",
+    "_maybe_connect_celery_signals",
     "_maybe_connect_celery_worker_signals",
     "clear_correlation_id_in_worker",
+    "configure_celery_correlation",
     "propagate_correlation_id_to_celery",
     "setup_correlation_id_in_worker",
 ]
