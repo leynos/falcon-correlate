@@ -41,6 +41,19 @@ def _receiver_count(signal: _SignalWithReceivers, receiver: object) -> int:
     return sum(1 for _, receiver_func in receivers if receiver_func is receiver)
 
 
+def _assert_all_signals_connected_once() -> None:
+    """Assert each integration signal has exactly one live receiver."""
+    for signal, receiver in (
+        (
+            before_task_publish,
+            propagate_correlation_id_to_celery,
+        ),
+        (task_prerun, setup_correlation_id_in_worker),
+        (task_postrun, clear_correlation_id_in_worker),
+    ):
+        assert _receiver_count(signal, receiver) == 1
+
+
 @pytest.fixture
 def celery_app() -> Celery:
     """Build a minimal Celery app for configuration tests."""
@@ -55,15 +68,7 @@ def test_configure_celery_correlation_connects_all_supported_signals(
 
     configure_celery_correlation(celery_app)
 
-    assert (
-        _receiver_count(
-            before_task_publish,
-            propagate_correlation_id_to_celery,
-        )
-        == 1
-    )
-    assert _receiver_count(task_prerun, setup_correlation_id_in_worker) == 1
-    assert _receiver_count(task_postrun, clear_correlation_id_in_worker) == 1
+    _assert_all_signals_connected_once()
 
 
 def test_configure_celery_correlation_is_idempotent(celery_app: Celery) -> None:
@@ -73,15 +78,7 @@ def test_configure_celery_correlation_is_idempotent(celery_app: Celery) -> None:
     configure_celery_correlation(celery_app)
     configure_celery_correlation(celery_app)
 
-    assert (
-        _receiver_count(
-            before_task_publish,
-            propagate_correlation_id_to_celery,
-        )
-        == 1
-    )
-    assert _receiver_count(task_prerun, setup_correlation_id_in_worker) == 1
-    assert _receiver_count(task_postrun, clear_correlation_id_in_worker) == 1
+    _assert_all_signals_connected_once()
 
 
 def test_configure_celery_correlation_returns_app_instance(
