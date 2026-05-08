@@ -9,12 +9,24 @@ import pytest
 
 celery = pytest.importorskip("celery")
 
-from celery import Celery  # noqa: E402
-from celery.signals import before_task_publish, task_postrun, task_prerun  # noqa: E402
-from pytest_bdd import given, parsers, scenarios, then, when  # noqa: E402
+from celery import Celery  # noqa: E402 -- after Celery availability check
+from celery.signals import (  # noqa: E402 -- after Celery availability check
+    before_task_publish,
+    task_postrun,
+    task_prerun,
+)
+from pytest_bdd import (  # noqa: E402 -- after optional Celery test setup
+    given,
+    parsers,
+    scenarios,
+    then,
+    when,
+)
 
-from falcon_correlate import correlation_id_var  # noqa: E402
-from falcon_correlate.celery import (  # noqa: E402
+from falcon_correlate import (  # noqa: E402 -- after optional Celery test setup
+    correlation_id_var,
+)
+from falcon_correlate.celery import (  # noqa: E402 -- after Celery skip setup
     _BEFORE_TASK_PUBLISH_DISPATCH_UID,
     _TASK_POSTRUN_DISPATCH_UID,
     _TASK_PRERUN_DISPATCH_UID,
@@ -107,6 +119,9 @@ def when_publish_configured_task(context: Context) -> Context:
         echo.apply_async(args=("payload",))
 
     assert publish.call_count == 1, "expected a single broker publish call"
+    assert "correlation_id" in publish.call_args.kwargs, (
+        "expected correlation_id in publish kwargs"
+    )
     return {
         **context,
         "published_correlation_id": publish.call_args.kwargs["correlation_id"],
@@ -149,7 +164,10 @@ def then_configured_published_correlation_id_matches(
     value: str,
 ) -> None:
     """Assert the broker publish call used the expected correlation ID."""
-    assert context["published_correlation_id"] == value
+    assert context["published_correlation_id"] == value, (
+        f"expected published_correlation_id {value}, "
+        f"got {context['published_correlation_id']}"
+    )
 
 
 @then(parsers.parse('the configured task body should observe correlation ID "{value}"'))
@@ -158,10 +176,16 @@ def then_configured_task_body_observes_correlation_id(
     value: str,
 ) -> None:
     """Assert the task body received the worker correlation ID context."""
-    assert context["task_correlation_id_seen"] == value
+    assert context["task_correlation_id_seen"] == value, (
+        f"expected task_correlation_id_seen {value}, "
+        f"got {context['task_correlation_id_seen']}"
+    )
 
 
 @then("the configured ambient correlation ID should be cleared after the task finishes")
 def then_configured_ambient_correlation_id_is_cleared(context: Context) -> None:
     """Assert worker cleanup restored a clean ambient context."""
-    assert context["correlation_id_after_task"] is None
+    assert context["correlation_id_after_task"] is None, (
+        "expected ambient correlation id to be cleared, "
+        f"got {context['correlation_id_after_task']}"
+    )

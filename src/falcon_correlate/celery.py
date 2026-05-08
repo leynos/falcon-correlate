@@ -231,9 +231,6 @@ _maybe_connect_celery_signals()
 
 
 __all__ = [
-    "_maybe_connect_celery_publish_signal",
-    "_maybe_connect_celery_signals",
-    "_maybe_connect_celery_worker_signals",
     "clear_correlation_id_in_worker",
     "configure_celery_correlation",
     "propagate_correlation_id_to_celery",
