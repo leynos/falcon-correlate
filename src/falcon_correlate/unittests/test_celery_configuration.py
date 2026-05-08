@@ -8,6 +8,8 @@ import typing as typ
 from types import SimpleNamespace
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 celery = pytest.importorskip("celery")
 
@@ -111,6 +113,56 @@ def test_configure_celery_correlation_is_idempotent(celery_app: Celery) -> None:
     _assert_all_signals_connected_once()
 
 
+@given(call_count=st.integers(min_value=1, max_value=10))
+@settings(max_examples=50)
+def test_configure_celery_correlation_idempotent_for_n_calls(
+    call_count: int,
+) -> None:
+    """Calling configure_celery_correlation n times must not duplicate receivers.
+
+    The dispatch UID guard guarantees idempotence regardless of call count.
+    """
+    app = Celery("prop-celery-idempotence", broker="memory://")
+    _disconnect_integration_receivers()
+
+    for _ in range(call_count):
+        configure_celery_correlation(app)
+
+    _assert_all_signals_connected_once()
+    _disconnect_integration_receivers()
+
+
+@given(
+    correlation_ids=st.lists(
+        st.text(
+            min_size=1,
+            max_size=64,
+            alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd")),
+        ),
+        min_size=1,
+        max_size=8,
+    )
+)
+@settings(max_examples=50)
+def test_context_token_stack_unwinds_lifo(correlation_ids: list[str]) -> None:
+    """setup/clear functions must unwind the ContextVar stack in LIFO order.
+
+    For any sequence of correlation IDs pushed via setup_correlation_id_in_worker,
+    successive calls to clear_correlation_id_in_worker must restore each prior
+    value in reverse order, ending with None.
+    """
+    tasks = [_TaskLike(correlation_id=cid) for cid in correlation_ids]
+
+    for task in tasks:
+        setup_correlation_id_in_worker(task=task)
+
+    for expected in reversed(correlation_ids):
+        assert correlation_id_var.get() == expected
+        clear_correlation_id_in_worker()
+
+    assert correlation_id_var.get() is None
+
+
 def test_configure_celery_correlation_isolates_nested_task_context(
     celery_app: Celery,
     isolated_context: typ.Callable[[typ.Callable[[], None]], None],
@@ -166,3 +218,55 @@ def test_configure_celery_correlation_is_exported_from_package_root() -> None:
 
     assert "configure_celery_correlation" in falcon_correlate.__all__
     assert falcon_correlate.configure_celery_correlation is configure_celery_correlation
+
+
+def test_safe_connect_signal_logs_when_signal_missing(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """_safe_connect_signal should emit a DEBUG message for a missing signal."""
+    import logging
+
+    from falcon_correlate.celery import _safe_connect_signal
+
+    def fake_handler(**_: object) -> None:
+        return
+
+    module_without_signal = object()
+
+    with caplog.at_level(logging.DEBUG, logger="falcon_correlate.celery"):
+        _safe_connect_signal(
+            module_without_signal,
+            "nonexistent_signal",
+            fake_handler,
+            "test.uid",
+        )
+
+    assert any("nonexistent_signal" in record.message for record in caplog.records)
+
+
+def test_safe_connect_signal_logs_on_successful_connect(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """_safe_connect_signal should emit a DEBUG message on successful connect."""
+    import logging
+
+    from falcon_correlate.celery import _safe_connect_signal
+
+    fake_uid = "falcon_correlate.test.debug_log_uid"
+
+    def fake_handler(**_: object) -> None:
+        return
+
+    fake_module = SimpleNamespace(before_task_publish=before_task_publish)
+
+    try:
+        with caplog.at_level(logging.DEBUG, logger="falcon_correlate.celery"):
+            _safe_connect_signal(
+                fake_module,
+                "before_task_publish",
+                fake_handler,
+                fake_uid,
+            )
+        assert any(fake_uid in record.message for record in caplog.records)
+    finally:
+        before_task_publish.disconnect(dispatch_uid=fake_uid)

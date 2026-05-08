@@ -408,6 +408,10 @@ commands pass.
   `before_task_publish`, `task_prerun`, and `task_postrun` receivers by
   dispatch UID first; otherwise import-time registration can make a missing or
   incomplete helper look correct.
+- 2026-05-08: Added Hypothesis as a dev dependency to prove repeated Celery
+  configuration remains idempotent across generated call counts and to prove
+  the worker context token stack unwinds in LIFO order across generated
+  correlation ID sequences.
 
 ## Decision Log
 
@@ -462,3 +466,6 @@ hook validation resolve the same project tools.
 Author/verification note: this ExecPlan was synchronized with the delivered
 implementation on 2026-04-27 after review of commits `7189e56` and `fc92042`,
 the updated user guide, design document, roadmap, unit tests, and BDD tests.
+Follow-up validation on 2026-05-08 added property tests and `_safe_connect_signal`
+debug logging, then passed `make check-fmt`, `make lint`, `make typecheck`, and
+`make test`.
