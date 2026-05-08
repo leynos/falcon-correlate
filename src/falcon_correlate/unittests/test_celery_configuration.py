@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import concurrent.futures
+import threading
 import typing as typ
+from types import SimpleNamespace
 
 import pytest
 
@@ -17,6 +20,7 @@ from falcon_correlate.celery import (  # noqa: E402
     _TASK_PRERUN_DISPATCH_UID,
     clear_correlation_id_in_worker,
     configure_celery_correlation,
+    correlation_id_var,
     propagate_correlation_id_to_celery,
     setup_correlation_id_in_worker,
 )
@@ -54,6 +58,13 @@ def _assert_all_signals_connected_once() -> None:
         assert _receiver_count(signal, receiver) == 1
 
 
+class _TaskLike:
+    """Minimal hashable task object for Celery signal dispatch tests."""
+
+    def __init__(self, *, correlation_id: str) -> None:
+        self.request = SimpleNamespace(correlation_id=correlation_id)
+
+
 @pytest.fixture
 def celery_app() -> Celery:
     """Build a minimal Celery app for configuration tests."""
@@ -71,6 +82,25 @@ def test_configure_celery_correlation_connects_all_supported_signals(
     _assert_all_signals_connected_once()
 
 
+def test_configure_celery_correlation_is_safe_under_concurrent_calls(
+    celery_app: Celery,
+) -> None:
+    """Concurrent configuration calls should still connect each signal once."""
+    _disconnect_integration_receivers()
+    barrier = threading.Barrier(4)
+
+    def _configure_from_thread() -> None:
+        barrier.wait()
+        configure_celery_correlation(celery_app)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(_configure_from_thread) for _ in range(4)]
+        for future in futures:
+            future.result(timeout=5)
+
+    _assert_all_signals_connected_once()
+
+
 def test_configure_celery_correlation_is_idempotent(celery_app: Celery) -> None:
     """Repeated configuration should not duplicate signal receivers."""
     _disconnect_integration_receivers()
@@ -79,6 +109,48 @@ def test_configure_celery_correlation_is_idempotent(celery_app: Celery) -> None:
     configure_celery_correlation(celery_app)
 
     _assert_all_signals_connected_once()
+
+
+def test_configure_celery_correlation_isolates_nested_task_context(
+    celery_app: Celery,
+    isolated_context: typ.Callable[[typ.Callable[[], None]], None],
+) -> None:
+    """Configured worker signals should unwind nested task contexts in order."""
+    _disconnect_integration_receivers()
+    configure_celery_correlation(celery_app)
+    outer_task = _TaskLike(correlation_id="outer-worker-correlation-id")
+    inner_task = _TaskLike(correlation_id="inner-worker-correlation-id")
+
+    def _logic() -> None:
+        assert correlation_id_var.get() is None
+
+        task_prerun.send(sender=outer_task, task=outer_task, args=(), kwargs={})
+        assert correlation_id_var.get() == "outer-worker-correlation-id"
+
+        task_prerun.send(sender=inner_task, task=inner_task, args=(), kwargs={})
+        assert correlation_id_var.get() == "inner-worker-correlation-id"
+
+        task_postrun.send(
+            sender=inner_task,
+            task=inner_task,
+            args=(),
+            kwargs={},
+            retval=None,
+            state="SUCCESS",
+        )
+        assert correlation_id_var.get() == "outer-worker-correlation-id"
+
+        task_postrun.send(
+            sender=outer_task,
+            task=outer_task,
+            args=(),
+            kwargs={},
+            retval=None,
+            state="SUCCESS",
+        )
+        assert correlation_id_var.get() is None
+
+    isolated_context(_logic)
 
 
 def test_configure_celery_correlation_returns_app_instance(

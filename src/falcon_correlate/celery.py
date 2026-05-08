@@ -196,7 +196,14 @@ def _maybe_connect_celery_worker_signals() -> None:
 
 
 def _maybe_connect_celery_signals() -> None:
-    """Register all supported Celery signal handlers when Celery is installed."""
+    """Register all supported Celery signal handlers when Celery is installed.
+
+    Celery's Django-derived signal implementation protects receiver mutation
+    with an internal ``threading.Lock``. Stable dispatch UIDs provide the
+    duplicate-registration guard when several callers configure the integration
+    concurrently.
+
+    """
     _maybe_connect_celery_publish_signal()
     _maybe_connect_celery_worker_signals()
 
