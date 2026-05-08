@@ -673,23 +673,36 @@ pip install "falcon-correlate[celery]"
 
 ### Enabling the publish and worker signal handlers
 
-Importing `falcon_correlate` registers the Celery `before_task_publish`,
-`task_prerun`, and `task_postrun` handlers automatically when Celery is
-installed. If the publisher process or worker process already imports anything
-from the package root, no extra registration call is needed.
+The clearest activation path is to call
+`configure_celery_correlation(celery_app)` during Celery application setup in
+each publisher and worker process:
 
 ```python
 from celery import Celery
-from falcon_correlate import CorrelationIDMiddleware
+from falcon_correlate import CorrelationIDMiddleware, configure_celery_correlation
 
-celery_app = Celery("myapp", broker="redis://localhost:6379/0")
+celery_app = configure_celery_correlation(
+    Celery("myapp", broker="redis://localhost:6379/0")
+)
 middleware = CorrelationIDMiddleware()
 ```
 
-Once the package is imported in the publisher process, normal task publishing
-APIs such as `delay()` and `apply_async()` propagate the request correlation ID
-automatically. When the worker process also imports the package, task execution
-sees that incoming value through `correlation_id_var.get()`.
+The helper connects the `before_task_publish`, `task_prerun`, and
+`task_postrun` handlers in one idempotent call and returns the same app
+instance. It is safe to call repeatedly, which is useful when publisher and
+worker bootstrap code share an application factory.
+
+Importing `falcon_correlate` also registers those handlers automatically when
+Celery is installed. If the publisher process or worker process already imports
+anything from the package root, no extra registration call is needed. The
+explicit helper remains the preferred form for new application setup because it
+makes Celery integration visible at the point where the Celery app is created.
+
+Once the handlers are registered in the publisher process, normal task
+publishing APIs such as `delay()` and `apply_async()` propagate the request
+correlation ID automatically. When the worker process also registers the
+handlers, task execution sees that incoming value through
+`correlation_id_var.get()`.
 
 ```python
 from falcon_correlate import correlation_id_var

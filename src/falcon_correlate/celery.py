@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextvars
 import importlib
+import logging
 import typing as typ
 
 from .middleware import correlation_id_var
@@ -23,6 +24,7 @@ _BEFORE_TASK_PUBLISH_DISPATCH_UID = (
 _TASK_PRERUN_DISPATCH_UID = "falcon_correlate.celery.setup_correlation_id_in_worker"
 _TASK_POSTRUN_DISPATCH_UID = "falcon_correlate.celery.clear_correlation_id_in_worker"
 _CORRELATION_ID_CONTEXT_KEY = "correlation_id"
+_logger = logging.getLogger(__name__)
 
 _ContextToken = contextvars.Token[str | None]
 _CeleryContextTokens = dict[str, list[_ContextToken]]
@@ -147,16 +149,46 @@ def _safe_connect_signal(
     handler: cabc.Callable[..., object],
     dispatch_uid: str,
 ) -> None:
-    """Connect a Celery signal when the signal object exposes ``connect``."""
+    """Connect a Celery signal when the signal object exposes ``connect``.
+
+    Emits ``DEBUG`` log lines for each connection attempt, skipped signal, and
+    exception so that misconfigured or missing signals are diagnosable in
+    production without raising.
+
+    """
     signal = getattr(signal_module, signal_name, None)
     if signal is None:
+        _logger.debug(
+            "falcon_correlate: signal %r not found on %r; skipping",
+            signal_name,
+            signal_module,
+        )
         return
 
     connect = getattr(signal, "connect", None)
     if not callable(connect):
+        _logger.debug(
+            "falcon_correlate: signal %r has no callable connect(); skipping",
+            signal_name,
+        )
         return
 
-    connect(handler, dispatch_uid=dispatch_uid, weak=False)
+    try:
+        handler_name = getattr(handler, "__name__", repr(handler))
+        connect(handler, dispatch_uid=dispatch_uid, weak=False)
+        _logger.debug(
+            "falcon_correlate: connected %r to %r (dispatch_uid=%r)",
+            handler_name,
+            signal_name,
+            dispatch_uid,
+        )
+    except Exception:  # noqa: BLE001
+        _logger.debug(
+            "falcon_correlate: exception connecting %r to %r",
+            getattr(handler, "__name__", repr(handler)),
+            signal_name,
+            exc_info=True,
+        )
 
 
 def _maybe_connect_celery_publish_signal() -> None:
@@ -195,14 +227,51 @@ def _maybe_connect_celery_worker_signals() -> None:
     )
 
 
-_maybe_connect_celery_publish_signal()
-_maybe_connect_celery_worker_signals()
+def _maybe_connect_celery_signals() -> None:
+    """Register all supported Celery signal handlers when Celery is installed.
+
+    Celery's Django-derived signal implementation protects receiver mutation
+    with an internal ``threading.Lock``. Stable dispatch UIDs provide the
+    duplicate-registration guard when several callers configure the integration
+    concurrently.
+
+    """
+    _maybe_connect_celery_publish_signal()
+    _maybe_connect_celery_worker_signals()
+
+
+def configure_celery_correlation[CeleryAppT](app: CeleryAppT) -> CeleryAppT:
+    """Configure Celery correlation ID propagation for an application.
+
+    The current integration uses Celery's global signal registry, so the
+    ``app`` parameter is returned unchanged for application-factory ergonomics.
+    Stable dispatch UIDs keep repeated calls idempotent.
+
+    Parameters
+    ----------
+    app : CeleryAppT
+        Celery application instance being configured. The instance is used as
+        the caller's explicit setup marker; signal registration remains global
+        and requires Celery's signal objects to be importable.
+
+    Returns
+    -------
+    CeleryAppT
+        The same ``app`` instance, returned for application-factory ergonomics.
+        Repeated calls are idempotent because registration uses stable dispatch
+        UIDs.
+
+    """
+    _maybe_connect_celery_signals()
+    return app
+
+
+_maybe_connect_celery_signals()
 
 
 __all__ = [
-    "_maybe_connect_celery_publish_signal",
-    "_maybe_connect_celery_worker_signals",
     "clear_correlation_id_in_worker",
+    "configure_celery_correlation",
     "propagate_correlation_id_to_celery",
     "setup_correlation_id_in_worker",
 ]
