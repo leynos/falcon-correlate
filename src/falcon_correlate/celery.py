@@ -207,6 +207,21 @@ def configure_celery_correlation[CeleryAppT](app: CeleryAppT) -> CeleryAppT:
     The current integration uses Celery's global signal registry, so the
     ``app`` parameter is returned unchanged for application-factory ergonomics.
     Stable dispatch UIDs keep repeated calls idempotent.
+
+    Parameters
+    ----------
+    app : CeleryAppT
+        Celery application instance being configured. The instance is used as
+        the caller's explicit setup marker; signal registration remains global
+        and requires Celery's signal objects to be importable.
+
+    Returns
+    -------
+    CeleryAppT
+        The same ``app`` instance, returned for application-factory ergonomics.
+        Repeated calls are idempotent because registration uses stable dispatch
+        UIDs.
+
     """
     _maybe_connect_celery_signals()
     return app

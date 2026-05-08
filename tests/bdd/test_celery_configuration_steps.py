@@ -62,7 +62,9 @@ def given_configured_celery_app() -> Context:
     app = Celery("bdd-celery-configuration", broker="memory://")
     app.conf.task_always_eager = False
     configured_app = configure_celery_correlation(app)
-    assert configured_app is app
+    assert configured_app is app, (
+        f"configured_app is not app: got {configured_app!r} expected {app!r}"
+    )
     return {"app": app}
 
 
