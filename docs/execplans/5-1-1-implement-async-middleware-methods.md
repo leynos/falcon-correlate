@@ -5,7 +5,7 @@ This Execution Plan (ExecPlan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: BLOCKED
 
 ## Purpose / big picture
 
@@ -448,7 +448,21 @@ Acceptance for this milestone:
   configuration point and that no `CorrelationIDMiddlewareASGI` symbol exists
   yet.
 - [x] 2026-05-08: Drafted this pre-implementation ExecPlan.
-- [ ] Obtain explicit approval for this ExecPlan before implementation.
+- [x] 2026-05-09: Received explicit approval to implement the approved
+  ExecPlan and changed plan status from `DRAFT` to `IN PROGRESS`.
+- [x] 2026-05-09: Re-read `CorrelationIDMiddleware`,
+  `CorrelationIDConfig`, public export tests, WSGI Falcon integration tests,
+  and BDD middleware steps before editing.
+- [x] 2026-05-09: Added
+  `src/falcon_correlate/unittests/test_middleware_response_header.py` to
+  verify the documented WSGI response-header echo contract before ASGI parity
+  work.
+- [x] 2026-05-09: Ran
+  `uv run pytest -v src/falcon_correlate/unittests/test_middleware_response_header.py`
+  and captured the red-state log at
+  `/tmp/test-falcon-correlate-5-1-1-wsgi-response-header-red.out`.
+- [ ] Resolve the confirmed WSGI response-header contract gap before adding
+  ASGI middleware tests.
 - [ ] Add failing unit and behavioural tests for ASGI middleware behaviour.
 - [ ] Implement `CorrelationIDMiddlewareASGI` and shared lifecycle helpers.
 - [ ] Update public exports, user documentation, design documentation and the
@@ -467,6 +481,15 @@ Acceptance for this milestone:
   context variable but does not visibly apply the documented
   `echo_header_in_response` behaviour. The implementation phase must test this
   contract before assuming parity.
+- 2026-05-09: Re-inspection confirmed the WSGI `process_response` method
+  currently contains only reset-token handling and does not call
+  `resp.set_header`. The next red test will verify whether the documented
+  response-header echo contract is currently unmet.
+- 2026-05-09: The new WSGI response-header test confirmed the documented
+  contract gap. With `echo_header_in_response=True`, `resp.get_header(
+  "X-Correlation-ID")` was `None` after `process_response`, while the disabled
+  echo test passed. This reaches the plan tolerance for response-header parity
+  and pauses implementation pending user direction.
 
 ## Decision Log
 
@@ -484,6 +507,17 @@ Acceptance for this milestone:
 - 2026-05-08: Treat response-header echo as a verified contract, not an
   assumption. The docs and configuration promise this behaviour, but the
   current WSGI code inspection suggests the implementation may be incomplete.
+- 2026-05-09: Treat the user's implementation request as explicit approval of
+  this ExecPlan. The work may now proceed milestone by milestone, but the
+  tolerance requiring escalation on a confirmed WSGI response-header contract
+  gap still applies.
+- 2026-05-09: Block implementation at the response-header tolerance. Options:
+  fix WSGI response-header echo and make ASGI share that corrected lifecycle,
+  or narrow this roadmap item so ASGI matches the current implementation and
+  update documentation to remove the response-header promise. The first option
+  preserves the documented public contract; the second avoids expanding
+  runtime behaviour in this branch but leaves or codifies a surprising
+  configuration no-op.
 
 ## Outcomes & Retrospective
 
