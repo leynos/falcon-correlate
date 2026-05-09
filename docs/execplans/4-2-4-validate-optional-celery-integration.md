@@ -5,7 +5,7 @@ This Execution Plan (ExecPlan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -37,8 +37,7 @@ features. Success is observable when:
 - `docs/roadmap.md` marks 4.2.4 complete only after implementation,
   documentation, and validation are finished.
 
-This plan is pre-implementation. It must be approved before any implementation
-steps are executed.
+This plan was approved on 2026-05-09 and has now been implemented.
 
 ## Constraints
 
@@ -149,10 +148,34 @@ steps are executed.
   `pyproject.toml`, `Makefile`, `src/falcon_correlate/celery.py`, and the
   existing Celery unit and BDD tests.
 - [x] (2026-05-08T19:16:45Z) Drafted this pre-implementation ExecPlan.
-- [ ] Await explicit approval before implementing roadmap item 4.2.4.
-- [ ] Implement the approved plan.
-- [ ] Run all validation gates and record results.
-- [ ] Update `docs/roadmap.md` to check off 4.2.4 after implementation.
+- [x] (2026-05-09T11:48:01Z) Received explicit approval to implement the
+  planned functionality.
+- [x] (2026-05-09T11:48:01Z) Reconfirmed that each current Celery-specific
+  unit test module and BDD step module calls `pytest.importorskip("celery")`
+  before importing Celery symbols.
+- [x] (2026-05-09T11:48:01Z) Added
+  `src/falcon_correlate/unittests/test_optional_celery_dependency.py` with
+  child-process validation for import safety and missing-Celery test skips.
+- [x] (2026-05-09T11:48:01Z) Observed the first missing-Celery child pytest run
+  fail the parent assertion because pytest exits with code 5 when all selected
+  modules skip during collection.
+- [x] (2026-05-09T11:48:01Z) Adjusted the child pytest run to include a
+  passing non-Celery sentinel test, matching a normal suite where non-Celery
+  tests continue while Celery-only modules skip.
+- [x] (2026-05-09T11:48:01Z) Updated the Celery design appendix and users'
+  guide with the optional-dependency validation decision and consumer-facing
+  import-safety note.
+- [x] (2026-05-09T11:50:52Z) Ran targeted installed-Celery validation; the
+  existing Celery unit and BDD tests reported `33 passed in 0.23s`.
+- [x] (2026-05-09T11:50:52Z) Ran the new optional-Celery validation directly;
+  it reported `2 passed in 5.71s`.
+- [x] (2026-05-09T11:50:52Z) Checked off roadmap item 4.2.4 after
+  implementation and targeted validation.
+- [x] Implement the approved plan.
+- [x] (2026-05-09T11:50:52Z) Ran all required validation gates and recorded
+  the results in this plan.
+- [x] (2026-05-09T11:50:52Z) Updated `docs/roadmap.md` to check off 4.2.4
+  after implementation.
 
 ## Surprises & Discoveries
 
@@ -176,6 +199,12 @@ steps are executed.
   needs a targeted validation strategy outwith the normal `make test`
   environment.
 
+- Observation: a pytest subprocess that selects only Celery-dependent modules
+  while Celery is blocked reports `6 skipped` but exits with code 5 because no
+  runnable tests were collected. Impact: the validation includes a generated
+  one-test non-Celery sentinel so the child process represents a normal mixed
+  test suite and can assert exit code 0 plus skipped Celery modules.
+
 ## Decision Log
 
 - Decision: Treat 4.2.4 as a validation and documentation task unless targeted
@@ -196,17 +225,37 @@ steps are executed.
   needs proof of behaviour when one optional dependency is absent. Date/Author:
   2026-05-08T19:16:45Z / Codex.
 
+- Decision: Use a child-process import blocker rather than uninstalling Celery
+  or creating a second dependency environment. Rationale: a temporary
+  `sitecustomize.py` on the child `PYTHONPATH` can make only `celery` imports
+  unavailable while preserving the existing project environment, which gives
+  realistic pytest collection behaviour without mutating shared dependencies.
+  Date/Author: 2026-05-09T11:48:01Z / Codex.
+
+- Decision: Keep the missing-Celery validation as subprocess harness coverage
+  rather than a Hypothesis property test. Rationale: the behaviour is an
+  environment and pytest collection contract, not an invariant over a range of
+  generated inputs. Date/Author: 2026-05-09T11:48:01Z / Codex.
+
 ## Outcomes & Retrospective
 
-This plan is drafted and awaiting approval. No implementation outcome exists
-yet. After implementation, update this section with:
+Roadmap item 4.2.4 is implemented. The final change keeps the existing
+`pytest.importorskip("celery")` guards in the Celery unit and BDD step modules
+and adds explicit validation in
+`src/falcon_correlate/unittests/test_optional_celery_dependency.py`.
 
-- the exact missing-Celery validation approach used;
-- whether any test files needed changes beyond their existing
-  `pytest.importorskip("celery")` guards;
-- the validation command results; and
-- any follow-up work, such as a dedicated CI job for optional dependency
-  matrices.
+The missing-Celery validation uses a subprocess with a temporary
+`sitecustomize.py` import hook that raises `ModuleNotFoundError` for `celery`
+and `celery.*`. That child process proves `falcon_correlate` and
+`falcon_correlate.celery` remain import-safe without Celery, then runs pytest
+against the Celery-specific test modules and verifies they are skipped without
+collection errors.
+
+No production Celery behaviour, public API, optional extra, or dependency group
+changed. The users' guide now clarifies that importing the package without the
+Celery extra is safe and leaves Celery signal integration inactive. The design
+appendix records the skip strategy, the subprocess import blocker, and the
+pytest exit-code discovery for all-skipped selected runs.
 
 ## Context and orientation
 
@@ -594,6 +643,32 @@ Wyvern agent findings from 2026-05-08:
   standard `make test` path installs Celery before running tests.
 
 Validation evidence will be appended here during implementation.
+
+Validation evidence appended during implementation:
+
+- The direct optional-Celery test command initially reported one pass and one
+  failure because the child pytest process returned code 5 for an all-skipped
+  selected test set.
+- After adding a generated sentinel test to the child process, the same direct
+  command reported `2 passed in 14.09s`.
+- `uv run pytest -v
+  src/falcon_correlate/unittests/test_celery_publish_signal.py
+  src/falcon_correlate/unittests/test_celery_worker_signal.py
+  src/falcon_correlate/unittests/test_celery_configuration.py
+  tests/bdd/test_celery_publish_signal_steps.py
+  tests/bdd/test_celery_worker_signal_steps.py
+  tests/bdd/test_celery_configuration_steps.py` reported `33 passed in 0.23s`.
+- `uv run pytest -v
+  src/falcon_correlate/unittests/test_optional_celery_dependency.py` reported `2
+   passed in 5.71s`.
+- `make fmt` passed after wrapping one long ExecPlan evidence line and moving
+  one Python-only type annotation import behind `TYPE_CHECKING`.
+- `make check-fmt` reported `50 files already formatted`.
+- `make typecheck` reported `All checks passed!`.
+- `make lint` reported `All checks passed!`.
+- `make test` reported `353 passed, 11 skipped in 8.33s`.
+- `make markdownlint` reported `Summary: 0 error(s)`.
+- `make nixie` reported `All diagrams validated successfully!`.
 
 ## Interfaces and dependencies
 

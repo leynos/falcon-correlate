@@ -173,8 +173,8 @@ Enable correlation ID propagation to downstream HTTP services and Celery tasks.
 - [x] 4.2.3. Provide Celery configuration utilities
   - [x] Create `configure_celery_correlation(app)` helper function.
   - [x] Connect all signal handlers in one call.
-- [ ] 4.2.4. Validate optional Celery integration
-  - [ ] Mark tests as skipped if Celery is not installed.
+- [x] 4.2.4. Validate optional Celery integration
+  - [x] Mark tests as skipped if Celery is not installed.
 
 ## 5. ASGI support
 

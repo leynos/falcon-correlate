@@ -1764,3 +1764,47 @@ helpers.
 - `docs/users-guide.md` — Documented the explicit helper, return contract,
   idempotence, and relationship to import-time auto-registration.
 - `docs/roadmap.md` — Marked roadmap item 4.2.3 complete.
+
+### A.11. Optional Celery integration validation (Task 4.2.4)
+
+**Decision:** Keep Celery test modules guarded by pytest's module-level
+`pytest.importorskip("celery")` mechanism and add an explicit missing-Celery
+validation test that exercises pytest collection in a child process.
+
+**Rationale:**
+
+1. **The optional dependency contract is a collection contract:** Celery support
+   is optional, so Celery-specific unit tests and Behaviour-Driven Development
+   (BDD) step modules must report skips when Celery is absent instead of
+   failing during collection. A subprocess pytest run validates the same path a
+   developer sees when running the suite.
+
+2. **The normal development environment still runs Celery coverage:** The
+   development dependency group includes Celery so `make test` executes the
+   publish, worker, and configuration tests normally. The missing-dependency
+   validation therefore blocks Celery imports only inside the child process,
+   leaving the shared virtual environment unchanged.
+
+3. **Import safety remains part of the tested contract:** The validation also
+   imports `falcon_correlate` and `falcon_correlate.celery` while Celery
+   imports are blocked. This proves that applications which install the base
+   package without the Celery extra can still import the library.
+
+4. **No new runtime or test dependency is required:** The child process uses a
+   temporary `sitecustomize.py` import hook to raise `ModuleNotFoundError` for
+   `celery` and `celery.*` only. This avoids uninstalling Celery, adding a
+   plugin, or creating a second dependency environment.
+
+5. **All-skipped selected runs are not treated as the consumer contract:**
+   Pytest exits with code 5 when every selected module skips at collection time
+   because no runnable tests were collected. The validation includes a passing
+   non-Celery sentinel test in the child run, matching a real suite where
+   non-Celery tests continue to run while Celery-only tests are skipped.
+
+**Files created/modified:**
+
+- `src/falcon_correlate/unittests/test_optional_celery_dependency.py` — Added
+  missing-Celery import-safety and pytest skip validation.
+- `docs/users-guide.md` — Clarified behaviour when the Celery extra is not
+  installed.
+- `docs/roadmap.md` — Marked roadmap item 4.2.4 complete.
