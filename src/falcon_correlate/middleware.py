@@ -273,8 +273,10 @@ class CorrelationIDMiddleware:
         """Post-process the response and clean up request-scoped context.
 
         This method is called after the resource responder has been invoked.
-        It resets `correlation_id_var` to the state that existed before
-        `process_request` set it for the current request.
+        When response-header echoing is enabled, it writes
+        `req.context.correlation_id` to the configured response header before
+        cleanup happens. It then resets `correlation_id_var` to the state that
+        existed before `process_request` set it for the current request.
 
         Parameters
         ----------
@@ -290,20 +292,29 @@ class CorrelationIDMiddleware:
 
         """
         reset_token = getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
-        if not isinstance(reset_token, contextvars.Token):
-            return
-
-        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
-
-        if reset_token.var is not correlation_id_var:
-            logger.debug("Ignoring mismatched correlation ID reset token")
-            return
-
         try:
-            correlation_id_var.reset(reset_token)
-        except ValueError:
-            logger.debug(
-                "Ignoring invalid correlation ID reset token",
-                exc_info=True,
-            )
-            return
+            if not self._config.echo_header_in_response:
+                logger.debug("Correlation ID response header echo disabled")
+                return
+
+            correlation_id = getattr(req.context, "correlation_id", None)
+            if correlation_id is None:
+                logger.debug("Correlation ID response header echo skipped; ID absent")
+                return
+
+            resp.set_header(self._config.header_name, correlation_id)
+            logger.debug("Correlation ID response header echoed")
+        finally:
+            setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
+
+            if isinstance(reset_token, contextvars.Token):
+                if reset_token.var is correlation_id_var:
+                    try:
+                        correlation_id_var.reset(reset_token)
+                    except ValueError:
+                        logger.debug(
+                            "Ignoring invalid correlation ID reset token",
+                            exc_info=True,
+                        )
+                else:
+                    logger.debug("Ignoring mismatched correlation ID reset token")

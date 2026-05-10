@@ -5,7 +5,7 @@ This Execution Plan (ExecPlan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: BLOCKED
+Status: IN PROGRESS
 
 ## Purpose / big picture
 
@@ -461,8 +461,15 @@ Acceptance for this milestone:
   `uv run pytest -v src/falcon_correlate/unittests/test_middleware_response_header.py`
   and captured the red-state log at
   `/tmp/test-falcon-correlate-5-1-1-wsgi-response-header-red.out`.
-- [ ] Resolve the confirmed WSGI response-header contract gap before adding
-  ASGI middleware tests.
+- [x] 2026-05-10: Resolved the confirmed WSGI response-header contract gap by
+  echoing `req.context.correlation_id` through `resp.set_header` before
+  reset-token cleanup when `echo_header_in_response` is enabled.
+- [x] 2026-05-10: Ran the two focused response-header tests requested for the
+  unblock and captured the passing log at
+  `/tmp/test-falcon-correlate-5-1-1-response-header-fix.out`.
+- [x] 2026-05-10: Ran response-header validation gates after the WSGI fix:
+  `make check-fmt`, `make typecheck`, `make lint`, `make test`,
+  `make markdownlint`, and `make nixie` all passed.
 - [ ] Add failing unit and behavioural tests for ASGI middleware behaviour.
 - [ ] Implement `CorrelationIDMiddlewareASGI` and shared lifecycle helpers.
 - [ ] Update public exports, user documentation, design documentation and the
@@ -490,6 +497,13 @@ Acceptance for this milestone:
   "X-Correlation-ID")` was `None` after `process_response`, while the disabled
   echo test passed. This reaches the plan tolerance for response-header parity
   and pauses implementation pending user direction.
+- 2026-05-10: The user directed the implementation to add response-header
+  echoing to `CorrelationIDMiddleware.process_response` using
+  `req.context.correlation_id` and the configured header name. The focused
+  red-state test now passes.
+- 2026-05-10: Full validation after the WSGI response-header fix passed with
+  `make test` reporting 353 passed and 11 skipped. This confirms the narrower
+  contract fix did not regress the existing unit or behavioural suite.
 
 ## Decision Log
 
@@ -518,6 +532,10 @@ Acceptance for this milestone:
   preserves the documented public contract; the second avoids expanding
   runtime behaviour in this branch but leaves or codifies a surprising
   configuration no-op.
+- 2026-05-10: Resolve the response-header tolerance by fixing WSGI
+  `process_response` to honour the existing documented contract. The block
+  reads `req.context.correlation_id`, skips missing values, uses
+  `self._config.header_name`, and runs before any `ContextVar` reset logic.
 
 ## Outcomes & Retrospective
 
