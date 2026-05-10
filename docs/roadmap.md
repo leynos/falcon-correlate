@@ -175,6 +175,9 @@ Enable correlation ID propagation to downstream HTTP services and Celery tasks.
   - [x] Connect all signal handlers in one call.
 - [x] 4.2.4. Validate optional Celery integration
   - [x] Mark tests as skipped if Celery is not installed.
+  - [x] Validate package and optional Celery module import safety without
+        Celery installed.
+  - [x] Record optional Celery validation decisions in design-doc A.11.
 
 ## 5. ASGI support
 

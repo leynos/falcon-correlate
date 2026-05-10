@@ -1786,9 +1786,10 @@ validation test that exercises pytest collection in a child process.
    leaving the shared virtual environment unchanged.
 
 3. **Import safety remains part of the tested contract:** The validation also
-   imports `falcon_correlate` and `falcon_correlate.celery` while Celery
-   imports are blocked. This proves that applications which install the base
-   package without the Celery extra can still import the library.
+   imports `falcon_correlate` and `falcon_correlate.celery` in separate child
+   interpreters while Celery imports are blocked. This proves that applications
+   which install the base package without the Celery extra can still import the
+   library without one import masking the other through module caching.
 
 4. **No new runtime or test dependency is required:** The child process uses a
    temporary `sitecustomize.py` import hook to raise `ModuleNotFoundError` for
@@ -1800,6 +1801,13 @@ validation test that exercises pytest collection in a child process.
    because no runnable tests were collected. The validation includes a passing
    non-Celery sentinel test in the child run, matching a real suite where
    non-Celery tests continue to run while Celery-only tests are skipped.
+
+6. **The selected Celery test set is discovered, not hand-maintained:** The
+   validation derives Celery unit and BDD step modules from repository-relative
+   glob patterns and asserts each discovered file still contains the
+   `pytest.importorskip("celery")` guard. The child pytest output is compared
+   with a normalised exact snapshot so skip counts are explicit while
+   nondeterministic runtime duration is redacted.
 
 **Files created/modified:**
 

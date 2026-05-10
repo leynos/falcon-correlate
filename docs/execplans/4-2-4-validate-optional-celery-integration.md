@@ -176,6 +176,13 @@ This plan was approved on 2026-05-09 and has now been implemented.
   the results in this plan.
 - [x] (2026-05-09T11:50:52Z) Updated `docs/roadmap.md` to check off 4.2.4
   after implementation.
+- [x] (2026-05-10T00:25:41Z) Addressed review findings by isolating package
+  import checks in separate subprocesses, deriving Celery test modules from
+  filesystem globs, injecting child-process environment mappings, and replacing
+  broad pytest-output substring checks with a normalised exact snapshot.
+- [x] (2026-05-10T00:25:41Z) Expanded the optional-Celery validation module
+  docstring and roadmap entry to capture the subprocess strategy, pytest
+  collection relationship, import-safety outcome, and design-doc A.11 link.
 
 ## Surprises & Discoveries
 
@@ -204,6 +211,13 @@ This plan was approved on 2026-05-09 and has now been implemented.
   runnable tests were collected. Impact: the validation includes a generated
   one-test non-Celery sentinel so the child process represents a normal mixed
   test suite and can assert exit code 0 plus skipped Celery modules.
+
+- Observation: pytest quiet output for modules skipped during collection does
+  not emit one `s` progress marker per skipped module. Evidence: after adding
+  the exact output assertion, the child output normalised to `. [100%]`
+  followed by `1 passed, 6 skipped in <duration>`. Impact: the snapshot records
+  pytest's actual collection-skip output instead of expecting per-module
+  progress markers.
 
 ## Decision Log
 
@@ -236,6 +250,12 @@ This plan was approved on 2026-05-09 and has now been implemented.
   rather than a Hypothesis property test. Rationale: the behaviour is an
   environment and pytest collection contract, not an invariant over a range of
   generated inputs. Date/Author: 2026-05-09T11:48:01Z / Codex.
+
+- Decision: Derive Celery test modules with repository-relative glob patterns
+  rather than maintaining a fixed tuple of paths. Rationale: the validation
+  should automatically include future Celery-specific unit modules and BDD step
+  modules that follow the existing naming convention. Date/Author:
+  2026-05-10T00:25:41Z / Codex.
 
 ## Outcomes & Retrospective
 
@@ -309,9 +329,10 @@ The relevant configuration files are:
 
 The relevant documentation files are:
 
-- `docs/roadmap.md`, which currently leaves 4.2.4 unchecked;
+- `docs/roadmap.md`, where 4.2.4 is now checked off with both the
+  missing-Celery skip and import-safety outcomes;
 - `docs/falcon-correlation-id-middleware-design.md`, especially appendix
-  sections A.8, A.9, and A.10 for Celery design decisions;
+  sections A.8, A.9, A.10, and A.11 for Celery design decisions;
 - `docs/users-guide.md`, especially the "Celery propagation" section that
   describes optional installation and `configure_celery_correlation(app)`; and
 - `docs/complexity-antipatterns-and-refactoring-strategies.md`, which should
@@ -571,15 +592,18 @@ make markdownlint 2>&1 | tee /tmp/markdownlint-falcon-correlate-4-2-4-validate-o
 make nixie 2>&1 | tee /tmp/nixie-falcon-correlate-4-2-4-validate-optional-celery-integration.out
 ```
 
-If all gates pass, stage the changed files, inspect the staged diff, and commit
-using a message file:
+Historical note: the initial implementation commit staged the approved plan and
+additional implementation files after the validation gates passed. Future
+follow-up commits should stage the changed files, inspect the staged diff, and
+commit using a message file:
 
 ```bash
 git add docs/execplans/4-2-4-validate-optional-celery-integration.md
 git diff --cached
 ```
 
-The implementation commit will stage additional files after approval.
+The first implementation commit was made after approval. Later follow-up
+commits should follow the same file-based commit-message workflow.
 
 ## Validation and acceptance
 
@@ -669,6 +693,16 @@ Validation evidence appended during implementation:
 - `make test` reported `353 passed, 11 skipped in 8.33s`.
 - `make markdownlint` reported `Summary: 0 error(s)`.
 - `make nixie` reported `All diagrams validated successfully!`.
+- Follow-up validation after review changes:
+  `uv run pytest -v
+  src/falcon_correlate/unittests/test_optional_celery_dependency.py` reported
+  `7 passed in 6.43s`.
+- Follow-up `make check-fmt` reported `50 files already formatted`.
+- Follow-up `make typecheck` reported `All checks passed!`.
+- Follow-up `make lint` reported `All checks passed!`.
+- Follow-up `make test` reported `358 passed, 11 skipped in 9.80s`.
+- Follow-up `make markdownlint` reported `Summary: 0 error(s)`.
+- Follow-up `make nixie` reported `All diagrams validated successfully!`.
 
 ## Interfaces and dependencies
 
