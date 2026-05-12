@@ -24,7 +24,6 @@ from pathlib import Path
 
 import pytest
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _CELERY_TEST_GLOBS = (
     "src/falcon_correlate/unittests/test_celery_*.py",
     "tests/bdd/test_celery_*_steps.py",
@@ -35,6 +34,18 @@ _PYTEST_PROGRESS_PATTERN = re.compile(
     r"^(?P<progress>[.s]+)\s+\[100%\]$",
     re.MULTILINE,
 )
+
+
+def _find_project_root(start: Path) -> Path:
+    """Return the nearest ancestor containing the repository project marker."""
+    start_dir = start.resolve().parent if start.is_file() else start.resolve()
+    for candidate in (start_dir, *start_dir.parents):
+        if (candidate / "pyproject.toml").is_file():
+            return candidate
+    raise RuntimeError
+
+
+_PROJECT_ROOT = _find_project_root(Path(__file__))
 
 
 class _PytestRun(typ.NamedTuple):
@@ -222,6 +233,19 @@ def test_blocked_celery_environment_prepends_existing_pythonpath(
     assert env["PYTHONPATH"] == f"{tmp_path}{os.pathsep}/already{os.pathsep}/present"
 
 
+def test_blocked_celery_environment_sets_pythonpath_when_missing(
+    tmp_path: Path,
+) -> None:
+    """The import blocker should set PYTHONPATH when it is missing."""
+    env = _blocked_celery_environment(
+        tmp_path,
+        {"KEEP": "1"},
+    )
+
+    assert env["KEEP"] == "1"
+    assert env["PYTHONPATH"] == str(tmp_path)
+
+
 @pytest.mark.parametrize(
     "module_name",
     [
@@ -270,11 +294,12 @@ def test_celery_import_blocker_rejects_celery_modules(
     assert f"No module named '{blocked_name}'" in result.stderr
 
 
-def test_celery_tests_produce_no_stderr_when_celery_is_unavailable(
+def test_celery_tests_emit_no_error_markers_when_celery_is_unavailable(
     celery_blocked_pytest_run: _PytestRun,
 ) -> None:
-    """Celery-only tests should not write stderr while skipping."""
-    assert celery_blocked_pytest_run.result.stderr == ""
+    """Celery-only tests should not report collection or execution errors."""
+    assert "ERROR" not in celery_blocked_pytest_run.result.stderr
+    assert "FAILED" not in celery_blocked_pytest_run.result.stderr
 
 
 def test_celery_tests_exit_successfully_when_celery_is_unavailable(

@@ -96,9 +96,9 @@ This plan was approved on 2026-05-09 and has now been implemented.
 - Documentation scope: if the users' guide needs more than a short note about
   optional Celery test behaviour, stop and confirm the intended audience for
   that guidance.
-- CI scope: if validating this properly requires a new CI job that installs the
-  package without development dependencies, stop and ask whether that CI change
-  belongs in 4.2.4 or a follow-up item.
+- Continuous Integration (CI) scope: if validating this properly requires a new
+  CI job that installs the package without development dependencies, stop and
+  ask whether that CI change belongs in 4.2.4 or a follow-up item.
 
 ## Risks
 
@@ -138,7 +138,8 @@ This plan was approved on 2026-05-09 and has now been implemented.
 
 - [x] (2026-05-08T19:16:45Z) Loaded the `execplans`, `leta`,
   `commit-message`, `pr-creation`, and `en-gb-oxendict-style` skills needed for
-  planning, repository navigation, committing, and draft PR preparation.
+  planning, repository navigation, committing, and draft Pull Request (PR)
+  preparation.
 - [x] (2026-05-08T19:16:45Z) Confirmed the starting branch was not the main
   branch and renamed it to `4-2-4-validate-optional-celery-integration`.
 - [x] (2026-05-08T19:16:45Z) Created a context pack for Wyvern agent team
@@ -153,6 +154,10 @@ This plan was approved on 2026-05-09 and has now been implemented.
 - [x] (2026-05-09T11:48:01Z) Reconfirmed that each current Celery-specific
   unit test module and BDD step module calls `pytest.importorskip("celery")`
   before importing Celery symbols.
+- [x] (2026-05-12T15:09:08Z) Addressed review comments by deriving the project
+  root from `pyproject.toml`, adding the missing PYTHONPATH environment edge
+  case, relaxing stderr validation to error-marker checks, and defining
+  Markdown acronyms on first use.
 - [x] (2026-05-09T11:48:01Z) Added
   `src/falcon_correlate/unittests/test_optional_celery_dependency.py` with
   child-process validation for import safety and missing-Celery test skips.
@@ -694,15 +699,23 @@ Validation evidence appended during implementation:
 - `make markdownlint` reported `Summary: 0 error(s)`.
 - `make nixie` reported `All diagrams validated successfully!`.
 - Follow-up validation after review changes:
-  `uv run pytest -v
-  src/falcon_correlate/unittests/test_optional_celery_dependency.py` reported
-  `7 passed in 6.43s`.
+  `uv run pytest -v src/falcon_correlate/unittests/test_optional_celery_dependency.py`
+   reported `7 passed in 6.43s`.
 - Follow-up `make check-fmt` reported `50 files already formatted`.
 - Follow-up `make typecheck` reported `All checks passed!`.
 - Follow-up `make lint` reported `All checks passed!`.
 - Follow-up `make test` reported `358 passed, 11 skipped in 9.80s`.
 - Follow-up `make markdownlint` reported `Summary: 0 error(s)`.
 - Follow-up `make nixie` reported `All diagrams validated successfully!`.
+- Review-comment validation:
+  `uv run pytest -v src/falcon_correlate/unittests/test_optional_celery_dependency.py`
+   reported `10 passed in 6.89s`.
+- Review-comment `make check-fmt` reported `50 files already formatted`.
+- Review-comment `make typecheck` reported `All checks passed!`.
+- Review-comment `make lint` reported `All checks passed!`.
+- Review-comment `make test` reported `361 passed, 11 skipped in 9.65s`.
+- Review-comment `make markdownlint` reported `Summary: 0 error(s)`.
+- Review-comment `make nixie` reported `All diagrams validated successfully!`.
 
 ## Interfaces and dependencies
 
