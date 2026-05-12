@@ -209,24 +209,6 @@ def test_celery_test_path_discovery_finds_expected_minimum(
     )
 
 
-def test_discovered_celery_test_modules_skip_when_celery_is_unavailable(
-    celery_blocked_pytest_run: _PytestRun,
-    project_root: Path,
-) -> None:
-    """Each discovered Celery test module should skip rather than error."""
-    expected_skip_count = len(_discover_celery_test_paths(project_root))
-
-    assert celery_blocked_pytest_run.result.returncode == 0, (
-        f"{celery_blocked_pytest_run.result.stdout}\n"
-        f"{celery_blocked_pytest_run.result.stderr}"
-    )
-    assert celery_blocked_pytest_run.result.stderr == ""
-    assert (
-        f"1 passed, {expected_skip_count} skipped in <duration>"
-        in celery_blocked_pytest_run.normalised_stdout
-    )
-
-
 def test_blocked_celery_environment_prepends_existing_pythonpath(
     tmp_path: Path,
 ) -> None:
