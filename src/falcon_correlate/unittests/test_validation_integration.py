@@ -337,13 +337,14 @@ class TestValidationLogging:
                 for record in caplog.records
             ), f"Expected DEBUG log containing '{scenario.log_contains}'"
         else:
-            middleware_records = [
-                r for r in caplog.records if r.name == "falcon_correlate.middleware"
-            ]
-            assert len(middleware_records) == 0, (
-                f"Expected no middleware log records, "
-                f"got {len(middleware_records)}: "
-                f"{[r.message for r in middleware_records]}"
+            assert not any(
+                record.name == "falcon_correlate.middleware"
+                and record.levelno == logging.DEBUG
+                and "failed validation" in record.getMessage()
+                for record in caplog.records
+            ), (
+                "Expected no validation failure log records, "
+                f"got {[r.message for r in caplog.records]}"
             )
 
 

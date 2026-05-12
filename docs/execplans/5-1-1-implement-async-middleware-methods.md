@@ -470,6 +470,16 @@ Acceptance for this milestone:
 - [x] 2026-05-10: Ran response-header validation gates after the WSGI fix:
   `make check-fmt`, `make typecheck`, `make lint`, `make test`,
   `make markdownlint`, and `make nixie` all passed.
+- [x] 2026-05-12: Addressed review findings on the WSGI response-header fix by
+  extracting `_echo_correlation_id_header`, documenting response echoing and
+  `resp.set_header` fallibility, adding debug logging, and broadening unit
+  coverage.
+- [x] 2026-05-12: Ran the focused response-header test module and captured the
+  passing log at
+  `/tmp/test-falcon-correlate-5-1-1-response-header-review.out`.
+- [x] 2026-05-12: Ran final review-fix validation gates:
+  `make check-fmt`, `make typecheck`, `make lint`, `make test`,
+  `make markdownlint`, and `make nixie` all passed.
 - [ ] Add failing unit and behavioural tests for ASGI middleware behaviour.
 - [ ] Implement `CorrelationIDMiddlewareASGI` and shared lifecycle helpers.
 - [ ] Update public exports, user documentation, design documentation and the
@@ -504,6 +514,15 @@ Acceptance for this milestone:
 - 2026-05-10: Full validation after the WSGI response-header fix passed with
   `make test` reporting 353 passed and 11 skipped. This confirms the narrower
   contract fix did not regress the existing unit or behavioural suite.
+- 2026-05-12: Review feedback identified that the initial response-header fix
+  coupled output and cleanup responsibilities in `process_response`. The echo
+  behaviour now lives in `_echo_correlation_id_header`, keeping
+  `process_response` responsible for orchestration order.
+- 2026-05-12: Adding required response-header debug logs invalidated a
+  validation-focused logging test that asserted no middleware debug records
+  for validation-success paths. The test now asserts the intended narrower
+  invariant: validation-success and no-validator paths do not emit validation
+  failure logs.
 
 ## Decision Log
 
@@ -536,10 +555,33 @@ Acceptance for this milestone:
   `process_response` to honour the existing documented contract. The block
   reads `req.context.correlation_id`, skips missing values, uses
   `self._config.header_name`, and runs before any `ContextVar` reset logic.
+- 2026-05-12: Keep `resp.set_header` failures propagating instead of catching
+  them. This matches existing middleware fallibility for user-visible request
+  setup failures and avoids hiding a Falcon response construction error behind
+  debug logging.
 
 ## Outcomes & Retrospective
 
-No implementation outcome exists yet. This plan is awaiting approval. After
-implementation, update this section with the commits produced, validation
-results, pull request link, and any lessons about Falcon ASGI middleware or
-context variable behaviour.
+The WSGI response-header contract gap discovered during ASGI planning has been
+fixed and committed before the ASGI middleware implementation proceeds.
+`CorrelationIDMiddleware.process_response` now orchestrates two phases in a
+defined order: echo the request correlation ID to the configured response
+header when enabled, then reset `correlation_id_var` using the stored request
+token. The echo phase is isolated in `_echo_correlation_id_header`, logs its
+enabled, skipped, and successful paths at debug level, and deliberately lets
+`resp.set_header` exceptions propagate.
+
+Validation evidence so far:
+
+- `uv run pytest -v src/falcon_correlate/unittests/test_middleware_response_header.py`
+  passed after the review follow-up with 9 tests.
+- `make check-fmt`, `make typecheck`, `make lint`, `make test`,
+  `make markdownlint`, and `make nixie` passed after the initial WSGI contract
+  fix on 2026-05-10.
+- `make check-fmt`, `make typecheck`, `make lint`, `make test`,
+  `make markdownlint`, and `make nixie` passed after the review follow-up on
+  2026-05-12. `make test` reported 360 passed and 11 skipped.
+
+The overall ExecPlan remains in progress. The ASGI middleware class,
+ASGI-specific tests, public exports, user guide updates, design-document
+updates, roadmap checkbox, final validation, and final PR update still remain.
