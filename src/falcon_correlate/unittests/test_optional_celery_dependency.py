@@ -16,15 +16,15 @@ modules are skipped, while non-Celery tests continue to run.
 from __future__ import annotations
 
 import os
-import pathlib
 import re
 import subprocess
 import sys
 import typing as typ
+from pathlib import Path
 
 import pytest
 
-_PROJECT_ROOT = pathlib.Path(__file__).parents[3]
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _CELERY_TEST_GLOBS = (
     "src/falcon_correlate/unittests/test_celery_*.py",
     "tests/bdd/test_celery_*_steps.py",
@@ -37,7 +37,15 @@ _PYTEST_PROGRESS_PATTERN = re.compile(
 )
 
 
-def _write_celery_import_blocker(sitecustomize_dir: pathlib.Path) -> pathlib.Path:
+class _PytestRun(typ.NamedTuple):
+    """Captured child pytest result and expected skip output."""
+
+    result: subprocess.CompletedProcess[str]
+    normalised_stdout: str
+    expected_stdout: str
+
+
+def _write_celery_import_blocker(sitecustomize_dir: Path) -> Path:
     """Write a child-process hook that makes only Celery imports unavailable."""
     sitecustomize = sitecustomize_dir / "sitecustomize.py"
     sitecustomize.write_text(
@@ -69,7 +77,7 @@ sys.meta_path.insert(0, _BlockCeleryFinder())
     return sitecustomize
 
 
-def _write_child_sentinel_test(tmp_path: pathlib.Path) -> pathlib.Path:
+def _write_child_sentinel_test(tmp_path: Path) -> Path:
     """Write a passing test so pytest exits successfully when Celery tests skip."""
     sentinel = tmp_path / "test_non_celery_sentinel.py"
     sentinel.write_text(
@@ -79,19 +87,19 @@ def _write_child_sentinel_test(tmp_path: pathlib.Path) -> pathlib.Path:
     return sentinel
 
 
-def _discover_celery_test_paths() -> tuple[pathlib.Path, ...]:
+def _discover_celery_test_paths(project_root: Path) -> tuple[Path, ...]:
     """Return current Celery-dependent unit and BDD step modules."""
     paths = {
         path
         for pattern in _CELERY_TEST_GLOBS
-        for path in _PROJECT_ROOT.glob(pattern)
+        for path in project_root.glob(pattern)
         if path.is_file()
     }
     return tuple(sorted(paths))
 
 
 def _pythonpath_with_import_blocker(
-    sitecustomize_dir: pathlib.Path,
+    sitecustomize_dir: Path,
     environ: typ.Mapping[str, str],
 ) -> str:
     """Return a PYTHONPATH with the import blocker taking precedence."""
@@ -103,7 +111,7 @@ def _pythonpath_with_import_blocker(
 
 
 def _blocked_celery_environment(
-    sitecustomize_dir: pathlib.Path,
+    sitecustomize_dir: Path,
     environ: typ.Mapping[str, str],
 ) -> dict[str, str]:
     """Build a child-process environment with the Celery import blocker first."""
@@ -114,12 +122,11 @@ def _blocked_celery_environment(
 
 
 def _run_python_with_celery_blocked(
-    sitecustomize_dir: pathlib.Path,
+    sitecustomize_dir: Path,
     environ: typ.Mapping[str, str],
     *args: str,
 ) -> subprocess.CompletedProcess[str]:
     """Run a Python child process where importing Celery raises ImportError."""
-    _write_celery_import_blocker(sitecustomize_dir)
     return subprocess.run(  # noqa: S603
         [sys.executable, *args],
         check=False,
@@ -130,9 +137,9 @@ def _run_python_with_celery_blocked(
     )
 
 
-def _relative_paths(paths: typ.Iterable[pathlib.Path]) -> tuple[str, ...]:
+def _relative_paths(paths: typ.Iterable[Path], project_root: Path) -> tuple[str, ...]:
     """Return paths relative to the repository root for subprocess pytest."""
-    return tuple(str(path.relative_to(_PROJECT_ROOT)) for path in paths)
+    return tuple(str(path.relative_to(project_root)) for path in paths)
 
 
 def _normalise_pytest_output(output: str) -> str:
@@ -144,19 +151,84 @@ def _normalise_pytest_output(output: str) -> str:
     return _PYTEST_DURATION_PATTERN.sub("<duration>", normalised_progress)
 
 
-def test_celery_test_path_discovery_covers_guarded_modules() -> None:
-    """Every discovered Celery test module should use the import-skip guard."""
-    celery_test_paths = _discover_celery_test_paths()
+def _run_celery_tests_with_celery_blocked(
+    sitecustomize_dir: Path,
+    sentinel_test: Path,
+    celery_test_paths: tuple[Path, ...],
+    project_root: Path,
+) -> _PytestRun:
+    """Run selected Celery tests in a child process with Celery unavailable."""
+    result = _run_python_with_celery_blocked(
+        sitecustomize_dir,
+        os.environ,
+        "-m",
+        "pytest",
+        "-q",
+        str(sentinel_test),
+        *_relative_paths(celery_test_paths, project_root),
+    )
+    expected_stdout = f""". [100%]
+1 passed, {len(celery_test_paths)} skipped in <duration>"""
+    return _PytestRun(
+        result=result,
+        normalised_stdout=_normalise_pytest_output(result.stdout),
+        expected_stdout=expected_stdout,
+    )
 
-    assert len(celery_test_paths) >= _MINIMUM_CELERY_TEST_MODULE_COUNT
-    assert all(
-        'pytest.importorskip("celery")' in path.read_text(encoding="utf-8")
-        for path in celery_test_paths
+
+@pytest.fixture(scope="module")
+def celery_blocked_pytest_run(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> _PytestRun:
+    """Run the Celery skip subprocess once for shared assertions."""
+    tmp_path = tmp_path_factory.mktemp("celery-blocked-suite")
+    _write_celery_import_blocker(tmp_path)
+    sentinel_test = _write_child_sentinel_test(tmp_path)
+    celery_test_paths = _discover_celery_test_paths(_PROJECT_ROOT)
+    return _run_celery_tests_with_celery_blocked(
+        tmp_path,
+        sentinel_test,
+        celery_test_paths,
+        _PROJECT_ROOT,
+    )
+
+
+@pytest.fixture(scope="module")
+def project_root() -> Path:
+    """Return the repository root for query helper injection."""
+    return _PROJECT_ROOT
+
+
+def test_celery_test_path_discovery_finds_expected_minimum(
+    project_root: Path,
+) -> None:
+    """Enough Celery test modules must be discovered for meaningful checks."""
+    assert (
+        len(_discover_celery_test_paths(project_root))
+        >= _MINIMUM_CELERY_TEST_MODULE_COUNT
+    )
+
+
+def test_discovered_celery_test_modules_skip_when_celery_is_unavailable(
+    celery_blocked_pytest_run: _PytestRun,
+    project_root: Path,
+) -> None:
+    """Each discovered Celery test module should skip rather than error."""
+    expected_skip_count = len(_discover_celery_test_paths(project_root))
+
+    assert celery_blocked_pytest_run.result.returncode == 0, (
+        f"{celery_blocked_pytest_run.result.stdout}\n"
+        f"{celery_blocked_pytest_run.result.stderr}"
+    )
+    assert celery_blocked_pytest_run.result.stderr == ""
+    assert (
+        f"1 passed, {expected_skip_count} skipped in <duration>"
+        in celery_blocked_pytest_run.normalised_stdout
     )
 
 
 def test_blocked_celery_environment_prepends_existing_pythonpath(
-    tmp_path: pathlib.Path,
+    tmp_path: Path,
 ) -> None:
     """The import blocker should lead PYTHONPATH without discarding callers."""
     env = _blocked_celery_environment(
@@ -176,10 +248,11 @@ def test_blocked_celery_environment_prepends_existing_pythonpath(
     ],
 )
 def test_package_and_celery_module_import_without_celery(
-    tmp_path: pathlib.Path,
+    tmp_path: Path,
     module_name: str,
 ) -> None:
     """Package modules should import independently when Celery is unavailable."""
+    _write_celery_import_blocker(tmp_path)
     result = _run_python_with_celery_blocked(
         tmp_path,
         os.environ,
@@ -198,10 +271,11 @@ def test_package_and_celery_module_import_without_celery(
     ],
 )
 def test_celery_import_blocker_rejects_celery_modules(
-    tmp_path: pathlib.Path,
+    tmp_path: Path,
     module_name: str,
 ) -> None:
     """The subprocess hook should block top-level and nested Celery imports."""
+    _write_celery_import_blocker(tmp_path)
     result = _run_python_with_celery_blocked(
         tmp_path,
         os.environ,
@@ -214,25 +288,28 @@ def test_celery_import_blocker_rejects_celery_modules(
     assert f"No module named '{blocked_name}'" in result.stderr
 
 
-def test_celery_dependent_tests_skip_when_celery_is_unavailable(
-    tmp_path: pathlib.Path,
+def test_celery_tests_produce_no_stderr_when_celery_is_unavailable(
+    celery_blocked_pytest_run: _PytestRun,
 ) -> None:
-    """Celery-only unit and BDD tests should match the skip snapshot."""
-    sentinel_test = _write_child_sentinel_test(tmp_path)
-    celery_test_paths = _discover_celery_test_paths()
-    result = _run_python_with_celery_blocked(
-        tmp_path,
-        os.environ,
-        "-m",
-        "pytest",
-        "-q",
-        str(sentinel_test),
-        *_relative_paths(celery_test_paths),
-    )
-    normalised_output = _normalise_pytest_output(result.stdout)
-    expected_output = f""". [100%]
-1 passed, {len(celery_test_paths)} skipped in <duration>"""
+    """Celery-only tests should not write stderr while skipping."""
+    assert celery_blocked_pytest_run.result.stderr == ""
 
-    assert result.returncode == 0, f"{result.stdout}\n{result.stderr}"
-    assert result.stderr == ""
-    assert normalised_output == expected_output
+
+def test_celery_tests_exit_successfully_when_celery_is_unavailable(
+    celery_blocked_pytest_run: _PytestRun,
+) -> None:
+    """Celery-only tests should exit successfully when a sentinel test runs."""
+    assert celery_blocked_pytest_run.result.returncode == 0, (
+        f"{celery_blocked_pytest_run.result.stdout}\n"
+        f"{celery_blocked_pytest_run.result.stderr}"
+    )
+
+
+def test_celery_tests_report_correct_skip_count_when_celery_is_unavailable(
+    celery_blocked_pytest_run: _PytestRun,
+) -> None:
+    """Celery-only tests should match the skip-count snapshot."""
+    assert (
+        celery_blocked_pytest_run.normalised_stdout
+        == celery_blocked_pytest_run.expected_stdout
+    )
