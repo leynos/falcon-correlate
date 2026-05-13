@@ -184,7 +184,7 @@ This plan was approved on 2026-05-09 and has now been implemented.
 - [x] (2026-05-10T00:25:41Z) Addressed review findings by isolating package
   import checks in separate subprocesses, deriving Celery test modules from
   filesystem globs, injecting child-process environment mappings, and replacing
-  broad pytest-output substring checks with a normalised exact snapshot.
+  broad pytest-output substring checks with a normalized exact snapshot.
 - [x] (2026-05-10T00:25:41Z) Expanded the optional-Celery validation module
   docstring and roadmap entry to capture the subprocess strategy, pytest
   collection relationship, import-safety outcome, and design-doc A.11 link.
