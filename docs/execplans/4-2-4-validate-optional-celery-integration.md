@@ -188,6 +188,9 @@ This plan was approved on 2026-05-09 and has now been implemented.
 - [x] (2026-05-10T00:25:41Z) Expanded the optional-Celery validation module
   docstring and roadmap entry to capture the subprocess strategy, pytest
   collection relationship, import-safety outcome, and design-doc A.11 link.
+- [x] (2026-05-13T11:50:37Z) Addressed review feedback by making the
+  missing-Celery child subprocess working directory explicit and rooted at the
+  repository root.
 
 ## Surprises & Discoveries
 
@@ -716,6 +719,13 @@ Validation evidence appended during implementation:
 - Review-comment `make test` reported `361 passed, 11 skipped in 9.65s`.
 - Review-comment `make markdownlint` reported `Summary: 0 error(s)`.
 - Review-comment `make nixie` reported `All diagrams validated successfully!`.
+- Explicit child-CWD validation:
+  `uv run pytest -v src/falcon_correlate/unittests/test_optional_celery_dependency.py`
+   reported `10 passed in 7.20s`.
+- Explicit child-CWD `make check-fmt` reported `50 files already formatted`.
+- Explicit child-CWD `make typecheck` reported `All checks passed!`.
+- Explicit child-CWD `make lint` reported `All checks passed!`.
+- Explicit child-CWD `make test` reported `361 passed, 11 skipped in 10.48s`.
 
 ## Interfaces and dependencies
 

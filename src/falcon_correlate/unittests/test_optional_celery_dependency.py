@@ -135,12 +135,14 @@ def _blocked_celery_environment(
 def _run_python_with_celery_blocked(
     sitecustomize_dir: Path,
     environ: typ.Mapping[str, str],
+    cwd: Path,
     *args: str,
 ) -> subprocess.CompletedProcess[str]:
     """Run a Python child process where importing Celery raises ImportError."""
     return subprocess.run(  # noqa: S603
         [sys.executable, *args],
         check=False,
+        cwd=cwd,
         env=_blocked_celery_environment(sitecustomize_dir, environ),
         text=True,
         capture_output=True,
@@ -172,6 +174,7 @@ def _run_celery_tests_with_celery_blocked(
     result = _run_python_with_celery_blocked(
         sitecustomize_dir,
         os.environ,
+        project_root,
         "-m",
         "pytest",
         "-q",
@@ -262,6 +265,7 @@ def test_package_and_celery_module_import_without_celery(
     result = _run_python_with_celery_blocked(
         tmp_path,
         os.environ,
+        _PROJECT_ROOT,
         "-c",
         f"import importlib; importlib.import_module({module_name!r})",
     )
@@ -285,6 +289,7 @@ def test_celery_import_blocker_rejects_celery_modules(
     result = _run_python_with_celery_blocked(
         tmp_path,
         os.environ,
+        _PROJECT_ROOT,
         "-c",
         f"import importlib; importlib.import_module({module_name!r})",
     )
