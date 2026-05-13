@@ -1809,6 +1809,16 @@ validation test that exercises pytest collection in a child process.
    with a normalised exact snapshot so skip counts are explicit while
    nondeterministic runtime duration is redacted.
 
+**Compile-time validation:**
+
+Type safety is verified by mypy through `make typecheck` over the full source
+tree. Import-time correctness is validated by the subprocess-based import tests
+in `src/falcon_correlate/unittests/test_optional_celery_dependency.py`, which
+assert that `falcon_correlate` and `falcon_correlate.celery` load without error
+when `celery` is unavailable. No `trybuild`-style compile-time artefacts are
+produced; this is a Python project, and the equivalent guarantees are provided
+by static type checking and import-time subprocess validation.
+
 **Files created/modified:**
 
 - `src/falcon_correlate/unittests/test_optional_celery_dependency.py` — Added

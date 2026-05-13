@@ -11,6 +11,22 @@ The subprocess boundary matters because pytest evaluates module-level
 child process verifies the same collection behaviour a downstream test suite
 would see: Celery-dependent unit and Behaviour-Driven Development (BDD) step
 modules are skipped, while non-Celery tests continue to run.
+
+Compile-time validation strategy
+---------------------------------
+This project does not use Rust-style ``trybuild`` tests. Compile-time
+correctness is validated by two complementary mechanisms:
+
+1. **Static type checking** — ``make typecheck`` runs mypy over the entire
+   source tree, including this module, and must report zero errors before
+   merge.
+
+2. **Import-time subprocess tests** —
+   ``test_package_and_celery_module_import_without_celery`` launches child
+   Python processes and asserts that ``falcon_correlate`` and
+   ``falcon_correlate.celery`` import without error under Celery-blocked
+   conditions, covering the import path that would raise at collection time in
+   a downstream test suite.
 """
 
 from __future__ import annotations
