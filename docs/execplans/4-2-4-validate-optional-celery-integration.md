@@ -222,7 +222,7 @@ This plan was approved on 2026-05-09 and has now been implemented.
 
 - Observation: pytest quiet output for modules skipped during collection does
   not emit one `s` progress marker per skipped module. Evidence: after adding
-  the exact output assertion, the child output normalised to `. [100%]`
+  the exact output assertion, the child output normalized to `. [100%]`
   followed by `1 passed, 6 skipped in <duration>`. Impact: the snapshot records
   pytest's actual collection-skip output instead of expecting per-module
   progress markers.
