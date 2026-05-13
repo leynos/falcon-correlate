@@ -217,9 +217,10 @@ def test_celery_test_path_discovery_finds_expected_minimum(
     project_root: Path,
 ) -> None:
     """Enough Celery test modules must be discovered for meaningful checks."""
-    assert (
-        len(_discover_celery_test_paths(project_root))
-        >= _MINIMUM_CELERY_TEST_MODULE_COUNT
+    celery_test_paths = _discover_celery_test_paths(project_root)
+    assert len(celery_test_paths) >= _MINIMUM_CELERY_TEST_MODULE_COUNT, (
+        "Celery test discovery should find enough guarded modules for "
+        "missing-dependency skip validation."
     )
 
 
@@ -232,8 +233,10 @@ def test_blocked_celery_environment_prepends_existing_pythonpath(
         {"PYTHONPATH": f"/already{os.pathsep}/present", "KEEP": "1"},
     )
 
-    assert env["KEEP"] == "1"
-    assert env["PYTHONPATH"] == f"{tmp_path}{os.pathsep}/already{os.pathsep}/present"
+    assert env["KEEP"] == "1", "Blocked environment should preserve unrelated keys."
+    assert env["PYTHONPATH"] == (
+        f"{tmp_path}{os.pathsep}/already{os.pathsep}/present"
+    ), "Blocked environment should prepend the import blocker to PYTHONPATH."
 
 
 def test_blocked_celery_environment_sets_pythonpath_when_missing(
@@ -245,8 +248,10 @@ def test_blocked_celery_environment_sets_pythonpath_when_missing(
         {"KEEP": "1"},
     )
 
-    assert env["KEEP"] == "1"
-    assert env["PYTHONPATH"] == str(tmp_path)
+    assert env["KEEP"] == "1", "Blocked environment should preserve unrelated keys."
+    assert env["PYTHONPATH"] == str(tmp_path), (
+        "Blocked environment should set PYTHONPATH to the import blocker."
+    )
 
 
 @pytest.mark.parametrize(
@@ -270,7 +275,9 @@ def test_package_and_celery_module_import_without_celery(
         f"import importlib; importlib.import_module({module_name!r})",
     )
 
-    assert result.returncode == 0, result.stderr
+    assert result.returncode == 0, (
+        f"{module_name} should import when Celery is unavailable.\n{result.stderr}"
+    )
 
 
 @pytest.mark.parametrize(
@@ -295,16 +302,24 @@ def test_celery_import_blocker_rejects_celery_modules(
     )
 
     blocked_name = module_name.split(".", maxsplit=1)[0]
-    assert result.returncode != 0
-    assert f"No module named '{blocked_name}'" in result.stderr
+    assert result.returncode != 0, (
+        f"{module_name} should fail to import when the Celery blocker is active."
+    )
+    assert f"No module named '{blocked_name}'" in result.stderr, (
+        f"{module_name} should fail with a missing-Celery import error."
+    )
 
 
 def test_celery_tests_emit_no_error_markers_when_celery_is_unavailable(
     celery_blocked_pytest_run: _PytestRun,
 ) -> None:
     """Celery-only tests should not report collection or execution errors."""
-    assert "ERROR" not in celery_blocked_pytest_run.result.stderr
-    assert "FAILED" not in celery_blocked_pytest_run.result.stderr
+    assert "ERROR" not in celery_blocked_pytest_run.result.stderr, (
+        "Missing-Celery pytest run should not report collection errors."
+    )
+    assert "FAILED" not in celery_blocked_pytest_run.result.stderr, (
+        "Missing-Celery pytest run should not report failed tests."
+    )
 
 
 def test_celery_tests_exit_successfully_when_celery_is_unavailable(
@@ -312,6 +327,8 @@ def test_celery_tests_exit_successfully_when_celery_is_unavailable(
 ) -> None:
     """Celery-only tests should exit successfully when a sentinel test runs."""
     assert celery_blocked_pytest_run.result.returncode == 0, (
+        "Missing-Celery pytest run should exit successfully with skipped "
+        "Celery tests and a passing sentinel.\n"
         f"{celery_blocked_pytest_run.result.stdout}\n"
         f"{celery_blocked_pytest_run.result.stderr}"
     )
@@ -324,4 +341,4 @@ def test_celery_tests_report_correct_skip_count_when_celery_is_unavailable(
     assert (
         celery_blocked_pytest_run.normalised_stdout
         == celery_blocked_pytest_run.expected_stdout
-    )
+    ), "Missing-Celery pytest output should match the expected skip-count snapshot."
