@@ -8,6 +8,9 @@ import pytest
 
 from falcon_correlate import CorrelationIDConfig
 
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
+
 
 class TestCorrelationIDConfigValidation:
     """Direct unit tests for CorrelationIDConfig validation."""
@@ -42,12 +45,12 @@ class TestCorrelationIDConfigValidation:
         """Verify non-callable generator on CorrelationIDConfig raises TypeError."""
         with pytest.raises(TypeError, match="generator must be callable"):
             CorrelationIDConfig(
-                generator=typ.cast("typ.Callable[[], str]", "not-a-callable")
+                generator=typ.cast("cabc.Callable[[], str]", "not-a-callable")
             )
 
     def test_config_non_callable_validator_raises_type_error(self) -> None:
         """Verify non-callable validator on CorrelationIDConfig raises TypeError."""
         with pytest.raises(TypeError, match="validator must be callable"):
             CorrelationIDConfig(
-                validator=typ.cast("typ.Callable[[str], bool]", "not-a-callable")
+                validator=typ.cast("cabc.Callable[[str], bool]", "not-a-callable")
             )

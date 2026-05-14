@@ -27,6 +27,9 @@ from falcon_correlate.celery import (  # noqa: E402
     setup_correlation_id_in_worker,
 )
 
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
+
 
 class _SignalWithReceivers(typ.Protocol):
     """Structural type for Celery signal objects inspected by tests."""
@@ -165,7 +168,7 @@ def test_context_token_stack_unwinds_lifo(correlation_ids: list[str]) -> None:
 
 def test_configure_celery_correlation_isolates_nested_task_context(
     celery_app: Celery,
-    isolated_context: typ.Callable[[typ.Callable[[], None]], None],
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
 ) -> None:
     """Configured worker signals should unwind nested task contexts in order."""
     _disconnect_integration_receivers()

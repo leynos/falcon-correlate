@@ -29,7 +29,7 @@ from tests.structlog_helpers import inject_correlation_context  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def _reset_structlog() -> typ.Generator[None, None, None]:
+def _reset_structlog() -> cabc.Generator[None, None, None]:
     """Reset structlog configuration before and after each test."""
     structlog.contextvars.clear_contextvars()
     structlog.reset_defaults()

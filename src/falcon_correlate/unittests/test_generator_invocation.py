@@ -69,7 +69,8 @@ def create_test_client(
     Args:
         correlation_echo_resource: The resource fixture to add to the app.
 
-    Returns:
+    Returns
+    -------
         A factory function that creates TestClient instances.
 
     """
@@ -84,7 +85,8 @@ def create_test_client(
             generator: Optional custom generator for correlation IDs.
             trusted_sources: Optional list of trusted source IPs/CIDRs.
 
-        Returns:
+        Returns
+        -------
             A configured Falcon TestClient.
 
         """

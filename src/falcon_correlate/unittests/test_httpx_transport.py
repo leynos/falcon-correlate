@@ -27,7 +27,7 @@ _OK_STATUS = 200
 
 
 @contextlib.contextmanager
-def _cid_context(cid: str) -> typ.Generator[None, None, None]:
+def _cid_context(cid: str) -> cabc.Generator[None, None, None]:
     """Set *cid* on ``correlation_id_var`` for the duration of the block."""
     token = correlation_id_var.set(cid)
     try:

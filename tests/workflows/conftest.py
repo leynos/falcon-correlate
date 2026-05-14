@@ -27,7 +27,8 @@ def _check_tool_available(tool_name: str, args: list[str]) -> bool:
         tool_name: Name of the tool to find in PATH.
         args: Arguments to pass to the tool.
 
-    Returns:
+    Returns
+    -------
         True if the tool is available and runs successfully.
 
     """

@@ -59,7 +59,8 @@ def run_act(config: ActConfig) -> tuple[int, Path, str]:
     Args:
         config: ActConfig instance with all settings.
 
-    Returns:
+    Returns
+    -------
         Tuple of (exit code, artifact directory, combined logs).
 
     """
@@ -110,7 +111,8 @@ def parse_json_logs(logs: str) -> list[dict[str, typ.Any]]:
     Args:
         logs: Raw log output from act.
 
-    Returns:
+    Returns
+    -------
         List of parsed JSON log entries.
 
     """
@@ -133,7 +135,8 @@ def log_contains_message(logs: str, message: str) -> bool:
         logs: Raw log output from act.
         message: Message to search for.
 
-    Returns:
+    Returns
+    -------
         True if the message is found in any log entry.
 
     """

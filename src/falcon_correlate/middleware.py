@@ -1,4 +1,5 @@
 """Falcon Correlation ID middleware implementation."""
+# pylint: disable=too-many-lines
 
 from __future__ import annotations
 
@@ -38,7 +39,7 @@ correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 user_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "user_id", default=None
 )
-_CORRELATION_ID_RESET_TOKEN_ATTR = "_correlation_id_reset_token"  # noqa: S105  # FIXME: attribute-name string is not a secret
+_CORRELATION_ID_RESET_TOKEN_ATTR = "_correlation_id_reset_token"  # noqa: S105 - attribute-name string is not a secret
 _MISSING_CONTEXT_PLACEHOLDER: str = "-"
 
 RECOMMENDED_LOG_FORMAT: str = (
@@ -260,9 +261,8 @@ def default_uuid_validator(value: str) -> bool:
         parsed = uuid.UUID(value)
     except ValueError:
         return False
-    else:
-        # Enforce valid UUID version (1-8)
-        return parsed.version in _VALID_UUID_VERSIONS
+    # Enforce valid UUID version (1-8)
+    return parsed.version in _VALID_UUID_VERSIONS
 
 
 @dataclasses.dataclass(frozen=True)
@@ -335,7 +335,8 @@ class CorrelationIDConfig:
         # Use object.__setattr__ to set frozen field
         object.__setattr__(self, "_parsed_networks", tuple(parsed))
 
-    def _validate_source_not_empty(self, source: str) -> None:
+    @staticmethod
+    def _validate_source_not_empty(source: str) -> None:
         """Validate that a trusted source string is not empty or whitespace.
 
         Parameters
@@ -353,7 +354,8 @@ class CorrelationIDConfig:
             msg = "trusted_sources must not contain empty strings"
             raise ValueError(msg)
 
-    def _parse_network(self, source: str) -> _NetworkType:
+    @staticmethod
+    def _parse_network(source: str) -> _NetworkType:
         """Parse an IP address or CIDR notation into a network object.
 
         Parameters
@@ -407,6 +409,7 @@ class CorrelationIDConfig:
 
     # @CodeScene(disable:"Excess Number of Function Arguments")
     @classmethod
+    # pylint: disable-next=too-many-arguments
     def from_kwargs(  # noqa: PLR0913
         cls,
         *,
@@ -620,14 +623,13 @@ class CorrelationIDMiddleware:
             return True
         try:
             result = self._config.validator(value)
-        except Exception:  # noqa: BLE001 — FIXME: user-supplied; cannot narrow
+        except Exception:  # noqa: BLE001 - user-supplied; cannot narrow
             logger.warning(
                 "Validator raised an exception for correlation ID, treating as invalid",
                 exc_info=True,
             )
             return False
-        else:
-            return result
+        return result
 
     def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
         """Process an incoming request to establish correlation ID context.
@@ -670,12 +672,13 @@ class CorrelationIDMiddleware:
         reset_token = correlation_id_var.set(correlation_id)
         setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, reset_token)
 
-    def process_response(
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
+    def process_response(  # noqa: PLR6301 - Falcon calls middleware hooks on instances.
         self,
         req: falcon.Request,
         resp: falcon.Response,
         resource: object,
-        req_succeeded: bool,  # noqa: FBT001  # FIXME: Falcon WSGI middleware interface requirement
+        req_succeeded: bool,  # noqa: FBT001 - Falcon WSGI middleware interface requirement
     ) -> None:
         """Post-process the response and clean up request-scoped context.
 

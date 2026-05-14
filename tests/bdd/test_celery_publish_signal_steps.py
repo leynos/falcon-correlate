@@ -17,6 +17,9 @@ from falcon_correlate.celery import (  # noqa: E402
     _maybe_connect_celery_publish_signal,
 )
 
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
+
 scenarios("celery_publish_signal.feature")
 
 
@@ -34,7 +37,7 @@ def _connect_celery_signal() -> None:
 
 
 @pytest.fixture(autouse=True)
-def _reset_context_variables() -> typ.Generator[None, None, None]:
+def _reset_context_variables() -> cabc.Generator[None, None, None]:
     """Reset context variables after each scenario."""
     yield
     correlation_id_var.set(None)

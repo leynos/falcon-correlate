@@ -1,4 +1,5 @@
 """Unit tests for ContextualLogFilter."""
+# pylint: disable=too-many-lines,too-many-arguments,too-many-positional-arguments
 
 from __future__ import annotations
 
@@ -178,8 +179,8 @@ class TestContextualLogFilterPlaceholder:
     def test_placeholder_when_context_explicit_none(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-        set_correlation: bool,  # noqa: FBT001 — FIXME: bool param injected by pytest parametrize; remove when ruff supports parametrize-aware FBT001 exemption
-        set_user: bool,  # noqa: FBT001 — FIXME: bool param injected by pytest parametrize; remove when ruff supports parametrize-aware FBT001 exemption
+        set_correlation: bool,  # noqa: FBT001 -  bool param injected by pytest parametrize; remove when ruff supports parametrize-aware FBT001 exemption
+        set_user: bool,  # noqa: FBT001 -  bool param injected by pytest parametrize; remove when ruff supports parametrize-aware FBT001 exemption
         check_attrs: tuple[str, ...],
     ) -> None:
         """Verify placeholder used when context vars are explicitly set to None."""
@@ -214,7 +215,7 @@ class TestContextualLogFilterReturnValue:
     def test_filter_always_returns_true(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-        populated: bool,  # noqa: FBT001 — FIXME: bool param injected by pytest parametrize; remove when ruff supports parametrize-aware FBT001 exemption
+        populated: bool,  # noqa: FBT001 -  bool param injected by pytest parametrize; remove when ruff supports parametrize-aware FBT001 exemption
     ) -> None:
         """Verify filter() always returns True regardless of context state."""
         f = ContextualLogFilter()

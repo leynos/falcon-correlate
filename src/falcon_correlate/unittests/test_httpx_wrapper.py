@@ -6,6 +6,7 @@ current correlation ID into outgoing ``httpx`` request headers.
 
 All tests are skipped when ``httpx`` is not installed.
 """
+# pylint: disable=too-many-lines,too-many-arguments,too-many-positional-arguments
 
 from __future__ import annotations
 
@@ -38,7 +39,7 @@ _EXPECTED_TIMEOUT = 5
 
 
 @pytest.fixture
-def mock_async_client() -> typ.Generator[mock.AsyncMock, None, None]:
+def mock_async_client() -> cabc.Generator[mock.AsyncMock, None, None]:
     """Provide a pre-configured httpx.AsyncClient mock."""
     with mock.patch("httpx.AsyncClient") as mock_client_cls:
         mock_client = mock.AsyncMock()

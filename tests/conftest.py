@@ -1,4 +1,5 @@
 """Shared pytest fixtures for falcon-correlate tests."""
+# pylint: disable=too-many-arguments,too-many-positional-arguments
 
 from __future__ import annotations
 
@@ -54,7 +55,7 @@ class TrackingMiddleware(CorrelationIDMiddleware):
         req: falcon.Request,
         resp: falcon.Response,
         resource: object,
-        req_succeeded: bool,  # noqa: FBT001  # FIXME: Falcon WSGI middleware interface requirement
+        req_succeeded: bool,  # noqa: FBT001 - Falcon WSGI middleware interface requirement
     ) -> None:
         """Track process_response invocation."""
         self.process_response_called = True

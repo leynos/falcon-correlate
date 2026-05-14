@@ -1,4 +1,5 @@
 """Unit tests for validation integration in process_request()."""
+# pylint: disable=too-many-lines
 
 from __future__ import annotations
 
@@ -41,7 +42,8 @@ def create_test_client(
     Args:
         correlation_echo_resource: The resource fixture to add to the app.
 
-    Returns:
+    Returns
+    -------
         A factory function that creates TestClient instances.
 
     """
