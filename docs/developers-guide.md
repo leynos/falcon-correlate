@@ -1,0 +1,155 @@
+# Developers' guide
+
+This guide records day-to-day development practices for `falcon-correlate`. The
+project keeps local and Continuous Integration (CI) checks behind Makefile
+targets so contributors can run the same gates before opening or updating a
+pull request.
+
+## Linting architecture
+
+The Python lint target uses a two-tier linting approach:
+
+- **Tier 1: Ruff.** Ruff runs first through `uv run ruff check`. It is the
+  fast linting gate and owns formatting-adjacent checks, import rules, common
+  correctness rules, docstring rules, security checks, complexity thresholds,
+  and Ruff's Pylint-compatible rule families.
+- **Tier 2: Pylint through PyPy.** Pylint runs second through the
+  `pylint-pypy-shim` wrapper. This tier focuses on rules that complement Ruff,
+  especially logging format correctness, pattern matching safety, refactoring
+  suggestions, resource-handling checks, and selected design limits.
+
+Ruff must pass before Pylint runs. This keeps the slow, deeper lint tier
+focused on code that has already passed the high-volume checks.
+
+The decision to use this architecture is recorded in
+[ADR 001: two-tier linting with Ruff and PyPy-backed Pylint](adr-001-two-tier-linting.md).
+
+## Running lint checks
+
+Run the full lint gate with:
+
+```bash
+make lint
+```
+
+`make lint` executes these commands in order:
+
+```bash
+$(UV_ENV) $(UV) run ruff check
+$(PYLINT) $(PYLINT_TARGETS)
+```
+
+The target should be run before committing changes that affect Python code,
+tests, or lint configuration. When diagnosing failures, fix Ruff findings
+first, then rerun `make lint` so the Pylint tier sees the post-Ruff state.
+
+Use the standard log pattern when capturing lint output for review:
+
+```bash
+make lint 2>&1 | tee /tmp/lint-falcon-correlate-$(git branch --show-current).out
+```
+
+## Makefile variables
+
+The lint target is configured by these Makefile variables:
+
+| Variable               | Default                                                                                       | Purpose                                                        |
+| ---------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `UV`                   | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                 | Selects the `uv` launcher used by all Python tool commands.    |
+| `UV_ENV`               | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                | Keeps project-local `uv` cache and tool directories.           |
+| `PYLINT_PYTHON`        | `pypy`                                                                                        | Selects the Python runtime used for the Pylint tool execution. |
+| `PYLINT_TARGETS`       | `src tests`                                                                                   | Defines the source trees checked by the Pylint tier.           |
+| `PYLINT_PYPY_SHIM_REF` | `726d09f968b4d729ee4b29c71fc732e744854f3b`                                                    | Pins the `pylint-pypy-shim` repository revision.               |
+| `PYLINT_PYPY_SHIM`     | `git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)`                  | Identifies the shim package installed by `uv tool run`.        |
+| `PYLINT`               | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                |
+
+Override variables at the command line for targeted investigation. For example:
+
+```bash
+make lint PYLINT_TARGETS=src/falcon_correlate/middleware.py
+```
+
+Do not change `PYLINT_PYPY_SHIM_REF` casually. Updating the shim changes the
+lint execution environment and should be reviewed as a tooling change.
+
+## Episodic lint policy
+
+The lint policy is imported from `leynos/episodic` and adapted to this package.
+The policy is:
+
+- prefer Ruff for fast, broad, deterministic lint coverage;
+- enable Ruff preview rules where they improve correctness or maintainability;
+- ban deprecated `typing` generic aliases in favour of modern built-ins,
+  `collections.abc`, `contextlib`, `collections`, or `re` equivalents;
+- enforce consistent import conventions, including `typing as typ`,
+  `collections.abc as cabc`, `datetime as dt`, and `unittest.mock as mock`;
+- keep docstrings in NumPy style;
+- use a focused Pylint allow-list rather than enabling every Pylint message;
+- run Pylint under PyPy through the shim as a second tier after Ruff; and
+- add narrow suppressions only when framework callbacks, tests, or existing
+  module boundaries make a rule unsuitable for the current change.
+
+New suppressions should explain why the rule is not useful at that location.
+Broad suppressions should be treated as design debt and either documented in an
+ADR, linked to a follow-up issue, or replaced with a refactor when the scope
+allows it.
+
+## `pyproject.toml` lint configuration
+
+The lint configuration lives in `pyproject.toml`.
+
+### Ruff
+
+`[tool.ruff]` sets:
+
+- `line-length = 88`;
+- `preview = true`; and
+- `target-version = "py312"`.
+
+`[tool.ruff.lint]` selects the main Ruff rule families used by the project,
+including Pyflakes (`F`), pycodestyle (`E`, `W`), import ordering (`I`),
+pyupgrade (`UP`), comprehensions (`C4`), type-checking imports (`TC`), pathlib
+usage (`PTH`), security (`S`), boolean traps (`FBT`), naming (`N`),
+flake8-bugbear (`B`), Ruff-native rules (`RUF`), logging (`LOG`), pytest style
+(`PT`), exceptions (`TRY`), docstrings (`D`), annotations (`ANN`), McCabe
+complexity (`C90`), and selected Pylint-compatible rules (`PLR`, `PLE`, and
+`PLW`).
+
+The configuration extends the imported policy with explicit preview rules such
+as `PLR6301`, `RUF053`, and `RUF066`. It ignores only the pydocstyle conflicts
+`D203` and `D213`.
+
+`[tool.ruff.lint.per-file-ignores]` carries targeted exceptions for tests and
+workflow tests. These keep test assertions, framework callback shapes, and
+workflow subprocess checks practical without weakening the production source
+policy.
+
+`[tool.ruff.lint.flake8-import-conventions]` bans selected `from` imports so
+call sites make type and module provenance explicit. The alias table defines
+the canonical aliases for common modules.
+
+`[tool.ruff.lint.flake8-tidy-imports.banned-api]` rejects deprecated `typing`
+aliases and points contributors to the preferred replacements.
+
+`[tool.ruff.lint.pydocstyle]`, `[tool.ruff.lint.mccabe]`, and
+`[tool.ruff.lint.pylint]` configure NumPy docstrings, a maximum McCabe
+complexity of 8, and Ruff's Pylint-compatible argument, boolean expression, and
+local-variable thresholds.
+
+### Pylint
+
+`[tool.pylint.main]` enables recursive directory checking and sets
+`max-module-lines = 400`.
+
+`[tool.pylint.design]` keeps Pylint's design thresholds aligned with the Ruff
+policy where possible:
+
+- `max-args = 4`;
+- `max-locals = 20`;
+- `max-statements = 70`; and
+- `max-positional-arguments = 4`.
+
+`[tool.pylint."messages control"]` disables all messages by default, disables
+`syntax-error` for the managed PyPy runtime boundary, and then enables the
+focused Pylint message set. This makes the second tier deliberate: it checks
+specific classes of problems rather than duplicating Ruff wholesale.
