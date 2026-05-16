@@ -671,6 +671,11 @@ extra in any process that publishes tasks:
 pip install "falcon-correlate[celery]"
 ```
 
+If the Celery extra is not installed, importing `falcon_correlate` and
+`falcon_correlate.celery` remains safe. The Celery signal integration simply
+stays inactive, and Celery-specific project tests are reported as skipped in
+test environments where the optional dependency is absent.
+
 ### Enabling the publish and worker signal handlers
 
 The clearest activation path is to call
