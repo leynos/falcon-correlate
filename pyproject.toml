@@ -5,6 +5,19 @@ description = "falcon-correlate package"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "ISC" }
+authors = [{ name = "Leynos", email = "leynos@users.noreply.github.com" }]
+keywords = ["correlation-id", "falcon", "logging", "middleware", "tracing"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: Falcon",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP :: WSGI :: Middleware",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "falcon>=4,<5",
     "uuid-utils>=0.14,<1; python_version < \"3.14\"",
@@ -23,7 +36,7 @@ dev = [
     "pytest-bdd>=8.1,<9",
     "pytest-asyncio>=1.0,<2",
     "pytest-xdist>=3.5,<4",
-    "ruff>=0.6,<1",
+    "ruff==0.14.10",
     "structlog>=24.1,<26",
     "pyright>=1.1,<2",
     "ty>=0.0.6,<1",
@@ -329,5 +342,5 @@ markers = [
 package = true
 
 [build-system]
-requires = ["uv_build>=0.9.18,<0.12.0"]
+requires = ["uv_build>=0.11.0,<0.12.0"]
 build-backend = "uv_build"
