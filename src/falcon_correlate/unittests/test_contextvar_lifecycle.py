@@ -232,9 +232,9 @@ class TestContextVariableLifecycle:
                 "Expected correlation_id_var to remain unchanged for "
                 "mismatched reset token"
             )
-            assert (
-                getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR) is foreign_token
-            ), "Expected mismatched reset token to be preserved on request context"
+            assert getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR) is None, (
+                "Expected mismatched reset token to be cleared from request context"
+            )
             foreign_var.reset(foreign_token)
             correlation_id_var.reset(original_token)
 

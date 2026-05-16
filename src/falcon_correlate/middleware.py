@@ -143,7 +143,7 @@ class CorrelationIDMiddleware:
     @property
     def trusted_sources(self) -> frozenset[str]:
         """The set of trusted IP addresses."""
-        return self._config.trusted_sources
+        return typ.cast("frozenset[str]", self._config.trusted_sources)
 
     @property
     def generator(self) -> cabc.Callable[[], str]:
@@ -292,6 +292,9 @@ class CorrelationIDMiddleware:
         reset_token = getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
         if not isinstance(reset_token, contextvars.Token):
             return
+
+        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
+
         if reset_token.var is not correlation_id_var:
             logger.debug("Ignoring mismatched correlation ID reset token")
             return
@@ -304,6 +307,3 @@ class CorrelationIDMiddleware:
                 exc_info=True,
             )
             return
-
-        # Prevent accidental double-reset if process_response is re-entered.
-        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)

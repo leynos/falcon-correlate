@@ -161,6 +161,16 @@ class TestCorrelationIDMiddlewareConfiguration:
         sources.append("10.0.0.1")
         assert middleware.trusted_sources == frozenset(["127.0.0.1"])
 
+    def test_config_trusted_sources_is_frozen_from_mutable_input(self) -> None:
+        """Verify direct config construction freezes trusted source inputs."""
+        sources = {"127.0.0.1"}
+        config = CorrelationIDConfig(trusted_sources=sources)
+
+        sources.add("10.0.0.1")
+
+        assert config.trusted_sources == frozenset(["127.0.0.1"])
+        assert isinstance(config.trusted_sources, frozenset)
+
     # Combined configuration tests
 
     def test_all_parameters_can_be_set(self) -> None:

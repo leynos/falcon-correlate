@@ -58,7 +58,7 @@ class CorrelationIDConfig:
     """
 
     header_name: str = DEFAULT_HEADER_NAME
-    trusted_sources: frozenset[str] = dataclasses.field(default_factory=frozenset)
+    trusted_sources: cabc.Iterable[str] = dataclasses.field(default_factory=frozenset)
     generator: cabc.Callable[[], str] = default_uuid7_generator
     validator: cabc.Callable[[str], bool] | None = None
     echo_header_in_response: bool = True
@@ -71,6 +71,7 @@ class CorrelationIDConfig:
 
     def __post_init__(self) -> None:
         """Validate configuration after initialisation."""
+        object.__setattr__(self, "trusted_sources", frozenset(self.trusted_sources))
         self._validate_header_name()
         self._validate_trusted_sources()
         self._validate_generator()
