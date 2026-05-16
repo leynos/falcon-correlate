@@ -212,11 +212,17 @@ class CorrelationIDConfig:
             A new configuration instance.
 
         """
+        if trusted_sources is None:
+            frozen_trusted_sources = frozenset()
+        elif isinstance(trusted_sources, str):
+            msg = "trusted_sources must be an iterable of strings, not a str"
+            raise TypeError(msg)
+        else:
+            frozen_trusted_sources = frozenset(trusted_sources)
+
         return cls(
             header_name=header_name,
-            trusted_sources=(
-                frozenset(trusted_sources) if trusted_sources else frozenset()
-            ),
+            trusted_sources=frozen_trusted_sources,
             generator=generator if generator is not None else default_uuid7_generator,
             validator=validator,
             echo_header_in_response=echo_header_in_response,

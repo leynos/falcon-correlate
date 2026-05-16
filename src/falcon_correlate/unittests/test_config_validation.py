@@ -53,6 +53,26 @@ class TestCorrelationIDConfigValidation:
                 trusted_sources=typ.cast("cabc.Iterable[str]", ["127.0.0.1", 123])
             )
 
+    def test_from_kwargs_scalar_trusted_source_raises_type_error(self) -> None:
+        """Verify from_kwargs rejects a single string trusted source."""
+        with pytest.raises(TypeError, match="trusted_sources must be an iterable"):
+            CorrelationIDConfig.from_kwargs(trusted_sources="127.0.0.1")
+
+    @pytest.mark.parametrize(
+        "trusted_sources",
+        [None, [], set()],
+        ids=["none", "empty_list", "empty_set"],
+    )
+    def test_from_kwargs_empty_trusted_sources_are_empty_frozensets(
+        self,
+        trusted_sources: cabc.Iterable[str] | None,
+    ) -> None:
+        """Verify from_kwargs preserves empty trusted source containers."""
+        config = CorrelationIDConfig.from_kwargs(trusted_sources=trusted_sources)
+
+        assert config.trusted_sources == frozenset()
+        assert isinstance(config.trusted_sources, frozenset)
+
     def test_config_non_callable_generator_raises_type_error(self) -> None:
         """Verify non-callable generator on CorrelationIDConfig raises TypeError."""
         with pytest.raises(TypeError, match="generator must be callable"):
