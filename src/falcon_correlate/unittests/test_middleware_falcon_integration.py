@@ -1,5 +1,5 @@
 """Unit tests for CorrelationIDMiddleware integration with Falcon."""
-# pylint: disable=too-many-arguments,too-many-positional-arguments
+# pylint: disable=too-many-arguments,too-many-positional-arguments  # Falcon middleware hooks and pytest fixtures require multi-arg signatures.
 
 from __future__ import annotations
 

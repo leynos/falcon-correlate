@@ -1,5 +1,7 @@
 """Unit tests for validation integration in process_request()."""
 # pylint: disable=too-many-lines
+# Justification: test_validation_integration.py keeps too-many-lines
+# validation scenarios together for clarity.
 
 from __future__ import annotations
 

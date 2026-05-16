@@ -1,5 +1,5 @@
 """Shared pytest fixtures for falcon-correlate tests."""
-# pylint: disable=too-many-arguments,too-many-positional-arguments
+# pylint: disable=too-many-arguments,too-many-positional-arguments  # Falcon WSGI and pytest fixture signatures require multiple arguments.
 
 from __future__ import annotations
 

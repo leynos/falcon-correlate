@@ -1,4 +1,7 @@
 """Unit tests for CorrelationIDMiddleware configuration options."""
+# TODO(TECHDEBT): split classes; see https://github.com/leynos/falcon-correlate/issues/0.
+# Suggested groups: DefaultValueTests, ValidationTests,
+# ImmutabilityTests, and ConfigConstructionTests before this class grows.
 # pylint: disable=too-many-public-methods
 
 from __future__ import annotations
