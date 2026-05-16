@@ -85,37 +85,30 @@ class TestRequestWithCorrelationId:
         assert captured["json"] == {"key": "val"}
         assert captured["timeout"] == EXPECTED_TIMEOUT
 
-    def test_converts_immutable_headers_to_mutable(
+    @pytest.mark.parametrize(
+        ("headers_input", "correlation_id"),
+        [
+            (types.MappingProxyType({"Accept": "text/html"}), "sync-cid-004"),
+            ([("Accept", "text/html")], "sync-cid-005"),
+        ],
+        ids=["immutable_mapping", "sequence"],
+    )
+    def test_accepts_alternative_header_formats(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+        headers_input: object,
+        correlation_id: str,
     ) -> None:
-        """Verify immutable mapping headers are converted without error."""
-        immutable = types.MappingProxyType({"Accept": "text/html"})
+        """Verify immutable-mapping and sequence-style headers are handled."""
         captured = run_sync(
             isolated_context,
-            correlation_id="sync-cid-004",
-            headers=immutable,
+            correlation_id=correlation_id,
+            headers=headers_input,
         )
 
         headers = captured["headers"]
         assert headers["Accept"] == "text/html"
-        assert headers[DEFAULT_HEADER_NAME] == "sync-cid-004"
-
-    def test_accepts_sequence_style_headers(
-        self,
-        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-    ) -> None:
-        """Verify sequence-style headers (list/tuple of pairs) are handled."""
-        sequence_headers = [("Accept", "text/html")]
-        captured = run_sync(
-            isolated_context,
-            correlation_id="sync-cid-005",
-            headers=sequence_headers,
-        )
-
-        headers = captured["headers"]
-        assert headers["Accept"] == "text/html"
-        assert headers[DEFAULT_HEADER_NAME] == "sync-cid-005"
+        assert headers[DEFAULT_HEADER_NAME] == correlation_id
 
     def test_copies_httpx_headers_before_injecting_correlation_id(
         self,
