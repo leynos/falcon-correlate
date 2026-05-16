@@ -259,8 +259,11 @@ class CorrelationIDMiddleware:
         reset_token = correlation_id_var.set(correlation_id)
         setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, reset_token)
 
+    # Falcon middleware hook requires this exact signature (request, response,
+    # resource, req_succeeded); disabling argument-count warnings for framework
+    # callback. FIXME: https://github.com/leynos/falcon-correlate/issues/38
     # pylint: disable-next=too-many-arguments,too-many-positional-arguments
-    def process_response(  # noqa: PLR6301 - Falcon calls middleware hooks on instances.
+    def process_response(  # noqa: PLR6301 - Falcon middleware hook; PLR6301 does not apply to framework callbacks.
         self,
         req: falcon.Request,
         resp: falcon.Response,
