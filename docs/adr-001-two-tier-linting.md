@@ -63,6 +63,43 @@ episodic.
 
 _Table 1: Comparison of linting options._
 
+## Goals and Non-Goals
+
+Goals:
+
+- Provide fast local feedback by keeping Ruff as the first lint tier.
+- Add deeper checks through a focused PyPy-backed Pylint tier.
+- Preserve a maintainable contributor workflow through a single `make lint`
+  command.
+- Keep lint behaviour reproducible across local development and CI.
+
+Non-goals:
+
+- Define the project's formatting policy; Ruff format and existing Markdown
+  tooling cover that separately.
+- Replace type checking, unit tests, behavioural tests, or security review.
+- Enable the full upstream Pylint rule set without project-specific curation.
+- Redesign existing modules solely to satisfy new lint rules in this ADR.
+
+## Requirements
+
+### Functional requirements
+
+- Linting must provide a fast first pass for common Python issues.
+- Linting must enforce import policy, including import ordering and
+  type-checking import placement.
+- Linting must run targeted Pylint checks that add signal beyond Ruff.
+- Linting must allow configurable targets so maintainers can scope checks when
+  needed.
+
+### Technical requirements
+
+- Pylint must run through `pylint-pypy-shim` under PyPy.
+- The shim package must be pinned to a known revision for reproducibility.
+- The lint workflow must keep Ruff first so common failures return quickly.
+- The Makefile must expose variables for the PyPy runtime, shim reference, and
+  Pylint targets.
+
 ## Decision Outcome / Proposed Direction
 
 Choose option C. `make lint` runs `uv run ruff check` first, then runs Pylint
