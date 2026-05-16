@@ -171,7 +171,7 @@ class CorrelationIDConfig:
 
     # @CodeScene(disable:"Excess Number of Function Arguments")
     @classmethod
-    # pylint: disable-next=too-many-arguments  # from_kwargs mirrors middleware constructor compatibility. FIXME: TECHDEBT-from-kwargs-refactor
+    # pylint: disable-next=too-many-arguments  # from_kwargs mirrors middleware constructor compatibility. FIXME: https://github.com/leynos/falcon-correlate/issues/36
     def from_kwargs(  # noqa: PLR0913 -- from_kwargs preserves the public factory API.
         cls,
         *,
