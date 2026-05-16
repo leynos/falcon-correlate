@@ -41,6 +41,18 @@ class TestCorrelationIDConfigValidation:
         ):
             CorrelationIDConfig(trusted_sources=frozenset(["127.0.0.1", "   "]))
 
+    def test_config_scalar_trusted_source_raises_type_error(self) -> None:
+        """Verify trusted_sources rejects a single string value."""
+        with pytest.raises(TypeError, match="trusted_sources must be an iterable"):
+            CorrelationIDConfig(trusted_sources="127.0.0.1")
+
+    def test_config_non_string_trusted_source_raises_type_error(self) -> None:
+        """Verify trusted_sources rejects non-string members."""
+        with pytest.raises(TypeError, match="trusted_sources must contain strings"):
+            CorrelationIDConfig(
+                trusted_sources=typ.cast("cabc.Iterable[str]", ["127.0.0.1", 123])
+            )
+
     def test_config_non_callable_generator_raises_type_error(self) -> None:
         """Verify non-callable generator on CorrelationIDConfig raises TypeError."""
         with pytest.raises(TypeError, match="generator must be callable"):

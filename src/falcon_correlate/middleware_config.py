@@ -71,6 +71,9 @@ class CorrelationIDConfig:
 
     def __post_init__(self) -> None:
         """Validate configuration after initialisation."""
+        if isinstance(self.trusted_sources, str):
+            msg = "trusted_sources must be an iterable of strings, not a string"
+            raise TypeError(msg)
         object.__setattr__(self, "trusted_sources", frozenset(self.trusted_sources))
         self._validate_header_name()
         self._validate_trusted_sources()
@@ -92,6 +95,9 @@ class CorrelationIDConfig:
         """
         parsed: list[_NetworkType] = []
         for source in self.trusted_sources:
+            if not isinstance(source, str):
+                msg = "trusted_sources must contain strings"
+                raise TypeError(msg)
             self._validate_source_not_empty(source)
             parsed.append(self._parse_network(source))
 
