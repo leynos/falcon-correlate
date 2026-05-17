@@ -6,8 +6,8 @@ This module defines the frozen dataclass and factory that encapsulate
 ``DEFAULT_HEADER_NAME``, and ``VALID_CONFIG_KWARGS``.
 
 ``middleware.py`` imports this module to validate and freeze middleware
-settings, while this module depends on ``middleware_utils.py`` for the default
-correlation ID generator and validator boundary.
+settings, while this module depends on ``middleware_utils.py`` for
+``default_uuid7_generator`` and ``default_uuid_validator``.
 """
 
 from __future__ import annotations
