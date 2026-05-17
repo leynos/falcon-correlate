@@ -81,7 +81,6 @@ into the system.
 
 The middleware accepts several configuration options as keyword-only arguments:
 
-
 ### `CorrelationIDConfig`
 
 `CorrelationIDConfig` is the exported immutable configuration object used by
@@ -96,8 +95,8 @@ validated and copied during construction, then exposed as read-only fields.
 | `validator`               | `Callable[[str], bool] \| None` | `None`                    | Optional validator for incoming trusted IDs.        |
 | `echo_header_in_response` | `bool`                          | `True`                    | Whether to echo the ID in the response header.      |
 
-Pass a config object directly when you want to build or share middleware
-configuration explicitly:
+Pass a config object directly to build or share middleware configuration
+explicitly:
 
 ```python
 import falcon
