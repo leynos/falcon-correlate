@@ -1,4 +1,5 @@
 """Unit tests for CorrelationIDMiddleware response header echoing."""
+# pylint: disable=too-many-arguments,too-many-positional-arguments  # pytest fixture signatures require multiple arguments.
 
 from __future__ import annotations
 
@@ -50,7 +51,7 @@ class TestCorrelationIDResponseHeader:
         request_response_factory: cabc.Callable[
             ..., tuple[falcon.Request, falcon.Response]
         ],
-        echo_header_in_response: typ.Literal[True, False],
+        echo_header_in_response: bool,  # noqa: FBT001 - pytest parametrized value
         expected_header: str | None,
     ) -> None:
         """Verify response processing honours response-header echo config."""

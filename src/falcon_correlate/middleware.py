@@ -263,7 +263,7 @@ class CorrelationIDMiddleware:
     # resource, req_succeeded); disabling argument-count warnings for framework
     # callback. FIXME: https://github.com/leynos/falcon-correlate/issues/38
     # pylint: disable-next=too-many-arguments,too-many-positional-arguments
-    def process_response(  # noqa: PLR6301 - Falcon middleware hook; PLR6301 does not apply to framework callbacks.
+    def process_response(
         self,
         req: falcon.Request,
         resp: falcon.Response,

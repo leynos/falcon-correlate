@@ -279,9 +279,11 @@ class ValidationLoggingScenario:
             return "validation_success_no_log"
         return "no_validator_no_log"
 
+
 def _is_debug_log_containing(record: logging.LogRecord, text: str) -> bool:
     """Return True if *record* is a DEBUG entry whose message contains *text*."""
     return record.levelno == logging.DEBUG and text in record.getMessage()
+
 
 def _is_validation_failure_debug_log(record: logging.LogRecord) -> bool:
     """Return True if *record* is a falcon_correlate DEBUG 'failed validation' entry."""
@@ -291,9 +293,10 @@ def _is_validation_failure_debug_log(record: logging.LogRecord) -> bool:
         and "failed validation" in record.getMessage()
     )
 
+
 def build_test_client(
     create_test_client: cabc.Callable[..., falcon.testing.TestClient],
-    validator_result: typ.Literal[True, False] | None,
+    validator_result: bool | None,  # noqa: FBT001 - test scenario value
 ) -> falcon.testing.TestClient:
     """Build a validation logging test client for the given validator result."""
     if validator_result is None:
@@ -305,6 +308,7 @@ def build_test_client(
         validator=mock_validator,
     )
 
+
 def assert_validation_logged(
     caplog: pytest.LogCaptureFixture,
     expected_substring: str,
@@ -314,12 +318,15 @@ def assert_validation_logged(
         _is_debug_log_containing(r, expected_substring) for r in caplog.records
     ), f"Expected DEBUG log containing '{expected_substring}'"
 
+
 def assert_validation_not_logged(caplog: pytest.LogCaptureFixture) -> None:
     """Assert that no validation failure debug log was emitted."""
     assert not any(_is_validation_failure_debug_log(r) for r in caplog.records), (
         "Expected no validation failure log records, "
         f"got {[r.getMessage() for r in caplog.records]}"
     )
+
+
 class TestValidationLogging:
     """Tests for DEBUG-level logging of validation failures."""
 
