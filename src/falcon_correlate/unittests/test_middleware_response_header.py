@@ -71,7 +71,11 @@ class TestCorrelationIDResponseHeader:
                 req_succeeded=True,
             )
 
-            assert resp.get_header("X-Correlation-ID") == expected_header
+            assert resp.get_header("X-Correlation-ID") == expected_header, (
+                "expected X-Correlation-ID header to equal expected_header "
+                f"{expected_header!r} but got "
+                f"{resp.get_header('X-Correlation-ID')!r}"
+            )
 
         isolated_context(_inner)
 
@@ -104,8 +108,14 @@ class TestCorrelationIDResponseHeader:
                 req_succeeded=True,
             )
 
-            assert resp.get_header(custom_header) == header_value
-            assert resp.get_header("X-Correlation-ID") is None
+            assert resp.get_header(custom_header) == header_value, (
+                f"expected {custom_header} header to equal header_value "
+                f"{header_value!r} but got {resp.get_header(custom_header)!r}"
+            )
+            assert resp.get_header("X-Correlation-ID") is None, (
+                "expected X-Correlation-ID header to be absent but got "
+                f"{resp.get_header('X-Correlation-ID')!r}"
+            )
 
         isolated_context(_inner)
 
@@ -158,7 +168,11 @@ class TestCorrelationIDResponseHeader:
                 req_succeeded=True,
             )
 
-            assert resp.get_header("X-Correlation-ID") == scenario.expected_header
+            assert resp.get_header("X-Correlation-ID") == scenario.expected_header, (
+                "expected X-Correlation-ID header to equal "
+                f"scenario.expected_header {scenario.expected_header!r} but got "
+                f"{resp.get_header('X-Correlation-ID')!r}"
+            )
 
         isolated_context(_inner)
 
@@ -184,7 +198,10 @@ class TestCorrelationIDResponseHeader:
                 req_succeeded=True,
             )
 
-            assert resp.get_header("X-Correlation-ID") == "trusted-id"
+            assert resp.get_header("X-Correlation-ID") == "trusted-id", (
+                "expected X-Correlation-ID header to equal 'trusted-id' but got "
+                f"{resp.get_header('X-Correlation-ID')!r}"
+            )
 
         isolated_context(_inner)
 
@@ -210,7 +227,10 @@ class TestCorrelationIDResponseHeader:
             resp = HeaderFailingResponse()
 
             middleware.process_request(req, resp)
-            assert correlation_id_var.get() == "trusted-id"
+            assert correlation_id_var.get() == "trusted-id", (
+                "expected correlation_id_var to equal 'trusted-id' before "
+                f"header echo failure but got {correlation_id_var.get()!r}"
+            )
 
             with pytest.raises(RuntimeError, match="failed to set"):
                 middleware.process_response(
@@ -220,8 +240,14 @@ class TestCorrelationIDResponseHeader:
                     req_succeeded=True,
                 )
 
-            assert correlation_id_var.get() is None
-            assert req.context._correlation_id_reset_token is None
+            assert correlation_id_var.get() is None, (
+                "expected correlation_id_var to be reset after header echo "
+                f"failure but got {correlation_id_var.get()!r}"
+            )
+            assert req.context._correlation_id_reset_token is None, (
+                "expected req.context._correlation_id_reset_token to be None "
+                f"but got {req.context._correlation_id_reset_token!r}"
+            )
 
         isolated_context(_inner)
 
@@ -264,10 +290,19 @@ class TestCorrelationIDResponseHeader:
                 req_succeeded=True,
             )
 
-            assert resp.get_header("X-Correlation-ID") is None
+            assert resp.get_header("X-Correlation-ID") is None, (
+                "expected X-Correlation-ID header to be absent when "
+                f"scenario={scenario!r} but got "
+                f"{resp.get_header('X-Correlation-ID')!r}"
+            )
 
         isolated_context(_inner)
-        assert "Correlation ID response header echo skipped; ID absent" in caplog.text
+        assert (
+            "Correlation ID response header echo skipped; ID absent" in caplog.text
+        ), (
+            "expected caplog.text to contain response-header skip message but got "
+            f"{caplog.text!r}"
+        )
 
     def test_process_response_echoes_header_before_contextvar_cleanup(
         self,
@@ -285,7 +320,10 @@ class TestCorrelationIDResponseHeader:
             req, resp = request_response_factory(correlation_id="trusted-id")
 
             middleware.process_request(req, resp)
-            assert correlation_id_var.get() == "trusted-id"
+            assert correlation_id_var.get() == "trusted-id", (
+                "expected correlation_id_var to equal 'trusted-id' before "
+                f"response cleanup but got {correlation_id_var.get()!r}"
+            )
 
             middleware.process_response(
                 req,
@@ -294,8 +332,17 @@ class TestCorrelationIDResponseHeader:
                 req_succeeded=True,
             )
 
-            assert resp.get_header("X-Correlation-ID") == "trusted-id"
-            assert correlation_id_var.get() is None
+            assert resp.get_header("X-Correlation-ID") == "trusted-id", (
+                "expected X-Correlation-ID header to equal 'trusted-id' but got "
+                f"{resp.get_header('X-Correlation-ID')!r}"
+            )
+            assert correlation_id_var.get() is None, (
+                "expected correlation_id_var to be reset after response cleanup "
+                f"but got {correlation_id_var.get()!r}"
+            )
 
         isolated_context(_inner)
-        assert "Correlation ID response header echoed" in caplog.text
+        assert "Correlation ID response header echoed" in caplog.text, (
+            "expected caplog.text to contain response-header echo message but got "
+            f"{caplog.text!r}"
+        )

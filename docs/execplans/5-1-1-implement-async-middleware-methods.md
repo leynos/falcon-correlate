@@ -42,9 +42,7 @@ Success is observable when all of the following are true:
 - The repository passes `make check-fmt`, `make typecheck`, `make lint`,
   `make test`, `make markdownlint`, and `make nixie`.
 
-This plan must be approved before implementation begins. Do not implement the
-middleware, update the roadmap checkbox, or create implementation commits until
-that approval is explicit.
+Approval gate satisfied on 2026-05-09; retained here for historical context.
 
 ## Context and orientation
 
