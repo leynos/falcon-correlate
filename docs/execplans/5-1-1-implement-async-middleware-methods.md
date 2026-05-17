@@ -9,24 +9,24 @@ Status: IN PROGRESS
 
 ## Purpose / big picture
 
-Roadmap item 5.1.1 adds Falcon ASGI support to `falcon-correlate` by
-introducing a middleware class whose Falcon hook methods are asynchronous.
-After implementation, a consumer using `falcon.asgi.App` can install
-`CorrelationIDMiddlewareASGI` and receive the same correlation ID behaviour
-that WSGI users receive from `CorrelationIDMiddleware`: incoming IDs are read
-from the configured header only when the source is trusted, invalid or
-untrusted IDs are replaced by generated IDs, the request context and
-`contextvars` state expose the active correlation ID, and response processing
-cleans up request-local state.
+Roadmap item 5.1.1 adds Falcon Asynchronous Server Gateway Interface (ASGI)
+support to `falcon-correlate` by introducing a middleware class whose Falcon
+hook methods are asynchronous. After implementation, a consumer using
+`falcon.asgi.App` can install `CorrelationIDMiddlewareASGI` and receive the
+same correlation ID behaviour that Web Server Gateway Interface (WSGI) users
+receive from `CorrelationIDMiddleware`: incoming IDs are read from the
+configured header only when the source is trusted, invalid or untrusted IDs are
+replaced by generated IDs, the request context and `contextvars` state expose
+the active correlation ID, and response processing cleans up request-local
+state.
 
 Success is observable when all of the following are true:
 
 - `CorrelationIDMiddlewareASGI` exists in `src/falcon_correlate/middleware.py`
   and is exported from `src/falcon_correlate/__init__.py`.
 - `CorrelationIDMiddlewareASGI.process_request(self, req, resp)` and
-  `CorrelationIDMiddlewareASGI.process_response(self, req, resp, resource,
-  req_succeeded)` are `async def` methods with Falcon ASGI-compatible
-  signatures.
+  `CorrelationIDMiddlewareASGI.process_response(self, req, resp, resource, req_succeeded)`
+   are `async def` methods with Falcon ASGI-compatible signatures.
 - The ASGI class shares `CorrelationIDConfig` and the existing configuration
   validation path with the WSGI class.
 - ASGI tests prove generation, trusted incoming ID acceptance, invalid incoming
@@ -64,8 +64,8 @@ sets `req.context.correlation_id`, and stores a reset token for
 `correlation_id_var`. `CorrelationIDMiddleware.process_response` retrieves the
 stored reset token, ignores missing or mismatched tokens, resets
 `correlation_id_var`, and clears the reset-token attribute to prevent double
-reset. The ASGI class should preserve this lifecycle and should not introduce
-a separate correlation algorithm.
+reset. The ASGI class should preserve this lifecycle and should not introduce a
+separate correlation algorithm.
 
 The package root, `src/falcon_correlate/__init__.py`, re-exports public API
 symbols. Any public ASGI middleware class must be added there and covered by
@@ -81,8 +81,8 @@ Current WSGI-oriented middleware tests live under
 - `test_validation_integration.py`
 - `test_trusted_sources.py`
 
-Current behavioural tests live under `tests/bdd/`. The existing WSGI
-middleware scenarios are in `tests/bdd/middleware.feature` and
+Current behavioural tests live under `tests/bdd/`. The existing WSGI middleware
+scenarios are in `tests/bdd/middleware.feature` and
 `tests/bdd/test_middleware_steps.py`. ASGI coverage may be added beside these
 tests or in a focused `asgi_middleware.feature` file if that keeps the step
 definitions clearer.
@@ -182,41 +182,33 @@ record the conflict in `Decision Log`, and ask for direction.
 ## Risks
 
 - Risk: Falcon ASGI request and response types may differ enough from WSGI
-  types that private helper annotations become awkward.
-  Severity: medium.
-  Likelihood: medium.
-  Mitigation: keep helper logic duck-typed around the small Falcon surface
-  actually used by both modes: `get_header`, `remote_addr`, `context`, and
-  response header mutation.
+  types that private helper annotations become awkward. Severity: medium.
+  Likelihood: medium. Mitigation: keep helper logic duck-typed around the small
+  Falcon surface actually used by both modes: `get_header`, `remote_addr`,
+  `context`, and response header mutation.
 
 - Risk: implementing ASGI by subclassing the WSGI class directly could make an
-  async class inherit synchronous hook methods unintentionally.
-  Severity: medium.
-  Likelihood: medium.
-  Mitigation: prefer extracting shared non-hook helper methods or a small
-  internal base class, then define explicit async hook methods on
-  `CorrelationIDMiddlewareASGI`.
+  async class inherit synchronous hook methods unintentionally. Severity:
+  medium. Likelihood: medium. Mitigation: prefer extracting shared non-hook
+  helper methods or a small internal base class, then define explicit async
+  hook methods on `CorrelationIDMiddlewareASGI`.
 
 - Risk: response-header echo behaviour is documented and configured, but the
   currently inspected WSGI `process_response` path appears focused on cleanup.
-  Severity: high.
-  Likelihood: medium.
-  Mitigation: write targeted tests around both WSGI and ASGI response-header
-  behaviour before implementation. If the tests expose a WSGI gap, use the
-  tolerance above to escalate the intended scope.
+  Severity: high. Likelihood: medium. Mitigation: write targeted tests around
+  both WSGI and ASGI response-header behaviour before implementation. If the
+  tests expose a WSGI gap, use the tolerance above to escalate the intended
+  scope.
 
 - Risk: async context isolation failures may be hidden by sequential tests.
-  Severity: high.
-  Likelihood: medium.
-  Mitigation: include an ASGI concurrency test that sends overlapping requests
-  with distinct generated IDs or accepted trusted IDs and verifies no leakage.
+  Severity: high. Likelihood: medium. Mitigation: include an ASGI concurrency
+  test that sends overlapping requests with distinct generated IDs or accepted
+  trusted IDs and verifies no leakage.
 
 - Risk: BDD scenarios can become brittle if they duplicate too much Falcon
-  test-client setup.
-  Severity: low.
-  Likelihood: medium.
-  Mitigation: keep behavioural scenarios focused on user-visible ASGI outcomes
-  and put detailed edge-case coverage in unit tests.
+  test-client setup. Severity: low. Likelihood: medium. Mitigation: keep
+  behavioural scenarios focused on user-visible ASGI outcomes and put detailed
+  edge-case coverage in unit tests.
 
 ## Proposed implementation
 
@@ -233,8 +225,7 @@ leta refs CorrelationIDConfig
 ```
 
 Review the WSGI tests listed in the context section and identify the smallest
-test helpers worth sharing with ASGI tests. Avoid broad refactors at this
-stage.
+test helpers worth sharing with ASGI tests. Avoid broad refactors at this stage.
 
 Acceptance for this milestone:
 
@@ -260,11 +251,12 @@ be extended without obscuring the WSGI cases. The tests should cover:
 - `correlation_id_var` is reset after response processing; and
 - concurrent ASGI requests keep their correlation IDs isolated.
 
-Add or extend BDD coverage under `tests/bdd/` for at least one externally
-observable ASGI request flow. A good initial scenario is: given a
-`falcon.asgi.App` with `CorrelationIDMiddlewareASGI`, when a client requests a
-resource, then the response body contains the request correlation ID and the
-response header contains the same ID when echoing is enabled.
+Add or extend Behaviour-Driven Development (BDD) coverage under `tests/bdd/`
+for at least one externally observable ASGI request flow. A good initial
+scenario is: given a `falcon.asgi.App` with `CorrelationIDMiddlewareASGI`, when
+a client requests a resource, then the response body contains the request
+correlation ID and the response header contains the same ID when echoing is
+enabled.
 
 Run only the focused new tests first and capture logs:
 
@@ -324,9 +316,9 @@ Acceptance for this milestone:
 
 ### Milestone 4: implement `CorrelationIDMiddlewareASGI`
 
-Add `CorrelationIDMiddlewareASGI` to `src/falcon_correlate/middleware.py`.
-Its constructor should mirror `CorrelationIDMiddleware`. Its Falcon hooks
-should be explicit coroutine methods:
+Add `CorrelationIDMiddlewareASGI` to `src/falcon_correlate/middleware.py`. Its
+constructor should mirror `CorrelationIDMiddleware`. Its Falcon hooks should be
+explicit coroutine methods:
 
 ```python
 async def process_request(self, req: falcon.asgi.Request, resp: falcon.asgi.Response) -> None:
@@ -384,8 +376,8 @@ options, and that application code can read `req.context.correlation_id` or
 
 Update `docs/falcon-correlation-id-middleware-design.md` with the final design
 decision for sharing configuration and lifecycle logic between WSGI and ASGI.
-If response-header behaviour required a WSGI correction, record that as part
-of the same decision.
+If response-header behaviour required a WSGI correction, record that as part of
+the same decision.
 
 Update `docs/roadmap.md` to check off all 5.1.1 sub-items and the parent item
 only after the implementation and validation gates have passed. Do not check
@@ -419,14 +411,13 @@ If documentation was edited, run `make fmt` before the final `make check-fmt`
 unless it would modify unrelated files. Inspect `git diff` before staging.
 
 Commit only after all applicable gates pass. Use the commit-message skill and
-commit with a temporary message file through `git commit -F`, not `git commit
--m`.
+commit with a temporary message file through `git commit -F`, not
+`git commit -m`.
 
 Push the branch `5-1-1-implement-async-middleware-methods` to
 `origin/5-1-1-implement-async-middleware-methods` and create a draft pull
 request. The PR title must include `(5.1.1)`, and the summary must link this
-ExecPlan:
-`docs/execplans/5-1-1-implement-async-middleware-methods.md`.
+ExecPlan: `docs/execplans/5-1-1-implement-async-middleware-methods.md`.
 
 Acceptance for this milestone:
 
@@ -439,8 +430,7 @@ Acceptance for this milestone:
 - [x] 2026-05-08: Read `AGENTS.md` and loaded the `leta` and `execplans`
   skills for the planning task.
 - [x] 2026-05-08: Checked the starting branch and renamed it from
-  `feat/plan-asgi-middleware` to
-  `5-1-1-implement-async-middleware-methods`.
+  `feat/plan-asgi-middleware` to `5-1-1-implement-async-middleware-methods`.
 - [x] 2026-05-08: Used a Wyvern agent team for planning reconnaissance. One
   helper reviewed the roadmap and design documentation; another reviewed the
   middleware implementation and test layout.
@@ -454,12 +444,11 @@ Acceptance for this milestone:
   `CorrelationIDConfig`, public export tests, WSGI Falcon integration tests,
   and BDD middleware steps before editing.
 - [x] 2026-05-09: Added
-  `src/falcon_correlate/unittests/test_middleware_response_header.py` to
-  verify the documented WSGI response-header echo contract before ASGI parity
-  work.
+  `src/falcon_correlate/unittests/test_middleware_response_header.py` to verify
+  the documented WSGI response-header echo contract before ASGI parity work.
 - [x] 2026-05-09: Ran
   `uv run pytest -v src/falcon_correlate/unittests/test_middleware_response_header.py`
-  and captured the red-state log at
+   and captured the red-state log at
   `/tmp/test-falcon-correlate-5-1-1-wsgi-response-header-red.out`.
 - [x] 2026-05-10: Resolved the confirmed WSGI response-header contract gap by
   echoing `req.context.correlation_id` through `resp.set_header` before
@@ -475,8 +464,7 @@ Acceptance for this milestone:
   `resp.set_header` fallibility, adding debug logging, and broadening unit
   coverage.
 - [x] 2026-05-12: Ran the focused response-header test module and captured the
-  passing log at
-  `/tmp/test-falcon-correlate-5-1-1-response-header-review.out`.
+  passing log at `/tmp/test-falcon-correlate-5-1-1-response-header-review.out`.
 - [x] 2026-05-12: Ran final review-fix validation gates:
   `make check-fmt`, `make typecheck`, `make lint`, `make test`,
   `make markdownlint`, and `make nixie` all passed.
@@ -503,10 +491,10 @@ Acceptance for this milestone:
   `resp.set_header`. The next red test will verify whether the documented
   response-header echo contract is currently unmet.
 - 2026-05-09: The new WSGI response-header test confirmed the documented
-  contract gap. With `echo_header_in_response=True`, `resp.get_header(
-  "X-Correlation-ID")` was `None` after `process_response`, while the disabled
-  echo test passed. This reaches the plan tolerance for response-header parity
-  and pauses implementation pending user direction.
+  contract gap. With `echo_header_in_response=True`,
+  `resp.get_header( "X-Correlation-ID")` was `None` after `process_response`,
+  while the disabled echo test passed. This reaches the plan tolerance for
+  response-header parity and pauses implementation pending user direction.
 - 2026-05-10: The user directed the implementation to add response-header
   echoing to `CorrelationIDMiddleware.process_response` using
   `req.context.correlation_id` and the configured header name. The focused
@@ -519,8 +507,8 @@ Acceptance for this milestone:
   behaviour now lives in `_echo_correlation_id_header`, keeping
   `process_response` responsible for orchestration order.
 - 2026-05-12: Adding required response-header debug logs invalidated a
-  validation-focused logging test that asserted no middleware debug records
-  for validation-success paths. The test now asserts the intended narrower
+  validation-focused logging test that asserted no middleware debug records for
+  validation-success paths. The test now asserts the intended narrower
   invariant: validation-success and no-validator paths do not emit validation
   failure logs.
 
@@ -548,9 +536,9 @@ Acceptance for this milestone:
   fix WSGI response-header echo and make ASGI share that corrected lifecycle,
   or narrow this roadmap item so ASGI matches the current implementation and
   update documentation to remove the response-header promise. The first option
-  preserves the documented public contract; the second avoids expanding
-  runtime behaviour in this branch but leaves or codifies a surprising
-  configuration no-op.
+  preserves the documented public contract; the second avoids expanding runtime
+  behaviour in this branch but leaves or codifies a surprising configuration
+  no-op.
 - 2026-05-10: Resolve the response-header tolerance by fixing WSGI
   `process_response` to honour the existing documented contract. The block
   reads `req.context.correlation_id`, skips missing values, uses

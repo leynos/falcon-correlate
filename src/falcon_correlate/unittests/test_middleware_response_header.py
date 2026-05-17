@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 import typing as typ
 
+import falcon
+import falcon.testing
 import pytest
 
 from falcon_correlate import CorrelationIDMiddleware
@@ -12,8 +14,6 @@ from falcon_correlate.middleware import correlation_id_var
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
-
-    import falcon
 
 _LOGGER_NAME = "falcon_correlate.middleware"
 
@@ -58,6 +58,40 @@ class TestCorrelationIDResponseHeader:
             )
 
             assert resp.get_header("X-Correlation-ID") == "trusted-id"
+
+        isolated_context(_inner)
+
+    def test_process_response_uses_custom_header_name(
+        self,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    ) -> None:
+        """Verify response processing echoes the configured header name."""
+        custom_header = "X-Request-ID"
+        header_value = "custom-request-id"
+        middleware = CorrelationIDMiddleware(
+            trusted_sources=["127.0.0.1"],
+            header_name=custom_header,
+        )
+
+        def _inner() -> None:
+            environ = falcon.testing.create_environ(
+                path="/test",
+                headers={custom_header: header_value},
+                remote_addr="127.0.0.1",
+            )
+            req = falcon.Request(environ)
+            resp = falcon.Response()
+
+            middleware.process_request(req, resp)
+            middleware.process_response(
+                req,
+                resp,
+                resource=None,
+                req_succeeded=True,
+            )
+
+            assert resp.get_header(custom_header) == header_value
+            assert resp.get_header("X-Correlation-ID") is None
 
         isolated_context(_inner)
 
@@ -111,6 +145,32 @@ class TestCorrelationIDResponseHeader:
             )
 
             assert resp.get_header("X-Correlation-ID") == scenario.expected_header
+
+        isolated_context(_inner)
+
+    def test_process_response_overwrites_existing_correlation_id_header(
+        self,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+        request_response_factory: cabc.Callable[
+            ..., tuple[falcon.Request, falcon.Response]
+        ],
+    ) -> None:
+        """Verify response processing overwrites a pre-existing echo header."""
+        middleware = CorrelationIDMiddleware(trusted_sources=["127.0.0.1"])
+
+        def _inner() -> None:
+            req, resp = request_response_factory(correlation_id="trusted-id")
+            resp.set_header("X-Correlation-ID", "pre-existing-id")
+
+            middleware.process_request(req, resp)
+            middleware.process_response(
+                req,
+                resp,
+                resource=None,
+                req_succeeded=True,
+            )
+
+            assert resp.get_header("X-Correlation-ID") == "trusted-id"
 
         isolated_context(_inner)
 
