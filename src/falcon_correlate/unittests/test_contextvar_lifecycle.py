@@ -194,9 +194,9 @@ class TestContextVariableLifecycle:
                 "Expected correlation_id_var to remain unchanged for "
                 "non-token reset attribute"
             )
-            assert (
-                getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR) is non_token
-            ), "Expected non-token reset attribute to be left untouched"
+            assert getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR) is None, (
+                "Expected non-token reset attribute to be cleared"
+            )
             correlation_id_var.reset(original_token)
 
         isolated_context(_inner)
@@ -233,7 +233,7 @@ class TestContextVariableLifecycle:
                 "mismatched reset token"
             )
             assert getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR) is None, (
-                "Expected mismatched reset token to be cleared from request context"
+                "Expected mismatched reset token to be cleared"
             )
             foreign_var.reset(foreign_token)
             correlation_id_var.reset(original_token)

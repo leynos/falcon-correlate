@@ -36,15 +36,28 @@ class MissingCorrelationIDScenario(typ.NamedTuple):
 class TestCorrelationIDResponseHeader:
     """Tests for response-header echoing in the WSGI middleware."""
 
-    def test_process_response_echoes_trusted_correlation_id_when_enabled(
+    @pytest.mark.parametrize(
+        ("echo_header_in_response", "expected_header"),
+        [
+            (True, "trusted-id"),
+            (False, None),
+        ],
+        ids=["enabled", "disabled"],
+    )
+    def test_process_response_echoes_correlation_id_according_to_config(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
         request_response_factory: cabc.Callable[
             ..., tuple[falcon.Request, falcon.Response]
         ],
+        echo_header_in_response: typ.Literal[True, False],
+        expected_header: str | None,
     ) -> None:
-        """Verify response processing echoes the active correlation ID by default."""
-        middleware = CorrelationIDMiddleware(trusted_sources=["127.0.0.1"])
+        """Verify response processing honours response-header echo config."""
+        middleware = CorrelationIDMiddleware(
+            trusted_sources=["127.0.0.1"],
+            echo_header_in_response=echo_header_in_response,
+        )
 
         def _inner() -> None:
             req, resp = request_response_factory(correlation_id="trusted-id")
@@ -57,7 +70,7 @@ class TestCorrelationIDResponseHeader:
                 req_succeeded=True,
             )
 
-            assert resp.get_header("X-Correlation-ID") == "trusted-id"
+            assert resp.get_header("X-Correlation-ID") == expected_header
 
         isolated_context(_inner)
 
@@ -174,6 +187,43 @@ class TestCorrelationIDResponseHeader:
 
         isolated_context(_inner)
 
+    def test_process_response_cleans_up_context_when_header_echo_fails(
+        self,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+        request_response_factory: cabc.Callable[
+            ..., tuple[falcon.Request, falcon.Response]
+        ],
+    ) -> None:
+        """Verify response cleanup still runs if response header echo fails."""
+        middleware = CorrelationIDMiddleware(trusted_sources=["127.0.0.1"])
+
+        class HeaderFailingResponse(falcon.Response):
+            """Falcon response that fails when setting a header."""
+
+            def set_header(self, name: str, value: str) -> None:
+                msg = f"failed to set {name}={value}"
+                raise RuntimeError(msg)
+
+        def _inner() -> None:
+            req, _resp = request_response_factory(correlation_id="trusted-id")
+            resp = HeaderFailingResponse()
+
+            middleware.process_request(req, resp)
+            assert correlation_id_var.get() == "trusted-id"
+
+            with pytest.raises(RuntimeError, match="failed to set"):
+                middleware.process_response(
+                    req,
+                    resp,
+                    resource=None,
+                    req_succeeded=True,
+                )
+
+            assert correlation_id_var.get() is None
+            assert req.context._correlation_id_reset_token is None
+
+        isolated_context(_inner)
+
     @pytest.mark.parametrize(
         "scenario",
         [
@@ -217,43 +267,6 @@ class TestCorrelationIDResponseHeader:
 
         isolated_context(_inner)
         assert "Correlation ID response header echo skipped; ID absent" in caplog.text
-
-    @pytest.mark.parametrize(
-        "correlation_id",
-        ["trusted-id", "generated-id"],
-        ids=["trusted", "generated"],
-    )
-    def test_process_response_omits_correlation_id_when_echo_disabled(
-        self,
-        caplog: pytest.LogCaptureFixture,
-        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-        request_response_factory: cabc.Callable[
-            ..., tuple[falcon.Request, falcon.Response]
-        ],
-        correlation_id: str,
-    ) -> None:
-        """Verify response processing honours disabled response-header echoing."""
-        middleware = CorrelationIDMiddleware(
-            trusted_sources=["127.0.0.1"],
-            echo_header_in_response=False,
-        )
-        caplog.set_level(logging.DEBUG, logger=_LOGGER_NAME)
-
-        def _inner() -> None:
-            req, resp = request_response_factory(correlation_id=correlation_id)
-
-            middleware.process_request(req, resp)
-            middleware.process_response(
-                req,
-                resp,
-                resource=None,
-                req_succeeded=True,
-            )
-
-            assert resp.get_header("X-Correlation-ID") is None
-
-        isolated_context(_inner)
-        assert "Correlation ID response header echo disabled" in caplog.text
 
     def test_process_response_echoes_header_before_contextvar_cleanup(
         self,

@@ -37,7 +37,7 @@ Success is observable when all of the following are true:
 - Documentation explains when to use `CorrelationIDMiddlewareASGI`, how its
   configuration matches the WSGI class, and what behaviour users can rely on.
 - `docs/roadmap.md` marks item 5.1.1 complete only after code, tests,
-  documentation, validation, commit, push and draft pull request creation are
+  documentation, validation, commit, push, and draft pull request creation are
   complete.
 - The repository passes `make check-fmt`, `make typecheck`, `make lint`,
   `make test`, `make markdownlint`, and `make nixie`.
@@ -93,7 +93,7 @@ The relevant project documentation is:
 - `docs/falcon-correlation-id-middleware-design.md` section 3.1.1 for Falcon
   middleware shape and the ASGI note that hook methods are asynchronous.
 - `docs/falcon-correlation-id-middleware-design.md` sections 3.2 and 3.3 for
-  ID retrieval, trusted source handling, validation and context storage.
+  ID retrieval, trusted source handling, validation, and context storage.
 - `docs/falcon-correlation-id-middleware-design.md` section 4.1 and
   implementation notes for configuration defaults and WSGI examples that need
   ASGI parity notes.
@@ -107,7 +107,7 @@ The relevant skills are:
 - `/home/leynos/.codex/skills/execplans/SKILL.md` to keep this living
   ExecPlan current.
 - `/home/leynos/.codex/skills/leta/SKILL.md` for semantic navigation of the
-  middleware, tests and public exports.
+  middleware, tests, and public exports.
 - `/home/leynos/.codex/skills/code-review/SKILL.md` for the post-change review
   stance before commit.
 - `/home/leynos/.codex/skills/commit-message/SKILL.md` when committing the
@@ -133,7 +133,7 @@ The relevant skills are:
   them for the request/response tests to pass. Section 3.1.1 says lifespan
   hooks are not directly involved in per-request correlation ID handling.
 - Do not add a new external dependency. The development environment already
-  includes `pytest`, `pytest-bdd`, `pytest-asyncio`, `hypothesis` and Falcon 4.
+  includes `pytest`, `pytest-bdd`, `pytest-asyncio`, `hypothesis`, and Falcon 4.
 - Add tests before implementation changes. For missing ASGI behaviour, first
   demonstrate at least one failing unit or behavioural test.
 - Use `hypothesis` only where a genuine invariant over a range of inputs or
@@ -143,7 +143,7 @@ The relevant skills are:
   `docs/falcon-correlation-id-middleware-design.md` for any internal design
   decisions made during implementation.
 - Check off `docs/roadmap.md` item 5.1.1 only after implementation,
-  documentation and validation are complete.
+  documentation, and validation are complete.
 - Keep Markdown wrapped at 80 columns and code blocks within 120 columns.
 - Follow the repository command guidance: prefer Makefile targets, run quality
   gates sequentially, and capture long outputs with `tee` logs under `/tmp`.
@@ -393,7 +393,7 @@ Acceptance for this milestone:
 - Roadmap item 5.1.1 is checked off only when the branch genuinely implements
   it.
 
-### Milestone 6: run full validation, commit, push and draft the PR
+### Milestone 6: run full validation, commit, push, and draft the PR
 
 Run validation sequentially and capture logs:
 
@@ -460,9 +460,10 @@ Acceptance for this milestone:
   `make check-fmt`, `make typecheck`, `make lint`, `make test`,
   `make markdownlint`, and `make nixie` all passed.
 - [x] 2026-05-12: Addressed review findings on the WSGI response-header fix by
-  extracting `_echo_correlation_id_header`, documenting response echoing and
-  `resp.set_header` fallibility, adding debug logging, and broadening unit
-  coverage.
+  documenting response echoing and `resp.set_header` fallibility, adding debug
+  logging, and broadening unit coverage.
+- [x] 2026-05-17: Updated WSGI response cleanup so `correlation_id_var` is
+  reset in a `finally` block even when response-header echoing fails.
 - [x] 2026-05-12: Ran the focused response-header test module and captured the
   passing log at `/tmp/test-falcon-correlate-5-1-1-response-header-review.out`.
 - [x] 2026-05-12: Ran final review-fix validation gates:
@@ -470,9 +471,9 @@ Acceptance for this milestone:
   `make markdownlint`, and `make nixie` all passed.
 - [ ] Add failing unit and behavioural tests for ASGI middleware behaviour.
 - [ ] Implement `CorrelationIDMiddlewareASGI` and shared lifecycle helpers.
-- [ ] Update public exports, user documentation, design documentation and the
+- [ ] Update public exports, user documentation, design documentation, and the
   roadmap.
-- [ ] Run full validation, commit, push and create a draft PR.
+- [ ] Run full validation, commit, push, and create a draft PR.
 
 ## Surprises & Discoveries
 
@@ -502,10 +503,9 @@ Acceptance for this milestone:
 - 2026-05-10: Full validation after the WSGI response-header fix passed with
   `make test` reporting 353 passed and 11 skipped. This confirms the narrower
   contract fix did not regress the existing unit or behavioural suite.
-- 2026-05-12: Review feedback identified that the initial response-header fix
-  coupled output and cleanup responsibilities in `process_response`. The echo
-  behaviour now lives in `_echo_correlation_id_header`, keeping
-  `process_response` responsible for orchestration order.
+- 2026-05-17: Review feedback identified that response-header echo failure
+  could skip request-local cleanup. `process_response` now reads the reset
+  token before echoing and resets `correlation_id_var` in a `finally` block.
 - 2026-05-12: Adding required response-header debug logs invalidated a
   validation-focused logging test that asserted no middleware debug records for
   validation-success paths. The test now asserts the intended narrower
@@ -550,26 +550,30 @@ Acceptance for this milestone:
 
 ## Outcomes & Retrospective
 
-The WSGI response-header contract gap discovered during ASGI planning has been
-fixed and committed before the ASGI middleware implementation proceeds.
-`CorrelationIDMiddleware.process_response` now orchestrates two phases in a
-defined order: echo the request correlation ID to the configured response
-header when enabled, then reset `correlation_id_var` using the stored request
-token. The echo phase is isolated in `_echo_correlation_id_header`, logs its
-enabled, skipped, and successful paths at debug level, and deliberately lets
-`resp.set_header` exceptions propagate.
+Current milestone: WSGI response-header contract fix implemented; ASGI
+middleware implementation remains in progress. The work is tracked in
+[PR #32](https://github.com/leynos/falcon-correlate/pull/32).
 
-Validation evidence so far:
+Commits produced for this milestone:
 
-- `uv run pytest -v src/falcon_correlate/unittests/test_middleware_response_header.py`
-  passed after the review follow-up with 9 tests.
-- `make check-fmt`, `make typecheck`, `make lint`, `make test`,
-  `make markdownlint`, and `make nixie` passed after the initial WSGI contract
-  fix on 2026-05-10.
-- `make check-fmt`, `make typecheck`, `make lint`, `make test`,
-  `make markdownlint`, and `make nixie` passed after the review follow-up on
-  2026-05-12. `make test` reported 360 passed and 11 skipped.
+- [`3e4f087`](https://github.com/leynos/falcon-correlate/commit/3e4f087):
+  capture response-header parity blocker.
+- [`2a876e5`](https://github.com/leynos/falcon-correlate/commit/2a876e5):
+  echo correlation IDs in WSGI responses.
+- [`e2dbdb7`](https://github.com/leynos/falcon-correlate/commit/e2dbdb7):
+  refine response-header echo handling.
+- [`8b8c0e8`](https://github.com/leynos/falcon-correlate/commit/8b8c0e8):
+  extract validation log predicates.
+- [`3b8e4b8`](https://github.com/leynos/falcon-correlate/commit/3b8e4b8):
+  address response-header review comments.
 
-The overall ExecPlan remains in progress. The ASGI middleware class,
-ASGI-specific tests, public exports, user guide updates, design-document
-updates, roadmap checkbox, final validation, and final PR update still remain.
+Validation: local gates passed with `make check-fmt`, `make typecheck`,
+`make lint`, `make test`, `make markdownlint`, and `make nixie`; the latest
+full local test run reported 362 passed and 11 skipped. GitHub CI for PR #32
+reported lint and Python 3.12, 3.13, and 3.14 test jobs passing; CodeScene and
+CodeRabbit review statuses remained outside manual validation.
+
+Lessons: Falcon response-header echo and `ContextVar` cleanup must be ordered
+so request-local state is cleared even when response mutation fails. Falcon
+ASGI middleware should reuse the same lifecycle decisions rather than copy a
+parallel correlation algorithm.
