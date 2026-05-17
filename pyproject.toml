@@ -334,6 +334,7 @@ enable = [
 [tool.pytest.ini_options]
 # Tests automatically killed after seconds elapsed
 timeout = 30
+pythonpath = ["."]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
