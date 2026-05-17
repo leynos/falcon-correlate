@@ -18,6 +18,26 @@ if typ.TYPE_CHECKING:
     import falcon
 
 
+_FOREIGN_VAR: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "foreign",
+    default=None,
+)
+
+
+def _make_non_token_bad_token() -> tuple[object, cabc.Callable[[], None]]:
+    """Return a non-Token sentinel and a no-op cleanup."""
+    return object(), lambda: None
+
+
+def _make_mismatched_bad_token() -> tuple[
+    contextvars.Token[str | None],
+    cabc.Callable[[], None],
+]:
+    """Return a Token from a foreign ContextVar and its reset cleanup."""
+    t = _FOREIGN_VAR.set("foreign-value")
+    return t, lambda: _FOREIGN_VAR.reset(t)
+
+
 class TestContextVariableLifecycle:
     """Tests for middleware-managed `correlation_id_var` lifecycle."""
 
@@ -167,21 +187,30 @@ class TestContextVariableLifecycle:
 
         isolated_context(_inner)
 
-    def test_process_response_is_safe_with_non_token_reset_attr(
+    @pytest.mark.parametrize(
+        "setup_bad_token",
+        [
+            _make_non_token_bad_token,
+            _make_mismatched_bad_token,
+        ],
+        ids=["non_token_reset_attr", "mismatched_token_var"],
+    )
+    def test_process_response_is_safe_with_invalid_reset_token(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
         request_response_factory: cabc.Callable[
             ..., tuple[falcon.Request, falcon.Response]
         ],
+        setup_bad_token: cabc.Callable[[], tuple[object, cabc.Callable[[], None]]],
     ) -> None:
-        """Verify process_response ignores non-Token reset attribute values."""
+        """Verify process_response is safe and cleans up for any invalid reset token."""
         middleware = CorrelationIDMiddleware()
 
         def _inner() -> None:
             original_token = correlation_id_var.set("original-correlation-id")
+            bad_token, cleanup = setup_bad_token()
             req, resp = request_response_factory()
-            non_token = object()
-            setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, non_token)
+            setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, bad_token)
 
             middleware.process_response(
                 req,
@@ -192,50 +221,12 @@ class TestContextVariableLifecycle:
 
             assert correlation_id_var.get() == "original-correlation-id", (
                 "Expected correlation_id_var to remain unchanged for "
-                "non-token reset attribute"
+                "invalid reset token"
             )
             assert getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR) is None, (
-                "Expected non-token reset attribute to be cleared"
+                "Expected invalid reset token attribute to be cleared"
             )
-            correlation_id_var.reset(original_token)
-
-        isolated_context(_inner)
-
-    def test_process_response_is_safe_with_mismatched_token_var(
-        self,
-        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-        request_response_factory: cabc.Callable[
-            ..., tuple[falcon.Request, falcon.Response]
-        ],
-    ) -> None:
-        """Verify process_response ignores tokens from unrelated context variables."""
-        middleware = CorrelationIDMiddleware()
-        foreign_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-            "foreign",
-            default=None,
-        )
-
-        def _inner() -> None:
-            original_token = correlation_id_var.set("original-correlation-id")
-            foreign_token = foreign_var.set("foreign-value")
-            req, resp = request_response_factory()
-            setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, foreign_token)
-
-            middleware.process_response(
-                req,
-                resp,
-                resource=None,
-                req_succeeded=False,
-            )
-
-            assert correlation_id_var.get() == "original-correlation-id", (
-                "Expected correlation_id_var to remain unchanged for "
-                "mismatched reset token"
-            )
-            assert getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR) is None, (
-                "Expected mismatched reset token to be cleared"
-            )
-            foreign_var.reset(foreign_token)
+            cleanup()
             correlation_id_var.reset(original_token)
 
         isolated_context(_inner)
