@@ -33,12 +33,15 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
+import subprocess  # noqa: S404 - tests intentionally spawn isolated Python subprocesses.
 import sys
 import typing as typ
 from pathlib import Path
 
 import pytest
+
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
 
 _CELERY_TEST_GLOBS = (
     "src/falcon_correlate/unittests/test_celery_*.py",
@@ -127,7 +130,7 @@ def _discover_celery_test_paths(project_root: Path) -> tuple[Path, ...]:
 
 def _pythonpath_with_import_blocker(
     sitecustomize_dir: Path,
-    environ: typ.Mapping[str, str],
+    environ: cabc.Mapping[str, str],
 ) -> str:
     """Return a PYTHONPATH with the import blocker taking precedence."""
     existing_pythonpath = environ.get("PYTHONPATH")
@@ -139,7 +142,7 @@ def _pythonpath_with_import_blocker(
 
 def _blocked_celery_environment(
     sitecustomize_dir: Path,
-    environ: typ.Mapping[str, str],
+    environ: cabc.Mapping[str, str],
 ) -> dict[str, str]:
     """Build a child-process environment with the Celery import blocker first."""
     return {
@@ -150,7 +153,7 @@ def _blocked_celery_environment(
 
 def _run_python_with_celery_blocked(
     sitecustomize_dir: Path,
-    environ: typ.Mapping[str, str],
+    environ: cabc.Mapping[str, str],
     cwd: Path,
     *args: str,
 ) -> subprocess.CompletedProcess[str]:
@@ -166,7 +169,7 @@ def _run_python_with_celery_blocked(
     )
 
 
-def _relative_paths(paths: typ.Iterable[Path], project_root: Path) -> tuple[str, ...]:
+def _relative_paths(paths: cabc.Iterable[Path], project_root: Path) -> tuple[str, ...]:
     """Return paths relative to the repository root for subprocess pytest."""
     return tuple(str(path.relative_to(project_root)) for path in paths)
 

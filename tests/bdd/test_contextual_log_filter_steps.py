@@ -10,6 +10,7 @@ import typing as typ
 import pytest
 
 if typ.TYPE_CHECKING:
+    import collections.abc as cabc
     import contextvars
 from pytest_bdd import given, parsers, scenarios, then, when
 
@@ -56,7 +57,7 @@ def _make_log_record(msg: str = "test message") -> logging.LogRecord:
 
 
 @pytest.fixture(autouse=True)
-def _reset_context_variables() -> typ.Generator[None, None, None]:
+def _reset_context_variables() -> cabc.Generator[None, None, None]:
     """Reset context variables after each scenario to prevent leakage."""
     yield
     # Reset to defaults — both variables default to None.

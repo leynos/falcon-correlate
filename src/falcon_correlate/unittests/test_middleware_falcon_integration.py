@@ -1,4 +1,5 @@
 """Unit tests for CorrelationIDMiddleware integration with Falcon."""
+# pylint: disable=too-many-arguments,too-many-positional-arguments  # Falcon middleware hooks and pytest fixtures require multi-arg signatures.
 
 from __future__ import annotations
 
@@ -125,7 +126,7 @@ class TestCorrelationIDMiddlewareWithFalcon:
                 req: falcon.Request,
                 resp: falcon.Response,
                 resource: object,
-                req_succeeded: bool,  # noqa: FBT001  # FIXME: Falcon WSGI middleware interface requirement
+                req_succeeded: bool,  # noqa: FBT001 - Falcon WSGI middleware interface requirement
             ) -> None:
                 call_log.append(call_name)
                 super().process_response(req, resp, resource, req_succeeded)

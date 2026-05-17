@@ -18,6 +18,9 @@ from falcon_correlate.celery import (  # noqa: E402
     _maybe_connect_celery_worker_signals,
 )
 
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
+
 scenarios("celery_worker_signal.feature")
 
 
@@ -37,7 +40,7 @@ def _connect_celery_worker_signals() -> None:
 
 
 @pytest.fixture(autouse=True)
-def _reset_context_variables() -> typ.Generator[None, None, None]:
+def _reset_context_variables() -> cabc.Generator[None, None, None]:
     """Reset context variables around each scenario using token-based reset."""
     celery_tokens_token = _celery_context_tokens.set(None)
     correlation_token = correlation_id_var.set(None)

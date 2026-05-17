@@ -11,6 +11,9 @@ import pytest
 from falcon_correlate import CorrelationIDMiddleware
 from tests.conftest import CorrelationEchoResource
 
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
+
 
 class TestTrustedSourceChecking:
     """Tests for trusted source IP/CIDR matching."""
@@ -212,7 +215,7 @@ class TestTrustedSourceIntegration:
     def _create_client(
         self,
         trusted_sources: list[str] | None = None,
-        generator: typ.Callable[[], str] | None = None,
+        generator: cabc.Callable[[], str] | None = None,
     ) -> falcon.testing.TestClient:
         """Create a test client with the configured middleware."""
         middleware = CorrelationIDMiddleware(

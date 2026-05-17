@@ -18,6 +18,9 @@ from falcon_correlate.httpx import (  # noqa: E402
     request_with_correlation_id,
 )
 
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
+
 scenarios("httpx_propagation.feature")
 
 
@@ -50,7 +53,7 @@ class Context(typ.TypedDict, total=False):
 
 
 @pytest.fixture(autouse=True)
-def _reset_context_variables() -> typ.Generator[None, None, None]:
+def _reset_context_variables() -> cabc.Generator[None, None, None]:
     """Reset context variables after each scenario."""
     yield
     correlation_id_var.set(None)

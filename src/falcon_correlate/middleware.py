@@ -3,459 +3,49 @@
 from __future__ import annotations
 
 import contextvars
-import dataclasses
-import importlib
 import ipaddress
 import logging
 import typing as typ
 import uuid
+
+from .middleware_config import (
+    DEFAULT_HEADER_NAME,
+    VALID_CONFIG_KWARGS,
+    CorrelationIDConfig,
+)
+from .middleware_utils import (
+    CORRELATION_ID_RESET_TOKEN_ATTR,
+    RECOMMENDED_LOG_FORMAT,
+    ContextualLogFilter,
+    correlation_id_var,
+    default_uuid7_generator,
+    default_uuid_validator,
+    user_id_var,
+)
+
+__all__ = [
+    "DEFAULT_HEADER_NAME",
+    "RECOMMENDED_LOG_FORMAT",
+    "ContextualLogFilter",
+    "CorrelationIDConfig",
+    "CorrelationIDMiddleware",
+    "correlation_id_var",
+    "default_uuid7_generator",
+    "default_uuid_validator",
+    "user_id_var",
+    "uuid",
+]
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
     import falcon
 
-    class _CorrelationIDConfigKwargs(typ.TypedDict, total=False):
-        """Type definition for CorrelationIDConfig keyword arguments."""
-
-        header_name: str
-        trusted_sources: cabc.Iterable[str] | None
-        generator: cabc.Callable[[], str] | None
-        validator: cabc.Callable[[str], bool] | None
-        echo_header_in_response: bool
-
-
-# Type alias for parsed network objects
-_NetworkType = ipaddress.IPv4Network | ipaddress.IPv6Network
-
-DEFAULT_HEADER_NAME = "X-Correlation-ID"
+    from .middleware_config import CorrelationIDConfigKwargs
 
 logger = logging.getLogger(__name__)
 
-correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "correlation_id", default=None
-)
-user_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "user_id", default=None
-)
-_CORRELATION_ID_RESET_TOKEN_ATTR = "_correlation_id_reset_token"  # noqa: S105  # FIXME: attribute-name string is not a secret
-_MISSING_CONTEXT_PLACEHOLDER: str = "-"
-
-RECOMMENDED_LOG_FORMAT: str = (
-    "%(asctime)s - [%(levelname)s] - [%(correlation_id)s] - "
-    "[%(user_id)s] - %(name)s - %(message)s"
-)
-
-
-class ContextualLogFilter(logging.Filter):
-    """Logging filter that injects correlation and user IDs into log records.
-
-    This filter reads ``correlation_id_var`` and ``user_id_var`` and copies
-    their values onto the ``LogRecord`` as ``correlation_id`` and ``user_id``
-    attributes.  When a context variable is not set, the placeholder ``"-"``
-    is used.
-
-    Attributes already present on the record (e.g. attached via
-    ``extra=`` or a ``LoggerAdapter``) are preserved; the filter only
-    fills in missing attributes, never overwrites existing ones.
-
-    The filter never suppresses records; it always returns ``True``.
-
-    The library provides a recommended format string as the constant
-    ``RECOMMENDED_LOG_FORMAT``::
-
-        from falcon_correlate import RECOMMENDED_LOG_FORMAT
-
-        # Value:
-        # "%(asctime)s - [%(levelname)s] - [%(correlation_id)s] - "
-        # "[%(user_id)s] - %(name)s - %(message)s"
-
-    Examples
-    --------
-    Attach to a handler::
-
-        import logging
-        from falcon_correlate import ContextualLogFilter
-
-        handler = logging.StreamHandler()
-        handler.addFilter(ContextualLogFilter())
-        handler.setFormatter(
-            logging.Formatter(
-                "%(asctime)s [%(correlation_id)s] "
-                "[%(user_id)s] %(message)s"
-            )
-        )
-
-    Using the recommended format constant::
-
-        import logging
-        from falcon_correlate import (
-            ContextualLogFilter,
-            RECOMMENDED_LOG_FORMAT,
-        )
-
-        handler = logging.StreamHandler()
-        handler.addFilter(ContextualLogFilter())
-        handler.setFormatter(
-            logging.Formatter(RECOMMENDED_LOG_FORMAT),
-        )
-
-    Configure via ``logging.config.dictConfig``::
-
-        import logging.config
-        from falcon_correlate import RECOMMENDED_LOG_FORMAT
-
-        LOGGING_CONFIG = {
-            "version": 1,
-            "disable_existing_loggers": False,
-            "filters": {
-                "contextual": {
-                    "()": "falcon_correlate.ContextualLogFilter",
-                },
-            },
-            "formatters": {
-                "standard": {
-                    "format": RECOMMENDED_LOG_FORMAT,
-                },
-            },
-            "handlers": {
-                "console": {
-                    "class": "logging.StreamHandler",
-                    "formatter": "standard",
-                    "filters": ["contextual"],
-                },
-            },
-            "root": {
-                "handlers": ["console"],
-                "level": "INFO",
-            },
-        }
-
-        logging.config.dictConfig(LOGGING_CONFIG)
-
-    """
-
-    @typ.override
-    def filter(self, record: logging.LogRecord) -> bool:
-        """Enrich *record* with correlation ID and user ID attributes.
-
-        Attributes already present on the record (e.g. set via
-        ``extra=`` or a ``LoggerAdapter``) are preserved.  Context
-        variable values are only applied when the record does not
-        already carry the attribute, avoiding accidental clobbering
-        of explicit caller-provided metadata.
-
-        Parameters
-        ----------
-        record : logging.LogRecord
-            The log record to enrich.
-
-        Returns
-        -------
-        bool
-            Always ``True`` — this filter enriches records but never
-            suppresses them.
-
-        """
-        if not hasattr(record, "correlation_id"):
-            cid = correlation_id_var.get()
-            record.correlation_id = (
-                cid if cid is not None else _MISSING_CONTEXT_PLACEHOLDER
-            )
-        if not hasattr(record, "user_id"):
-            uid = user_id_var.get()
-            record.user_id = uid if uid is not None else _MISSING_CONTEXT_PLACEHOLDER
-        return True
-
-
-def default_uuid7_generator() -> str:
-    """Generate a UUIDv7 correlation ID.
-
-    Uses the standard library ``uuid.uuid7()`` when available and falls back
-    to ``uuid_utils.uuid7()`` when the runtime lacks ``uuid.uuid7()``.
-
-    Returns
-    -------
-    str
-        A UUIDv7 hex string representation.
-
-    """
-    uuid7 = getattr(uuid, "uuid7", None)
-    if uuid7 is not None:
-        return uuid7().hex
-
-    uuid_utils = importlib.import_module("uuid_utils")
-    return uuid_utils.uuid7().hex
-
-
-# Maximum length for a valid UUID string (hyphenated format: 8-4-4-4-12)
-_MAX_UUID_LENGTH = 36
-# Minimum length for a valid UUID string (hex-only format: 32 characters)
-_MIN_UUID_LENGTH = 32
-# Expected hyphen positions in 8-4-4-4-12 format (indices 8, 13, 18, 23)
-_HYPHEN_POSITIONS = frozenset({8, 13, 18, 23})
-# Valid UUID versions per RFC 4122 and RFC 9562
-_VALID_UUID_VERSIONS = frozenset({1, 2, 3, 4, 5, 6, 7, 8})
-
-
-def _has_valid_hyphen_placement(value: str) -> bool:
-    """Check that hyphens appear exactly at positions 8, 13, 18, 23 and nowhere else."""
-    for i, char in enumerate(value):
-        if char == "-":
-            if i not in _HYPHEN_POSITIONS:
-                return False
-        elif i in _HYPHEN_POSITIONS:
-            # Expected a hyphen but found a different character
-            return False
-    return True
-
-
-def default_uuid_validator(value: str) -> bool:
-    """Validate that a string is a valid UUID (versions 1-8).
-
-    Accepts both hyphenated (8-4-4-4-12) and hex-only (32-character) UUID
-    formats. Case-insensitive. Rejects UUIDs with non-standard version nibbles.
-    Enforces strict hyphen placement at positions 8, 13, 18, and 23 for
-    36-character inputs.
-
-    Parameters
-    ----------
-    value : str
-        The string to validate.
-
-    Returns
-    -------
-    bool
-        ``True`` if the value is a valid UUID (version 1-8), ``False`` otherwise.
-
-    Examples
-    --------
-    >>> default_uuid_validator("550e8400-e29b-41d4-a716-446655440000")
-    True
-    >>> default_uuid_validator("550e8400e29b41d4a716446655440000")
-    True
-    >>> default_uuid_validator("not-a-uuid")
-    False
-
-    """
-    # Early exit for empty strings
-    if not value:
-        return False
-
-    # Early exit for out-of-range length strings
-    length = len(value)
-    if length > _MAX_UUID_LENGTH or length < _MIN_UUID_LENGTH:
-        return False
-
-    # Reject strings in the 33-35 character "gap" (neither hex-only nor valid
-    # hyphenated format)
-    if _MIN_UUID_LENGTH < length < _MAX_UUID_LENGTH:
-        return False
-
-    # For 36-character strings, enforce strict 8-4-4-4-12 hyphen placement
-    if length == _MAX_UUID_LENGTH and not _has_valid_hyphen_placement(value):
-        return False
-
-    try:
-        parsed = uuid.UUID(value)
-    except ValueError:
-        return False
-    else:
-        # Enforce valid UUID version (1-8)
-        return parsed.version in _VALID_UUID_VERSIONS
-
-
-@dataclasses.dataclass(frozen=True)
-class CorrelationIDConfig:
-    """Configuration for CorrelationIDMiddleware.
-
-    This immutable configuration object encapsulates all settings for the
-    correlation ID middleware, providing validation and sensible defaults.
-
-    Parameters
-    ----------
-    header_name : str
-        The HTTP header name for correlation IDs. Defaults to ``X-Correlation-ID``.
-    trusted_sources : frozenset[str]
-        IP addresses considered trusted. Defaults to empty frozenset.
-    generator : Callable[[], str]
-        Function to generate new correlation IDs. Defaults to
-        ``default_uuid7_generator``.
-    validator : Callable[[str], bool] | None
-        Optional function to validate incoming IDs. Defaults to ``None``.
-    echo_header_in_response : bool
-        Whether to echo the ID in response headers. Defaults to ``True``.
-
-    Raises
-    ------
-    ValueError
-        If ``header_name`` is empty or ``trusted_sources`` contains empty strings.
-    TypeError
-        If ``generator`` or ``validator`` is not callable.
-
-    """
-
-    header_name: str = DEFAULT_HEADER_NAME
-    trusted_sources: frozenset[str] = dataclasses.field(default_factory=frozenset)
-    generator: cabc.Callable[[], str] = default_uuid7_generator
-    validator: cabc.Callable[[str], bool] | None = None
-    echo_header_in_response: bool = True
-    _parsed_networks: tuple[_NetworkType, ...] = dataclasses.field(
-        default=(),
-        init=False,
-        repr=False,
-        compare=False,
-    )
-
-    def __post_init__(self) -> None:
-        """Validate configuration after initialisation."""
-        self._validate_header_name()
-        self._validate_trusted_sources()
-        self._validate_generator()
-        self._validate_validator()
-
-    def _validate_header_name(self) -> None:
-        """Validate that header_name is not empty."""
-        if not self.header_name or not self.header_name.strip():
-            msg = "header_name must not be empty"
-            raise ValueError(msg)
-
-    def _validate_trusted_sources(self) -> None:
-        """Validate trusted_sources and parse IP/CIDR notations.
-
-        Each entry in trusted_sources must be a valid IP address or CIDR
-        notation. Parsed networks are stored in _parsed_networks for efficient
-        matching at request time.
-        """
-        parsed: list[_NetworkType] = []
-        for source in self.trusted_sources:
-            self._validate_source_not_empty(source)
-            parsed.append(self._parse_network(source))
-
-        # Use object.__setattr__ to set frozen field
-        object.__setattr__(self, "_parsed_networks", tuple(parsed))
-
-    def _validate_source_not_empty(self, source: str) -> None:
-        """Validate that a trusted source string is not empty or whitespace.
-
-        Parameters
-        ----------
-        source : str
-            The trusted source string to validate.
-
-        Raises
-        ------
-        ValueError
-            If ``source`` is empty or contains only whitespace characters.
-
-        """
-        if not source or not source.strip():
-            msg = "trusted_sources must not contain empty strings"
-            raise ValueError(msg)
-
-    def _parse_network(self, source: str) -> _NetworkType:
-        """Parse an IP address or CIDR notation into a network object.
-
-        Parameters
-        ----------
-        source : str
-            The IP address or CIDR notation string to parse.
-
-        Returns
-        -------
-        IPv4Network | IPv6Network
-            The parsed network object.
-
-        Raises
-        ------
-        ValueError
-            If ``source`` has host bits set (for CIDR notation) or is not a
-            valid IP address or CIDR notation.
-
-        """
-        try:
-            network = ipaddress.ip_network(source, strict=False)
-        except ValueError as err:
-            msg = f"Invalid IP address or CIDR notation: '{source}'"
-            raise ValueError(msg) from err
-
-        # If CIDR notation was provided, check for host bits explicitly
-        if "/" in source:
-            addr_str, _, _ = source.partition("/")
-            try:
-                ip = ipaddress.ip_address(addr_str)
-            except ValueError as err:
-                msg = f"Invalid IP address or CIDR notation: '{source}'"
-                raise ValueError(msg) from err
-            if ip != network.network_address:
-                msg = f"Invalid CIDR notation '{source}': has host bits set"
-                raise ValueError(msg)
-
-        return network
-
-    def _validate_generator(self) -> None:
-        """Validate that generator is callable."""
-        if not callable(self.generator):
-            msg = "generator must be callable"
-            raise TypeError(msg)
-
-    def _validate_validator(self) -> None:
-        """Validate that validator is callable if provided."""
-        if self.validator is not None and not callable(self.validator):
-            msg = "validator must be callable"
-            raise TypeError(msg)
-
-    # @CodeScene(disable:"Excess Number of Function Arguments")
-    @classmethod
-    def from_kwargs(  # noqa: PLR0913
-        cls,
-        *,
-        header_name: str = DEFAULT_HEADER_NAME,
-        trusted_sources: cabc.Iterable[str] | None = None,
-        generator: cabc.Callable[[], str] | None = None,
-        validator: cabc.Callable[[str], bool] | None = None,
-        echo_header_in_response: bool = True,
-    ) -> CorrelationIDConfig:
-        """Create a configuration from individual keyword arguments.
-
-        This factory method handles conversion of ``trusted_sources`` to a
-        frozenset and applies the default generator if none is provided.
-
-        Parameters
-        ----------
-        header_name : str
-            The HTTP header name. Defaults to ``X-Correlation-ID``.
-        trusted_sources : Iterable[str] | None
-            IP addresses to trust. Converted to frozenset.
-        generator : Callable[[], str] | None
-            ID generator function. Defaults to ``default_uuid7_generator``.
-        validator : Callable[[str], bool] | None
-            ID validation function.
-        echo_header_in_response : bool
-            Whether to echo ID in response.
-
-        Returns
-        -------
-        CorrelationIDConfig
-            A new configuration instance.
-
-        """
-        return cls(
-            header_name=header_name,
-            trusted_sources=(
-                frozenset(trusted_sources) if trusted_sources else frozenset()
-            ),
-            generator=generator if generator is not None else default_uuid7_generator,
-            validator=validator,
-            echo_header_in_response=echo_header_in_response,
-        )
-
-
-# Derive valid kwargs from dataclass fields to ensure synchronization
-# Only include fields that are initialized at construction (init=True)
-_VALID_CONFIG_KWARGS = frozenset(
-    field.name for field in dataclasses.fields(CorrelationIDConfig) if field.init
-)
+_CORRELATION_ID_RESET_TOKEN_ATTR = CORRELATION_ID_RESET_TOKEN_ATTR
 
 
 class CorrelationIDMiddleware:
@@ -531,12 +121,12 @@ class CorrelationIDMiddleware:
                 raise ValueError(msg)
             self._config = config
         else:
-            unknown_keys = set(kwargs.keys()) - _VALID_CONFIG_KWARGS
+            unknown_keys = set(kwargs.keys()) - VALID_CONFIG_KWARGS
             if unknown_keys:
                 msg = f"Unknown keyword arguments: {', '.join(sorted(unknown_keys))}"
                 raise TypeError(msg)
             # Cast to TypedDict after validating keys - runtime will verify values
-            typed_kwargs = typ.cast("_CorrelationIDConfigKwargs", kwargs)
+            typed_kwargs = typ.cast("CorrelationIDConfigKwargs", kwargs)
             self._config = CorrelationIDConfig.from_kwargs(**typed_kwargs)
 
     # @CodeScene(disable:"Bumpy Road Ahead")
@@ -553,7 +143,7 @@ class CorrelationIDMiddleware:
     @property
     def trusted_sources(self) -> frozenset[str]:
         """The set of trusted IP addresses."""
-        return self._config.trusted_sources
+        return typ.cast("frozenset[str]", self._config.trusted_sources)
 
     @property
     def generator(self) -> cabc.Callable[[], str]:
@@ -620,14 +210,13 @@ class CorrelationIDMiddleware:
             return True
         try:
             result = self._config.validator(value)
-        except Exception:  # noqa: BLE001 — FIXME: user-supplied; cannot narrow
+        except Exception:  # noqa: BLE001 - user-supplied; cannot narrow
             logger.warning(
                 "Validator raised an exception for correlation ID, treating as invalid",
                 exc_info=True,
             )
             return False
-        else:
-            return result
+        return result
 
     def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
         """Process an incoming request to establish correlation ID context.
@@ -668,14 +257,18 @@ class CorrelationIDMiddleware:
 
         req.context.correlation_id = correlation_id
         reset_token = correlation_id_var.set(correlation_id)
-        setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, reset_token)
+        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, reset_token)
 
-    def process_response(
+    # Falcon middleware hook requires this exact signature (request, response,
+    # resource, req_succeeded); disabling argument-count warnings for framework
+    # callback. FIXME: https://github.com/leynos/falcon-correlate/issues/38
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
+    def process_response(  # noqa: PLR6301 - Falcon middleware hook; PLR6301 does not apply to framework callbacks.
         self,
         req: falcon.Request,
         resp: falcon.Response,
         resource: object,
-        req_succeeded: bool,  # noqa: FBT001  # FIXME: Falcon WSGI middleware interface requirement
+        req_succeeded: bool,  # noqa: FBT001 - Falcon WSGI middleware interface requirement
     ) -> None:
         """Post-process the response and clean up request-scoped context.
 
@@ -696,9 +289,12 @@ class CorrelationIDMiddleware:
             True if no exceptions were raised during request processing.
 
         """
-        reset_token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
+        reset_token = getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
         if not isinstance(reset_token, contextvars.Token):
             return
+
+        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
+
         if reset_token.var is not correlation_id_var:
             logger.debug("Ignoring mismatched correlation ID reset token")
             return
@@ -711,6 +307,3 @@ class CorrelationIDMiddleware:
                 exc_info=True,
             )
             return
-
-        # Prevent accidental double-reset if process_response is re-entered.
-        setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)

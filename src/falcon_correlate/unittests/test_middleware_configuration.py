@@ -1,4 +1,8 @@
 """Unit tests for CorrelationIDMiddleware configuration options."""
+# TODO(TECHDEBT): split classes; see https://github.com/leynos/falcon-correlate/issues/37.
+# Suggested groups: DefaultValueTests, ValidationTests,
+# ImmutabilityTests, and ConfigConstructionTests before this class grows.
+# pylint: disable=too-many-public-methods
 
 from __future__ import annotations
 
@@ -156,6 +160,16 @@ class TestCorrelationIDMiddlewareConfiguration:
         # Modifying original list should not affect middleware
         sources.append("10.0.0.1")
         assert middleware.trusted_sources == frozenset(["127.0.0.1"])
+
+    def test_config_trusted_sources_is_frozen_from_mutable_input(self) -> None:
+        """Verify direct config construction freezes trusted source inputs."""
+        sources = {"127.0.0.1"}
+        config = CorrelationIDConfig(trusted_sources=sources)
+
+        sources.add("10.0.0.1")
+
+        assert config.trusted_sources == frozenset(["127.0.0.1"])
+        assert isinstance(config.trusted_sources, frozenset)
 
     # Combined configuration tests
 

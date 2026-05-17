@@ -221,7 +221,7 @@ dev = [
     { name = "pytest-timeout", specifier = ">=2.3,<3" },
     { name = "pytest-xdist", specifier = ">=3.5,<4" },
     { name = "pyyaml", specifier = ">=6.0,<7" },
-    { name = "ruff", specifier = ">=0.6,<1" },
+    { name = "ruff", specifier = "==0.14.10" },
     { name = "structlog", specifier = ">=24.1,<26" },
     { name = "ty", specifier = ">=0.0.6,<1" },
 ]
