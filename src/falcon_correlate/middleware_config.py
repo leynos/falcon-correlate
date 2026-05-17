@@ -1,4 +1,14 @@
-"""Configuration for Falcon correlation middleware."""
+"""Configuration objects for Falcon correlation middleware.
+
+This module defines the frozen dataclass and factory that encapsulate
+``CorrelationIDMiddleware`` configuration. Its key exports are
+``CorrelationIDConfig``, ``CorrelationIDConfig.from_kwargs``,
+``DEFAULT_HEADER_NAME``, and ``VALID_CONFIG_KWARGS``.
+
+``middleware.py`` imports this module to validate and freeze middleware
+settings, while this module depends on ``middleware_utils.py`` for the default
+correlation ID generator and validator boundary.
+"""
 
 from __future__ import annotations
 

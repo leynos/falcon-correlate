@@ -81,6 +81,64 @@ into the system.
 
 The middleware accepts several configuration options as keyword-only arguments:
 
+
+### `CorrelationIDConfig`
+
+`CorrelationIDConfig` is the exported immutable configuration object used by
+`CorrelationIDMiddleware`. It is a frozen dataclass, so configuration state is
+validated and copied during construction, then exposed as read-only fields.
+
+| Field                     | Type                            | Default                   | Description                                         |
+| ------------------------- | ------------------------------- | ------------------------- | --------------------------------------------------- |
+| `header_name`             | `str`                           | `"X-Correlation-ID"`      | Header used for incoming and outgoing IDs.          |
+| `trusted_sources`         | `Iterable[str]`                 | `frozenset()`             | Trusted IP addresses or CIDR ranges.                |
+| `generator`               | `Callable[[], str]`             | `default_uuid7_generator` | Callable used when the middleware creates a new ID. |
+| `validator`               | `Callable[[str], bool] \| None` | `None`                    | Optional validator for incoming trusted IDs.        |
+| `echo_header_in_response` | `bool`                          | `True`                    | Whether to echo the ID in the response header.      |
+
+Pass a config object directly when you want to build or share middleware
+configuration explicitly:
+
+```python
+import falcon
+from falcon_correlate import CorrelationIDConfig, CorrelationIDMiddleware
+
+config = CorrelationIDConfig(
+    trusted_sources=["10.0.0.0/8"],
+    echo_header_in_response=True,
+)
+middleware = CorrelationIDMiddleware(config=config)
+app = falcon.App(middleware=[middleware])
+```
+
+The `CorrelationIDConfig.from_kwargs()` classmethod mirrors the middleware's
+keyword arguments and returns a validated config object. When `trusted_sources`
+is omitted or `None`, it defaults to an empty `frozenset`. When `generator` is
+omitted or `None`, it defaults to `default_uuid7_generator`.
+
+```python
+from falcon_correlate import CorrelationIDConfig, CorrelationIDMiddleware
+
+config = CorrelationIDConfig.from_kwargs(
+    header_name="X-Request-ID",
+    trusted_sources=("127.0.0.1",),
+)
+middleware = CorrelationIDMiddleware(config=config)
+```
+
+The `trusted_sources` field is always frozen. Regardless of whether a `list`,
+`set`, `tuple`, or other iterable is supplied, `config.trusted_sources` is a
+`frozenset`, and mutations to the original input do not affect the config:
+
+```python
+from falcon_correlate import CorrelationIDConfig
+
+sources = ["10.0.0.0/8"]
+config = CorrelationIDConfig(trusted_sources=sources)
+sources.append("192.168.0.0/16")  # mutation has no effect
+assert "192.168.0.0/16" not in config.trusted_sources
+```
+
 ### header_name
 
 The HTTP header name used for incoming and outgoing correlation IDs.

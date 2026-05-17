@@ -1,4 +1,15 @@
-"""Context and UUID helpers for Falcon correlation middleware."""
+"""Runtime helpers for Falcon correlation middleware.
+
+This module owns context-variable management, the contextual logging filter,
+and UUID generation and validation tooling for the correlation middleware. Its
+key exports include ``correlation_id_var``, ``user_id_var``,
+``CORRELATION_ID_RESET_TOKEN_ATTR``, ``ContextualLogFilter``,
+``default_uuid7_generator``, and ``default_uuid_validator``.
+
+Both ``middleware.py`` and ``middleware_config.py`` import this module, and it
+does not import from either of them. That boundary keeps the shared runtime
+helpers available without introducing circular imports.
+"""
 
 from __future__ import annotations
 

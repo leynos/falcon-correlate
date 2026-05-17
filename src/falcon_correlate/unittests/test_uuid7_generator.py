@@ -32,7 +32,7 @@ class TestDefaultUUID7Generator:
     ) -> None:
         """Verify fallback to uuid_utils when uuid.uuid7 is unavailable."""
         monkeypatch.setattr(
-            "falcon_correlate.middleware.uuid.uuid7", None, raising=False
+            "falcon_correlate.middleware_utils.uuid.uuid7", None, raising=False
         )
         sentinel_hex = "f" * 32
         fake_uuid_utils = SimpleNamespace(

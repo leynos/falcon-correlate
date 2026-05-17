@@ -24,6 +24,33 @@ focused on code that has already passed the high-volume checks.
 The decision to use this architecture is recorded in
 [ADR 001: two-tier linting with Ruff and PyPy-backed Pylint](adr-001-two-tier-linting.md).
 
+## Internal module architecture
+
+`middleware_config.py` owns validation and freezing of middleware
+configuration. Its central export is `CorrelationIDConfig`, an immutable
+dataclass that enforces the invariant that all configuration state is immutable
+after `__post_init__`, including conversion of `trusted_sources` to a
+`frozenset`. `middleware.py` imports this module to construct and expose
+validated configuration, and `__init__.py` re-exports the public config class.
+
+`middleware_utils.py` owns the request context-variable lifecycle, logging
+integration, and UUID tooling shared by the middleware. It exports
+`correlation_id_var` and `user_id_var` for request-scoped state,
+`ContextualLogFilter` for logging enrichment, and the default UUID generator
+and validator helpers used by middleware configuration.
+
+The architectural boundary is deliberately one-way: `middleware.py` imports
+from both utility modules, while neither `middleware_config.py` nor
+`middleware_utils.py` imports from `middleware.py`. This prevents circular
+imports and keeps configuration and runtime helpers usable independently.
+
+## Roadmap notes
+
+The two-tier linting work described in
+[ADR 001: two-tier linting with Ruff and PyPy-backed Pylint](adr-001-two-tier-linting.md)
+is complete. Keep future linting changes aligned with that ADR unless a new
+ADR supersedes it.
+
 ## Running lint checks
 
 Run the full lint gate with:
