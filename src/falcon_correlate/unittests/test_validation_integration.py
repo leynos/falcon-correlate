@@ -290,6 +290,36 @@ def _is_validation_failure_debug_log(record: logging.LogRecord) -> bool:
         and record.levelno == logging.DEBUG
         and "failed validation" in record.getMessage()
     )
+
+def build_test_client(
+    create_test_client: cabc.Callable[..., falcon.testing.TestClient],
+    validator_result: typ.Literal[True, False] | None,
+) -> falcon.testing.TestClient:
+    """Build a validation logging test client for the given validator result."""
+    if validator_result is None:
+        return create_test_client(trusted_sources=["127.0.0.1"])
+
+    mock_validator = mock.MagicMock(return_value=validator_result)
+    return create_test_client(
+        trusted_sources=["127.0.0.1"],
+        validator=mock_validator,
+    )
+
+def assert_validation_logged(
+    caplog: pytest.LogCaptureFixture,
+    expected_substring: str,
+) -> None:
+    """Assert that validation failure logging contains the expected substring."""
+    assert any(
+        _is_debug_log_containing(r, expected_substring) for r in caplog.records
+    ), f"Expected DEBUG log containing '{expected_substring}'"
+
+def assert_validation_not_logged(caplog: pytest.LogCaptureFixture) -> None:
+    """Assert that no validation failure debug log was emitted."""
+    assert not any(_is_validation_failure_debug_log(r) for r in caplog.records), (
+        "Expected no validation failure log records, "
+        f"got {[r.getMessage() for r in caplog.records]}"
+    )
 class TestValidationLogging:
     """Tests for DEBUG-level logging of validation failures."""
 
@@ -324,14 +354,7 @@ class TestValidationLogging:
         scenario: ValidationLoggingScenario,
     ) -> None:
         """Verify DEBUG logging behaviour for validation outcomes."""
-        if scenario.validator_result is None:
-            client = create_test_client(trusted_sources=["127.0.0.1"])
-        else:
-            mock_validator = mock.MagicMock(return_value=scenario.validator_result)
-            client = create_test_client(
-                trusted_sources=["127.0.0.1"],
-                validator=mock_validator,
-            )
+        client = build_test_client(create_test_client, scenario.validator_result)
 
         with caplog.at_level(logging.DEBUG, logger="falcon_correlate.middleware"):
             client.simulate_get(
@@ -341,17 +364,9 @@ class TestValidationLogging:
 
         if scenario.expect_log:
             assert scenario.log_contains is not None
-            assert any(
-                _is_debug_log_containing(r, scenario.log_contains)
-                for r in caplog.records
-            ), f"Expected DEBUG log containing '{scenario.log_contains}'"
+            assert_validation_logged(caplog, scenario.log_contains)
         else:
-            assert not any(
-                _is_validation_failure_debug_log(r) for r in caplog.records
-            ), (
-                "Expected no validation failure log records, "
-                f"got {[r.message for r in caplog.records]}"
-            )
+            assert_validation_not_logged(caplog)
 
 
 class TestValidationNotCalledWhenUnnecessary:
