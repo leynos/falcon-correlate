@@ -279,7 +279,17 @@ class ValidationLoggingScenario:
             return "validation_success_no_log"
         return "no_validator_no_log"
 
+def _is_debug_log_containing(record: logging.LogRecord, text: str) -> bool:
+    """Return True if *record* is a DEBUG entry whose message contains *text*."""
+    return record.levelno == logging.DEBUG and text in record.getMessage()
 
+def _is_validation_failure_debug_log(record: logging.LogRecord) -> bool:
+    """Return True if *record* is a falcon_correlate DEBUG 'failed validation' entry."""
+    return (
+        record.name == "falcon_correlate.middleware"
+        and record.levelno == logging.DEBUG
+        and "failed validation" in record.getMessage()
+    )
 class TestValidationLogging:
     """Tests for DEBUG-level logging of validation failures."""
 
@@ -332,16 +342,12 @@ class TestValidationLogging:
         if scenario.expect_log:
             assert scenario.log_contains is not None
             assert any(
-                record.levelno == logging.DEBUG
-                and scenario.log_contains in record.getMessage()
-                for record in caplog.records
+                _is_debug_log_containing(r, scenario.log_contains)
+                for r in caplog.records
             ), f"Expected DEBUG log containing '{scenario.log_contains}'"
         else:
             assert not any(
-                record.name == "falcon_correlate.middleware"
-                and record.levelno == logging.DEBUG
-                and "failed validation" in record.getMessage()
-                for record in caplog.records
+                _is_validation_failure_debug_log(r) for r in caplog.records
             ), (
                 "Expected no validation failure log records, "
                 f"got {[r.message for r in caplog.records]}"
