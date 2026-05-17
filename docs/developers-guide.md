@@ -22,7 +22,7 @@ Ruff must pass before Pylint runs. This keeps the slow, deeper lint tier
 focused on code that has already passed the high-volume checks.
 
 The decision to use this architecture is recorded in
-[ADR 001: two-tier linting with Ruff and PyPy-backed Pylint](adr-001-two-tier-linting.md).
+[ADR-001: two-tier linting with Ruff and PyPy-backed Pylint](adr-001-two-tier-linting.md).
 
 ## Internal module architecture
 
@@ -47,7 +47,7 @@ imports and keeps configuration and runtime helpers usable independently.
 ## Roadmap notes
 
 The two-tier linting work described in
-[ADR 001: two-tier linting with Ruff and PyPy-backed Pylint](adr-001-two-tier-linting.md)
+[ADR-001: two-tier linting with Ruff and PyPy-backed Pylint](adr-001-two-tier-linting.md)
 is complete. Keep future linting changes aligned with that ADR unless a new
 ADR supersedes it.
 
