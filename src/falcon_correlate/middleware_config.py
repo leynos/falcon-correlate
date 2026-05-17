@@ -157,6 +157,8 @@ class CorrelationIDConfig:
         try:
             return ipaddress.ip_network(source, strict=True)
         except ValueError as err:
+            if "has host bits set" in str(err):
+                raise ValueError(str(err)) from err
             msg = f"Invalid IP address or CIDR notation: '{source}'"
             raise ValueError(msg) from err
 
