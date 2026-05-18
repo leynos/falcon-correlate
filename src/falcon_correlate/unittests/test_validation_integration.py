@@ -313,13 +313,15 @@ def assert_validation_logged(
     caplog: pytest.LogCaptureFixture,
     expected_substring: str,
 ) -> None:
-    """Assert that validation failure logging contains the expected substring."""
-    middleware_records = (
-        r for r in caplog.records if r.name == "falcon_correlate.middleware"
-    )
+    """Assert that a falcon_correlate.middleware DEBUG log contains the expected substring."""  # noqa: E501
     assert any(
-        _is_debug_log_containing(r, expected_substring) for r in middleware_records
-    ), f"Expected DEBUG log containing '{expected_substring}'"
+        r.name == "falcon_correlate.middleware"
+        and _is_debug_log_containing(r, expected_substring)
+        for r in caplog.records
+    ), (
+        f"Expected DEBUG log from 'falcon_correlate.middleware' "
+        f"containing '{expected_substring}'"
+    )
 
 
 def assert_validation_not_logged(caplog: pytest.LogCaptureFixture) -> None:
