@@ -413,9 +413,10 @@ commit with a temporary message file through `git commit -F`, not
 `git commit -m`.
 
 Push the branch `5-1-1-implement-async-middleware-methods` to
-`origin/5-1-1-implement-async-middleware-methods` and create a draft pull
-request. The PR title must include `(5.1.1)`, and the summary must link this
-ExecPlan: `docs/execplans/5-1-1-implement-async-middleware-methods.md`.
+`origin/5-1-1-implement-async-middleware-methods` and update the existing draft
+pull request. The PR title must include `(5.1.1)`, and the summary must link
+this ExecPlan:
+`docs/execplans/5-1-1-implement-async-middleware-methods.md`.
 
 Acceptance for this milestone:
 
