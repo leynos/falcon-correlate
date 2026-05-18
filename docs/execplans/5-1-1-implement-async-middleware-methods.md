@@ -437,6 +437,9 @@ Acceptance for this milestone:
 - [x] 2026-05-19: Ran `coderabbit review --agent` for the refreshed plan.
   CodeRabbit reported zero findings in
   `/tmp/coderabbit-falcon-correlate-5-1-1-plan-refresh.out`.
+- [x] 2026-05-19: Ran the requested full code gates after the plan refresh:
+  `make check-fmt`, `make typecheck`, `make lint`, and `make test` all passed.
+  The test suite reported 379 passed and 11 skipped.
 - [ ] Receive explicit approval before implementing ASGI middleware.
 - [ ] Add failing ASGI unit and behavioural tests.
 - [ ] Implement shared lifecycle helpers and `CorrelationIDMiddlewareASGI`.
@@ -500,7 +503,9 @@ skipped.
 
 Planning refresh validation: `make markdownlint`, `make nixie`, and
 `coderabbit review --agent` passed on 2026-05-19. CodeRabbit reported zero
-findings for the refreshed plan.
+findings for the refreshed plan. The requested code gates also passed:
+`make check-fmt`, `make typecheck`, `make lint`, and `make test`. The test
+suite reported 379 passed and 11 skipped.
 
 Lessons so far: Falcon response-header echo and `ContextVar` cleanup must be
 ordered so request-local state is cleared even when response mutation fails.
