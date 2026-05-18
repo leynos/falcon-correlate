@@ -232,6 +232,40 @@ In `process_response`:
    `asgi-correlation-id`.[^2]
 3. Perform any necessary cleanup, such as resetting context-local variables.
 
+Figure 1: Sequence diagram showing a client request entering a Falcon
+application, the correlation middleware setting request context in
+`process_request`, the resource handling the request, and `process_response`
+optionally echoing the correlation ID header before resetting the stored
+context variable token.
+
+```mermaid
+sequenceDiagram
+    actor Client
+    participant FalconApp
+    participant CorrelationIDMiddleware
+    participant Resource
+    participant Request
+    participant Response
+
+    Client->>FalconApp: HTTP request
+    FalconApp->>CorrelationIDMiddleware: process_request(req, resp)
+    CorrelationIDMiddleware->>Request: set context.correlation_id
+    CorrelationIDMiddleware-->>FalconApp: return
+
+    FalconApp->>Resource: on_request(req, resp)
+    Resource-->>FalconApp: return
+
+    FalconApp->>CorrelationIDMiddleware: process_response(req, resp, resource, req_succeeded)
+    CorrelationIDMiddleware->>Request: read context.correlation_id
+    alt echo_header_in_response enabled and correlation_id present
+        CorrelationIDMiddleware->>Response: set_header(header_name, correlation_id)
+    end
+    CorrelationIDMiddleware->>CorrelationIDMiddleware: reset correlation_id_var with stored token
+    CorrelationIDMiddleware-->>FalconApp: return
+
+    FalconApp-->>Client: HTTP response with optional correlation-id header
+```
+
 A middleware method can short-circuit request processing by setting
 `resp.complete = True`, causing Falcon to skip subsequent `process_request`,
 `process_resource`, and responder methods, but still execute `process_response`
