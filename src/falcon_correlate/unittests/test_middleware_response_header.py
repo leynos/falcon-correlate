@@ -34,15 +34,35 @@ class MissingCorrelationIDScenario(typ.NamedTuple):
     context_value: str | None
 
 
+class ConfigEchoScenario(typ.NamedTuple):
+    """Scenario for response-header echo configuration tests."""
+
+    echo_header_in_response: bool
+    request_kwargs: dict[str, str]
+    expected_header: str | None
+
+
 class TestCorrelationIDResponseHeader:
     """Tests for response-header echoing in the WSGI middleware."""
 
     @pytest.mark.parametrize(
-        ("echo_header_in_response", "request_kwargs", "expected_header"),
+        "scenario",
         [
-            (True, {"correlation_id": "trusted-id"}, "trusted-id"),
-            (False, {"correlation_id": "trusted-id"}, None),
-            (False, {}, None),
+            ConfigEchoScenario(
+                echo_header_in_response=True,
+                request_kwargs={"correlation_id": "trusted-id"},
+                expected_header="trusted-id",
+            ),
+            ConfigEchoScenario(
+                echo_header_in_response=False,
+                request_kwargs={"correlation_id": "trusted-id"},
+                expected_header=None,
+            ),
+            ConfigEchoScenario(
+                echo_header_in_response=False,
+                request_kwargs={},
+                expected_header=None,
+            ),
         ],
         ids=["enabled_trusted", "disabled_trusted", "disabled_generated"],
     )
@@ -52,23 +72,20 @@ class TestCorrelationIDResponseHeader:
         request_response_factory: cabc.Callable[
             ..., tuple[falcon.Request, falcon.Response]
         ],
-        echo_header_in_response: bool,  # noqa: FBT001 - pytest parametrized value
-        request_kwargs: dict[str, str],
-        expected_header: str | None,
+        scenario: ConfigEchoScenario,
     ) -> None:
         """Verify response processing honours response-header echo config."""
         middleware = CorrelationIDMiddleware(
             trusted_sources=["127.0.0.1"],
             generator=lambda: "generated-id",
-            echo_header_in_response=echo_header_in_response,
+            echo_header_in_response=scenario.echo_header_in_response,
         )
 
         def _inner() -> None:
-            """Exercise one response-header echo configuration scenario."""
-            req, resp = request_response_factory(**request_kwargs)
+            req, resp = request_response_factory(**scenario.request_kwargs)
 
             middleware.process_request(req, resp)
-            if not request_kwargs:
+            if not scenario.request_kwargs:
                 assert req.context.correlation_id == "generated-id", (
                     "expected generated request correlation ID to be "
                     f"'generated-id' but got {req.context.correlation_id!r}"
@@ -80,9 +97,9 @@ class TestCorrelationIDResponseHeader:
                 req_succeeded=True,
             )
 
-            assert resp.get_header("X-Correlation-ID") == expected_header, (
+            assert resp.get_header("X-Correlation-ID") == scenario.expected_header, (
                 "expected X-Correlation-ID header to equal expected_header "
-                f"{expected_header!r} but got "
+                f"{scenario.expected_header!r} but got "
                 f"{resp.get_header('X-Correlation-ID')!r}"
             )
 
