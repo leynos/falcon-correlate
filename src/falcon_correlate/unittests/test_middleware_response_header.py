@@ -38,12 +38,13 @@ class TestCorrelationIDResponseHeader:
     """Tests for response-header echoing in the WSGI middleware."""
 
     @pytest.mark.parametrize(
-        ("echo_header_in_response", "expected_header"),
+        ("echo_header_in_response", "request_kwargs", "expected_header"),
         [
-            (True, "trusted-id"),
-            (False, None),
+            (True, {"correlation_id": "trusted-id"}, "trusted-id"),
+            (False, {"correlation_id": "trusted-id"}, None),
+            (False, {}, None),
         ],
-        ids=["enabled", "disabled"],
+        ids=["enabled_trusted", "disabled_trusted", "disabled_generated"],
     )
     def test_process_response_echoes_correlation_id_according_to_config(
         self,
@@ -52,18 +53,25 @@ class TestCorrelationIDResponseHeader:
             ..., tuple[falcon.Request, falcon.Response]
         ],
         echo_header_in_response: bool,  # noqa: FBT001 - pytest parametrized value
+        request_kwargs: dict[str, str],
         expected_header: str | None,
     ) -> None:
         """Verify response processing honours response-header echo config."""
         middleware = CorrelationIDMiddleware(
             trusted_sources=["127.0.0.1"],
+            generator=lambda: "generated-id",
             echo_header_in_response=echo_header_in_response,
         )
 
         def _inner() -> None:
-            req, resp = request_response_factory(correlation_id="trusted-id")
+            req, resp = request_response_factory(**request_kwargs)
 
             middleware.process_request(req, resp)
+            if not request_kwargs:
+                assert req.context.correlation_id == "generated-id", (
+                    "expected generated request correlation ID to be "
+                    f"'generated-id' but got {req.context.correlation_id!r}"
+                )
             middleware.process_response(
                 req,
                 resp,
