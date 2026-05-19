@@ -39,6 +39,14 @@ integration, and UUID tooling shared by the middleware. It exports
 `ContextualLogFilter` for logging enrichment, and the default UUID generator
 and validator helpers used by middleware configuration.
 
+`process_response` in `middleware.py` is responsible for the response-header
+echo and cleanup path. It copies `req.context.correlation_id` into the
+configured response header only when `echo_header_in_response` is enabled,
+skips the header write when the request has no resolved correlation ID, and
+always resets the request-scoped `correlation_id_var` token in a `finally`
+block. If `resp.set_header()` fails, the middleware logs a warning, performs
+cleanup, and re-raises the exception so Falcon still sees the failure.
+
 The architectural boundary is deliberately one-way: `middleware.py` imports
 from both utility modules, while neither `middleware_config.py` nor
 `middleware_utils.py` imports from `middleware.py`. This prevents circular
@@ -48,7 +56,7 @@ imports and keeps configuration and runtime helpers usable independently.
 
 The two-tier linting work described in
 [ADR-001: two-tier linting with Ruff and PyPy-backed Pylint](adr-001-two-tier-linting.md)
-is complete. Keep future linting changes aligned with that ADR unless a new
+ is complete. Keep future linting changes aligned with that ADR unless a new
 ADR supersedes it.
 
 ## Running lint checks
@@ -137,8 +145,8 @@ The lint configuration lives in `pyproject.toml`.
 including Pyflakes (`F`), pycodestyle (`E`, `W`), import ordering (`I`),
 pyupgrade (`UP`), comprehensions (`C4`), type-checking imports (`TC`), pathlib
 usage (`PTH`), security (`S`), boolean traps (`FBT`), naming (`N`),
-flake8-bugbear (`B`), Ruff-native rules (`RUF`), logging (`LOG`), pytest style
-(`PT`), exceptions (`TRY`), docstrings (`D`), annotations (`ANN`), McCabe
+flake8-bugbear (`B`), Ruff-native rules (`RUF`), logging (`LOG`), pytest style (
+`PT`), exceptions (`TRY`), docstrings (`D`), annotations (`ANN`), McCabe
 complexity (`C90`), and selected Pylint-compatible rules (`PLR`, `PLE`, and
 `PLW`).
 
