@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import collections.abc as cabc  # noqa: TC003 - requested runtime import.
 import typing as typ
 from http import HTTPStatus
 
@@ -43,19 +44,38 @@ class Context(typ.TypedDict, total=False):
     response: falcon.testing.Result
 
 
+def _build_asgi_context(
+    *,
+    sources: list[str] | None = None,
+    generated_id: str | None = None,
+    validator: cabc.Callable[[str], bool] | None = None,
+    echo_header_in_response: bool = True,
+) -> Context:
+    """Build a Falcon ASGI test context with CorrelationIDMiddlewareASGI."""
+    kwargs: dict[str, object] = {}
+    if sources is not None:
+        kwargs["trusted_sources"] = sources
+    if generated_id is not None:
+        kwargs["generator"] = lambda: generated_id
+    if validator is not None:
+        kwargs["validator"] = validator
+    if not echo_header_in_response:
+        kwargs["echo_header_in_response"] = False
+    app = falcon.asgi.App(
+        middleware=[CorrelationIDMiddlewareASGI(**typ.cast("typ.Any", kwargs))],
+    )
+    return {"app": app, "client": falcon.testing.TestClient(app)}
+
+
 @given(
     parsers.parse(_TRUSTED_APP_STEP),
     target_fixture="context",
 )
 def given_asgi_app_with_trusted_sources(sources: str) -> Context:
     """Create a Falcon ASGI app with trusted-source middleware."""
-    source_list = [source.strip() for source in sources.split(",")]
-    app = falcon.asgi.App(
-        middleware=[
-            CorrelationIDMiddlewareASGI(trusted_sources=source_list),
-        ],
+    return _build_asgi_context(
+        sources=[source.strip() for source in sources.split(",")],
     )
-    return {"app": app, "client": falcon.testing.TestClient(app)}
 
 
 @given(
@@ -67,16 +87,10 @@ def given_asgi_app_with_generator(
     generated_id: str,
 ) -> Context:
     """Create a Falcon ASGI app with a fixed ID generator."""
-    source_list = [source.strip() for source in sources.split(",")]
-    app = falcon.asgi.App(
-        middleware=[
-            CorrelationIDMiddlewareASGI(
-                trusted_sources=source_list,
-                generator=lambda: generated_id,
-            ),
-        ],
+    return _build_asgi_context(
+        sources=[source.strip() for source in sources.split(",")],
+        generated_id=generated_id,
     )
-    return {"app": app, "client": falcon.testing.TestClient(app)}
 
 
 @given(
@@ -88,17 +102,11 @@ def given_asgi_app_with_rejecting_validator(
     generated_id: str,
 ) -> Context:
     """Create a Falcon ASGI app with fixed generation and rejected input."""
-    source_list = [source.strip() for source in sources.split(",")]
-    app = falcon.asgi.App(
-        middleware=[
-            CorrelationIDMiddlewareASGI(
-                trusted_sources=source_list,
-                generator=lambda: generated_id,
-                validator=lambda _: False,
-            ),
-        ],
+    return _build_asgi_context(
+        sources=[source.strip() for source in sources.split(",")],
+        generated_id=generated_id,
+        validator=lambda _: False,
     )
-    return {"app": app, "client": falcon.testing.TestClient(app)}
 
 
 @given(
@@ -107,15 +115,10 @@ def given_asgi_app_with_rejecting_validator(
 )
 def given_asgi_app_with_echo_disabled(generated_id: str) -> Context:
     """Create a Falcon ASGI app with response-header echoing disabled."""
-    app = falcon.asgi.App(
-        middleware=[
-            CorrelationIDMiddlewareASGI(
-                generator=lambda: generated_id,
-                echo_header_in_response=False,
-            ),
-        ],
+    return _build_asgi_context(
+        generated_id=generated_id,
+        echo_header_in_response=False,
     )
-    return {"app": app, "client": falcon.testing.TestClient(app)}
 
 
 @given(parsers.parse('an ASGI correlation echo resource at "{path}"'))
