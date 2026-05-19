@@ -64,6 +64,7 @@ class TestCorrelationIDResponseHeader:
         )
 
         def _inner() -> None:
+            """Exercise one response-header echo configuration scenario."""
             req, resp = request_response_factory(**request_kwargs)
 
             middleware.process_request(req, resp)
@@ -100,6 +101,7 @@ class TestCorrelationIDResponseHeader:
         )
 
         def _inner() -> None:
+            """Exercise response echoing with a custom header name."""
             environ = falcon.testing.create_environ(
                 path="/test",
                 headers={custom_header: header_value},
@@ -166,6 +168,7 @@ class TestCorrelationIDResponseHeader:
         """Verify response echo uses the final request correlation ID."""
 
         def _inner() -> None:
+            """Exercise response echoing for one final-ID scenario."""
             req, resp = request_response_factory(**scenario.request_kwargs)
 
             scenario.middleware.process_request(req, resp)
@@ -195,6 +198,7 @@ class TestCorrelationIDResponseHeader:
         middleware = CorrelationIDMiddleware(trusted_sources=["127.0.0.1"])
 
         def _inner() -> None:
+            """Exercise response echoing over an existing header value."""
             req, resp = request_response_factory(correlation_id="trusted-id")
             resp.set_header("X-Correlation-ID", "pre-existing-id")
 
@@ -215,6 +219,7 @@ class TestCorrelationIDResponseHeader:
 
     def test_process_response_cleans_up_context_when_header_echo_fails(
         self,
+        caplog: pytest.LogCaptureFixture,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
         request_response_factory: cabc.Callable[
             ..., tuple[falcon.Request, falcon.Response]
@@ -222,15 +227,18 @@ class TestCorrelationIDResponseHeader:
     ) -> None:
         """Verify response cleanup still runs if response header echo fails."""
         middleware = CorrelationIDMiddleware(trusted_sources=["127.0.0.1"])
+        caplog.set_level(logging.WARNING, logger=_LOGGER_NAME)
 
         class HeaderFailingResponse(falcon.Response):
             """Falcon response that fails when setting a header."""
 
             def set_header(self, name: str, value: str) -> None:
+                """Raise to simulate Falcon response header mutation failure."""
                 msg = f"failed to set {name}={value}"
                 raise RuntimeError(msg)
 
         def _inner() -> None:
+            """Exercise cleanup when response header mutation raises."""
             req, _resp = request_response_factory(correlation_id="trusted-id")
             resp = HeaderFailingResponse()
 
@@ -258,6 +266,10 @@ class TestCorrelationIDResponseHeader:
             )
 
         isolated_context(_inner)
+        assert "Failed to echo correlation ID response header" in caplog.text, (
+            "expected caplog.text to contain response-header failure message but "
+            f"got {caplog.text!r}"
+        )
 
     @pytest.mark.parametrize(
         "scenario",
@@ -287,6 +299,7 @@ class TestCorrelationIDResponseHeader:
         caplog.set_level(logging.DEBUG, logger=_LOGGER_NAME)
 
         def _inner() -> None:
+            """Exercise response processing when request ID is absent."""
             req, resp = request_response_factory()
             if scenario.has_context_value:
                 req.context.correlation_id = scenario.context_value
@@ -325,6 +338,7 @@ class TestCorrelationIDResponseHeader:
         caplog.set_level(logging.DEBUG, logger=_LOGGER_NAME)
 
         def _inner() -> None:
+            """Exercise response echo ordering before context cleanup."""
             req, resp = request_response_factory(correlation_id="trusted-id")
 
             middleware.process_request(req, resp)

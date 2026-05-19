@@ -1,9 +1,8 @@
 # Implement async middleware methods (5.1.1)
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+ `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -16,9 +15,9 @@ approved.
 ## Purpose / big picture
 
 Roadmap item 5.1.1 adds Falcon Asynchronous Server Gateway Interface (ASGI)
-support to `falcon-correlate`. After the change is implemented, a consumer
-using `falcon.asgi.App` can install `CorrelationIDMiddlewareASGI` and receive
-the same request correlation behaviour that Web Server Gateway Interface (WSGI)
+support to `falcon-correlate`. After the change is implemented, a consumer using
+ `falcon.asgi.App` can install `CorrelationIDMiddlewareASGI` and receive the
+same request correlation behaviour that Web Server Gateway Interface (WSGI)
 consumers receive from `CorrelationIDMiddleware`.
 
 Success is observable when an ASGI Falcon application can accept a request,
@@ -510,6 +509,16 @@ Acceptance for this milestone:
   `5-1-1-implement-async-middleware-methods` to origin and updated draft PR
   #32 with implementation summary, validation evidence, this ExecPlan link,
   and the Lody session reference.
+- [x] 2026-05-19: Addressed review warnings that remained valid after checking
+  the current code. Documentation gaps were fixed by the scribe agent in commit
+  `153dc11`. The remaining code/test fixes add warning logging when
+  response-header echo fails, add BDD coverage for the externally observable
+  WSGI response header, and add docstrings to touched helper functions.
+- [x] 2026-05-19: Validated the review-warning fixes with focused tests,
+  `make check-fmt`, `make typecheck`, `make lint`, `make test`,
+  `make markdownlint`, and `make nixie`. The full test suite reported 402
+  passed and 11 skipped. `coderabbit review --agent` completed with zero
+  findings.
 
 ## Surprises & Discoveries
 
@@ -545,6 +554,10 @@ Acceptance for this milestone:
   protocol members from the type checker's perspective. The shared private
   request protocol therefore uses `remote_addr: str`, matching Falcon's public
   type surface, while the trust helper still accepts `str | None` defensively.
+- 2026-05-19: The current WSGI BDD feature did not include an externally
+  observable response-header echo scenario, even though ASGI BDD coverage did.
+  The gap is valid for the shared middleware behaviour and now has focused WSGI
+  coverage.
 
 ## Decision Log
 
@@ -572,6 +585,9 @@ Acceptance for this milestone:
 - 2026-05-19: Keep the ASGI public hooks annotated with
   `falcon.asgi.Request` and `falcon.asgi.Response`; the focused ASGI tests pass
   with those annotations.
+- 2026-05-19: Keep response-header mutation failures visible by logging them at
+  warning level and re-raising. Cleanup still runs in the existing `finally`
+  path so diagnostics do not change failure semantics.
 
 ## Outcomes & Retrospective
 
@@ -598,7 +614,11 @@ ordered so request-local state is cleared even when response mutation fails.
 ASGI middleware should share those lifecycle decisions rather than copy a
 parallel correlation algorithm.
 
-Final implementation validation passed locally on 2026-05-19:
+Final implementation validation passed locally on 2026-05-19: `make check-fmt`,
+`make typecheck`, `make lint`, `make test`, `make markdownlint`, and
+`make nixie`. The full test suite reported 400 passed and 11 skipped.
+
+Review-warning follow-up validation passed locally on 2026-05-19:
 `make check-fmt`, `make typecheck`, `make lint`, `make test`,
-`make markdownlint`, and `make nixie`. The full test suite reported 400 passed
-and 11 skipped.
+`make markdownlint`, and `make nixie`. The full test suite reported 402 passed
+and 11 skipped. CodeRabbit reported zero findings for this follow-up.

@@ -213,7 +213,14 @@ class _CorrelationIDMiddlewareBase:
                 logger.debug("Correlation ID response header echo skipped; ID absent")
                 return
 
-            resp.set_header(self._config.header_name, correlation_id)
+            try:
+                resp.set_header(self._config.header_name, correlation_id)
+            except Exception:
+                logger.warning(
+                    "Failed to echo correlation ID response header",
+                    exc_info=True,
+                )
+                raise
             logger.debug("Correlation ID response header echoed")
         finally:
             setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
