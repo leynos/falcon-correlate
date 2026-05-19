@@ -506,7 +506,10 @@ Acceptance for this milestone:
   `/tmp/coderabbit-falcon-correlate-5-1-1-final-retry.out`.
 - [x] 2026-05-19: Committed the implementation as `2631c8c` with message
   `Implement Falcon ASGI correlation middleware`.
-- [ ] Push the implementation branch and update the pull request.
+- [x] 2026-05-19: Pushed branch
+  `5-1-1-implement-async-middleware-methods` to origin and updated draft PR
+  #32 with implementation summary, validation evidence, this ExecPlan link,
+  and the Lody session reference.
 
 ## Surprises & Discoveries
 
