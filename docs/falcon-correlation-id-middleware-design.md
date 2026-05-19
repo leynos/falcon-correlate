@@ -196,6 +196,20 @@ If the Falcon application is running in ASGI mode, these methods will be
 `process_shutdown(self, scope, event)` to handle ASGI lifespan events, though
 these are not directly involved in per-request correlation ID handling.[^11]
 
+The implementation exposes WSGI and ASGI as separate public classes:
+`CorrelationIDMiddleware` for `falcon.App` and `CorrelationIDMiddlewareASGI`
+for `falcon.asgi.App`. Both classes share a private lifecycle base so the
+configuration contract, incoming ID selection, response-header echoing, and
+`ContextVar` cleanup are implemented once. The ASGI class only adapts Falcon's
+middleware hook shape by defining `async process_request(self, req, resp)` and
+`async process_response(self, req, resp, resource, req_succeeded)`.
+
+Response processing writes the configured correlation header before cleanup
+when `echo_header_in_response` is enabled and a request ID is present. Cleanup
+then clears the stored reset token and resets `correlation_id_var` in a
+`finally` path, so request-local state is cleared even if response header
+mutation raises an exception.
+
 #### 3.1.2. Integrating with Falcon's request/response cycle
 
 The correlation ID logic will primarily reside in the process_request and
@@ -1029,7 +1043,7 @@ during its initialisation.
 # Configure trusted IPs (e.g., your load balancer, API gateway)
 TRUSTED_IPS = ["10.0.0.1", "192.168.1.254"]
 
-# Instantiate the middleware
+# Instantiate the middleware for WSGI
 correlation_middleware = CorrelationIDMiddleware(
     header_name="X-MyCompany-Correlation-ID",  # Custom header name
     trusted_sources=TRUSTED_IPS,
@@ -1042,7 +1056,9 @@ correlation_middleware = CorrelationIDMiddleware(
 # For WSGI:
 # app = falcon.App(middleware=[correlation_middleware, ...other_middleware...])
 # For ASGI:
-# app = falcon.asgi.App(middleware=[correlation_middleware, ...other_middleware...])
+# from .middleware import CorrelationIDMiddlewareASGI
+# asgi_correlation_middleware = CorrelationIDMiddlewareASGI(config=correlation_middleware.config)
+# app = falcon.asgi.App(middleware=[asgi_correlation_middleware, ...other_middleware...])
 ```
 
 #### Table: Middleware configuration options
@@ -1757,8 +1773,8 @@ helpers.
 
 1. **Explicit application setup without a second registration model:** Celery's
    signals are process-global in the integration used here. The helper accepts
-   the Celery app so application factories can expose their intent clearly,
-   but it does not store app-local state or duplicate signal logic.
+   the Celery app so application factories can expose their intent clearly, but
+   it does not store app-local state or duplicate signal logic.
 
 2. **Backwards compatibility:** Import-time registration remains in place, so
    existing consumers that rely on `import falcon_correlate` continue to get

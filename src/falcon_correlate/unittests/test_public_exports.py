@@ -13,6 +13,7 @@ class TestPublicExports:
         import falcon_correlate
 
         assert "CorrelationIDMiddleware" in falcon_correlate.__all__
+        assert "CorrelationIDMiddlewareASGI" in falcon_correlate.__all__
         assert "CorrelationIDConfig" in falcon_correlate.__all__
         assert "default_uuid7_generator" in falcon_correlate.__all__
 

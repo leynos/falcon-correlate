@@ -186,13 +186,13 @@ Extend the middleware to support Falcon's ASGI mode.
 
 ### 5.1. ASGI middleware variant
 
-- [ ] 5.1.1. Implement async middleware methods. See design-doc §3.1.1.
-  - [ ] Create `CorrelationIDMiddlewareASGI` class.
-  - [ ] Implement `async process_request(self, req, resp)`.
-  - [ ] Implement `async process_response(self, req, resp, resource,
+- [x] 5.1.1. Implement async middleware methods. See design-doc §3.1.1.
+  - [x] Create `CorrelationIDMiddlewareASGI` class.
+  - [x] Implement `async process_request(self, req, resp)`.
+  - [x] Implement `async process_response(self, req, resp, resource,
         req_succeeded)`.
-  - [ ] Share configuration logic with WSGI variant.
-  - [ ] Test middleware functions in an ASGI application.
+  - [x] Share configuration logic with WSGI variant.
+  - [x] Test middleware functions in an ASGI application.
 - [ ] 5.1.2. Ensure context variable compatibility with async
   - [ ] Verify `contextvars` behaviour in async context.
   - [ ] Test with concurrent async requests.

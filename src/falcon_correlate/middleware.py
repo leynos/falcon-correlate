@@ -29,6 +29,7 @@ __all__ = [
     "ContextualLogFilter",
     "CorrelationIDConfig",
     "CorrelationIDMiddleware",
+    "CorrelationIDMiddlewareASGI",
     "correlation_id_var",
     "default_uuid7_generator",
     "default_uuid_validator",
@@ -40,71 +41,33 @@ if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
     import falcon
+    import falcon.asgi
 
     from .middleware_config import CorrelationIDConfigKwargs
+
+    class _RequestLike(typ.Protocol):
+        """Small request surface shared by Falcon WSGI and ASGI."""
+
+        context: typ.Any
+        remote_addr: str
+
+        def get_header(self, name: str) -> str | None:
+            """Return a request header by name."""
+
+    class _ResponseLike(typ.Protocol):
+        """Small response surface shared by Falcon WSGI and ASGI."""
+
+        def set_header(self, name: str, value: str) -> None:
+            """Set a response header."""
+
 
 logger = logging.getLogger(__name__)
 
 _CORRELATION_ID_RESET_TOKEN_ATTR = CORRELATION_ID_RESET_TOKEN_ATTR
 
 
-class CorrelationIDMiddleware:
-    """Middleware for managing correlation IDs in Falcon applications.
-
-    This middleware handles the lifecycle of correlation IDs, extracting
-    them from incoming request headers or generating new ones, making
-    them available throughout the request lifecycle, and optionally
-    echoing them in response headers.
-
-    Parameters
-    ----------
-    config : CorrelationIDConfig | None
-        A pre-built configuration object. If provided, no other keyword
-        arguments may be specified. Defaults to ``None``.
-    **kwargs
-        Individual configuration parameters. Valid keys are: ``header_name``,
-        ``trusted_sources``, ``generator``, ``validator``, and
-        ``echo_header_in_response``. See :meth:`CorrelationIDConfig.from_kwargs`
-        for parameter details.
-
-    Raises
-    ------
-    ValueError
-        If both ``config`` and other keyword arguments are provided, or if
-        ``header_name`` is empty or ``trusted_sources`` contains empty strings.
-    TypeError
-        If unknown keyword arguments are provided, or if ``generator`` or
-        ``validator`` is provided but not callable.
-
-    Examples
-    --------
-    Basic usage with a Falcon WSGI application::
-
-        import falcon
-        from falcon_correlate import CorrelationIDMiddleware
-
-        middleware = CorrelationIDMiddleware()
-        app = falcon.App(middleware=[middleware])
-
-    Custom configuration::
-
-        middleware = CorrelationIDMiddleware(
-            header_name="X-Request-ID",
-            trusted_sources=["10.0.0.1", "192.168.1.1"],
-            echo_header_in_response=True,
-        )
-
-    Using a configuration object::
-
-        from falcon_correlate import CorrelationIDConfig
-
-        config = CorrelationIDConfig(
-            header_name="X-Request-ID",
-            trusted_sources=frozenset(["10.0.0.1"]),
-        )
-        middleware = CorrelationIDMiddleware(config=config)
-
-    """
+class _CorrelationIDMiddlewareBase:
+    """Shared lifecycle logic for Falcon correlation ID middleware variants."""
 
     __slots__ = ("_config",)
 
@@ -160,7 +123,7 @@ class CorrelationIDMiddleware:
         """Whether to echo the correlation ID in response headers."""
         return self._config.echo_header_in_response
 
-    def _get_incoming_header_value(self, req: falcon.Request) -> str | None:
+    def _get_incoming_header_value(self, req: _RequestLike) -> str | None:
         """Return the incoming correlation ID header value, if present.
 
         Leading and trailing whitespace is stripped; empty or whitespace-only
@@ -218,6 +181,114 @@ class CorrelationIDMiddleware:
             return False
         return result
 
+    def _process_request(self, req: _RequestLike) -> None:
+        """Establish request-local correlation ID state."""
+        incoming = self._get_incoming_header_value(req)
+
+        if incoming is not None and self._is_trusted_source(req.remote_addr):
+            if self._is_valid_id(incoming):
+                correlation_id = incoming
+            else:
+                logger.debug(
+                    "Correlation ID failed validation, generating new ID",
+                )
+                correlation_id = self._config.generator()
+        else:
+            correlation_id = self._config.generator()
+
+        req.context.correlation_id = correlation_id
+        reset_token = correlation_id_var.set(correlation_id)
+        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, reset_token)
+
+    def _process_response(self, req: _RequestLike, resp: _ResponseLike) -> None:
+        """Echo the response header if configured, then clear request state."""
+        reset_token = getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
+        try:
+            if not self._config.echo_header_in_response:
+                logger.debug("Correlation ID response header echo disabled")
+                return
+
+            correlation_id = getattr(req.context, "correlation_id", None)
+            if correlation_id is None:
+                logger.debug("Correlation ID response header echo skipped; ID absent")
+                return
+
+            resp.set_header(self._config.header_name, correlation_id)
+            logger.debug("Correlation ID response header echoed")
+        finally:
+            setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
+
+            if isinstance(reset_token, contextvars.Token):
+                if reset_token.var is correlation_id_var:
+                    try:
+                        correlation_id_var.reset(reset_token)
+                    except ValueError:
+                        logger.debug(
+                            "Ignoring invalid correlation ID reset token",
+                            exc_info=True,
+                        )
+                else:
+                    logger.debug("Ignoring mismatched correlation ID reset token")
+
+
+class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
+    """Middleware for managing correlation IDs in Falcon WSGI applications.
+
+    This middleware handles the lifecycle of correlation IDs, extracting
+    them from incoming request headers or generating new ones, making
+    them available throughout the request lifecycle, and optionally
+    echoing them in response headers.
+
+    Parameters
+    ----------
+    config : CorrelationIDConfig | None
+        A pre-built configuration object. If provided, no other keyword
+        arguments may be specified. Defaults to ``None``.
+    **kwargs
+        Individual configuration parameters. Valid keys are: ``header_name``,
+        ``trusted_sources``, ``generator``, ``validator``, and
+        ``echo_header_in_response``. See :meth:`CorrelationIDConfig.from_kwargs`
+        for parameter details.
+
+    Raises
+    ------
+    ValueError
+        If both ``config`` and other keyword arguments are provided, or if
+        ``header_name`` is empty or ``trusted_sources`` contains empty strings.
+    TypeError
+        If unknown keyword arguments are provided, or if ``generator`` or
+        ``validator`` is provided but not callable.
+
+    Examples
+    --------
+    Basic usage with a Falcon WSGI application::
+
+        import falcon
+        from falcon_correlate import CorrelationIDMiddleware
+
+        middleware = CorrelationIDMiddleware()
+        app = falcon.App(middleware=[middleware])
+
+    Custom configuration::
+
+        middleware = CorrelationIDMiddleware(
+            header_name="X-Request-ID",
+            trusted_sources=["10.0.0.1", "192.168.1.1"],
+            echo_header_in_response=True,
+        )
+
+    Using a configuration object::
+
+        from falcon_correlate import CorrelationIDConfig
+
+        config = CorrelationIDConfig(
+            header_name="X-Request-ID",
+            trusted_sources=frozenset(["10.0.0.1"]),
+        )
+        middleware = CorrelationIDMiddleware(config=config)
+
+    """
+
     def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
         """Process an incoming request to establish correlation ID context.
 
@@ -242,22 +313,7 @@ class CorrelationIDMiddleware:
             error handling; the middleware does not catch generator exceptions.
 
         """
-        incoming = self._get_incoming_header_value(req)
-
-        if incoming is not None and self._is_trusted_source(req.remote_addr):
-            if self._is_valid_id(incoming):
-                correlation_id = incoming
-            else:
-                logger.debug(
-                    "Correlation ID failed validation, generating new ID",
-                )
-                correlation_id = self._config.generator()
-        else:
-            correlation_id = self._config.generator()
-
-        req.context.correlation_id = correlation_id
-        reset_token = correlation_id_var.set(correlation_id)
-        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, reset_token)
+        self._process_request(req)
 
     # Falcon middleware hook requires this exact signature (request, response,
     # resource, req_succeeded); disabling argument-count warnings for framework
@@ -291,30 +347,35 @@ class CorrelationIDMiddleware:
             True if no exceptions were raised during request processing.
 
         """
-        reset_token = getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
-        try:
-            if not self._config.echo_header_in_response:
-                logger.debug("Correlation ID response header echo disabled")
-                return
+        self._process_response(req, resp)
 
-            correlation_id = getattr(req.context, "correlation_id", None)
-            if correlation_id is None:
-                logger.debug("Correlation ID response header echo skipped; ID absent")
-                return
 
-            resp.set_header(self._config.header_name, correlation_id)
-            logger.debug("Correlation ID response header echoed")
-        finally:
-            setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
+class CorrelationIDMiddlewareASGI(_CorrelationIDMiddlewareBase):
+    """Middleware for managing correlation IDs in Falcon ASGI applications.
 
-            if isinstance(reset_token, contextvars.Token):
-                if reset_token.var is correlation_id_var:
-                    try:
-                        correlation_id_var.reset(reset_token)
-                    except ValueError:
-                        logger.debug(
-                            "Ignoring invalid correlation ID reset token",
-                            exc_info=True,
-                        )
-                else:
-                    logger.debug("Ignoring mismatched correlation ID reset token")
+    The constructor accepts the same `CorrelationIDConfig` object or individual
+    keyword arguments as `CorrelationIDMiddleware`. Falcon ASGI applications
+    call the coroutine hooks while request selection, response-header echoing,
+    and context cleanup share the WSGI lifecycle implementation.
+    """
+
+    async def process_request(
+        self,
+        req: falcon.asgi.Request,
+        resp: falcon.asgi.Response,
+    ) -> None:
+        """Process an incoming ASGI request to establish correlation ID context."""
+        self._process_request(req)
+
+    # Falcon ASGI middleware hook requires this exact signature.
+    # See https://github.com/leynos/falcon-correlate/issues/38
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
+    async def process_response(
+        self,
+        req: falcon.asgi.Request,
+        resp: falcon.asgi.Response,
+        resource: object,
+        req_succeeded: bool,  # noqa: FBT001 - Falcon ASGI middleware interface requirement
+    ) -> None:
+        """Post-process an ASGI response and clean up request-scoped context."""
+        self._process_response(req, resp)

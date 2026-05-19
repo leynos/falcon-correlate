@@ -36,6 +36,35 @@ class HelloResource:
 app.add_route("/hello", HelloResource())
 ```
 
+### Falcon ASGI Usage
+
+Use `CorrelationIDMiddlewareASGI` with `falcon.asgi.App`:
+
+```python
+import falcon.asgi
+from falcon_correlate import CorrelationIDMiddlewareASGI
+
+middleware = CorrelationIDMiddlewareASGI()
+app = falcon.asgi.App(middleware=[middleware])
+```
+
+`CorrelationIDMiddlewareASGI` accepts the same keyword arguments and
+`CorrelationIDConfig` object as the WSGI `CorrelationIDMiddleware`. During an
+ASGI request, application code can read the established ID from
+`req.context.correlation_id` or from `correlation_id_var.get()`.
+
+```python
+from falcon_correlate import correlation_id_var
+
+
+class HelloResource:
+    async def on_get(self, req, resp):
+        resp.media = {
+            "request_id": req.context.correlation_id,
+            "ambient_id": correlation_id_var.get(),
+        }
+```
+
 ### How It Works
 
 The middleware provides two hook points in the request/response lifecycle:
@@ -47,6 +76,10 @@ The middleware provides two hook points in the request/response lifecycle:
 2. **`process_response(req, resp, resource, req_succeeded)`**: Called after the
    resource responder has been invoked. This is where the correlation ID will
    be added to response headers and any cleanup will be performed.
+
+For Falcon ASGI applications, `CorrelationIDMiddlewareASGI` exposes the same
+hook names as coroutine methods. Request selection, response-header echoing,
+and cleanup follow the same rules as the WSGI middleware.
 
 ### Header retrieval and trusted source behaviour
 
@@ -87,13 +120,13 @@ The middleware accepts several configuration options as keyword-only arguments:
 `CorrelationIDMiddleware`. It is a frozen dataclass, so configuration state is
 validated and copied during construction, then exposed as read-only fields.
 
-| Field                     | Type                            | Default                   | Description                                         |
-| ------------------------- | ------------------------------- | ------------------------- | --------------------------------------------------- |
-| `header_name`             | `str`                           | `"X-Correlation-ID"`      | Header used for incoming and outgoing IDs.          |
-| `trusted_sources`         | `Iterable[str]`                 | `frozenset()`             | Trusted IP addresses or CIDR ranges.                |
-| `generator`               | `Callable[[], str]`             | `default_uuid7_generator` | Callable used when the middleware creates a new ID. |
-| `validator`               | `Callable[[str], bool] \| None` | `None`                    | Optional validator for incoming trusted IDs.        |
-| `echo_header_in_response` | `bool`                          | `True`                    | Whether to echo the ID in the response header.      |
+| Field                     | Type                | Default                   | Description                                         |
+| ------------------------- | ------------------- | ------------------------- | --------------------------------------------------- |
+| `header_name`             | `str`               | `"X-Correlation-ID"`      | Header used for incoming and outgoing IDs.          |
+| `trusted_sources`         | `Iterable[str]`     | `frozenset()`             | Trusted IP addresses or CIDR ranges.                |
+| `generator`               | `Callable[[], str]` | `default_uuid7_generator` | Callable used when the middleware creates a new ID. |
+| `validator`               | callable or `None`  | `None`                    | Optional validator for incoming trusted IDs.        |
+| `echo_header_in_response` | `bool`              | `True`                    | Whether to echo the ID in the response header.      |
 
 Pass a config object directly to build or share middleware configuration
 explicitly:
