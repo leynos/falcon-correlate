@@ -246,11 +246,11 @@ In `process_response`:
    ^2]
 3. Perform any necessary cleanup, such as resetting context-local variables.
 
-Figure 1: Sequence diagram showing a client request entering a Falcon
-application, the correlation middleware setting request context in
-`process_request`, the resource handling the request, and `process_response`
-optionally echoing the correlation ID header before resetting the stored
-context variable token.
+**Figure 1 screen reader caption:** Sequence diagram showing a client request
+entering a Falcon application, the correlation middleware setting request
+context in `process_request`, the resource handling the request, and
+`process_response` optionally echoing the correlation ID header before resetting
+the stored context variable token.
 
 ```mermaid
 sequenceDiagram
