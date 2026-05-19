@@ -5,7 +5,7 @@ This Execution Plan (ExecPlan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 This draft covers the remaining ASGI middleware implementation. The branch
 already contains prerequisite WSGI response-header parity commits discovered
@@ -504,7 +504,9 @@ Acceptance for this milestone:
   validation. Both final attempts stopped at rate limits before producing
   findings. Logs are in `/tmp/coderabbit-falcon-correlate-5-1-1-final.out` and
   `/tmp/coderabbit-falcon-correlate-5-1-1-final-retry.out`.
-- [ ] Run full validation, commit, push, and update the pull request.
+- [x] 2026-05-19: Committed the implementation as `2631c8c` with message
+  `Implement Falcon ASGI correlation middleware`.
+- [ ] Push the implementation branch and update the pull request.
 
 ## Surprises & Discoveries
 
@@ -570,8 +572,12 @@ Acceptance for this milestone:
 
 ## Outcomes & Retrospective
 
-Current outcome: the refreshed ExecPlan is ready for review. The remaining ASGI
-implementation is not approved yet and has not begun.
+Current outcome: roadmap item 5.1.1 is implemented. Falcon ASGI consumers can
+install `CorrelationIDMiddlewareASGI` in `falcon.asgi.App`, and application
+code can observe the request ID through both `req.context.correlation_id` and
+`correlation_id_var.get()` during the request. The middleware shares
+configuration and lifecycle logic with the WSGI variant while keeping explicit
+async Falcon hooks for ASGI.
 
 Historical prerequisite outcome: this branch already fixed the WSGI
 response-header echo contract and cleanup ordering so ASGI parity has a correct
@@ -588,3 +594,8 @@ Lessons so far: Falcon response-header echo and `ContextVar` cleanup must be
 ordered so request-local state is cleared even when response mutation fails.
 ASGI middleware should share those lifecycle decisions rather than copy a
 parallel correlation algorithm.
+
+Final implementation validation passed locally on 2026-05-19:
+`make check-fmt`, `make typecheck`, `make lint`, `make test`,
+`make markdownlint`, and `make nixie`. The full test suite reported 400 passed
+and 11 skipped.
