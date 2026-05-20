@@ -1,4 +1,5 @@
 """Falcon Correlation ID middleware implementation."""
+# pylint: disable=too-many-lines
 
 from __future__ import annotations
 
@@ -200,42 +201,66 @@ class _CorrelationIDMiddlewareBase:
         reset_token = correlation_id_var.set(correlation_id)
         setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, reset_token)
 
+    def _echo_correlation_id_header(
+        self,
+        req: _RequestLike,
+        resp: _ResponseLike,
+    ) -> None:
+        """Write the active correlation ID to the configured response header.
+
+        Does nothing when echoing is disabled or the correlation ID is absent.
+        Re-raises any exception from ``resp.set_header`` so that the caller's
+        ``finally`` block still runs.
+        """
+        if not self._config.echo_header_in_response:
+            logger.debug("Correlation ID response header echo disabled")
+            return
+
+        correlation_id = getattr(req.context, "correlation_id", None)
+        if correlation_id is None:
+            logger.debug("Correlation ID response header echo skipped; ID absent")
+            return
+
+        try:
+            resp.set_header(self._config.header_name, correlation_id)
+        except Exception:
+            logger.warning(
+                "Failed to echo correlation ID response header",
+                exc_info=True,
+            )
+            raise
+        logger.debug("Correlation ID response header echoed")
+
+    def _reset_correlation_id_context(  # noqa: PLR6301 - helper must remain an instance method.
+        self,
+        req: _RequestLike,
+        reset_token: object,
+    ) -> None:
+        """Clear request reset token state and restore ContextVar state."""
+        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
+
+        if not isinstance(reset_token, contextvars.Token):
+            return
+
+        if reset_token.var is not correlation_id_var:
+            logger.debug("Ignoring mismatched correlation ID reset token")
+            return
+
+        try:
+            correlation_id_var.reset(reset_token)
+        except ValueError:
+            logger.debug(
+                "Ignoring invalid correlation ID reset token",
+                exc_info=True,
+            )
+
     def _process_response(self, req: _RequestLike, resp: _ResponseLike) -> None:
         """Echo the response header if configured, then clear request state."""
         reset_token = getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
         try:
-            if not self._config.echo_header_in_response:
-                logger.debug("Correlation ID response header echo disabled")
-                return
-
-            correlation_id = getattr(req.context, "correlation_id", None)
-            if correlation_id is None:
-                logger.debug("Correlation ID response header echo skipped; ID absent")
-                return
-
-            try:
-                resp.set_header(self._config.header_name, correlation_id)
-            except Exception:
-                logger.warning(
-                    "Failed to echo correlation ID response header",
-                    exc_info=True,
-                )
-                raise
-            logger.debug("Correlation ID response header echoed")
+            self._echo_correlation_id_header(req, resp)
         finally:
-            setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
-
-            if isinstance(reset_token, contextvars.Token):
-                if reset_token.var is correlation_id_var:
-                    try:
-                        correlation_id_var.reset(reset_token)
-                    except ValueError:
-                        logger.debug(
-                            "Ignoring invalid correlation ID reset token",
-                            exc_info=True,
-                        )
-                else:
-                    logger.debug("Ignoring mismatched correlation ID reset token")
+            self._reset_correlation_id_context(req, reset_token)
 
 
 class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
