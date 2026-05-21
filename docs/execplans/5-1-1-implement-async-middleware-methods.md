@@ -595,7 +595,7 @@ Acceptance for this milestone:
   with those annotations.
 - 2026-05-19: Keep response-header mutation failures visible by logging them at
   warning level and re-raising. Cleanup still runs in the existing `finally`
-  path so diagnostics do not change failure semantics.
+  path, so diagnostics do not change failure semantics.
 - 2026-05-21: Treat the request-scoped reset token as the ownership marker for
   response-header echo. `process_response` still performs cleanup for every
   call, but it only writes the response header when the stored token belongs to
@@ -607,13 +607,13 @@ Current outcome: roadmap item 5.1.1 is implemented. Falcon ASGI consumers can
 install `CorrelationIDMiddlewareASGI` in `falcon.asgi.App`, and application
 code can observe the request ID through both `req.context.correlation_id` and
 `correlation_id_var.get()` during the request. The middleware shares
-configuration and lifecycle logic with the WSGI variant while keeping explicit
+configuration and lifecycle logic with the WSGI variant, while keeping explicit
 async Falcon hooks for ASGI.
 
 Historical prerequisite outcome: this branch already fixed the WSGI
 response-header echo contract and cleanup ordering so ASGI parity has a correct
 shared target. The latest recorded full validation from that earlier milestone
-reported the local gates passing with 362 tests passed and 11 skipped.
+reported the local gates passing, with 362 tests passed and 11 skipped.
 
 Planning refresh validation: `make markdownlint`, `make nixie`, and
 `coderabbit review --agent` passed on 2026-05-19. CodeRabbit reported zero

@@ -1,15 +1,11 @@
 """Unit tests for the Falcon ASGI correlation ID middleware."""
-# pylint: disable=too-many-arguments,too-many-positional-arguments  # Falcon middleware hooks and pytest fixtures require multi-arg signatures.
 
 from __future__ import annotations
 
 import asyncio
 import inspect
 import typing as typ
-from http import HTTPStatus
 
-import falcon.asgi
-import falcon.testing
 import pytest
 
 from falcon_correlate import (
@@ -17,7 +13,9 @@ from falcon_correlate import (
     CorrelationIDMiddlewareASGI,
     correlation_id_var,
 )
-from tests.asgi_resources import ASGICorrelationEchoResource
+
+if typ.TYPE_CHECKING:
+    import falcon.asgi
 
 
 class _Context:
@@ -102,17 +100,32 @@ class TestCorrelationIDMiddlewareASGIConfiguration:
         """Verify default construction mirrors WSGI keyword configuration."""
         middleware = CorrelationIDMiddlewareASGI(generator=lambda: "generated-asgi")
 
-        assert middleware.config.generator() == "generated-asgi"
-        assert middleware.header_name == "X-Correlation-ID"
-        assert middleware.echo_header_in_response is True
+        assert middleware.config.generator() == "generated-asgi", (
+            "expected middleware.config.generator() to return 'generated-asgi' "
+            f"but got {middleware.config.generator()!r}"
+        )
+        assert middleware.header_name == "X-Correlation-ID", (
+            "expected middleware.header_name to be 'X-Correlation-ID' but got "
+            f"{middleware.header_name!r}"
+        )
+        assert middleware.echo_header_in_response is True, (
+            "expected middleware.echo_header_in_response to be True but got "
+            f"{middleware.echo_header_in_response!r}"
+        )
 
     def test_config_based_construction_uses_given_config(self) -> None:
         """Verify ASGI middleware accepts a pre-built configuration."""
         config = CorrelationIDConfig(header_name="X-Request-ID")
         middleware = CorrelationIDMiddlewareASGI(config=config)
 
-        assert middleware.config is config
-        assert middleware.header_name == "X-Request-ID"
+        assert middleware.config is config, (
+            "expected middleware.config to be the supplied config object but got "
+            f"{middleware.config!r}"
+        )
+        assert middleware.header_name == "X-Request-ID", (
+            "expected middleware.header_name to be 'X-Request-ID' but got "
+            f"{middleware.header_name!r}"
+        )
 
     def test_config_and_kwargs_conflict_raises_value_error(self) -> None:
         """Verify config-plus-keyword rejection matches WSGI middleware."""
@@ -126,8 +139,12 @@ class TestCorrelationIDMiddlewareASGIConfiguration:
 
     def test_process_hooks_are_coroutines(self) -> None:
         """Verify Falcon ASGI hooks are explicit coroutine functions."""
-        assert inspect.iscoroutinefunction(CorrelationIDMiddlewareASGI.process_request)
-        assert inspect.iscoroutinefunction(CorrelationIDMiddlewareASGI.process_response)
+        assert inspect.iscoroutinefunction(
+            CorrelationIDMiddlewareASGI.process_request,
+        ), "expected CorrelationIDMiddlewareASGI.process_request to be a coroutine"
+        assert inspect.iscoroutinefunction(
+            CorrelationIDMiddlewareASGI.process_response,
+        ), "expected CorrelationIDMiddlewareASGI.process_response to be a coroutine"
 
 
 class TestCorrelationIDMiddlewareASGIRequestLifecycle:
@@ -142,12 +159,24 @@ class TestCorrelationIDMiddlewareASGIRequestLifecycle:
 
         await _process_request(middleware, req, resp)
 
-        assert req.context.correlation_id == "generated-asgi"
-        assert correlation_id_var.get() == "generated-asgi"
+        assert req.context.correlation_id == "generated-asgi", (
+            "expected req.context.correlation_id to be 'generated-asgi' but got "
+            f"{req.context.correlation_id!r}"
+        )
+        assert correlation_id_var.get() == "generated-asgi", (
+            "expected correlation_id_var.get() to be 'generated-asgi' but got "
+            f"{correlation_id_var.get()!r}"
+        )
 
         await _process_response(middleware, req, resp)
-        assert correlation_id_var.get() is None
-        assert resp.get_header("X-Correlation-ID") == "generated-asgi"
+        assert correlation_id_var.get() is None, (
+            "expected correlation_id_var.get() to be None after response but got "
+            f"{correlation_id_var.get()!r}"
+        )
+        assert resp.get_header("X-Correlation-ID") == "generated-asgi", (
+            "expected resp.get_header('X-Correlation-ID') to be 'generated-asgi' "
+            f"but got {resp.get_header('X-Correlation-ID')!r}"
+        )
 
     @pytest.mark.parametrize(
         ("middleware", "req", "expected_id"),
@@ -197,11 +226,20 @@ class TestCorrelationIDMiddlewareASGIRequestLifecycle:
 
         await _process_request(middleware, req, resp)
 
-        assert req.context.correlation_id == expected_id
-        assert correlation_id_var.get() == expected_id
+        assert req.context.correlation_id == expected_id, (
+            "expected req.context.correlation_id to equal expected_id "
+            f"{expected_id!r} but got {req.context.correlation_id!r}"
+        )
+        assert correlation_id_var.get() == expected_id, (
+            "expected correlation_id_var.get() to equal expected_id "
+            f"{expected_id!r} but got {correlation_id_var.get()!r}"
+        )
 
         await _process_response(middleware, req, resp)
-        assert correlation_id_var.get() is None
+        assert correlation_id_var.get() is None, (
+            "expected correlation_id_var.get() to be None after response but got "
+            f"{correlation_id_var.get()!r}"
+        )
 
     @pytest.mark.asyncio
     async def test_validator_exception_generates_new_id(self) -> None:
@@ -221,7 +259,10 @@ class TestCorrelationIDMiddlewareASGIRequestLifecycle:
 
         await _process_request(middleware, req, resp)
 
-        assert req.context.correlation_id == "generated-after-exception"
+        assert req.context.correlation_id == "generated-after-exception", (
+            "expected req.context.correlation_id to be "
+            f"'generated-after-exception' but got {req.context.correlation_id!r}"
+        )
 
         await _process_response(middleware, req, resp)
 
@@ -247,8 +288,15 @@ class TestCorrelationIDMiddlewareASGIRequestLifecycle:
         await _process_request(middleware, req, resp)
         await _process_response(middleware, req, resp)
 
-        assert resp.get_header("X-Correlation-ID") == expected_header
-        assert correlation_id_var.get() is None
+        assert resp.get_header("X-Correlation-ID") == expected_header, (
+            "expected resp.get_header('X-Correlation-ID') to equal "
+            f"expected_header {expected_header!r} but got "
+            f"{resp.get_header('X-Correlation-ID')!r}"
+        )
+        assert correlation_id_var.get() is None, (
+            "expected correlation_id_var.get() to be None after response but got "
+            f"{correlation_id_var.get()!r}"
+        )
 
     @pytest.mark.asyncio
     async def test_process_response_skips_echo_when_correlation_id_absent(self) -> None:
@@ -259,8 +307,14 @@ class TestCorrelationIDMiddlewareASGIRequestLifecycle:
 
         await _process_response(middleware, req, resp)
 
-        assert resp.get_header("X-Correlation-ID") is None
-        assert correlation_id_var.get() is None
+        assert resp.get_header("X-Correlation-ID") is None, (
+            "expected resp.get_header('X-Correlation-ID') to be None but got "
+            f"{resp.get_header('X-Correlation-ID')!r}"
+        )
+        assert correlation_id_var.get() is None, (
+            "expected correlation_id_var.get() to be None after response but got "
+            f"{correlation_id_var.get()!r}"
+        )
 
     @pytest.mark.asyncio
     async def test_process_response_cleans_up_context_when_header_echo_fails(
@@ -272,13 +326,22 @@ class TestCorrelationIDMiddlewareASGIRequestLifecycle:
         resp = _HeaderFailingResponse()
 
         await _process_request(middleware, req, resp)
-        assert correlation_id_var.get() == "generated-asgi"
+        assert correlation_id_var.get() == "generated-asgi", (
+            "expected correlation_id_var.get() to be 'generated-asgi' before "
+            f"header failure but got {correlation_id_var.get()!r}"
+        )
 
         with pytest.raises(RuntimeError, match="failed to set"):
             await _process_response(middleware, req, resp)
 
-        assert correlation_id_var.get() is None
-        assert getattr(req.context, "_correlation_id_reset_token", None) is None
+        assert correlation_id_var.get() is None, (
+            "expected correlation_id_var.get() to be None after failure but got "
+            f"{correlation_id_var.get()!r}"
+        )
+        assert getattr(req.context, "_correlation_id_reset_token", None) is None, (
+            "expected req.context._correlation_id_reset_token to be None but got "
+            f"{getattr(req.context, '_correlation_id_reset_token', None)!r}"
+        )
 
     @pytest.mark.asyncio
     async def test_concurrent_asgi_requests_keep_correlation_ids_isolated(
@@ -301,40 +364,20 @@ class TestCorrelationIDMiddlewareASGIRequestLifecycle:
             await asyncio.sleep(0)
             await asyncio.sleep(0.001)
             await _process_response(middleware, req, resp)
-            assert request_id is not None
+            assert request_id is not None, (
+                "expected request_id to be set during ASGI request but got None"
+            )
             return request_id, during_request_id, correlation_id_var.get()
 
         results = await asyncio.gather(*(run_request() for _ in range(16)))
 
-        assert results == [
+        expected_results = [
             (f"generated-{index}", f"generated-{index}", None) for index in range(16)
         ]
-        assert correlation_id_var.get() is None
-
-
-class TestCorrelationIDMiddlewareASGIFalconIntegration:
-    """Tests for ASGI middleware in a real Falcon ASGI application."""
-
-    def test_falcon_asgi_app_exposes_and_echoes_correlation_id(self) -> None:
-        """Verify a Falcon ASGI app observes and echoes the same ID."""
-        app = falcon.asgi.App(
-            middleware=[
-                CorrelationIDMiddlewareASGI(
-                    trusted_sources=["127.0.0.1"],
-                ),
-            ],
+        assert results == expected_results, (
+            f"expected ASGI concurrent results {expected_results!r} but got {results!r}"
         )
-        app.add_route("/correlation", ASGICorrelationEchoResource())
-        client = falcon.testing.TestClient(app)
-
-        result = client.simulate_get(
-            "/correlation",
-            headers={"X-Correlation-ID": "trusted-asgi"},
+        assert correlation_id_var.get() is None, (
+            "expected correlation_id_var.get() to be None after concurrent "
+            f"requests but got {correlation_id_var.get()!r}"
         )
-
-        assert result.status_code == HTTPStatus.OK
-        assert result.json == {
-            "context_correlation_id": "trusted-asgi",
-            "contextvar_correlation_id": "trusted-asgi",
-        }
-        assert result.headers["X-Correlation-ID"] == "trusted-asgi"

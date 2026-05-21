@@ -11,11 +11,18 @@ class TestPublicExports:
     def test_public_exports_in_all(self) -> None:
         """Verify expected names are present in __all__."""
         import falcon_correlate
+        from falcon_correlate import CorrelationIDMiddlewareASGI
 
         assert "CorrelationIDMiddleware" in falcon_correlate.__all__
         assert "CorrelationIDMiddlewareASGI" in falcon_correlate.__all__
         assert "CorrelationIDConfig" in falcon_correlate.__all__
         assert "default_uuid7_generator" in falcon_correlate.__all__
+        assert (
+            CorrelationIDMiddlewareASGI is falcon_correlate.CorrelationIDMiddlewareASGI
+        ), (
+            "expected imported CorrelationIDMiddlewareASGI to be "
+            "falcon_correlate.CorrelationIDMiddlewareASGI but got different objects"
+        )
 
     def test_default_uuid7_generator_importable_from_root(self) -> None:
         """Verify default_uuid7_generator can be imported from package root."""

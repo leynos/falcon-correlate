@@ -1,5 +1,4 @@
 """Falcon Correlation ID middleware implementation."""
-# pylint: disable=too-many-lines
 
 from __future__ import annotations
 
@@ -42,7 +41,6 @@ if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
     import falcon
-    import falcon.asgi
 
     from .middleware_config import CorrelationIDConfigKwargs
 
@@ -391,32 +389,4 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
         self._process_response(req, resp)
 
 
-class CorrelationIDMiddlewareASGI(_CorrelationIDMiddlewareBase):
-    """Middleware for managing correlation IDs in Falcon ASGI applications.
-
-    The constructor accepts the same `CorrelationIDConfig` object or individual
-    keyword arguments as `CorrelationIDMiddleware`. Falcon ASGI applications
-    call the coroutine hooks while request selection, response-header echoing,
-    and context cleanup share the WSGI lifecycle implementation.
-    """
-
-    async def process_request(
-        self,
-        req: falcon.asgi.Request,
-        resp: falcon.asgi.Response,
-    ) -> None:
-        """Process an incoming ASGI request to establish correlation ID context."""
-        self._process_request(req)
-
-    # Falcon ASGI middleware hook requires this exact signature.
-    # See https://github.com/leynos/falcon-correlate/issues/38
-    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
-    async def process_response(
-        self,
-        req: falcon.asgi.Request,
-        resp: falcon.asgi.Response,
-        resource: object,
-        req_succeeded: bool,  # noqa: FBT001 - Falcon ASGI middleware interface requirement
-    ) -> None:
-        """Post-process an ASGI response and clean up request-scoped context."""
-        self._process_response(req, resp)
+from .middleware_asgi import CorrelationIDMiddlewareASGI  # noqa: E402
