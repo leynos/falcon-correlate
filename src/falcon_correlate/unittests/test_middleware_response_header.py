@@ -15,6 +15,7 @@ from falcon_correlate.middleware import correlation_id_var
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
+
 _LOGGER_NAME = "falcon_correlate.middleware"
 
 
@@ -282,9 +283,19 @@ class TestCorrelationIDResponseHeader:
             )
 
         isolated_context(_inner)
-        assert "Failed to echo correlation ID response header" in caplog.text, (
-            "expected caplog.text to contain response-header failure message but "
-            f"got {caplog.text!r}"
+        failure_record = next(
+            record
+            for record in caplog.records
+            if "Failed to echo correlation ID response header" in record.getMessage()
+        )
+        failure_log = typ.cast("typ.Any", failure_record)
+        assert failure_log.correlation_id == "trusted-id", (
+            "expected response-header failure log correlation_id to be "
+            f"'trusted-id' but got {failure_log.correlation_id!r}"
+        )
+        assert failure_log.header_name == "X-Correlation-ID", (
+            "expected response-header failure log header_name to be "
+            f"'X-Correlation-ID' but got {failure_log.header_name!r}"
         )
 
     @pytest.mark.parametrize(

@@ -175,6 +175,10 @@ class _CorrelationIDMiddlewareBase:
         except Exception:  # noqa: BLE001 - user-supplied; cannot narrow
             logger.warning(
                 "Validator raised an exception for correlation ID, treating as invalid",
+                extra={
+                    "correlation_id": value,
+                    "header_name": self._config.header_name,
+                },
                 exc_info=True,
             )
             return False
@@ -224,6 +228,10 @@ class _CorrelationIDMiddlewareBase:
         except Exception:
             logger.warning(
                 "Failed to echo correlation ID response header",
+                extra={
+                    "correlation_id": correlation_id,
+                    "header_name": self._config.header_name,
+                },
                 exc_info=True,
             )
             raise
@@ -354,9 +362,7 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
         """
         self._process_request(req)
 
-    # Falcon middleware hook requires this exact signature (request, response,
-    # resource, req_succeeded); disabling argument-count warnings for framework
-    # callback. FIXME: https://github.com/leynos/falcon-correlate/issues/38
+    # Falcon middleware hook requires this exact callback signature; see #38.
     # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def process_response(
         self,

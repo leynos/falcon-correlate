@@ -462,11 +462,21 @@ class TestValidatorExceptionHandling:
                 headers={"X-Correlation-ID": "crash-value"},
             )
 
-        assert any(
-            record.levelno == logging.WARNING
-            and "exception" in record.getMessage().lower()
+        warning_record = next(
+            record
             for record in caplog.records
-        ), "Expected WARNING log about validator exception"
+            if record.levelno == logging.WARNING
+            and "exception" in record.getMessage().lower()
+        )
+        warning_log = typ.cast("typ.Any", warning_record)
+        assert warning_log.correlation_id == "crash-value", (
+            "expected validator warning correlation_id to be 'crash-value' but got "
+            f"{warning_log.correlation_id!r}"
+        )
+        assert warning_log.header_name == "X-Correlation-ID", (
+            "expected validator warning header_name to be 'X-Correlation-ID' but got "
+            f"{warning_log.header_name!r}"
+        )
 
     def test_request_succeeds_despite_validator_exception(
         self,
