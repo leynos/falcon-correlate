@@ -258,7 +258,16 @@ class _CorrelationIDMiddlewareBase:
         """Echo the response header if configured, then clear request state."""
         reset_token = getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
         try:
-            self._echo_correlation_id_header(req, resp)
+            if (
+                isinstance(reset_token, contextvars.Token)
+                and reset_token.var is correlation_id_var
+            ):
+                self._echo_correlation_id_header(req, resp)
+            else:
+                logger.debug(
+                    "Correlation ID response header echo skipped; "
+                    "middleware token absent",
+                )
         finally:
             self._reset_correlation_id_context(req, reset_token)
 

@@ -1881,7 +1881,8 @@ by static type checking and import-time subprocess validation.
 
 **Decision:** When `echo_header_in_response` is enabled, `process_response`
 copies the resolved correlation ID into the configured response header before
-cleanup. The middleware uses the same `header_name` for both directions. If the
+cleanup only when the request has a middleware-owned `correlation_id_var` reset
+token. The middleware uses the same `header_name` for both directions. If the
 response already contains that header, the middleware overwrites it with the
 resolved correlation ID. When `echo_header_in_response` is disabled, the
 response header is left untouched.
@@ -1903,3 +1904,8 @@ response header is left untouched.
 4. **Predictable overrides:** Overwriting any pre-existing response header with
    the same name avoids ambiguity about which correlation ID the client should
    trust.
+
+5. **Middleware ownership:** Gating echoing on the reset token created during
+   `process_request` prevents Falcon's response hook from returning a
+   pre-existing `req.context.correlation_id` that bypassed the middleware's
+   trusted-source and validation rules.

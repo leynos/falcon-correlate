@@ -42,10 +42,13 @@ and validator helpers used by middleware configuration.
 `process_response` in `middleware.py` is responsible for the response-header
 echo and cleanup path. It copies `req.context.correlation_id` into the
 configured response header only when `echo_header_in_response` is enabled,
-skips the header write when the request has no resolved correlation ID, and
-always resets the request-scoped `correlation_id_var` token in a `finally`
-block. If `resp.set_header()` fails, the middleware logs a warning, performs
-cleanup, and re-raises the exception so Falcon still sees the failure.
+the request has a middleware-owned `correlation_id_var` reset token, and the
+request has a resolved correlation ID. This prevents `process_response` from
+echoing a spoofed `req.context.correlation_id` that was set by other code after
+Falcon short-circuited before this middleware's `process_request` ran. The
+method always resets the request-scoped `correlation_id_var` token in a
+`finally` block. If `resp.set_header()` fails, the middleware logs a warning,
+performs cleanup, and re-raises the exception so Falcon still sees the failure.
 
 The architectural boundary is deliberately one-way: `middleware.py` imports
 from both utility modules, while neither `middleware_config.py` nor

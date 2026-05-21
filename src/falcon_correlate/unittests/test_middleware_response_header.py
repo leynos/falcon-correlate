@@ -1,5 +1,5 @@
 """Unit tests for CorrelationIDMiddleware response header echoing."""
-# pylint: disable=too-many-arguments,too-many-positional-arguments  # pytest fixture signatures require multiple arguments.
+# pylint: disable=too-many-arguments,too-many-lines,too-many-positional-arguments  # pytest fixture signatures require multiple arguments.
 
 from __future__ import annotations
 
@@ -288,6 +288,44 @@ class TestCorrelationIDResponseHeader:
             f"got {caplog.text!r}"
         )
 
+    def test_process_response_skips_echo_without_middleware_token(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+        request_response_factory: cabc.Callable[
+            ..., tuple[falcon.Request, falcon.Response]
+        ],
+    ) -> None:
+        """Verify response echo requires middleware-owned request state."""
+        middleware = CorrelationIDMiddleware()
+        caplog.set_level(logging.DEBUG, logger=_LOGGER_NAME)
+
+        def _inner() -> None:
+            """Exercise response processing with a spoofed request context ID."""
+            req, resp = request_response_factory()
+            req.context.correlation_id = "spoofed-id"
+
+            middleware.process_response(
+                req,
+                resp,
+                resource=None,
+                req_succeeded=True,
+            )
+
+            assert resp.get_header("X-Correlation-ID") is None, (
+                "expected X-Correlation-ID header to be absent for spoofed "
+                f"context ID but got {resp.get_header('X-Correlation-ID')!r}"
+            )
+
+        isolated_context(_inner)
+        assert (
+            "Correlation ID response header echo skipped; middleware token absent"
+            in caplog.text
+        ), (
+            "expected caplog.text to contain middleware-token skip message but got "
+            f"{caplog.text!r}"
+        )
+
     @pytest.mark.parametrize(
         "scenario",
         [
@@ -336,7 +374,8 @@ class TestCorrelationIDResponseHeader:
 
         isolated_context(_inner)
         assert (
-            "Correlation ID response header echo skipped; ID absent" in caplog.text
+            "Correlation ID response header echo skipped; middleware token absent"
+            in caplog.text
         ), (
             "expected caplog.text to contain response-header skip message but got "
             f"{caplog.text!r}"

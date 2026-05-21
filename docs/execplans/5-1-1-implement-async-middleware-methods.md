@@ -519,6 +519,10 @@ Acceptance for this milestone:
   `make markdownlint`, and `make nixie`. The full test suite reported 402
   passed and 11 skipped. `coderabbit review --agent` completed with zero
   findings.
+- [x] 2026-05-21: Gated response-header echo on the middleware-owned
+  `correlation_id_var` reset token so Falcon response hooks cannot echo a
+  spoofed `req.context.correlation_id` when this middleware did not process the
+  request.
 
 ## Surprises & Discoveries
 
@@ -558,6 +562,10 @@ Acceptance for this milestone:
   observable response-header echo scenario, even though ASGI BDD coverage did.
   The gap is valid for the shared middleware behaviour and now has focused WSGI
   coverage.
+- 2026-05-21: Falcon can still call `process_response` when upstream middleware
+  short-circuits request processing. Response echo therefore must require the
+  reset token stored by this middleware during `process_request`, not merely a
+  pre-existing `req.context.correlation_id` value.
 
 ## Decision Log
 
@@ -588,6 +596,10 @@ Acceptance for this milestone:
 - 2026-05-19: Keep response-header mutation failures visible by logging them at
   warning level and re-raising. Cleanup still runs in the existing `finally`
   path so diagnostics do not change failure semantics.
+- 2026-05-21: Treat the request-scoped reset token as the ownership marker for
+  response-header echo. `process_response` still performs cleanup for every
+  call, but it only writes the response header when the stored token belongs to
+  `correlation_id_var`.
 
 ## Outcomes & Retrospective
 

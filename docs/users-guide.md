@@ -74,8 +74,9 @@ The middleware provides two hook points in the request/response lifecycle:
    headers or generated.
 
 2. **`process_response(req, resp, resource, req_succeeded)`**: Called after the
-   resource responder has been invoked. This is where the correlation ID will
-   be added to response headers and any cleanup will be performed.
+   resource responder has been invoked. This is where the correlation ID
+   established by this middleware will be added to response headers and any
+   cleanup will be performed.
 
 For Falcon ASGI applications, `CorrelationIDMiddlewareASGI` exposes the same
 hook names as coroutine methods. Request selection, response-header echoing,
@@ -382,9 +383,11 @@ during `process_response`.
 - **Default**: `True`
 
 When enabled, the middleware uses the same `header_name` value for both the
-incoming request header and the outgoing response header. If the response
-already has a header with that name, it is overwritten with the resolved
-correlation ID.
+incoming request header and the outgoing response header. It only echoes a
+correlation ID that this middleware established during `process_request`; a
+pre-existing `req.context.correlation_id` from other code is not echoed. If the
+response already has a header with that name, it is overwritten with the
+resolved correlation ID.
 
 ```python
 # Disable echoing correlation ID in responses
