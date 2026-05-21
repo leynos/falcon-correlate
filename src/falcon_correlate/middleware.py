@@ -389,4 +389,6 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
         self._process_response(req, resp)
 
 
-from .middleware_asgi import CorrelationIDMiddlewareASGI  # noqa: E402
+from .middleware_asgi import (  # noqa: E402 - avoids CorrelationIDMiddlewareASGI cycle.
+    CorrelationIDMiddlewareASGI,
+)
