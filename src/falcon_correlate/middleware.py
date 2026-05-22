@@ -1,4 +1,7 @@
-"""Falcon Correlation ID middleware implementation."""
+"""Falcon Correlation ID middleware implementation.
+
+Provides the WSGI middleware and shared lifecycle base reused by ASGI.
+"""
 
 from __future__ import annotations
 
@@ -68,15 +71,19 @@ _CORRELATION_ID_RESET_TOKEN_ATTR = CORRELATION_ID_RESET_TOKEN_ATTR
 class _CorrelationIDMiddlewareBase:
     """Shared lifecycle logic for Falcon correlation ID middleware variants."""
 
-    __slots__ = ("_config",)
+    __slots__ = ("_config", "_correlation_id_var")
 
     def __init__(
         self,
         *,
         config: CorrelationIDConfig | None = None,
+        correlation_id_context_var: contextvars.ContextVar[
+            typ.Any
+        ] = correlation_id_var,
         **kwargs: object,
     ) -> None:
         """Initialise the correlation ID middleware with configuration options."""
+        self._correlation_id_var = correlation_id_context_var
         if config is not None:
             if kwargs:
                 msg = "Cannot specify both 'config' and individual parameters"
@@ -121,6 +128,13 @@ class _CorrelationIDMiddlewareBase:
     def echo_header_in_response(self) -> bool:
         """Whether to echo the correlation ID in response headers."""
         return self._config.echo_header_in_response
+
+    def _log_context(self, correlation_id: object) -> dict[str, object]:
+        """Return structured log context for middleware diagnostics."""
+        return {
+            "correlation_id": correlation_id,
+            "header_name": self._config.header_name,
+        }
 
     def _get_incoming_header_value(self, req: _RequestLike) -> str | None:
         """Return the incoming correlation ID header value, if present.
@@ -175,10 +189,7 @@ class _CorrelationIDMiddlewareBase:
         except Exception:  # noqa: BLE001 - user-supplied; cannot narrow
             logger.warning(
                 "Validator raised an exception for correlation ID, treating as invalid",
-                extra={
-                    "correlation_id": value,
-                    "header_name": self._config.header_name,
-                },
+                extra=self._log_context(value),
                 exc_info=True,
             )
             return False
@@ -194,13 +205,14 @@ class _CorrelationIDMiddlewareBase:
             else:
                 logger.debug(
                     "Correlation ID failed validation, generating new ID",
+                    extra=self._log_context(incoming),
                 )
                 correlation_id = self._config.generator()
         else:
             correlation_id = self._config.generator()
 
         req.context.correlation_id = correlation_id
-        reset_token = correlation_id_var.set(correlation_id)
+        reset_token = self._correlation_id_var.set(correlation_id)
         setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, reset_token)
 
     def _echo_correlation_id_header(
@@ -215,12 +227,18 @@ class _CorrelationIDMiddlewareBase:
         ``finally`` block still runs.
         """
         if not self._config.echo_header_in_response:
-            logger.debug("Correlation ID response header echo disabled")
+            logger.debug(
+                "Correlation ID response header echo disabled",
+                extra=self._log_context(getattr(req.context, "correlation_id", None)),
+            )
             return
 
         correlation_id = getattr(req.context, "correlation_id", None)
         if correlation_id is None:
-            logger.debug("Correlation ID response header echo skipped; ID absent")
+            logger.debug(
+                "Correlation ID response header echo skipped; ID absent",
+                extra=self._log_context(None),
+            )
             return
 
         try:
@@ -228,16 +246,16 @@ class _CorrelationIDMiddlewareBase:
         except Exception:
             logger.warning(
                 "Failed to echo correlation ID response header",
-                extra={
-                    "correlation_id": correlation_id,
-                    "header_name": self._config.header_name,
-                },
+                extra=self._log_context(correlation_id),
                 exc_info=True,
             )
             raise
-        logger.debug("Correlation ID response header echoed")
+        logger.debug(
+            "Correlation ID response header echoed",
+            extra=self._log_context(correlation_id),
+        )
 
-    def _reset_correlation_id_context(  # noqa: PLR6301 - helper must remain an instance method.
+    def _reset_correlation_id_context(
         self,
         req: _RequestLike,
         reset_token: object,
@@ -248,15 +266,19 @@ class _CorrelationIDMiddlewareBase:
         if not isinstance(reset_token, contextvars.Token):
             return
 
-        if reset_token.var is not correlation_id_var:
-            logger.debug("Ignoring mismatched correlation ID reset token")
+        if reset_token.var is not self._correlation_id_var:
+            logger.debug(
+                "Ignoring mismatched correlation ID reset token",
+                extra=self._log_context(getattr(req.context, "correlation_id", None)),
+            )
             return
 
         try:
-            correlation_id_var.reset(reset_token)
+            self._correlation_id_var.reset(reset_token)
         except ValueError:
             logger.debug(
                 "Ignoring invalid correlation ID reset token",
+                extra=self._log_context(getattr(req.context, "correlation_id", None)),
                 exc_info=True,
             )
 
@@ -266,13 +288,16 @@ class _CorrelationIDMiddlewareBase:
         try:
             if (
                 isinstance(reset_token, contextvars.Token)
-                and reset_token.var is correlation_id_var
+                and reset_token.var is self._correlation_id_var
             ):
                 self._echo_correlation_id_header(req, resp)
             else:
                 logger.debug(
                     "Correlation ID response header echo skipped; "
                     "middleware token absent",
+                    extra=self._log_context(
+                        getattr(req.context, "correlation_id", None)
+                    ),
                 )
         finally:
             self._reset_correlation_id_context(req, reset_token)
@@ -305,34 +330,6 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
     TypeError
         If unknown keyword arguments are provided, or if ``generator`` or
         ``validator`` is provided but not callable.
-
-    Examples
-    --------
-    Basic usage with a Falcon WSGI application::
-
-        import falcon
-        from falcon_correlate import CorrelationIDMiddleware
-
-        middleware = CorrelationIDMiddleware()
-        app = falcon.App(middleware=[middleware])
-
-    Custom configuration::
-
-        middleware = CorrelationIDMiddleware(
-            header_name="X-Request-ID",
-            trusted_sources=["10.0.0.1", "192.168.1.1"],
-            echo_header_in_response=True,
-        )
-
-    Using a configuration object::
-
-        from falcon_correlate import CorrelationIDConfig
-
-        config = CorrelationIDConfig(
-            header_name="X-Request-ID",
-            trusted_sources=frozenset(["10.0.0.1"]),
-        )
-        middleware = CorrelationIDMiddleware(config=config)
 
     """
 

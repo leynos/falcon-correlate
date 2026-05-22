@@ -282,7 +282,11 @@ class ValidationLoggingScenario:
 
 def _is_debug_log_containing(record: logging.LogRecord, text: str) -> bool:
     """Return True if *record* is a DEBUG entry whose message contains *text*."""
-    return record.levelno == logging.DEBUG and text in record.getMessage()
+    return (
+        record.name == "falcon_correlate.middleware"
+        and record.levelno == logging.DEBUG
+        and text in record.getMessage()
+    )
 
 
 def _is_validation_failure_debug_log(record: logging.LogRecord) -> bool:
@@ -315,9 +319,7 @@ def assert_validation_logged(
 ) -> None:
     """Assert that a falcon_correlate.middleware DEBUG log contains the expected substring."""  # noqa: E501
     assert any(
-        r.name == "falcon_correlate.middleware"
-        and _is_debug_log_containing(r, expected_substring)
-        for r in caplog.records
+        _is_debug_log_containing(r, expected_substring) for r in caplog.records
     ), (
         f"Expected DEBUG log from 'falcon_correlate.middleware' "
         f"containing '{expected_substring}'"
@@ -465,8 +467,10 @@ class TestValidatorExceptionHandling:
         warning_record = next(
             record
             for record in caplog.records
-            if record.levelno == logging.WARNING
-            and "exception" in record.getMessage().lower()
+            if record.name == "falcon_correlate.middleware"
+            and record.levelno == logging.WARNING
+            and record.getMessage()
+            == "Validator raised an exception for correlation ID, treating as invalid"
         )
         warning_log = typ.cast("typ.Any", warning_record)
         assert warning_log.correlation_id == "crash-value", (

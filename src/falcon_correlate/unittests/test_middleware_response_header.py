@@ -286,7 +286,9 @@ class TestCorrelationIDResponseHeader:
         failure_record = next(
             record
             for record in caplog.records
-            if "Failed to echo correlation ID response header" in record.getMessage()
+            if record.name == _LOGGER_NAME
+            and record.levelno == logging.WARNING
+            and record.getMessage() == "Failed to echo correlation ID response header"
         )
         failure_log = typ.cast("typ.Any", failure_record)
         assert failure_log.correlation_id == "trusted-id", (
@@ -393,7 +395,4 @@ class TestCorrelationIDResponseHeader:
             )
 
         isolated_context(_inner)
-        assert "Correlation ID response header echoed" in caplog.text, (
-            "expected caplog.text to contain response-header echo message but got "
-            f"{caplog.text!r}"
-        )
+        assert "Correlation ID response header echoed" in caplog.text

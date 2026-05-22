@@ -1,4 +1,11 @@
-"""Falcon ASGI correlation ID middleware implementation."""
+"""Falcon ASGI correlation ID middleware implementation.
+
+This module exposes the async Falcon middleware hooks while reusing the WSGI
+middleware lifecycle implemented by ``_CorrelationIDMiddlewareBase`` in
+``middleware.py``. That split keeps ASGI integration focused on coroutine hook
+signatures and shares request selection, ContextVar state, response-header
+echoing, and cleanup with the WSGI variant.
+"""
 
 from __future__ import annotations
 
