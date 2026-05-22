@@ -67,16 +67,25 @@ class _HeaderFailingResponse(_Response):
         raise RuntimeError(msg)
 
 
+def _cast_asgi_doubles(
+    req: _Request,
+    resp: _Response,
+) -> "tuple[falcon.asgi.Request, falcon.asgi.Response]":  # noqa: UP037
+    """Return the request and response doubles cast to their Falcon ASGI types."""
+    return (
+        typ.cast("falcon.asgi.Request", req),
+        typ.cast("falcon.asgi.Response", resp),
+    )
+
+
 async def _process_request(
     middleware: CorrelationIDMiddlewareASGI,
     req: _Request,
     resp: _Response,
 ) -> None:
     """Call the public ASGI request hook with a lightweight request double."""
-    await middleware.process_request(
-        typ.cast("falcon.asgi.Request", req),
-        typ.cast("falcon.asgi.Response", resp),
-    )
+    cast_req, cast_resp = _cast_asgi_doubles(req, resp)
+    await middleware.process_request(cast_req, cast_resp)
 
 
 async def _process_response(
@@ -85,9 +94,10 @@ async def _process_response(
     resp: _Response,
 ) -> None:
     """Call the public ASGI response hook with lightweight doubles."""
+    cast_req, cast_resp = _cast_asgi_doubles(req, resp)
     await middleware.process_response(
-        typ.cast("falcon.asgi.Request", req),
-        typ.cast("falcon.asgi.Response", resp),
+        cast_req,
+        cast_resp,
         resource=None,
         req_succeeded=True,
     )
