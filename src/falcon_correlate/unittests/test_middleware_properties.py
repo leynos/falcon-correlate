@@ -89,42 +89,54 @@ def _validator_for(mode: str) -> cabc.Callable[[str], bool] | None:
     return _raise
 
 
-@given(
-    incoming=_HEADER_OR_EMPTY,
-    is_trusted=st.booleans(),
-    validator_mode=st.sampled_from(["missing", "accept", "reject", "raise"]),
-    generated_id=_ID_TEXT,
-)
+class _RequestSelectionScenario(typ.NamedTuple):
+    """Hypothesis-generated scenario for request correlation ID selection."""
+
+    incoming: str | None
+    is_trusted: bool
+    validator_mode: str
+    generated_id: str
+
+
+@st.composite
+def _request_selection_scenarios(
+    draw: "st.DrawFn",  # noqa: UP037
+) -> _RequestSelectionScenario:
+    """Composite Hypothesis strategy for request-selection property scenarios."""
+    return _RequestSelectionScenario(
+        incoming=draw(_HEADER_OR_EMPTY),
+        is_trusted=draw(st.booleans()),
+        validator_mode=draw(st.sampled_from(["missing", "accept", "reject", "raise"])),
+        generated_id=draw(_ID_TEXT),
+    )
+
+
+@given(scenario=_request_selection_scenarios())
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
-# Hypothesis @given injects parameters for this property test.
-# pylint: disable-next=too-many-arguments,too-many-positional-arguments
 def test_process_request_selection_property(
     request_response_factory: cabc.Callable[..., tuple[typ.Any, typ.Any]],
-    incoming: str | None,
-    is_trusted: bool,  # noqa: FBT001 - generated property input
-    validator_mode: str,
-    generated_id: str,
+    scenario: _RequestSelectionScenario,
 ) -> None:
     """Verify request ID selection across trust and validator combinations."""
-    remote_addr = "127.0.0.1" if is_trusted else "203.0.113.5"
+    remote_addr = "127.0.0.1" if scenario.is_trusted else "203.0.113.5"
     trusted_sources = ["127.0.0.1"]
     middleware = CorrelationIDMiddleware(
         trusted_sources=trusted_sources,
-        generator=lambda: generated_id,
-        validator=_validator_for(validator_mode),
+        generator=lambda: scenario.generated_id,
+        validator=_validator_for(scenario.validator_mode),
     )
     req, resp = request_response_factory(
-        correlation_id=incoming,
+        correlation_id=scenario.incoming,
         remote_addr=remote_addr,
     )
 
     context = contextvars.copy_context()
     context.run(middleware.process_request, req, resp)
     expected = _expected_correlation_id(
-        incoming=incoming,
-        is_trusted=is_trusted,
-        validator_mode=validator_mode,
-        generated_id=generated_id,
+        incoming=scenario.incoming,
+        is_trusted=scenario.is_trusted,
+        validator_mode=scenario.validator_mode,
+        generated_id=scenario.generated_id,
     )
 
     assert req.context.correlation_id == expected, (
