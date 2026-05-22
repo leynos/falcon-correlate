@@ -39,17 +39,25 @@ integration, and UUID tooling shared by the middleware. It exports
 `ContextualLogFilter` for logging enrichment, and the default UUID generator
 and validator helpers used by middleware configuration.
 
+`middleware.py` and `middleware_asgi.py` both build on
+`_CorrelationIDMiddlewareBase`, which owns the shared request selection,
+response-header echo, and cleanup logic. The base class uses the narrow
+`_RequestLike` and `_ResponseLike` protocols so the shared lifecycle code only
+depends on the request and response methods that Falcon WSGI and ASGI both
+provide. `middleware.py` exposes the WSGI middleware hooks, while
+`middleware_asgi.py` exposes the public ASGI class with `async`
+`process_request` and `process_response` hooks that delegate to the shared base.
+
 `process_response` in `middleware.py` is responsible for the response-header
 echo and cleanup path. It copies `req.context.correlation_id` into the
-configured response header only when `echo_header_in_response` is enabled,
-the request has a middleware-owned `correlation_id_var` reset token, and the
+configured response header only when `echo_header_in_response` is enabled, the
+request has a middleware-owned `correlation_id_var` reset token, and the
 request has a resolved correlation ID. This prevents `process_response` from
 echoing a spoofed `req.context.correlation_id` that was set by other code after
 Falcon short-circuited before this middleware's `process_request` ran. The
 method always resets the request-scoped `correlation_id_var` token in a
 `finally` block. If `resp.set_header()` fails, the middleware logs a warning,
-performs cleanup, and re-raises the exception, so Falcon still sees the
-failure.
+performs cleanup, and re-raises the exception, so Falcon still sees the failure.
 
 The architectural boundary is deliberately one-way: `middleware.py` imports
 from both utility modules, while neither `middleware_config.py` nor
@@ -150,7 +158,7 @@ including Pyflakes (`F`), pycodestyle (`E`, `W`), import ordering (`I`),
 pyupgrade (`UP`), comprehensions (`C4`), type-checking imports (`TC`), pathlib
 usage (`PTH`), security (`S`), boolean traps (`FBT`), naming (`N`),
 flake8-bugbear (`B`), Ruff-native rules (`RUF`), logging (`LOG`), pytest style (
-`PT`), exceptions (`TRY`), docstrings (`D`), annotations (`ANN`), McCabe
+ `PT`), exceptions (`TRY`), docstrings (`D`), annotations (`ANN`), McCabe
 complexity (`C90`), and selected Pylint-compatible rules (`PLR`, `PLE`, and
 `PLW`).
 
