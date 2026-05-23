@@ -100,7 +100,7 @@ class _RequestSelectionScenario(typ.NamedTuple):
 
 @st.composite
 def _request_selection_scenarios(
-    draw: "st.DrawFn",  # noqa: UP037
+    draw: "st.DrawFn",  # noqa: UP037 -- st.DrawFn is not runtime-stable.
 ) -> _RequestSelectionScenario:
     """Composite Hypothesis strategy for request-selection property scenarios."""
     return _RequestSelectionScenario(

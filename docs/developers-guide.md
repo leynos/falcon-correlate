@@ -42,7 +42,7 @@ and validator helpers used by middleware configuration.
 `middleware.py` and `middleware_asgi.py` both build on
 `_CorrelationIDMiddlewareBase`, which owns the shared request selection,
 response-header echo, and cleanup logic. The base class uses the narrow
-`_RequestLike` and `_ResponseLike` protocols so the shared lifecycle code only
+`_RequestLike` and `_ResponseLike` protocols, so the shared lifecycle code only
 depends on the request and response methods that Falcon WSGI and ASGI both
 provide. `middleware.py` exposes the WSGI middleware hooks, while
 `middleware_asgi.py` exposes the public ASGI class with `async`
