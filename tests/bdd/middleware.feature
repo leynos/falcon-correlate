@@ -27,6 +27,12 @@ Feature: Correlation ID Middleware
     When I request "/correlation" with header "X-Correlation-ID" value "cid-123"
     Then the response correlation id should be "cid-123"
 
+  Scenario: Correlation ID is echoed in the HTTP response header
+    Given a Falcon application with CorrelationIDMiddleware
+    And a correlation echo resource at "/correlation"
+    When I request "/correlation" with header "X-Correlation-ID" value "cid-123"
+    Then the HTTP response header "X-Correlation-ID" should be "cid-123"
+
   Scenario: Missing correlation ID header triggers generation
     Given a Falcon application with CorrelationIDMiddleware
     And a correlation echo resource at "/correlation"

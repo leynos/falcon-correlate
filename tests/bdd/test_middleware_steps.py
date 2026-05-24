@@ -127,6 +127,22 @@ def then_response_has_correlation_id(context: Context, expected_id: str) -> None
     assert data["correlation_id"] == expected_id
 
 
+@then(
+    parsers.parse('the HTTP response header "{header_name}" should be "{expected_id}"')
+)
+def then_http_response_header_matches(
+    context: Context,
+    header_name: str,
+    expected_id: str,
+) -> None:
+    """Verify the HTTP response includes the expected header value."""
+    actual_id = context["response"].headers[header_name]
+    assert actual_id == expected_id, (
+        f"expected response header {header_name!r} to be {expected_id!r} "
+        f"but got {actual_id!r}"
+    )
+
+
 @then("the response should not include a correlation ID")
 def then_response_has_no_correlation_id(context: Context) -> None:
     """Verify the response does not include a correlation ID."""
@@ -177,6 +193,7 @@ def given_custom_generator(return_value: str) -> Context:
     """Create a custom generator function."""
 
     def custom_gen() -> str:
+        """Return the configured custom correlation ID."""
         return return_value
 
     return {"custom_generator": custom_gen}
@@ -201,6 +218,7 @@ def given_custom_validator() -> Context:
     """Create a custom validator function."""
 
     def custom_val(value: str) -> bool:
+        """Accept any supplied correlation ID value."""
         return True
 
     return {"custom_validator": custom_val}
@@ -351,6 +369,7 @@ def given_custom_prefix_rejecting_validator(prefix: str) -> Context:
     """Create a custom validator that rejects IDs starting with the given prefix."""
 
     def prefix_validator(value: str) -> bool:
+        """Reject correlation IDs that begin with the configured prefix."""
         return not value.startswith(prefix)
 
     return {"custom_validator": prefix_validator}

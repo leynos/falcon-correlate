@@ -36,6 +36,35 @@ class HelloResource:
 app.add_route("/hello", HelloResource())
 ```
 
+### Falcon ASGI Usage
+
+Use `CorrelationIDMiddlewareASGI` with `falcon.asgi.App`:
+
+```python
+import falcon.asgi
+from falcon_correlate import CorrelationIDMiddlewareASGI
+
+middleware = CorrelationIDMiddlewareASGI()
+app = falcon.asgi.App(middleware=[middleware])
+```
+
+`CorrelationIDMiddlewareASGI` accepts the same keyword arguments and
+`CorrelationIDConfig` object as the WSGI `CorrelationIDMiddleware`. During an
+ASGI request, application code can read the established ID from
+`req.context.correlation_id` or from `correlation_id_var.get()`.
+
+```python
+from falcon_correlate import correlation_id_var
+
+
+class HelloResource:
+    async def on_get(self, req, resp):
+        resp.media = {
+            "request_id": req.context.correlation_id,
+            "ambient_id": correlation_id_var.get(),
+        }
+```
+
 ### How It Works
 
 The middleware provides two hook points in the request/response lifecycle:
@@ -45,8 +74,13 @@ The middleware provides two hook points in the request/response lifecycle:
    headers or generated.
 
 2. **`process_response(req, resp, resource, req_succeeded)`**: Called after the
-   resource responder has been invoked. This is where the correlation ID will
-   be added to response headers and any cleanup will be performed.
+   resource responder has been invoked. This is where the correlation ID
+   established by this middleware will be added to response headers and any
+   cleanup will be performed.
+
+For Falcon ASGI applications, `CorrelationIDMiddlewareASGI` exposes the same
+hook names as coroutine methods. Request selection, response-header echoing,
+and cleanup follow the same rules as the WSGI middleware.
 
 ### Header retrieval and trusted source behaviour
 
@@ -87,13 +121,13 @@ The middleware accepts several configuration options as keyword-only arguments:
 `CorrelationIDMiddleware`. It is a frozen dataclass, so configuration state is
 validated and copied during construction, then exposed as read-only fields.
 
-| Field                     | Type                            | Default                   | Description                                         |
-| ------------------------- | ------------------------------- | ------------------------- | --------------------------------------------------- |
-| `header_name`             | `str`                           | `"X-Correlation-ID"`      | Header used for incoming and outgoing IDs.          |
-| `trusted_sources`         | `Iterable[str]`                 | `frozenset()`             | Trusted IP addresses or CIDR ranges.                |
-| `generator`               | `Callable[[], str]`             | `default_uuid7_generator` | Callable used when the middleware creates a new ID. |
-| `validator`               | `Callable[[str], bool] \| None` | `None`                    | Optional validator for incoming trusted IDs.        |
-| `echo_header_in_response` | `bool`                          | `True`                    | Whether to echo the ID in the response header.      |
+| Field                     | Type                | Default                   | Description                                                                         |
+| ------------------------- | ------------------- | ------------------------- | ----------------------------------------------------------------------------------- |
+| `header_name`             | `str`               | `"X-Correlation-ID"`      | Header used for incoming and outgoing IDs.                                          |
+| `trusted_sources`         | `Iterable[str]`     | `frozenset()`             | Trusted IP addresses or CIDR ranges.                                                |
+| `generator`               | `Callable[[], str]` | `default_uuid7_generator` | Callable used when the middleware creates a new ID.                                 |
+| `validator`               | callable or `None`  | `None`                    | Optional validator for incoming trusted IDs.                                        |
+| `echo_header_in_response` | `bool`              | `True`                    | Whether to copy the resolved ID into the response header during `process_response`. |
 
 Pass a config object directly to build or share middleware configuration
 explicitly:
@@ -219,8 +253,8 @@ When no validator is configured, incoming IDs from trusted sources are accepted
 without format checking. This maintains backwards compatibility.
 
 The library provides `default_uuid_validator` as a ready-to-use validator that
-accepts any standard UUID format (versions 1-8), both hyphenated
-(`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) and hex-only (32 characters). It is
+accepts any standard UUID format (versions 1-8), both hyphenated (
+`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) and hex-only (32 characters). It is
 case-insensitive and rejects empty, malformed, or excessively long strings.
 
 ```python
@@ -342,15 +376,38 @@ exclusively — use whichever is most convenient for the call site.
 
 ### echo_header_in_response
 
-Whether to include the correlation ID in response headers.
+Whether to copy the resolved correlation ID into the configured response header
+during `process_response`.
 
 - **Type**: `bool`
 - **Default**: `True`
+
+When enabled, the middleware uses the same `header_name` value for both the
+incoming request header and the outgoing response header. It only echoes a
+correlation ID that this middleware established during `process_request`; a
+pre-existing `req.context.correlation_id` from other code is not echoed. If the
+response already has a header with that name, it is overwritten with the
+resolved correlation ID.
 
 ```python
 # Disable echoing correlation ID in responses
 middleware = CorrelationIDMiddleware(echo_header_in_response=False)
 ```
+
+Example request and response:
+
+```http
+GET /hello HTTP/1.1
+Host: api.example.com
+X-Correlation-ID: 7f0c8a2f1b2e4a3b9d0f5c6e7a8b9c0d
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+X-Correlation-ID: 7f0c8a2f1b2e4a3b9d0f5c6e7a8b9c0d
+```
+
+With `echo_header_in_response=False`, the request still gets a correlation ID
+internally, but the response omits the correlation header.
 
 ## Logging integration
 
@@ -602,8 +659,8 @@ middleware and no per-request bridging calls.
 
 `structlog.contextvars.merge_contextvars()` only merges context variables bound
 via `structlog.contextvars.bind_contextvars()`. It does not automatically pick
-up arbitrary `contextvars.ContextVar` instances such as `correlation_id_var`
-and `user_id_var`. This is why a bridging step — either the custom processor or
+up arbitrary `contextvars.ContextVar` instances such as `correlation_id_var` and
+ `user_id_var`. This is why a bridging step — either the custom processor or
 the middleware approach above — is required.
 
 ## httpx propagation
@@ -844,8 +901,8 @@ The following functionality is now implemented:
 - Custom generator injection support.
 - Default UUID validator for incoming ID format validation.
 - Validation integration into request processing: incoming IDs from trusted
-  sources are validated (when a validator is configured) before acceptance,
-  with `DEBUG`-level logging of failures.
+  sources are validated (when a validator is configured) before acceptance, with
+   `DEBUG`-level logging of failures.
 - Context variables (`correlation_id_var` and `user_id_var`) for
   request-scoped storage via `contextvars`.
 - Correlation ID context variable lifecycle management: `correlation_id_var` is

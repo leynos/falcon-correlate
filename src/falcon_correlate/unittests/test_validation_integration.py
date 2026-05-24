@@ -280,6 +280,60 @@ class ValidationLoggingScenario:
         return "no_validator_no_log"
 
 
+def _is_debug_log_containing(record: logging.LogRecord, text: str) -> bool:
+    """Return True if *record* is a DEBUG entry whose message contains *text*."""
+    return (
+        record.name == "falcon_correlate.middleware"
+        and record.levelno == logging.DEBUG
+        and text in record.getMessage()
+    )
+
+
+def _is_validation_failure_debug_log(record: logging.LogRecord) -> bool:
+    """Return True if *record* is a falcon_correlate DEBUG 'failed validation' entry."""
+    return (
+        record.name == "falcon_correlate.middleware"
+        and record.levelno == logging.DEBUG
+        and "failed validation" in record.getMessage()
+    )
+
+
+def build_test_client(
+    create_test_client: cabc.Callable[..., falcon.testing.TestClient],
+    validator_result: bool | None,  # noqa: FBT001 - test scenario value
+) -> falcon.testing.TestClient:
+    """Build a validation logging test client for the given validator result."""
+    if validator_result is None:
+        return create_test_client(trusted_sources=["127.0.0.1"])
+
+    mock_validator = mock.MagicMock(return_value=validator_result)
+    return create_test_client(
+        trusted_sources=["127.0.0.1"],
+        validator=mock_validator,
+    )
+
+
+def assert_validation_logged(
+    caplog: pytest.LogCaptureFixture,
+    expected_substring: str,
+) -> None:
+    """Assert that a falcon_correlate.middleware DEBUG log contains the expected substring."""  # noqa: E501
+    assert any(
+        _is_debug_log_containing(r, expected_substring) for r in caplog.records
+    ), (
+        f"Expected DEBUG log from 'falcon_correlate.middleware' "
+        f"containing '{expected_substring}'"
+    )
+
+
+def assert_validation_not_logged(caplog: pytest.LogCaptureFixture) -> None:
+    """Assert that no validation failure debug log was emitted."""
+    assert not any(_is_validation_failure_debug_log(r) for r in caplog.records), (
+        "Expected no validation failure log records, "
+        f"got {[r.getMessage() for r in caplog.records]}"
+    )
+
+
 class TestValidationLogging:
     """Tests for DEBUG-level logging of validation failures."""
 
@@ -314,14 +368,7 @@ class TestValidationLogging:
         scenario: ValidationLoggingScenario,
     ) -> None:
         """Verify DEBUG logging behaviour for validation outcomes."""
-        if scenario.validator_result is None:
-            client = create_test_client(trusted_sources=["127.0.0.1"])
-        else:
-            mock_validator = mock.MagicMock(return_value=scenario.validator_result)
-            client = create_test_client(
-                trusted_sources=["127.0.0.1"],
-                validator=mock_validator,
-            )
+        client = build_test_client(create_test_client, scenario.validator_result)
 
         with caplog.at_level(logging.DEBUG, logger="falcon_correlate.middleware"):
             client.simulate_get(
@@ -331,20 +378,9 @@ class TestValidationLogging:
 
         if scenario.expect_log:
             assert scenario.log_contains is not None
-            assert any(
-                record.levelno == logging.DEBUG
-                and scenario.log_contains in record.getMessage()
-                for record in caplog.records
-            ), f"Expected DEBUG log containing '{scenario.log_contains}'"
+            assert_validation_logged(caplog, scenario.log_contains)
         else:
-            middleware_records = [
-                r for r in caplog.records if r.name == "falcon_correlate.middleware"
-            ]
-            assert len(middleware_records) == 0, (
-                f"Expected no middleware log records, "
-                f"got {len(middleware_records)}: "
-                f"{[r.message for r in middleware_records]}"
-            )
+            assert_validation_not_logged(caplog)
 
 
 class TestValidationNotCalledWhenUnnecessary:
@@ -428,11 +464,23 @@ class TestValidatorExceptionHandling:
                 headers={"X-Correlation-ID": "crash-value"},
             )
 
-        assert any(
-            record.levelno == logging.WARNING
-            and "exception" in record.getMessage().lower()
+        warning_record = next(
+            record
             for record in caplog.records
-        ), "Expected WARNING log about validator exception"
+            if record.name == "falcon_correlate.middleware"
+            and record.levelno == logging.WARNING
+            and record.getMessage()
+            == "Validator raised an exception for correlation ID, treating as invalid"
+        )
+        warning_log = typ.cast("typ.Any", warning_record)
+        assert warning_log.correlation_id == "crash-value", (
+            "expected validator warning correlation_id to be 'crash-value' but got "
+            f"{warning_log.correlation_id!r}"
+        )
+        assert warning_log.header_name == "X-Correlation-ID", (
+            "expected validator warning header_name to be 'X-Correlation-ID' but got "
+            f"{warning_log.header_name!r}"
+        )
 
     def test_request_succeeds_despite_validator_exception(
         self,
