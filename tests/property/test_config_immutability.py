@@ -58,7 +58,10 @@ def test_trusted_sources_are_always_frozen(
     config_input: cabc.Iterable[str] = trusted_sources
     expected_input: cabc.Iterable[str] = trusted_sources
     if isinstance(trusted_sources, cabc.Iterator):
-        expected_input, config_input = itertools.tee(trusted_sources)
+        expected_input, config_input = typ.cast(
+            "tuple[cabc.Iterator[str], cabc.Iterator[str]]",
+            itertools.tee(trusted_sources),
+        )
 
     expected_sources = frozenset(expected_input)
     config = CorrelationIDConfig(trusted_sources=config_input)
