@@ -84,16 +84,20 @@ def test_does_not_inject_header_when_context_is_unset(
     """An unset context never adds a correlation ID header."""
     headers = _without_correlation_id_header(headers)
     captured = _capture_httpx_request(monkeypatch)
+    executed = False
 
     def run_request() -> None:
+        nonlocal executed
         request_with_correlation_id(
             "GET",
             "https://example.test/",
             headers=headers,
         )
+        executed = True
 
     isolated_context(run_request)
 
+    assert executed is True
     assert DEFAULT_HEADER_NAME not in captured.headers, (
         "test_does_not_inject_header_when_context_is_unset expected "
         "_capture_httpx_request to observe no correlation ID header when "

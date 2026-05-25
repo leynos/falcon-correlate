@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import collections.abc as cabc
+import itertools
 import typing as typ
 
 import pytest
@@ -54,9 +55,16 @@ def test_trusted_sources_are_always_frozen(
     trusted_sources: _TrustedSourcesInput,
 ) -> None:
     """All accepted trusted-source iterables are stored as a frozenset."""
-    config = CorrelationIDConfig(trusted_sources=trusted_sources)
+    config_input: cabc.Iterable[str] = trusted_sources
+    expected_input: cabc.Iterable[str] = trusted_sources
+    if isinstance(trusted_sources, cabc.Iterator):
+        expected_input, config_input = itertools.tee(trusted_sources)
+
+    expected_sources = frozenset(expected_input)
+    config = CorrelationIDConfig(trusted_sources=config_input)
 
     assert type(config.trusted_sources) is frozenset
+    assert config.trusted_sources == expected_sources
 
 
 @given(trusted_sources=st.text())
