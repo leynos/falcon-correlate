@@ -40,9 +40,9 @@ def _first_host_with_bits_set(network: _IpNetwork) -> _IpAddress:
 
 
 def is_parseable_network(value: str) -> bool:
-    """Return whether *value* parses as a strict IP network."""
+    """Return whether *value* parses as any IP network shape."""
     try:
-        ipaddress.ip_network(value, strict=True)
+        ipaddress.ip_network(value, strict=False)
     except ValueError:
         return False
     return True
