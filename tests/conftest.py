@@ -3,9 +3,14 @@
 
 from __future__ import annotations
 
+import contextvars
 import typing as typ
 
+import pytest
+
 if typ.TYPE_CHECKING:
+    import collections.abc as cabc
+
     import falcon
 
 from falcon_correlate import CorrelationIDMiddleware
@@ -60,3 +65,26 @@ class TrackingMiddleware(CorrelationIDMiddleware):
         """Track process_response invocation."""
         self.process_response_called = True
         super().process_response(req, resp, resource, req_succeeded)
+
+
+@pytest.fixture
+def isolated_context() -> cabc.Callable[[cabc.Callable[[], None]], None]:
+    """Return a runner that isolates ContextVar changes per callable.
+
+    Hypothesis and behaviour tests may execute many examples or scenarios in a
+    single process. Run context-mutating callables through this fixture so
+    ``correlation_id_var`` and other request-scoped ``ContextVar`` values do not
+    leak between examples.
+
+    Returns
+    -------
+    Callable[[Callable[[], None]], None]
+        A runner that executes each callable in a copied context so
+        ``ContextVar`` changes remain isolated from other examples.
+
+    """
+
+    def runner(func: cabc.Callable[[], None]) -> None:
+        contextvars.copy_context().run(func)
+
+    return runner

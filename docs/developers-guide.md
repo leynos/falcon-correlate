@@ -64,6 +64,27 @@ from both utility modules, while neither `middleware_config.py` nor
 `middleware_utils.py` imports from `middleware.py`. This prevents circular
 imports and keeps configuration and runtime helpers usable independently.
 
+## Property-based testing
+
+Property-based tests live under `tests/property/` and use Hypothesis for input
+generation and repeated execution. Keep this suite focused on behavioural
+properties that benefit from broad input coverage rather than example-specific
+cases.
+
+Shared fixtures for the property suite live in `tests/property/conftest.py`.
+The `isolated_context` fixture runs each generated example inside
+`contextvars.copy_context().run()` so `ContextVar` state does not leak between
+examples. Use it whenever a property test mutates request-scoped context.
+
+Follow the existing pattern in `tests/property/test_header_injection.py`:
+
+- generate inputs with Hypothesis strategies;
+- use `@given` with a conservative `@settings` cap for stable runs;
+- suppress `HealthCheck.function_scoped_fixture` when a fixture is required
+  per example; and
+- assert on the external behaviour of the property rather than the generated
+  example itself.
+
 ## Roadmap notes
 
 The two-tier linting work described in
