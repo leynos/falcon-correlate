@@ -53,15 +53,21 @@ def is_valid_uuid_candidate(value: str) -> bool:
 @settings(max_examples=50)
 def test_accepts_valid_hyphenated_and_hex_uuids(value: uuid.UUID) -> None:
     """Canonical valid UUID strings are accepted in both supported forms."""
-    assert default_uuid_validator(str(value)) is True
-    assert default_uuid_validator(value.hex) is True
+    assert default_uuid_validator(str(value)) is True, (
+        f"expected hyphenated UUID string {value!s} to be accepted"
+    )
+    assert default_uuid_validator(value.hex) is True, (
+        f"expected hex UUID string {value.hex} from {value!s} to be accepted"
+    )
 
 
 @given(value=st.text().filter(lambda text: not is_valid_uuid_candidate(text)))
 @settings(max_examples=50)
 def test_rejects_invalid_uuid_strings(value: str) -> None:
     """Strings outside canonical UUID syntax or versions are rejected."""
-    assert default_uuid_validator(value) is False
+    assert default_uuid_validator(value) is False, (
+        f"expected invalid UUID candidate {value!r} to be rejected"
+    )
 
 
 @given(
@@ -77,4 +83,6 @@ def test_rejects_invalid_uuid_strings(value: str) -> None:
 @settings(max_examples=50)
 def test_rejects_uuid_edge_cases(value: str) -> None:
     """Known malformed and version-zero edge cases are rejected."""
-    assert default_uuid_validator(value) is False
+    assert default_uuid_validator(value) is False, (
+        f"expected UUID edge case {value!r} to be rejected"
+    )

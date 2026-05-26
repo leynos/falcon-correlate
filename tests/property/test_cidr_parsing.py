@@ -66,7 +66,9 @@ def test_accepts_valid_cidr_blocks(cidr: _IpNetwork) -> None:
     config = CorrelationIDConfig(trusted_sources=[str(cidr)])
 
     # CorrelationIDConfig exposes parsed CIDRs only through middleware internals.
-    assert config._parsed_networks == (cidr,)
+    assert config._parsed_networks == (cidr,), (
+        f"expected parsed networks {(cidr,)!r}, got {config._parsed_networks!r}"
+    )
 
 
 @given(cidr=host_bit_violations())

@@ -108,7 +108,7 @@ def test_does_not_inject_header_when_context_is_unset(
 
     isolated_context(run_request)
 
-    assert executed is True
+    assert executed is True, f"expected executed to be True, got {executed!r}"
     assert DEFAULT_HEADER_NAME not in captured.headers, (
         "test_does_not_inject_header_when_context_is_unset expected "
         "_capture_httpx_request to observe no correlation ID header when "
