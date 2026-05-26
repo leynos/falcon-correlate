@@ -1,4 +1,15 @@
-"""Property tests for correlation ID configuration immutability."""
+"""Property tests for correlation ID configuration immutability.
+
+These properties exercise the boundary between arbitrary caller-provided
+trusted-source iterables and ``CorrelationIDConfig``. The tested invariant is
+that configuration construction always freezes accepted inputs into a
+``frozenset`` while preserving the source contents, including one-shot
+generator inputs.
+
+The strategies deliberately vary iterable shape rather than middleware request
+flow. This keeps the test focused on ``CorrelationIDConfig.__post_init__`` and
+its validation dependency on parsed IP/CIDR source strings.
+"""
 
 from __future__ import annotations
 

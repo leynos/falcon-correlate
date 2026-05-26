@@ -1,4 +1,15 @@
-"""Property tests for httpx correlation ID header injection."""
+"""Property tests for httpx correlation ID header injection.
+
+These properties exercise the relationship between ``correlation_id_var``,
+``request_with_correlation_id``, and ``httpx.request`` without making network
+calls. Generated header dictionaries cover caller-supplied headers while the
+shared ``isolated_context`` fixture prevents ``ContextVar`` state from leaking
+between Hypothesis examples.
+
+The core invariants are that a set context injects ``X-Correlation-ID`` when
+the caller did not provide one, an unset context does not inject anything, and
+an explicit caller-supplied correlation header is preserved.
+"""
 
 from __future__ import annotations
 

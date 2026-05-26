@@ -1,4 +1,15 @@
-"""Property tests for trusted-source CIDR parsing."""
+"""Property tests for trusted-source CIDR parsing.
+
+These properties cover the ``CorrelationIDConfig`` parsing boundary for trusted
+source strings. Valid network strings must be accepted and retained as parsed
+``ipaddress`` networks, host-bit CIDR inputs must follow the dedicated
+``"host bits set"`` error path, and malformed strings must stay in the generic
+invalid-IP/CIDR domain.
+
+The strategies use Python's ``ipaddress`` module to generate valid networks
+and host-bit violations so the tests compare configuration behaviour with the
+same network model used by production parsing.
+"""
 
 from __future__ import annotations
 

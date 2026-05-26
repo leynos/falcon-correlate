@@ -1,4 +1,14 @@
-"""Property tests for default UUID validation."""
+"""Property tests for default UUID validation.
+
+These properties exercise ``default_uuid_validator`` across generated UUID
+inputs rather than a small example table. Valid examples cover canonical
+hyphenated and hex-only forms for versions 1 through 8, including the RFC 4122
+variant bits that Python exposes through ``uuid.UUID.version``.
+
+Invalid examples are filtered against the validator's public syntax and
+version rules, then checked to ensure malformed strings and version-zero edge
+cases are rejected without raising.
+"""
 
 from __future__ import annotations
 
