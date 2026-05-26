@@ -76,6 +76,12 @@ def isolated_context() -> cabc.Callable[[cabc.Callable[[], None]], None]:
     ``correlation_id_var`` and other request-scoped ``ContextVar`` values do not
     leak between examples.
 
+    Returns
+    -------
+    Callable[[Callable[[], None]], None]
+        A runner that executes each callable in a copied context so
+        ``ContextVar`` changes remain isolated from other examples.
+
     """
 
     def runner(func: cabc.Callable[[], None]) -> None:
