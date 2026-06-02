@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 This plan covers roadmap item 5.1.2 only. The user approved implementation on
 2026-06-02, so the plan is now being executed milestone by milestone.
@@ -193,8 +193,19 @@ record the conflict in `Decision Log`, and ask for direction.
 - [x] (2026-06-02T05:19:21+02:00) CodeRabbit documentation review completed
   with zero findings after one recoverable rate-limit retry and a 27-minute
   backoff.
+- [x] (2026-06-02T05:26:31+02:00) Final gates passed:
+  `make check-fmt`, `make typecheck`, `make lint`, `make test`,
+  `make markdownlint`, and `make nixie`. Logs:
+  `/tmp/check-fmt-falcon-correlate-5-1-2-final.out`,
+  `/tmp/typecheck-falcon-correlate-5-1-2-final.out`,
+  `/tmp/lint-falcon-correlate-5-1-2-final.out`,
+  `/tmp/test-falcon-correlate-5-1-2-final.out`,
+  `/tmp/markdownlint-falcon-correlate-5-1-2-final.out`, and
+  `/tmp/nixie-falcon-correlate-5-1-2-final.out`.
+- [x] (2026-06-02T05:26:31+02:00) Final CodeRabbit review completed with zero
+  findings.
 - [x] Implement the approved milestones.
-- [ ] Run all required gates and CodeRabbit reviews.
+- [x] Run all required gates and CodeRabbit reviews.
 - [x] Mark roadmap item 5.1.2 done after the feature is complete.
 
 ## Surprises & Discoveries
@@ -317,6 +328,10 @@ same active request ID through `req.context.correlation_id` and
 ambient context after response processing, and follows
 `echo_header_in_response` for response headers. The design document records the
 reset-token lifecycle and the test-backed async invariant.
+
+All deterministic gates and CodeRabbit reviews required by this plan completed
+with no unresolved findings. The remaining handoff work is mechanical pull
+request metadata and branch push, outside the implementation itself.
 
 ## Context and orientation
 
