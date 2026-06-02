@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import collections.abc as cabc  # noqa: TC003 - requested runtime import.
 import typing as typ
 from http import HTTPStatus
@@ -10,8 +11,11 @@ import falcon.asgi
 import falcon.testing
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from falcon_correlate import CorrelationIDMiddlewareASGI
-from tests.asgi_resources import ASGICorrelationEchoResource
+from falcon_correlate import CorrelationIDMiddlewareASGI, correlation_id_var
+from tests.asgi_resources import (
+    ASGICorrelationEchoResource,
+    ASGIInterleavedCorrelationResource,
+)
 
 scenarios("asgi_middleware.feature")
 
@@ -42,6 +46,7 @@ class Context(typ.TypedDict, total=False):
     app: falcon.asgi.App
     client: falcon.testing.TestClient
     response: falcon.testing.Result
+    concurrent_responses: dict[str, falcon.testing.Result]
 
 
 def _build_asgi_context(
@@ -127,6 +132,24 @@ def given_asgi_correlation_resource(context: Context, path: str) -> None:
     context["app"].add_route(path, ASGICorrelationEchoResource())
 
 
+@given(
+    parsers.parse(
+        "an interleaved ASGI correlation resource expecting {request_count:d} "
+        'requests at "{path}"',
+    ),
+)
+def given_interleaved_asgi_correlation_resource(
+    context: Context,
+    request_count: int,
+    path: str,
+) -> None:
+    """Add a correlation resource that waits for concurrent ASGI requests."""
+    context["app"].add_route(
+        path,
+        ASGIInterleavedCorrelationResource(expected_requests=request_count),
+    )
+
+
 @when(parsers.parse(_GET_WITH_HEADER_STEP))
 def when_make_asgi_get_request_with_header(
     context: Context,
@@ -145,6 +168,44 @@ def when_make_asgi_get_request_with_header(
 def when_make_asgi_get_request(context: Context, path: str) -> None:
     """Make an ASGI GET request without a correlation header."""
     context["response"] = context["client"].simulate_get(path)
+
+
+@when(
+    parsers.parse(
+        'I make concurrent ASGI GET requests to "{path}" with correlation IDs '
+        '"{first_id}" and "{second_id}"',
+    ),
+)
+def when_make_concurrent_asgi_get_requests(
+    context: Context,
+    path: str,
+    first_id: str,
+    second_id: str,
+) -> None:
+    """Make concurrent ASGI requests with distinct correlation IDs."""
+
+    async def _request(
+        conductor: falcon.testing.ASGIConductor,
+        correlation_id: str,
+    ) -> tuple[str, falcon.testing.Result]:
+        result = await conductor.simulate_get(
+            path,
+            headers={"X-Correlation-ID": correlation_id},
+        )
+        return correlation_id, result
+
+    async def _run_requests() -> dict[str, falcon.testing.Result]:
+        async with falcon.testing.ASGIConductor(context["app"]) as conductor:
+            pairs = await asyncio.wait_for(
+                asyncio.gather(
+                    _request(conductor, first_id),
+                    _request(conductor, second_id),
+                ),
+                timeout=5.0,
+            )
+        return dict(pairs)
+
+    context["concurrent_responses"] = asyncio.run(_run_requests())
 
 
 @then("the ASGI response should complete successfully")
@@ -197,4 +258,44 @@ def then_asgi_response_header_absent(
     assert actual_header is None, (
         f"expected ASGI response header {header_name!r} to be absent but got "
         f"{actual_header!r}"
+    )
+
+
+@then("each ASGI concurrent response should observe its own correlation id")
+def then_each_asgi_concurrent_response_observes_own_id(context: Context) -> None:
+    """Verify concurrent ASGI responses observed isolated context state."""
+    for expected_id, result in context["concurrent_responses"].items():
+        expected_json = {
+            "context_correlation_id": expected_id,
+            "contextvar_correlation_id": expected_id,
+            "contextvar_correlation_id_after_wait": expected_id,
+        }
+        assert result.status_code == HTTPStatus.OK, (
+            f"expected ASGI response status to be 200 but got {result.status_code}"
+        )
+        assert result.json == expected_json, (
+            f"expected ASGI resource to observe {expected_json!r} but got "
+            f"{result.json!r}"
+        )
+
+
+@then("each ASGI concurrent response header should match its own correlation id")
+def then_each_asgi_concurrent_response_header_matches_own_id(
+    context: Context,
+) -> None:
+    """Verify concurrent ASGI responses echoed their own request IDs."""
+    for expected_id, result in context["concurrent_responses"].items():
+        actual_header = result.headers["X-Correlation-ID"]
+        assert actual_header == expected_id, (
+            "expected ASGI response header 'X-Correlation-ID' to be "
+            f"{expected_id!r} but got {actual_header!r}"
+        )
+
+
+@then("the ASGI ambient correlation ID context should be cleared")
+def then_asgi_ambient_context_cleared() -> None:
+    """Verify ASGI request handling left no ambient correlation ID."""
+    assert correlation_id_var.get() is None, (
+        "expected correlation_id_var.get() to be None after ASGI request but got "
+        f"{correlation_id_var.get()!r}"
     )

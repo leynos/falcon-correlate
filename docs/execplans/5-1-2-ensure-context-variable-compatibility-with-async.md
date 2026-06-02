@@ -157,6 +157,24 @@ record the conflict in `Decision Log`, and ask for direction.
   `/tmp/test-falcon-correlate-5-1-2-baseline.out`.
 - [x] (2026-06-02T00:00:00+02:00) CodeRabbit baseline review completed with
   zero findings after three recoverable rate-limit retries.
+- [x] (2026-06-02T00:00:00+02:00) Completed Milestone 2 by adding ASGI
+  property, Falcon ASGI integration, and BDD coverage for concurrent async
+  context isolation and ambient cleanup. The new tests were green on arrival:
+  the existing shared lifecycle already satisfied the verified contracts.
+- [x] (2026-06-02T00:00:00+02:00) Full test-milestone gates passed after
+  CodeRabbit fixes: `make check-fmt`, `make typecheck`, `make lint`, and
+  `make test`. Final logs:
+  `/tmp/check-fmt-falcon-correlate-5-1-2-tests-dataclass-final.out`,
+  `/tmp/typecheck-falcon-correlate-5-1-2-tests-dataclass-final.out`,
+  `/tmp/lint-falcon-correlate-5-1-2-tests-dataclass-final.out`, and
+  `/tmp/test-falcon-correlate-5-1-2-tests-dataclass-final.out`.
+- [x] (2026-06-02T00:00:00+02:00) CodeRabbit test-milestone review completed
+  with zero findings after applying its helper extraction, Hypothesis context
+  isolation, deadline, lock, typing, and dataclass feedback.
+- [x] (2026-06-02T00:00:00+02:00) Completed Milestone 3 with no production
+  code changes. No lifecycle bug was found; the implementation fix milestone
+  was unnecessary because the new tests proved the existing ASGI wrapper and
+  shared base already handle async context isolation and cleanup.
 - [ ] Implement the approved milestones.
 - [ ] Run all required gates and CodeRabbit reviews.
 - [ ] Mark roadmap item 5.1.2 done after the feature is complete.
@@ -197,6 +215,29 @@ record the conflict in `Decision Log`, and ask for direction.
   zero findings. Impact: later CodeRabbit milestones may require the same
   backoff loop and should not be treated as deterministic gate failures.
 
+- Observation: Milestone 2 tests were green on arrival. Evidence:
+  `uv run pytest -v` against
+  `src/falcon_correlate/unittests/test_middleware_asgi.py`,
+  `src/falcon_correlate/unittests/test_middleware_asgi_integration.py`, and
+  `tests/bdd/test_asgi_middleware_steps.py` passed after adding the new cases,
+  and the final full suite passed with 409 passed and 11 skipped. Impact:
+  roadmap item 5.1.2 is primarily a verification and documentation milestone;
+  no production lifecycle change is required.
+
+- Observation: The ASGI property test needed a shared helper module rather
+  than importing private doubles from the direct unit test file. Evidence:
+  CodeRabbit flagged cross-test private imports, and the helpers now live in
+  `src/falcon_correlate/unittests/asgi_middleware_helpers.py`. Impact: direct
+  ASGI unit tests and ASGI property tests share the same doubles without
+  coupling one test module to another.
+
+- Observation: Hypothesis examples for async context isolation should run
+  inside the existing `isolated_context` fixture and without the default
+  200-millisecond deadline. Evidence: CodeRabbit flagged potential ContextVar
+  leakage between examples and CI flakiness from the default deadline. Impact:
+  the property test now isolates each generated example and disables per-example
+  deadline enforcement.
+
 ## Decision Log
 
 - Decision: Treat this work as a test-backed compatibility milestone, not an
@@ -217,6 +258,18 @@ record the conflict in `Decision Log`, and ask for direction.
   milestone, a bounded deterministic concurrency test may be the better signal
   unless request counts, ordering, or failure combinations become meaningful
   variables. Date/Author: 2026-05-26T21:15:36Z / Codex.
+
+- Decision: Add an ASGI-specific property test over task counts 2 through 16.
+  Rationale: the implementation added a meaningful invariant over a range of
+  concurrent async request counts, and this directly satisfies the user's
+  property-test requirement where applicable. Date/Author:
+  2026-06-02T00:00:00+02:00 / Codex.
+
+- Decision: Do not edit production middleware for Milestone 3. Rationale: the
+  new unit, property, integration, and BDD tests passed against the existing
+  ASGI middleware, proving the shared lifecycle already provides async
+  ContextVar isolation and cleanup. Date/Author:
+  2026-06-02T00:00:00+02:00 / Codex.
 
 ## Outcomes & Retrospective
 

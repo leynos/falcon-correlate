@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import typing as typ
 
 import pytest
 
@@ -13,94 +12,13 @@ from falcon_correlate import (
     CorrelationIDMiddlewareASGI,
     correlation_id_var,
 )
-
-if typ.TYPE_CHECKING:
-    import falcon.asgi
-
-
-class _Context:
-    """Minimal Falcon-like request context for direct middleware tests."""
-
-    correlation_id: str | None = None
-    _correlation_id_reset_token: typ.Any = None
-
-
-class _Request:
-    """Minimal ASGI request double for middleware hook tests."""
-
-    def __init__(
-        self,
-        *,
-        headers: dict[str, str] | None = None,
-        remote_addr: str | None = "127.0.0.1",
-    ) -> None:
-        self.context = _Context()
-        self.remote_addr = remote_addr
-        self._headers = headers or {}
-
-    def get_header(self, name: str) -> str | None:
-        """Return a test header by name."""
-        return self._headers.get(name)
-
-
-class _Response:
-    """Minimal ASGI response double for middleware hook tests."""
-
-    def __init__(self) -> None:
-        self.headers: dict[str, str] = {}
-
-    def set_header(self, name: str, value: str) -> None:
-        """Record a response header."""
-        self.headers[name] = value
-
-    def get_header(self, name: str) -> str | None:
-        """Return a recorded response header."""
-        return self.headers.get(name)
-
-
-class _HeaderFailingResponse(_Response):
-    """Response double that fails during header mutation."""
-
-    def set_header(self, name: str, value: str) -> None:
-        """Raise when middleware tries to echo the response header."""
-        msg = f"failed to set {name}={value}"
-        raise RuntimeError(msg)
-
-
-def _cast_asgi_doubles(
-    req: _Request,
-    resp: _Response,
-) -> "tuple[falcon.asgi.Request, falcon.asgi.Response]":  # noqa: UP037 -- falcon.asgi types are TYPE_CHECKING-only.
-    """Return the request and response doubles cast to their Falcon ASGI types."""
-    return (
-        typ.cast("falcon.asgi.Request", req),
-        typ.cast("falcon.asgi.Response", resp),
-    )
-
-
-async def _process_request(
-    middleware: CorrelationIDMiddlewareASGI,
-    req: _Request,
-    resp: _Response,
-) -> None:
-    """Call the public ASGI request hook with a lightweight request double."""
-    cast_req, cast_resp = _cast_asgi_doubles(req, resp)
-    await middleware.process_request(cast_req, cast_resp)
-
-
-async def _process_response(
-    middleware: CorrelationIDMiddlewareASGI,
-    req: _Request,
-    resp: _Response,
-) -> None:
-    """Call the public ASGI response hook with lightweight doubles."""
-    cast_req, cast_resp = _cast_asgi_doubles(req, resp)
-    await middleware.process_response(
-        cast_req,
-        cast_resp,
-        resource=None,
-        req_succeeded=True,
-    )
+from falcon_correlate.unittests.asgi_middleware_helpers import (
+    _HeaderFailingResponse,
+    _process_request,
+    _process_response,
+    _Request,
+    _Response,
+)
 
 
 class TestCorrelationIDMiddlewareASGIConfiguration:
