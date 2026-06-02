@@ -82,6 +82,14 @@ For Falcon ASGI applications, `CorrelationIDMiddlewareASGI` exposes the same
 hook names as coroutine methods. Request selection, response-header echoing,
 and cleanup follow the same rules as the WSGI middleware.
 
+ASGI context variables are request-local. While an ASGI request is running,
+`req.context.correlation_id` and `correlation_id_var.get()` expose the same
+active correlation ID to application code. Concurrent ASGI requests keep
+separate values even when their resource responders overlap in the event loop.
+After response processing completes, `correlation_id_var` is reset to its
+previous value, normally `None` outside request handling. Response header
+echoing still follows the `echo_header_in_response` setting.
+
 ### Header retrieval and trusted source behaviour
 
 During `process_request`, the middleware reads the configured header name and
@@ -660,7 +668,7 @@ middleware and no per-request bridging calls.
 `structlog.contextvars.merge_contextvars()` only merges context variables bound
 via `structlog.contextvars.bind_contextvars()`. It does not automatically pick
 up arbitrary `contextvars.ContextVar` instances such as `correlation_id_var` and
- `user_id_var`. This is why a bridging step — either the custom processor or
+`user_id_var`. This is why a bridging step — either the custom processor or
 the middleware approach above — is required.
 
 ## httpx propagation
@@ -902,7 +910,7 @@ The following functionality is now implemented:
 - Default UUID validator for incoming ID format validation.
 - Validation integration into request processing: incoming IDs from trusted
   sources are validated (when a validator is configured) before acceptance, with
-   `DEBUG`-level logging of failures.
+  `DEBUG`-level logging of failures.
 - Context variables (`correlation_id_var` and `user_id_var`) for
   request-scoped storage via `contextvars`.
 - Correlation ID context variable lifecycle management: `correlation_id_var` is

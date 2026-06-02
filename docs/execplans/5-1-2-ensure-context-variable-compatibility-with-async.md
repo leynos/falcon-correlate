@@ -175,9 +175,27 @@ record the conflict in `Decision Log`, and ask for direction.
   code changes. No lifecycle bug was found; the implementation fix milestone
   was unnecessary because the new tests proved the existing ASGI wrapper and
   shared base already handle async context isolation and cleanup.
-- [ ] Implement the approved milestones.
+- [x] (2026-06-02T05:19:21+02:00) Completed Milestone 4 documentation by
+  updating `docs/users-guide.md`,
+  `docs/falcon-correlation-id-middleware-design.md`, and `docs/roadmap.md`.
+  `make fmt` exposed an unrelated existing Markdown line-length failure in
+  `docs/execplans/4-2-4-validate-optional-celery-integration.md`, so unrelated
+  formatter churn was reverted and the documentation gates were rerun.
+- [x] (2026-06-02T05:19:21+02:00) Documentation milestone gates passed:
+  `make check-fmt`, `make markdownlint`, `make nixie`, `make typecheck`,
+  `make lint`, and `make test`. Logs:
+  `/tmp/check-fmt-falcon-correlate-5-1-2-docs.out`,
+  `/tmp/markdownlint-falcon-correlate-5-1-2-docs.out`,
+  `/tmp/nixie-falcon-correlate-5-1-2-docs.out`,
+  `/tmp/typecheck-falcon-correlate-5-1-2-docs.out`,
+  `/tmp/lint-falcon-correlate-5-1-2-docs.out`, and
+  `/tmp/test-falcon-correlate-5-1-2-docs.out`.
+- [x] (2026-06-02T05:19:21+02:00) CodeRabbit documentation review completed
+  with zero findings after one recoverable rate-limit retry and a 27-minute
+  backoff.
+- [x] Implement the approved milestones.
 - [ ] Run all required gates and CodeRabbit reviews.
-- [ ] Mark roadmap item 5.1.2 done after the feature is complete.
+- [x] Mark roadmap item 5.1.2 done after the feature is complete.
 
 ## Surprises & Discoveries
 
@@ -235,8 +253,16 @@ record the conflict in `Decision Log`, and ask for direction.
   inside the existing `isolated_context` fixture and without the default
   200-millisecond deadline. Evidence: CodeRabbit flagged potential ContextVar
   leakage between examples and CI flakiness from the default deadline. Impact:
-  the property test now isolates each generated example and disables per-example
-  deadline enforcement.
+  the property test now isolates each generated example and disables
+  per-example deadline enforcement.
+
+- Observation: `make fmt` can fail on pre-existing Markdown defects outside
+  the current roadmap item. Evidence: the docs milestone `make fmt` run failed
+  on `docs/execplans/4-2-4-validate-optional-celery-integration.md:685`, while
+  the current task documentation passed `make check-fmt`, `make markdownlint`,
+  and `make nixie` after unrelated formatter churn was reverted. Impact: future
+  documentation work may need to isolate current-task diffs when global
+  formatting exposes older documentation debt.
 
 ## Decision Log
 
@@ -268,13 +294,29 @@ record the conflict in `Decision Log`, and ask for direction.
 - Decision: Do not edit production middleware for Milestone 3. Rationale: the
   new unit, property, integration, and BDD tests passed against the existing
   ASGI middleware, proving the shared lifecycle already provides async
-  ContextVar isolation and cleanup. Date/Author:
-  2026-06-02T00:00:00+02:00 / Codex.
+  ContextVar isolation and cleanup. Date/Author: 2026-06-02T00:00:00+02:00 /
+  Codex.
+
+- Decision: Document the verified ASGI guarantees without changing the public
+  API. Rationale: consumers need to know that ASGI request context is isolated
+  and cleaned up, but the tests showed no constructor, hook, or configuration
+  contract change was needed. Date/Author: 2026-06-02T05:19:21+02:00 / Codex.
 
 ## Outcomes & Retrospective
 
-No implementation outcomes exist yet. This document is in draft status and is
-waiting for approval.
+Roadmap item 5.1.2 has been implemented as a test-backed compatibility
+verification. The existing ASGI middleware already used the shared lifecycle
+correctly, so the work added stronger evidence rather than production changes:
+a bounded Hypothesis property test over concurrent ASGI task counts, a Falcon
+ASGI integration test with overlapping responders, and a consumer-facing BDD
+scenario for concurrent isolation and cleanup.
+
+The documentation now states that `CorrelationIDMiddlewareASGI` exposes the
+same active request ID through `req.context.correlation_id` and
+`correlation_id_var`, keeps concurrent ASGI request values isolated, resets
+ambient context after response processing, and follows
+`echo_header_in_response` for response headers. The design document records the
+reset-token lifecycle and the test-backed async invariant.
 
 ## Context and orientation
 
