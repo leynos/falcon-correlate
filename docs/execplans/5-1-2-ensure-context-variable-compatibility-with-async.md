@@ -1,14 +1,13 @@
 # Ensure context variable compatibility with async (5.1.2)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: IN PROGRESS
 
-This draft covers roadmap item 5.1.2 only. It must be approved before any
-implementation work begins.
+This plan covers roadmap item 5.1.2 only. The user approved implementation on
+2026-06-02, so the plan is now being executed milestone by milestone.
 
 ## Purpose / big picture
 
@@ -142,7 +141,22 @@ record the conflict in `Decision Log`, and ask for direction.
 - [x] (2026-05-26T21:15:36Z) Used Firecrawl to check Python `contextvars`,
   Falcon ASGI middleware, Falcon ASGI testing, and ASGI prior-art documentation.
 - [x] (2026-05-26T21:15:36Z) Drafted this pre-implementation execplan.
-- [ ] Obtain approval for this execplan before implementation begins.
+- [x] (2026-06-02T00:00:00+02:00) Obtained user approval for this execplan
+  and began implementation.
+- [x] (2026-06-02T00:00:00+02:00) Completed Milestone 1 audit. Existing
+  direct ASGI unit tests already cover request context setup, response cleanup,
+  header echo disabling, header echo failure cleanup, and concurrent direct
+  hook isolation. The missing coverage is stronger Falcon ASGI application
+  boundary testing and consumer-facing BDD coverage for concurrent isolation
+  and post-response cleanup.
+- [x] (2026-06-02T00:00:00+02:00) Baseline gates passed:
+  `make check-fmt`, `make typecheck`, `make lint`, and `make test`. Logs:
+  `/tmp/check-fmt-falcon-correlate-5-1-2-baseline.out`,
+  `/tmp/typecheck-falcon-correlate-5-1-2-baseline.out`,
+  `/tmp/lint-falcon-correlate-5-1-2-baseline.out`, and
+  `/tmp/test-falcon-correlate-5-1-2-baseline.out`.
+- [x] (2026-06-02T00:00:00+02:00) CodeRabbit baseline review completed with
+  zero findings after three recoverable rate-limit retries.
 - [ ] Implement the approved milestones.
 - [ ] Run all required gates and CodeRabbit reviews.
 - [ ] Mark roadmap item 5.1.2 done after the feature is complete.
@@ -169,6 +183,19 @@ record the conflict in `Decision Log`, and ask for direction.
   `ASGIConductor` provides coroutine-based lifecycle control and interleaved
   request testing. Impact: the plan should prefer `ASGIConductor` for
   concurrent ASGI integration tests when `TestClient` cannot model interleaving.
+
+- Observation: `CorrelationIDMiddlewareASGI` is already a thin coroutine
+  wrapper over `_CorrelationIDMiddlewareBase`; no ASGI-specific lifecycle fork
+  exists. Evidence: `src/falcon_correlate/middleware_asgi.py` calls
+  `_process_request()` and `_process_response()` directly from the Falcon ASGI
+  hooks. Impact: new tests should first prove the shared lifecycle holds at the
+  ASGI app boundary before changing production code.
+
+- Observation: CodeRabbit reported repeated recoverable rate-limit errors
+  before completing the baseline review. Evidence: retries followed random
+  18-minute, 16-minute, and 20-minute backoffs; the final retry completed with
+  zero findings. Impact: later CodeRabbit milestones may require the same
+  backoff loop and should not be treated as deterministic gate failures.
 
 ## Decision Log
 
