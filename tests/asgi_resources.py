@@ -100,16 +100,17 @@ class ASGIInterleavedCorrelationResource:
             if self._arrived_requests == self._expected_requests:
                 self._all_requests_arrived.set()
 
-        await asyncio.wait_for(self._all_requests_arrived.wait(), timeout=2.0)
-        await asyncio.sleep(0)
+        try:
+            await asyncio.wait_for(self._all_requests_arrived.wait(), timeout=2.0)
+            await asyncio.sleep(0)
 
-        resp.media = {
-            "context_correlation_id": req.context.correlation_id,
-            "contextvar_correlation_id": contextvar_before_wait,
-            "contextvar_correlation_id_after_wait": correlation_id_var.get(),
-        }
-
-        async with self._lock:
-            self._arrived_requests -= 1
-            if self._arrived_requests == 0:
-                self._all_requests_arrived.clear()
+            resp.media = {
+                "context_correlation_id": req.context.correlation_id,
+                "contextvar_correlation_id": contextvar_before_wait,
+                "contextvar_correlation_id_after_wait": correlation_id_var.get(),
+            }
+        finally:
+            async with self._lock:
+                self._arrived_requests -= 1
+                if self._arrived_requests == 0:
+                    self._all_requests_arrived.clear()

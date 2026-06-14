@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: COMPLETE
+Status: IN PROGRESS
 
 This plan covers roadmap item 5.1.2 only. The user approved implementation on
 2026-06-02, so the plan is now being executed milestone by milestone.
@@ -203,7 +203,8 @@ record the conflict in `Decision Log`, and ask for direction.
   `/tmp/markdownlint-falcon-correlate-5-1-2-final.out`, and
   `/tmp/nixie-falcon-correlate-5-1-2-final.out`.
 - [x] (2026-06-02T05:26:31+02:00) Final CodeRabbit review completed with zero
-  findings.
+  findings at that milestone. Later PR review follow-ups reopened the plan for
+  targeted documentation and test-infrastructure cleanup.
 - [x] Implement the approved milestones.
 - [x] Run all required gates and CodeRabbit reviews.
 - [x] Mark roadmap item 5.1.2 done after the feature is complete.
@@ -341,9 +342,10 @@ ambient context after response processing, and follows
 `echo_header_in_response` for response headers. The design document records the
 reset-token lifecycle and the test-backed async invariant.
 
-All deterministic gates and CodeRabbit reviews required by this plan completed
-with no unresolved findings. The remaining handoff work is mechanical pull
-request metadata and branch push, outside the implementation itself.
+The original deterministic gates and CodeRabbit reviews required by this plan
+completed. Later PR review follow-ups reopened the plan for targeted
+documentation and test-infrastructure cleanup, so completion remains
+provisional until those follow-ups are closed and the final gates are rerun.
 
 ## Context and orientation
 
