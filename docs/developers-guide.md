@@ -64,6 +64,16 @@ from both utility modules, while neither `middleware_config.py` nor
 `middleware_utils.py` imports from `middleware.py`. This prevents circular
 imports and keeps configuration and runtime helpers usable independently.
 
+`asgi_middleware_helpers.py` lives under `falcon_correlate.unittests` as shared
+ASGI middleware test infrastructure. It provides lightweight request and
+response doubles (`_Request`, `_Response`, and `_HeaderFailingResponse`) and a
+minimal `_Context` object that carries `correlation_id` plus an optional reset
+token. Its `_process_request` and `_process_response` async wrappers invoke
+`CorrelationIDMiddlewareASGI` hooks with those doubles. `_HeaderFailingResponse`
+subclasses `_Response` and raises `RuntimeError` from `set_header()`, enabling
+failure-path tests around response-header echo and cleanup. This module is
+owned by the unit-test package and must not be imported by production code.
+
 ## Property-based testing
 
 Property-based tests live under `tests/property/` and use Hypothesis for input
