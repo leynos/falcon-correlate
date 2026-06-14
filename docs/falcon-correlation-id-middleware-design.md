@@ -251,7 +251,7 @@ In `process_response`:
    a more global context storage).
 2. Optionally, it can add this ID to the outgoing response headers (e.g.,
    `X-Correlation-ID`), a feature seen in libraries like `asgi-correlation-id`.
-   [ ^2]
+   [^2]
 3. Perform any necessary cleanup, such as resetting context-local variables.
 
 **Figure 1 screen reader caption:** Sequence diagram showing a client request

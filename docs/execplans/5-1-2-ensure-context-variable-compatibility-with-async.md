@@ -665,7 +665,8 @@ rm -rf "$COMMIT_MSG_DIR"
 ```
 
 Push the branch and update the draft pull request description so reviewers can
-see the execplan, implementation, validation logs, and Lody session reference.
+see the execplan, implementation, validation logs, and collaboration session
+reference.
 
 Acceptance for this milestone:
 
@@ -675,15 +676,15 @@ Acceptance for this milestone:
 - The draft pull request title includes `(5.1.2)`.
 - The pull request summary mentions this execplan:
   `docs/execplans/5-1-2-ensure-context-variable-compatibility-with-async.md`.
-- The pull request description ends with a `## References` section containing
-  the Lody session link.
+- The pull request description ends with a `## References` section containing the
+  collaboration session link/reference.
 
 ## Concrete steps
 
 All commands run from the repository root:
 
 ```bash
-cd /home/leynos/.lody/repos/github---leynos---falcon-correlate/worktrees/898a4024-3c62-4b6b-90e4-e6bf66eac55f
+cd <repo-root>
 ```
 
 Before implementation, verify branch and workspace state:
@@ -691,7 +692,7 @@ Before implementation, verify branch and workspace state:
 ```bash
 git branch --show-current
 git status --short --branch
-leta workspace add /home/leynos/.lody/repos/github---leynos---falcon-correlate/worktrees/898a4024-3c62-4b6b-90e4-e6bf66eac55f
+leta workspace add .
 ```
 
 Expected branch output:
@@ -823,10 +824,10 @@ git branch --show-current
 5-1-2-ensure-context-variable-compatibility-with-async
 ```
 
-Lody session ID for pull request references:
+Collaboration session ID for pull request references:
 
 ```plaintext
-898a4024-3c62-4b6b-90e4-e6bf66eac55f
+<session-id>
 ```
 
 ## Interfaces and dependencies

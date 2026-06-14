@@ -47,6 +47,7 @@ class Context(typ.TypedDict, total=False):
     client: falcon.testing.TestClient
     response: falcon.testing.Result
     concurrent_responses: dict[str, falcon.testing.Result]
+    concurrent_correlation_vals: dict[str, str | None]
 
 
 def _build_asgi_context(
@@ -187,25 +188,37 @@ def when_make_concurrent_asgi_get_requests(
     async def _request(
         conductor: falcon.testing.ASGIConductor,
         correlation_id: str,
-    ) -> tuple[str, falcon.testing.Result]:
+    ) -> tuple[str, falcon.testing.Result, str | None]:
         result = await conductor.simulate_get(
             path,
             headers={"X-Correlation-ID": correlation_id},
         )
-        return correlation_id, result
+        return correlation_id, result, correlation_id_var.get()
 
-    async def _run_requests() -> dict[str, falcon.testing.Result]:
+    async def _run_requests() -> tuple[
+        dict[str, falcon.testing.Result],
+        dict[str, str | None],
+    ]:
         async with falcon.testing.ASGIConductor(context["app"]) as conductor:
-            pairs = await asyncio.wait_for(
+            results = await asyncio.wait_for(
                 asyncio.gather(
                     _request(conductor, first_id),
                     _request(conductor, second_id),
                 ),
                 timeout=5.0,
             )
-        return dict(pairs)
+        return (
+            {correlation_id: result for correlation_id, result, _ in results},
+            {
+                correlation_id: ambient_value
+                for correlation_id, _, ambient_value in results
+            },
+        )
 
-    context["concurrent_responses"] = asyncio.run(_run_requests())
+    (
+        context["concurrent_responses"],
+        context["concurrent_correlation_vals"],
+    ) = asyncio.run(_run_requests())
 
 
 @then("the ASGI response should complete successfully")
@@ -293,8 +306,17 @@ def then_each_asgi_concurrent_response_header_matches_own_id(
 
 
 @then("the ASGI ambient correlation ID context should be cleared")
-def then_asgi_ambient_context_cleared() -> None:
+def then_asgi_ambient_context_cleared(context: Context) -> None:
     """Verify ASGI request handling left no ambient correlation ID."""
+    for correlation_id, ambient_value in context.get(
+        "concurrent_correlation_vals",
+        {},
+    ).items():
+        assert ambient_value is None, (
+            "expected per-request correlation_id_var.get() to be None after "
+            f"concurrent ASGI request {correlation_id!r} but got "
+            f"{ambient_value!r}"
+        )
     assert correlation_id_var.get() is None, (
         "expected correlation_id_var.get() to be None after ASGI request but got "
         f"{correlation_id_var.get()!r}"
