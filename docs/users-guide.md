@@ -87,8 +87,10 @@ ASGI context variables are request-local. While an ASGI request is running,
 active correlation ID to application code. Concurrent ASGI requests keep
 separate values even when their resource responders overlap in the event loop.
 After response processing completes, `correlation_id_var` is reset to its
-previous value, normally `None` outside request handling. Response header
-echoing still follows the `echo_header_in_response` setting.
+previous ambient value. That value is usually `None` when no correlation ID was
+set before the request, but nested or already-populated contexts can restore a
+non-`None` value. Response header echoing still follows the
+`echo_header_in_response` setting.
 
 ### Header retrieval and trusted source behaviour
 

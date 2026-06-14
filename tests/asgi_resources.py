@@ -10,6 +10,8 @@ from falcon_correlate import correlation_id_var
 if typ.TYPE_CHECKING:
     import falcon.asgi
 
+_NON_POSITIVE_EXPECTED_REQUESTS_ERROR = "expected_requests must be positive"
+
 
 class ASGICorrelationEchoResource:
     """Falcon ASGI resource that echoes correlation state for tests.
@@ -78,6 +80,8 @@ class ASGIInterleavedCorrelationResource:
 
     def __init__(self, *, expected_requests: int) -> None:
         """Initialise the request barrier for the expected concurrency level."""
+        if expected_requests <= 0:
+            raise ValueError(_NON_POSITIVE_EXPECTED_REQUESTS_ERROR)
         self._expected_requests = expected_requests
         self._arrived_requests = 0
         self._all_requests_arrived = asyncio.Event()

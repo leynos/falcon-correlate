@@ -19,6 +19,11 @@ from tests.asgi_resources import (
 class TestCorrelationIDMiddlewareASGIFalconIntegration:
     """Tests for ASGI middleware in a real Falcon ASGI application."""
 
+    def test_interleaved_resource_rejects_non_positive_request_count(self) -> None:
+        """Verify barrier misconfiguration fails during construction."""
+        with pytest.raises(ValueError, match="expected_requests must be positive"):
+            ASGIInterleavedCorrelationResource(expected_requests=0)
+
     def test_falcon_asgi_app_exposes_and_echoes_correlation_id(self) -> None:
         """Verify a Falcon ASGI app observes and echoes the same ID."""
         app = falcon.asgi.App(
