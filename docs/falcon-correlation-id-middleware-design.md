@@ -519,20 +519,18 @@ messages.[^1]
 If the application uses `structlog` for structured logging, integrating context
 variables is often more straightforward.[^18] `structlog` provides processors
 like `structlog.contextvars.merge_contextvars()` which can be added to the
-processor chain.[^18] This processor automatically merges any data bound using
-`structlog.contextvars.bind_contextvars()` (or compatible `contextvars` set
-elsewhere) into the log event dictionary.
+processor chain.[^18] This processor only merges values bound via
+`structlog.contextvars.bind_contextvars()`. A custom processor or bridging
+middleware is still required to expose `correlation_id_var` and `user_id_var` to
+`structlog` event dictionaries.
 
 For applications already employing or considering `structlog`, this approach
-offers a more elegant and powerful way to include contextual data compared to
-standard `logging` filters and manual format string manipulation. It aligns
-well with `structlog`'s philosophy of structured, context-rich logging and can
-simplify the overall logging setup. This should be presented as an advanced or
-alternative option for users seeking sophisticated logging capabilities. Using
-`structlog` would typically involve configuring it at application startup, and
-then `contextvars` set by the middleware (like `correlation_id_var` and
-`user_id_var`) would be automatically picked up if `merge_contextvars` is in
-the processor chain.
+offers a structured way to include contextual data while keeping `structlog` as
+user-side configuration rather than a runtime dependency of this library.
+Applications should either configure a custom processor that reads
+`correlation_id_var` and `user_id_var` directly, or add bridging middleware
+that binds those values with `structlog.contextvars.bind_contextvars()` before
+`merge_contextvars()` runs.
 
 ### 3.5. Downstream propagation strategies
 
