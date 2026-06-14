@@ -207,6 +207,18 @@ record the conflict in `Decision Log`, and ask for direction.
 - [x] Implement the approved milestones.
 - [x] Run all required gates and CodeRabbit reviews.
 - [x] Mark roadmap item 5.1.2 done after the feature is complete.
+- [x] (2026-06-14T00:00:00+02:00) Addressed post-rebase review follow-ups
+  using Wyvern verification and Scribe documentation review. Changes re-arm
+  the reusable ASGI overlap barrier between request waves, enforce the BDD
+  step preconditions for two distinct concurrent request IDs, move the ASGI
+  property test under `tests/property/`, expand ASGI property/helper module
+  docstrings, and align design documentation for Celery `Task` hooks and
+  `ContextualLogFilter` ownership.
+- [x] (2026-06-14T00:00:00+02:00) Validation exposed an existing CIDR parsing
+  edge case where a malformed string containing `has host bits set` was
+  reported as a CIDR host-bit failure. The parser now reserves the host-bit
+  message for slash-containing CIDR inputs and keeps unrelated malformed
+  strings on the generic invalid-IP/CIDR path.
 
 ## Surprises & Discoveries
 

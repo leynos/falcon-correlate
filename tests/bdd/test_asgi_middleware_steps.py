@@ -145,6 +145,10 @@ def given_interleaved_asgi_correlation_resource(
     path: str,
 ) -> None:
     """Add a correlation resource that waits for concurrent ASGI requests."""
+    assert request_count == 2, (
+        "the concurrent ASGI step launches exactly two requests; "
+        f"got request_count={request_count}"
+    )
     context["app"].add_route(
         path,
         ASGIInterleavedCorrelationResource(expected_requests=request_count),
@@ -184,6 +188,9 @@ def when_make_concurrent_asgi_get_requests(
     second_id: str,
 ) -> None:
     """Make concurrent ASGI requests with distinct correlation IDs."""
+    assert first_id != second_id, (
+        "concurrent ASGI isolation scenarios require distinct correlation IDs"
+    )
 
     async def _request(
         conductor: falcon.testing.ASGIConductor,

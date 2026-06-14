@@ -1,4 +1,10 @@
-"""Property tests for Falcon ASGI middleware context invariants."""
+"""Property tests for Falcon ASGI middleware context invariants.
+
+These properties vary concurrent ASGI task counts with Hypothesis and exercise
+the shared ASGI middleware test doubles.  They verify that each task observes
+its own correlation ID before and after event-loop overlap, and that
+``correlation_id_var`` is restored after each simulated request completes.
+"""
 
 from __future__ import annotations
 

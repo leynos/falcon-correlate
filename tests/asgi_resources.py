@@ -108,3 +108,8 @@ class ASGIInterleavedCorrelationResource:
             "contextvar_correlation_id": contextvar_before_wait,
             "contextvar_correlation_id_after_wait": correlation_id_var.get(),
         }
+
+        async with self._lock:
+            self._arrived_requests -= 1
+            if self._arrived_requests == 0:
+                self._all_requests_arrived.clear()

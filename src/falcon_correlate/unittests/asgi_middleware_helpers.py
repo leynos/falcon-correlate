@@ -1,4 +1,11 @@
-"""Shared helpers for Falcon ASGI middleware unit tests."""
+"""Shared ASGI middleware test utilities.
+
+The lightweight request and response doubles in this module let unit and
+property tests invoke ``CorrelationIDMiddlewareASGI`` hooks directly without a
+Falcon ASGI application.  The async wrappers keep tests focused on middleware
+lifecycle behaviour while the doubles model only the request context, header
+lookup, and response-header mutation surface used by the middleware.
+"""
 
 from __future__ import annotations
 

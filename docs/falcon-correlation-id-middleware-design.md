@@ -658,12 +658,11 @@ into the task publishing mechanism.
 ##### 3.5.2.3. Method 2: Custom Celery `Task` base class
 
 Alternatively, a custom base class inheriting from `celery.Task` can be created.
-[^27] This base class can override methods like `apply_async` or `send_task`
-to automatically retrieve the correlation ID from `contextvars` and inject it
-into the task options (specifically `correlation_id=cid`) before calling the
-superclass method. All application tasks would then inherit from this custom
-base class. This encapsulates the behaviour but requires modifying task
-definitions.
+[^27] This base class can override `apply_async` to retrieve the correlation ID
+from `contextvars` and inject it into the task options (specifically
+`correlation_id=cid`) before calling the superclass method. All application
+tasks would then inherit from this custom base class. This encapsulates the
+behaviour but requires modifying task definitions.
 
 ##### 3.5.2.4. Accessing correlation ID within the Celery task worker
 
@@ -1173,9 +1172,11 @@ applies only to incoming IDs from external sources.
 
 #### 4.6.8. ContextualLogFilter implementation
 
-The `ContextualLogFilter` class is defined in `middleware.py`, co-located with
-the context variables it reads (`correlation_id_var` and `user_id_var`). This
-follows the project's convention of grouping by feature rather than layer.
+The `ContextualLogFilter` class is defined in `middleware_utils.py`, alongside
+the context variables it reads (`correlation_id_var` and `user_id_var`), and is
+re-exported through `middleware.py` and the package root for user-facing import
+paths. This follows the project's convention of grouping by feature rather than
+layer while keeping utility ownership separate from middleware hook classes.
 
 The filter uses `"-"` as the placeholder string when a context variable is not
 set (i.e. its value is `None`). This is safer than forwarding `None`, which
