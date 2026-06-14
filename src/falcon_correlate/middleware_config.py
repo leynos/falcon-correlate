@@ -175,6 +175,45 @@ class CorrelationIDConfig:
             msg = "validator must be callable"
             raise TypeError(msg)
 
+    @staticmethod
+    def _normalise_trusted_sources(
+        trusted_sources: cabc.Iterable[str] | None,
+    ) -> frozenset[str]:
+        """Normalise optional trusted sources into an immutable set.
+
+        Parameters
+        ----------
+        trusted_sources : Iterable[str] | None
+            Trusted-source strings supplied to the public factory.
+
+        Returns
+        -------
+        frozenset[str]
+            The frozen trusted-source collection.
+
+        Raises
+        ------
+        TypeError
+            If ``trusted_sources`` is a bare string rather than an iterable of
+            source strings.
+
+        """
+        if trusted_sources is None:
+            return frozenset()
+        if isinstance(trusted_sources, str):
+            msg = "trusted_sources must be an iterable of strings, not a str"
+            raise TypeError(msg)
+        return frozenset(trusted_sources)
+
+    @staticmethod
+    def _resolve_generator(
+        generator: cabc.Callable[[], str] | None,
+    ) -> cabc.Callable[[], str]:
+        """Return the configured generator or the default UUIDv7 generator."""
+        if generator is None:
+            return default_uuid7_generator
+        return generator
+
     # @CodeScene(disable:"Excess Number of Function Arguments")
     @classmethod
     # pylint: disable-next=too-many-arguments  # from_kwargs mirrors middleware constructor compatibility. FIXME: https://github.com/leynos/falcon-correlate/issues/36
@@ -211,18 +250,10 @@ class CorrelationIDConfig:
             A new configuration instance.
 
         """
-        if trusted_sources is None:
-            frozen_trusted_sources = frozenset()
-        elif isinstance(trusted_sources, str):
-            msg = "trusted_sources must be an iterable of strings, not a str"
-            raise TypeError(msg)
-        else:
-            frozen_trusted_sources = frozenset(trusted_sources)
-
         return cls(
             header_name=header_name,
-            trusted_sources=frozen_trusted_sources,
-            generator=generator if generator is not None else default_uuid7_generator,
+            trusted_sources=cls._normalise_trusted_sources(trusted_sources),
+            generator=cls._resolve_generator(generator),
             validator=validator,
             echo_header_in_response=echo_header_in_response,
         )
