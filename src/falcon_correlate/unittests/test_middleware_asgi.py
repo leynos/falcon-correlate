@@ -174,6 +174,7 @@ class TestCorrelationIDMiddlewareASGIRequestLifecycle:
         """Verify validator exceptions reject incoming ASGI correlation IDs."""
 
         def rejecting_validator(_value: str) -> bool:
+            """Reject the supplied correlation ID for the test."""
             msg = "validator failed"
             raise RuntimeError(msg)
 
@@ -281,6 +282,7 @@ class TestCorrelationIDMiddlewareASGIRequestLifecycle:
         middleware = CorrelationIDMiddlewareASGI(generator=lambda: next(ids))
 
         async def run_request() -> tuple[str, str | None, str | None]:
+            """Run one ASGI request and capture its correlation ID."""
             req = _Request()
             resp = _Response()
 
