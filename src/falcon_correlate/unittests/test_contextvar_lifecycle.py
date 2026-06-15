@@ -116,6 +116,7 @@ class TestContextVariableLifecycle:
         middleware_factory, request_kwargs, expected_id = scenario
 
         def _inner() -> None:
+            """Exercise the request lifecycle inside an isolated context."""
             middleware = middleware_factory()
             req, resp = request_response_factory(**request_kwargs)
 
@@ -143,6 +144,7 @@ class TestContextVariableLifecycle:
         middleware = CorrelationIDMiddleware(trusted_sources=["127.0.0.1"])
 
         def _inner() -> None:
+            """Exercise the request lifecycle inside an isolated context."""
             req, resp = request_response_factory(correlation_id="trusted-id")
 
             middleware.process_request(req, resp)
@@ -172,6 +174,7 @@ class TestContextVariableLifecycle:
         middleware = CorrelationIDMiddleware()
 
         def _inner() -> None:
+            """Exercise the request lifecycle inside an isolated context."""
             req, resp = request_response_factory()
 
             middleware.process_response(
@@ -207,6 +210,7 @@ class TestContextVariableLifecycle:
         middleware = CorrelationIDMiddleware()
 
         def _inner() -> None:
+            """Exercise the request lifecycle inside an isolated context."""
             original_token = correlation_id_var.set("original-correlation-id")
             bad_token, cleanup = setup_bad_token()
             req, resp = request_response_factory()
@@ -242,7 +246,10 @@ class TestContextVariableLifecycle:
         barrier = threading.Barrier(2)
 
         def _worker(correlation_id: str) -> tuple[str | None, str | None, str | None]:
+            """Run one concurrent request scenario."""
+
             def _inner() -> tuple[str | None, str | None, str | None]:
+                """Exercise the request lifecycle inside an isolated context."""
                 req, resp = request_response_factory(correlation_id=correlation_id)
 
                 middleware.process_request(req, resp)

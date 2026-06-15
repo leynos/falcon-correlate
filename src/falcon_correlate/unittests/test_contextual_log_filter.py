@@ -108,6 +108,7 @@ class TestContextualLogFilterAttributeInjection:
         record = _make_log_record()
 
         def test_logic() -> None:
+            """Exercise the isolated logging scenario."""
             context_var.set(context_value)
             f.filter(record)
             actual = getattr(record, attr_name)
@@ -125,6 +126,7 @@ class TestContextualLogFilterAttributeInjection:
         record = _make_log_record()
 
         def test_logic() -> None:
+            """Exercise the isolated logging scenario."""
             correlation_id_var.set("both-cid")
             user_id_var.set("both-uid")
             f.filter(record)
@@ -161,6 +163,7 @@ class TestContextualLogFilterPlaceholder:
         record = _make_log_record()
 
         def test_logic() -> None:
+            """Exercise the isolated logging scenario."""
             f.filter(record)
             for attr in check_attrs:
                 actual = getattr(record, attr)
@@ -189,6 +192,7 @@ class TestContextualLogFilterPlaceholder:
         record = _make_log_record()
 
         def test_logic() -> None:
+            """Exercise the isolated logging scenario."""
             if set_correlation:
                 correlation_id_var.set(None)
             if set_user:
@@ -223,6 +227,7 @@ class TestContextualLogFilterReturnValue:
         record = _make_log_record()
 
         def test_logic() -> None:
+            """Exercise the isolated logging scenario."""
             if populated:
                 correlation_id_var.set("cid")
                 user_id_var.set("uid")
@@ -265,6 +270,7 @@ class TestContextualLogFilterPreservesExistingAttributes:
         setattr(record, preservation_case.attr_name, preservation_case.existing_value)
 
         def test_logic() -> None:
+            """Exercise the isolated logging scenario."""
             preservation_case.context_var.set(preservation_case.contextvar_value)
             f.filter(record)
             actual = getattr(record, preservation_case.attr_name)
@@ -285,6 +291,7 @@ class TestContextualLogFilterPreservesExistingAttributes:
         record.user_id = "explicit-uid"
 
         def test_logic() -> None:
+            """Exercise the isolated logging scenario."""
             f.filter(record)
             rec = typ.cast("_HasContextIDs", record)
             assert rec.correlation_id == "explicit-cid", (
@@ -305,6 +312,7 @@ class TestContextualLogFilterPreservesExistingAttributes:
         record.correlation_id = "caller-cid"
 
         def test_logic() -> None:
+            """Exercise the isolated logging scenario."""
             user_id_var.set("contextvar-uid")
             f.filter(record)
             rec = typ.cast("_HasContextIDs", record)
@@ -332,6 +340,7 @@ class TestContextualLogFilterLoggingIntegration:
         )
 
         def test_logic() -> None:
+            """Exercise the isolated logging scenario."""
             correlation_id_var.set("log-cid-001")
             user_id_var.set("log-uid-001")
             test_logger.info("hello from test")
@@ -393,6 +402,7 @@ class TestContextualLogFilterLoggingIntegration:
         try:
 
             def test_logic() -> None:
+                """Exercise the isolated logging scenario."""
                 correlation_id_var.set("dictcfg-cid")
                 user_id_var.set("dictcfg-uid")
                 test_logger.info("dictconfig test")
@@ -421,6 +431,7 @@ class TestContextualLogFilterLoggingIntegration:
         )
 
         def test_logic() -> None:
+            """Exercise the isolated logging scenario."""
             correlation_id_var.set("contextvar-cid")
             user_id_var.set("contextvar-uid")
             test_logger.info(
@@ -509,6 +520,7 @@ class TestRecommendedLogFormat:
         try:
 
             def test_logic() -> None:
+                """Exercise the isolated logging scenario."""
                 correlation_id_var.set("rec-cid-001")
                 user_id_var.set("rec-uid-001")
                 test_logger.info("recommended format test")
@@ -575,6 +587,7 @@ class TestRecommendedLogFormat:
         try:
 
             def test_logic() -> None:
+                """Exercise the isolated logging scenario."""
                 correlation_id_var.set("recdcfg-cid")
                 user_id_var.set("recdcfg-uid")
                 test_logger.info("recommended dictconfig test")

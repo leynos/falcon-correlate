@@ -135,6 +135,7 @@ class TestReqContextIntegration:
         middleware_factory, request_kwargs, expected_id = scenario
 
         def _inner() -> None:
+            """Exercise the request lifecycle inside an isolated context."""
             middleware = middleware_factory()
             req, resp = request_response_factory(**request_kwargs)
 
@@ -188,6 +189,7 @@ class TestReqContextIntegration:
         """
 
         def _inner() -> tuple[str | None, str | None, str | None, bool, bool]:
+            """Exercise the request lifecycle inside an isolated context."""
             req, resp = request_response_factory(
                 correlation_id=correlation_id,
             )

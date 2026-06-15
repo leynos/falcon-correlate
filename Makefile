@@ -71,6 +71,7 @@ check-fmt: ruff ## Verify formatting
 
 lint: ruff ## Run linters
 	$(UV_ENV) $(UV) run ruff check
+	cd src && $(UV_ENV) $(UV) run interrogate --fail-under 100 falcon_correlate
 	$(PYLINT) $(PYLINT_TARGETS)
 
 typecheck: build ty ## Run typechecking

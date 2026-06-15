@@ -1,9 +1,8 @@
 # Integrate validation into request processing (2.3.2)
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
-proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -418,7 +417,7 @@ Behavioural acceptance:
 
 - A Falcon app configured with
   `CorrelationIDMiddleware(validator=default_uuid_validator, trusted_sources=["127.0.0.1"])`
-   that receives a request with header `X-Correlation-ID: not-a-uuid` from
+  that receives a request with header `X-Correlation-ID: not-a-uuid` from
   `127.0.0.1` will generate a new correlation ID (a UUIDv7 hex string) instead
   of accepting `not-a-uuid`.
 - The same app receiving a valid UUID from a trusted source will accept and
@@ -430,9 +429,9 @@ Behavioural acceptance:
 
 All steps are safe to re-run. If a test fails after implementation, adjust the
 implementation or tests and re-run `make test`. If formatting fails, run
-`make fmt` and rerun `make check-fmt`. The logger addition is idempotent
-(adding `logging.getLogger(__name__)` twice would be a code issue caught by
-linting, but the edit is a single insertion).
+`make fmt` and rerun `make check-fmt`. The logger addition is idempotent (adding
+`logging.getLogger(__name__)` twice would be a code issue caught by linting,
+but the edit is a single insertion).
 
 ## Artifacts and notes
 

@@ -231,6 +231,7 @@ class TestValidationWithValidatorRejecting:
         call_log: list[str] = []
 
         def tracking_validator(value: str) -> bool:
+            """Record the validator input and reject it."""
             call_log.append(value)
             return value.startswith("ok-")
 

@@ -64,6 +64,7 @@ class TestContextVariableOperations:
         var: contextvars.ContextVar[str | None] = getattr(falcon_correlate, var_name)
 
         def _inner() -> None:
+            """Exercise the request lifecycle inside an isolated context."""
             token = var.set(test_value)
             assert var.get() == test_value
             var.reset(token)
@@ -85,6 +86,7 @@ class TestContextVariableOperations:
         var: contextvars.ContextVar[str | None] = getattr(falcon_correlate, var_name)
 
         def _inner() -> None:
+            """Exercise the request lifecycle inside an isolated context."""
             token = var.set("temporary-value")
             var.reset(token)
             assert var.get() is None

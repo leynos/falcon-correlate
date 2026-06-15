@@ -82,6 +82,7 @@ class TestCorrelationIDResponseHeader:
         )
 
         def _inner() -> None:
+            """Exercise the request lifecycle inside an isolated context."""
             req, resp = request_response_factory(**scenario.request_kwargs)
 
             middleware.process_request(req, resp)

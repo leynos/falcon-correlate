@@ -40,6 +40,7 @@ def test_setup_handler_exposes_task_request_correlation_id(
     task = _build_task(correlation_id="worker-correlation-id")
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         setup_correlation_id_in_worker(task=task)
 
         stored_tokens = _celery_context_tokens.get(None)
@@ -57,6 +58,7 @@ def test_setup_handler_is_noop_without_task_request_correlation_id(
     task = _build_task(correlation_id=None)
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         setup_correlation_id_in_worker(task=task)
 
         assert correlation_id_var.get() is None
@@ -72,6 +74,7 @@ def test_clear_handler_resets_context_to_previous_value(
     task = _build_task(correlation_id="worker-correlation-id")
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         correlation_id_var.set("ambient-correlation-id")
         setup_correlation_id_in_worker(task=task)
 
@@ -91,6 +94,7 @@ def test_nested_worker_cleanup_restores_outer_then_ambient_context(
     inner_task = _build_task(correlation_id="inner-worker-correlation-id")
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         correlation_id_var.set("ambient-correlation-id")
         setup_correlation_id_in_worker(task=outer_task)
         setup_correlation_id_in_worker(task=inner_task)
@@ -118,6 +122,7 @@ def test_clear_handler_is_noop_without_stored_token(
     """Worker cleanup should tolerate missing setup state."""
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         clear_correlation_id_in_worker(task=_build_task())
 
         assert correlation_id_var.get() is None

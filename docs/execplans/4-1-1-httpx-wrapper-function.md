@@ -1,9 +1,8 @@
 # Implement httpx wrapper function (4.1.1)
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
-proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -130,8 +129,8 @@ Success is observable when:
   `from unittest.mock import ...` (direct submodule imports), but
   `from unittest import mock` is fine because it imports from `unittest`, not
   from `unittest.mock`. The existing test files
-  (`test_validation_integration.py`, `test_generator_invocation.py`) already
-  use `from unittest import mock`. Impact: used the `from unittest import mock`
+  (`test_validation_integration.py`, `test_generator_invocation.py`) already use
+  `from unittest import mock`. Impact: used the `from unittest import mock`
   pattern in all new test files.
 
 - Observation: ruff PLR2004 (magic value in comparison) triggered on

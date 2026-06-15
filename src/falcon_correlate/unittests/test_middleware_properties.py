@@ -42,6 +42,7 @@ class _PropertyResponse:
     """Small response double with optional header mutation failure."""
 
     def __init__(self, *, should_fail: bool = False) -> None:
+        """Initialise the test double."""
         self.headers: dict[str, str] = {}
         self.should_fail = should_fail
 
@@ -83,6 +84,7 @@ def _validator_for(mode: str) -> cabc.Callable[[str], bool] | None:
         return lambda _value: False
 
     def _raise(_value: str) -> bool:
+        """Raise the configured validation exception."""
         msg = "validator failed"
         raise RuntimeError(msg)
 
@@ -181,6 +183,7 @@ def test_process_response_cleanup_property(
     expected_id = correlation_id.strip() or "unused-generated-id"
 
     def _inner() -> None:
+        """Exercise the request lifecycle inside an isolated context."""
         response = typ.cast("falcon.Response", resp)
         middleware.process_request(req, response)
         if should_fail:
@@ -227,7 +230,10 @@ def test_concurrent_context_isolation_property(
     barrier = threading.Barrier(task_count)
 
     def _worker(index: int) -> tuple[str | None, str | None, str | None]:
+        """Run one concurrent request scenario."""
+
         def _inner() -> tuple[str | None, str | None, str | None]:
+            """Exercise the request lifecycle inside an isolated context."""
             correlation_id = f"cid-{index}"
             req, resp = request_response_factory(correlation_id=correlation_id)
             middleware.process_request(req, resp)

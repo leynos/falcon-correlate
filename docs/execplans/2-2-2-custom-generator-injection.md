@@ -1,9 +1,8 @@
 # Support custom generator injection (2.2.2)
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
-proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -89,9 +88,9 @@ when:
 
 The custom generator injection feature is now complete. The configured
 generator is called in `process_request()` whenever an incoming correlation ID
-is not accepted (missing header, empty header, or untrusted source). The
-default `default_uuid7_generator` is used as a fallback when no custom
-generator is provided.
+is not accepted (missing header, empty header, or untrusted source). The default
+`default_uuid7_generator` is used as a fallback when no custom generator is
+provided.
 
 Key files modified:
 
@@ -134,8 +133,8 @@ generator is called when the header is missing or the source is untrusted, and
 that custom generator output is used as the correlation ID. Add BDD scenarios
 that exercise generator behaviour end-to-end.
 
-Stage B implements the generator integration. Modify `process_request()` to
-call `self._config.generator()` in the else branch when the incoming ID is not
+Stage B implements the generator integration. Modify `process_request()` to call
+`self._config.generator()` in the else branch when the incoming ID is not
 accepted. This is a minimal change to the existing conditional logic.
 
 Stage C updates documentation. Revise `docs/users-guide.md` to reflect that

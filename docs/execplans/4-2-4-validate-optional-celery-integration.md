@@ -1,9 +1,8 @@
 # Validate optional Celery integration (4.2.4)
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -683,16 +682,20 @@ Validation evidence appended during implementation:
   selected test set.
 - After adding a generated sentinel test to the child process, the same direct
   command reported `2 passed in 14.09s`.
-- `uv run pytest -v
-  src/falcon_correlate/unittests/test_celery_publish_signal.py
-  src/falcon_correlate/unittests/test_celery_worker_signal.py
-  src/falcon_correlate/unittests/test_celery_configuration.py
-  tests/bdd/test_celery_publish_signal_steps.py
-  tests/bdd/test_celery_worker_signal_steps.py
-  tests/bdd/test_celery_configuration_steps.py` reported `33 passed in 0.23s`.
-- `uv run pytest -v
-  src/falcon_correlate/unittests/test_optional_celery_dependency.py` reported `2
-   passed in 5.71s`.
+- This command reported `33 passed in 0.23s`:
+
+  ```bash
+  uv run pytest -v \
+    src/falcon_correlate/unittests/test_celery_publish_signal.py \
+    src/falcon_correlate/unittests/test_celery_worker_signal.py \
+    src/falcon_correlate/unittests/test_celery_configuration.py \
+    tests/bdd/test_celery_publish_signal_steps.py \
+    tests/bdd/test_celery_worker_signal_steps.py \
+    tests/bdd/test_celery_configuration_steps.py
+  ```
+
+- `uv run pytest -v src/falcon_correlate/unittests/test_optional_celery_dependency.py`
+  reported `2 passed in 5.71s`.
 - `make fmt` passed after wrapping one long ExecPlan evidence line and moving
   one Python-only type annotation import behind `TYPE_CHECKING`.
 - `make check-fmt` reported `50 files already formatted`.
@@ -703,7 +706,7 @@ Validation evidence appended during implementation:
 - `make nixie` reported `All diagrams validated successfully!`.
 - Follow-up validation after review changes:
   `uv run pytest -v src/falcon_correlate/unittests/test_optional_celery_dependency.py`
-   reported `7 passed in 6.43s`.
+  reported `7 passed in 6.43s`.
 - Follow-up `make check-fmt` reported `50 files already formatted`.
 - Follow-up `make typecheck` reported `All checks passed!`.
 - Follow-up `make lint` reported `All checks passed!`.
@@ -712,7 +715,7 @@ Validation evidence appended during implementation:
 - Follow-up `make nixie` reported `All diagrams validated successfully!`.
 - Review-comment validation:
   `uv run pytest -v src/falcon_correlate/unittests/test_optional_celery_dependency.py`
-   reported `10 passed in 6.89s`.
+  reported `10 passed in 6.89s`.
 - Review-comment `make check-fmt` reported `50 files already formatted`.
 - Review-comment `make typecheck` reported `All checks passed!`.
 - Review-comment `make lint` reported `All checks passed!`.
@@ -721,7 +724,7 @@ Validation evidence appended during implementation:
 - Review-comment `make nixie` reported `All diagrams validated successfully!`.
 - Explicit child-CWD validation:
   `uv run pytest -v src/falcon_correlate/unittests/test_optional_celery_dependency.py`
-   reported `10 passed in 7.20s`.
+  reported `10 passed in 7.20s`.
 - Explicit child-CWD `make check-fmt` reported `50 files already formatted`.
 - Explicit child-CWD `make typecheck` reported `All checks passed!`.
 - Explicit child-CWD `make lint` reported `All checks passed!`.

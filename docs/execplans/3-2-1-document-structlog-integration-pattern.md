@@ -1,9 +1,8 @@
 # Document structlog integration pattern (3.2.1 + 3.2.2)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -12,8 +11,8 @@ Status: COMPLETE
 The `falcon-correlate` middleware stores correlation IDs and user IDs in
 `contextvars.ContextVar` instances (`correlation_id_var` and `user_id_var`).
 Users of the standard library `logging` module already have
-`ContextualLogFilter` to inject these values into log records. However, users
-of `structlog` — a popular structured logging library — have no guidance on how
+`ContextualLogFilter` to inject these values into log records. However, users of
+`structlog` — a popular structured logging library — have no guidance on how
 to include these values in structured log output.
 
 Task 3.2.1 fills this documentation gap by explaining how `structlog`'s
@@ -110,9 +109,9 @@ After this change:
 - Observation: `structlog.contextvars.merge_contextvars()` does NOT
   automatically pick up arbitrary `ContextVar` instances. It only reads
   `ContextVar` instances whose `.name` starts with the prefix `"structlog_"`,
-  which are created by `structlog.contextvars.bind_contextvars()`. The
-  library's `correlation_id_var` (name `"correlation_id"`) and `user_id_var`
-  (name `"user_id"`) are invisible to it. Evidence: structlog source code; the
+  which are created by `structlog.contextvars.bind_contextvars()`. The library's
+  `correlation_id_var` (name `"correlation_id"`) and `user_id_var` (name
+  `"user_id"`) are invisible to it. Evidence: structlog source code; the
   processor iterates over the current context and filters by name prefix.
   Impact: The design document section 3.4.3 states that context variables set
   by the middleware "would be automatically picked up if `merge_contextvars` is

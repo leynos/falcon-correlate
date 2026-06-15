@@ -72,6 +72,7 @@ class TestCorrelationIDMiddlewareConfiguration:
         """Verify custom generator is stored."""
 
         def custom_gen() -> str:
+            """Generate a custom correlation ID for the test."""
             return "custom-id"
 
         middleware = CorrelationIDMiddleware(generator=custom_gen)
@@ -81,6 +82,7 @@ class TestCorrelationIDMiddlewareConfiguration:
         """Verify custom validator is stored."""
 
         def custom_validator(value: str) -> bool:
+            """Validate the candidate correlation ID for the test."""
             return len(value) > 0
 
         middleware = CorrelationIDMiddleware(validator=custom_validator)
@@ -177,9 +179,11 @@ class TestCorrelationIDMiddlewareConfiguration:
         """Verify all parameters can be set together."""
 
         def gen() -> str:
+            """Generate a custom correlation ID for the test."""
             return "id"
 
         def val(s: str) -> bool:
+            """Validate the candidate correlation ID for the test."""
             return True
 
         middleware = CorrelationIDMiddleware(

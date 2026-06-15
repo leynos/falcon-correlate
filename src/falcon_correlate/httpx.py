@@ -23,20 +23,60 @@ if typ.TYPE_CHECKING:
     import httpx
 
     class _SupportsSyncExit(typ.Protocol):
+        """Protocol for synchronous transport context manager exits."""
+
         def __exit__(
             self,
             exc_type: type[BaseException] | None = None,
             exc_value: BaseException | None = None,
             traceback: TracebackType | None = None,
-        ) -> object: ...
+        ) -> object:
+            """Exit the transport context manager.
+
+            Parameters
+            ----------
+            exc_type : type[BaseException] | None
+                The exception type, if any.
+            exc_value : BaseException | None
+                The exception instance, if any.
+            traceback : TracebackType | None
+                The traceback for the exception, if any.
+
+            Returns
+            -------
+            object
+                A protocol-level return value passed through to callers.
+
+            """
+            ...
 
     class _SupportsAsyncExit(typ.Protocol):
+        """Protocol for asynchronous transport context manager exits."""
+
         async def __aexit__(
             self,
             exc_type: type[BaseException] | None = None,
             exc_value: BaseException | None = None,
             traceback: TracebackType | None = None,
-        ) -> object: ...
+        ) -> object:
+            """Exit the asynchronous transport context manager.
+
+            Parameters
+            ----------
+            exc_type : type[BaseException] | None
+                The exception type, if any.
+            exc_value : BaseException | None
+                The exception instance, if any.
+            traceback : TracebackType | None
+                The traceback for the exception, if any.
+
+            Returns
+            -------
+            object
+                A protocol-level return value passed through to callers.
+
+            """
+            ...
 
     _ExitArgs = tuple[
         type[BaseException] | None,

@@ -81,8 +81,8 @@ generation and repeated execution. Keep this suite focused on behavioural
 properties that benefit from broad input coverage rather than example-specific
 cases.
 
-Shared fixtures for the property suite live in `tests/property/conftest.py`.
-The `isolated_context` fixture runs each generated example inside
+Shared fixtures for the property suite live in `tests/property/conftest.py`. The
+`isolated_context` fixture runs each generated example inside
 `contextvars.copy_context().run()` so `ContextVar` state does not leak between
 examples. Use it whenever a property test mutates request-scoped context.
 
@@ -99,7 +99,7 @@ Follow the existing pattern in `tests/property/test_header_injection.py`:
 
 The two-tier linting work described in
 [ADR-001: two-tier linting with Ruff and PyPy-backed Pylint](adr-001-two-tier-linting.md)
- is complete. Keep future linting changes aligned with that ADR unless a new
+is complete. Keep future linting changes aligned with that ADR unless a new
 ADR supersedes it.
 
 ## Running lint checks
@@ -189,7 +189,7 @@ including Pyflakes (`F`), pycodestyle (`E`, `W`), import ordering (`I`),
 pyupgrade (`UP`), comprehensions (`C4`), type-checking imports (`TC`), pathlib
 usage (`PTH`), security (`S`), boolean traps (`FBT`), naming (`N`),
 flake8-bugbear (`B`), Ruff-native rules (`RUF`), logging (`LOG`), pytest style (
- `PT`), exceptions (`TRY`), docstrings (`D`), annotations (`ANN`), McCabe
+`PT`), exceptions (`TRY`), docstrings (`D`), annotations (`ANN`), McCabe
 complexity (`C90`), and selected Pylint-compatible rules (`PLR`, `PLE`, and
 `PLW`).
 

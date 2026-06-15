@@ -65,6 +65,7 @@ def _configure_structlog_with_capture(
         method_name: str,
         event_dict: dict[str, object],
     ) -> dict[str, object]:
+        """Capture a structlog event for later assertions."""
         captured.append(dict(event_dict))
         raise structlog.DropEvent
 
@@ -101,6 +102,7 @@ def _run_isolated_structlog_test(
     captured: list[dict[str, object]] = []
 
     def test_logic() -> None:
+        """Exercise the isolated logging scenario."""
         setup_and_log(captured)
 
     isolated_context(test_logic)
@@ -126,6 +128,7 @@ class TestMergeContextvarsLimitation:
         def setup_and_log(
             captured: list[dict[str, object]],
         ) -> None:
+            """Configure structlog state and emit a test event."""
             correlation_id_var.set("should-not-appear")
             _configure_structlog_with_capture(captured)
             structlog.get_logger().info("test")
@@ -147,6 +150,7 @@ class TestMergeContextvarsLimitation:
         def setup_and_log(
             captured: list[dict[str, object]],
         ) -> None:
+            """Configure structlog state and emit a test event."""
             user_id_var.set("should-not-appear")
             _configure_structlog_with_capture(captured)
             structlog.get_logger().info("test")
@@ -176,6 +180,7 @@ class TestCustomProcessorApproach:
         def setup_and_log(
             captured: list[dict[str, object]],
         ) -> None:
+            """Configure structlog state and emit a test event."""
             correlation_id_var.set("proc-cid-001")
             user_id_var.set("proc-uid-001")
             _configure_structlog_with_capture(captured, include_custom_processor=True)
@@ -200,6 +205,7 @@ class TestCustomProcessorApproach:
         def setup_and_log(
             captured: list[dict[str, object]],
         ) -> None:
+            """Configure structlog state and emit a test event."""
             _configure_structlog_with_capture(captured, include_custom_processor=True)
             structlog.get_logger().info("test")
 
@@ -221,6 +227,7 @@ class TestCustomProcessorApproach:
         captured: list[dict[str, object]] = []
 
         def test_logic() -> None:
+            """Exercise the isolated logging scenario."""
             correlation_id_var.set("contextvar-value")
             structlog.contextvars.bind_contextvars(correlation_id="explicit-value")
             _configure_structlog_with_capture(captured, include_custom_processor=True)
@@ -252,6 +259,7 @@ class TestBindContextvarsApproach:
         captured: list[dict[str, object]] = []
 
         def test_logic() -> None:
+            """Exercise the isolated logging scenario."""
             correlation_id_var.set("bind-cid-001")
             user_id_var.set("bind-uid-001")
 
