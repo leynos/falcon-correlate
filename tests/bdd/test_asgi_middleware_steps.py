@@ -196,6 +196,7 @@ def when_make_concurrent_asgi_get_requests(
         conductor: falcon.testing.ASGIConductor,
         correlation_id: str,
     ) -> tuple[str, falcon.testing.Result, str | None]:
+        """Perform one ASGI request and capture post-response ambient state."""
         result = await conductor.simulate_get(
             path,
             headers={"X-Correlation-ID": correlation_id},
@@ -206,6 +207,7 @@ def when_make_concurrent_asgi_get_requests(
         dict[str, falcon.testing.Result],
         dict[str, str | None],
     ]:
+        """Run both concurrent ASGI requests through one conductor."""
         async with falcon.testing.ASGIConductor(context["app"]) as conductor:
             results = await asyncio.wait_for(
                 asyncio.gather(

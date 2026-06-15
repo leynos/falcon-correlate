@@ -37,6 +37,7 @@ class _Request:
         headers: dict[str, str] | None = None,
         remote_addr: str | None = "127.0.0.1",
     ) -> None:
+        """Create a request double with optional headers and remote address."""
         self.context = _Context()
         self.remote_addr = remote_addr
         self._headers = headers or {}
@@ -50,6 +51,7 @@ class _Response:
     """Minimal ASGI response double for middleware hook tests."""
 
     def __init__(self) -> None:
+        """Create an empty response-header store."""
         self.headers: dict[str, str] = {}
 
     def set_header(self, name: str, value: str) -> None:

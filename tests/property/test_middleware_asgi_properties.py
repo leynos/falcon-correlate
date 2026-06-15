@@ -35,12 +35,14 @@ def test_async_context_isolation_property(
     """Verify variable ASGI task counts keep correlation IDs isolated."""
 
     async def _exercise_concurrent_requests() -> None:
+        """Run one generated concurrent ASGI isolation scenario."""
         middleware = CorrelationIDMiddlewareASGI(trusted_sources=["127.0.0.1"])
         all_requests_started = asyncio.Event()
         ready_count = [0]
         ready_lock = asyncio.Lock()
 
         async def _run_request(index: int) -> tuple[str | None, ...]:
+            """Exercise one simulated ASGI request within the concurrent batch."""
             expected_id = f"cid-{index}"
             req = _Request(headers={"X-Correlation-ID": expected_id})
             resp = _Response()
