@@ -116,8 +116,8 @@ chronological ordering when sorted lexicographically.[^6] This time-sortable
 property is particularly beneficial for database indexing and querying logs
 based on time ranges, potentially improving performance for such operations.[^6]
 
-UUIDv7 offers precise timestamping, with the current draft RFC4122 specifying
-millisecond precision by default.[^6] This contrasts with UUIDv4, which is
+UUIDv7 offers precise timestamping, with RFC 9562 specifying millisecond
+precision by default.[^6] This contrasts with UUIDv4, which is
 entirely random and thus offers no inherent time ordering. UUIDv1 is time-based
 but has been criticised for potential privacy concerns due to the inclusion of
 the MAC address of the generating machine[^6], and UUIDv7 aims to provide
@@ -1143,7 +1143,7 @@ signature). This design choice:
 
 #### 4.6.2. Internal storage of trusted_sources
 
-The `trusted_sources` parameter accepts any `Sequence[str]` (list, tuple, set)
+The `trusted_sources` parameter accepts any `Iterable[str]` (list, tuple, set)
 but is stored internally as a `frozenset[str]`. This provides:
 
 - **Immutability**: Configuration cannot be accidentally modified after
@@ -1188,8 +1188,9 @@ or `IPv6Network` objects. This design choice:
 
 - **Validates early**: Invalid IP/CIDR formats raise `ValueError` at
   instantiation, providing immediate feedback rather than runtime errors.
-- **Optimizes lookups**: Pre-parsed network objects enable O(1) containment
-  checks at request time using `addr in network`.
+- **Optimizes lookups**: Pre-parsed network objects avoid reparsing
+  trusted-source entries on every request; overall matching still scales with
+  the number of configured networks.
 - **Enforces correctness**: Using `strict=True` ensures CIDR notations specify
   network addresses (e.g., `10.0.0.0/24`) rather than host addresses with
   subnet masks (e.g., `10.0.0.5/24`), preventing common configuration mistakes.
@@ -1309,9 +1310,9 @@ task's execution context, enabling consistent logging.
 - **Middleware order:** The `CorrelationIDMiddleware` should generally be
   placed early in the middleware stack, but potentially after any middleware
   that might modify `req.remote_addr` (e.g., a proxy fixup middleware if not
-  handled by the WSGI/ASGI server itself). It should ideally run before
+  handled by the WSGI/ASGI server itself). It should ideally run after
   authentication middleware if it needs to rely on the user ID set by auth, or
-  the auth middleware should set the user ID `contextvar` itself.
+  the auth middleware should set `user_id_var` itself.
 - **Trusted source configuration:** Diligently configure and maintain the list
   of `trusted_sources`. This is critical for security and the integrity of
   correlation IDs.
