@@ -116,8 +116,8 @@ chronological ordering when sorted lexicographically.[^6] This time-sortable
 property is particularly beneficial for database indexing and querying logs
 based on time ranges, potentially improving performance for such operations.[^6]
 
-UUIDv7 offers precise timestamping, with the current draft RFC4122 specifying
-millisecond precision by default.[^6] This contrasts with UUIDv4, which is
+UUIDv7 offers precise timestamping, with RFC 9562 specifying millisecond
+precision by default.[^6] This contrasts with UUIDv4, which is
 entirely random and thus offers no inherent time ordering. UUIDv1 is time-based
 but has been criticised for potential privacy concerns due to the inclusion of
 the MAC address of the generating machine[^6], and UUIDv7 aims to provide
@@ -198,14 +198,71 @@ these are not directly involved in per-request correlation ID handling.[^11]
 
 The implementation exposes WSGI and ASGI as separate public classes:
 `CorrelationIDMiddleware` for `falcon.App` and `CorrelationIDMiddlewareASGI` for
- `falcon.asgi.App`. Both classes share a private lifecycle base so the
+`falcon.asgi.App`. Both classes share a private lifecycle base so the
 configuration contract, incoming ID selection, response-header echoing, and
 `ContextVar` cleanup are implemented once. The ASGI class only adapts Falcon's
 middleware hook shape by defining `async process_request(self, req, resp)` and
 `async process_response(self, req, resp, resource, req_succeeded)`.
 
+The ASGI variant relies on the same module-level `correlation_id_var` as the
+WSGI variant. Each request stores the `contextvars.Token` returned by
+`correlation_id_var.set()` on `req.context._correlation_id_reset_token`.
+Response processing resets the variable with that token and clears the stored
+token. Unit property tests, Falcon ASGI integration tests, and BDD scenarios
+verify that concurrent async request tasks observe only their own correlation
+ID while running and that ambient context is clear after request completion.
+
+**Figure 2 screen reader caption:** Sequence diagram showing the ASGI
+concurrency test driver launching overlapping requests through an async
+conductor, `CorrelationIDMiddlewareASGI` setting a distinct `correlation_id_var`
+value per task, `ASGIInterleavedCorrelationResource` waiting at a shared
+barrier before reading each task's value again, and response processing
+resetting each stored token before the test driver verifies isolation and
+post-completion cleanup.
+
+```mermaid
+sequenceDiagram
+    participant TestDriver
+    participant AsyncConductor
+    participant CorrelationIDMiddlewareASGI
+    participant correlation_id_var
+    participant ASGIInterleavedCorrelationResource
+
+    rect rgba(70, 130, 180, 0.5)
+        TestDriver->>AsyncConductor: launch concurrent simulate_get(id1, id2, ...)
+    end
+
+    par Task 1
+        AsyncConductor->>CorrelationIDMiddlewareASGI: process_request(req, id1)
+        CorrelationIDMiddlewareASGI->>correlation_id_var: set(id1)
+        AsyncConductor->>ASGIInterleavedCorrelationResource: on_get - snapshot pre-barrier id1
+    and Task 2
+        AsyncConductor->>CorrelationIDMiddlewareASGI: process_request(req, id2)
+        CorrelationIDMiddlewareASGI->>correlation_id_var: set(id2)
+        AsyncConductor->>ASGIInterleavedCorrelationResource: on_get - snapshot pre-barrier id2
+    end
+
+    rect rgba(60, 179, 113, 0.5)
+        ASGIInterleavedCorrelationResource->>ASGIInterleavedCorrelationResource: await asyncio.Event
+        ASGIInterleavedCorrelationResource->>correlation_id_var: read post-barrier per task
+    end
+
+    par Task 1 Reset
+        AsyncConductor->>CorrelationIDMiddlewareASGI: process_response
+        CorrelationIDMiddlewareASGI->>correlation_id_var: reset(token1)
+    and Task 2 Reset
+        AsyncConductor->>CorrelationIDMiddlewareASGI: process_response
+        CorrelationIDMiddlewareASGI->>correlation_id_var: reset(token2)
+    end
+
+    rect rgba(178, 34, 34, 0.5)
+        TestDriver->>correlation_id_var: assert all isolation invariants
+        TestDriver->>correlation_id_var: assert ambient is None post-completion
+    end
+```
+
 Response processing writes the configured correlation header before cleanup when
- `echo_header_in_response` is enabled and a request ID is present. Cleanup then
+`echo_header_in_response` is enabled and a request ID is present. Cleanup then
 clears the stored reset token and resets `correlation_id_var` in a `finally`
 path, so request-local state is cleared even if response header mutation raises
 an exception.
@@ -228,8 +285,8 @@ Falcon middleware components are executed hierarchically. If multiple
 middleware components are registered, their `process_request` methods are
 called in order, followed by `process_resource` methods in the same order, then
 the resource responder, and finally `process_response` methods in reverse order.
-[^11] This execution model ensures that once the correlation ID middleware sets
-the ID in `process_request`, it becomes available to subsequent middleware
+[^11] This execution model ensures that once the correlation ID middleware
+sets the ID in `process_request`, it becomes available to subsequent middleware
 layers and the target resource handler.
 
 Falcon provides `req.context` and `resp.context` objects for passing
@@ -242,15 +299,15 @@ In `process_response`:
 1. The middleware can retrieve the correlation ID (e.g., from `req.context` or
    a more global context storage).
 2. Optionally, it can add this ID to the outgoing response headers (e.g.,
-   `X-Correlation-ID`), a feature seen in libraries like `asgi-correlation-id`.[
-   ^2]
+   `X-Correlation-ID`), a feature seen in libraries like
+   `asgi-correlation-id`.[^2]
 3. Perform any necessary cleanup, such as resetting context-local variables.
 
 **Figure 1 screen reader caption:** Sequence diagram showing a client request
 entering a Falcon application, the correlation middleware setting request
 context in `process_request`, the resource handling the request, and
-`process_response` optionally echoing the correlation ID header before resetting
-the stored context variable token.
+`process_response` optionally echoing the correlation ID header before
+resetting the stored context variable token.
 
 ```mermaid
 sequenceDiagram
@@ -291,7 +348,7 @@ feature of Falcon's middleware system.
 #### 3.2.1. Retrieval from `X-Correlation-ID` header
 
 Within the `process_request` method, the middleware will access `req.headers` (a
- `dict`-like object) to look for the configured correlation ID header,
+`dict`-like object) to look for the configured correlation ID header,
 defaulting to `X-Correlation-ID`. If the header is present and non-empty, its
 value will be considered as a candidate correlation ID.
 
@@ -379,7 +436,7 @@ validation if needed.
 To make the correlation ID (and other request-scoped data like the logged-in
 user ID) available throughout the application code during the processing of a
 single request, Python's `contextvars` module is the recommended mechanism.[^17]
- `contextvars` provide a way to manage context-local state that is correctly
+`contextvars` provide a way to manage context-local state that is correctly
 handled across threads and asynchronous tasks, which is essential for web
 applications.
 
@@ -503,28 +560,26 @@ LOG_FORMAT = (
 formatter = logging.Formatter(LOG_FORMAT)
 ```
 
-This will ensure that the correlation ID and user ID appear in the formatted
-log messages.[^1]
+This will ensure that the correlation ID and user ID appear in the formatted log
+messages.[^1]
 
 #### 3.4.3. (Optional) Considerations for `structlog`
 
 If the application uses `structlog` for structured logging, integrating context
 variables is often more straightforward.[^18] `structlog` provides processors
 like `structlog.contextvars.merge_contextvars()` which can be added to the
-processor chain.[^18] This processor automatically merges any data bound using
-`structlog.contextvars.bind_contextvars()` (or compatible `contextvars` set
-elsewhere) into the log event dictionary.
+processor chain.[^18] This processor only merges values bound via
+`structlog.contextvars.bind_contextvars()`. A custom processor or bridging
+middleware is still required to expose `correlation_id_var` and `user_id_var` to
+`structlog` event dictionaries.
 
 For applications already employing or considering `structlog`, this approach
-offers a more elegant and powerful way to include contextual data compared to
-standard `logging` filters and manual format string manipulation. It aligns
-well with `structlog`'s philosophy of structured, context-rich logging and can
-simplify the overall logging setup. This should be presented as an advanced or
-alternative option for users seeking sophisticated logging capabilities. Using
-`structlog` would typically involve configuring it at application startup, and
-then `contextvars` set by the middleware (like `correlation_id_var` and
-`user_id_var`) would be automatically picked up if `merge_contextvars` is in
-the processor chain.
+offers a structured way to include contextual data while keeping `structlog` as
+user-side configuration rather than a runtime dependency of this library.
+Applications should either configure a custom processor that reads
+`correlation_id_var` and `user_id_var` directly, or add bridging middleware
+that binds those values with `structlog.contextvars.bind_contextvars()` before
+`merge_contextvars()` runs.
 
 ### 3.5. Downstream propagation strategies
 
@@ -652,12 +707,11 @@ into the task publishing mechanism.
 ##### 3.5.2.3. Method 2: Custom Celery `Task` base class
 
 Alternatively, a custom base class inheriting from `celery.Task` can be created.
-[^27] This base class can override methods like `apply_async` or `send_task` to
-automatically retrieve the correlation ID from `contextvars` and inject it into
-the task options (specifically `correlation_id=cid`) before calling the
-superclass method. All application tasks would then inherit from this custom
-base class. This encapsulates the behaviour but requires modifying task
-definitions.
+[^27] This base class can override `apply_async` to retrieve the correlation ID
+from `contextvars` and inject it into the task options (specifically
+`correlation_id=cid`) before calling the superclass method. All application
+tasks would then inherit from this custom base class. This encapsulates the
+behaviour but requires modifying task definitions.
 
 ##### 3.5.2.4. Accessing correlation ID within the Celery task worker
 
@@ -1089,7 +1143,7 @@ signature). This design choice:
 
 #### 4.6.2. Internal storage of trusted_sources
 
-The `trusted_sources` parameter accepts any `Sequence[str]` (list, tuple, set)
+The `trusted_sources` parameter accepts any `Iterable[str]` (list, tuple, set)
 but is stored internally as a `frozenset[str]`. This provides:
 
 - **Immutability**: Configuration cannot be accidentally modified after
@@ -1103,7 +1157,7 @@ but is stored internally as a `frozenset[str]`. This provides:
 
 The `default_uuid7_generator` function uses the standard library `uuid.uuid7()`
 when available. If the runtime does not provide `uuid.uuid7()`, it falls back to
- `uuid_utils.uuid7()` so UUIDv7 generation remains available. The generator
+`uuid_utils.uuid7()` so UUIDv7 generation remains available. The generator
 returns the UUID hex string representation to keep correlation IDs compact and
 consistent. Custom generators remain supported via the `generator` parameter.
 
@@ -1134,8 +1188,9 @@ or `IPv6Network` objects. This design choice:
 
 - **Validates early**: Invalid IP/CIDR formats raise `ValueError` at
   instantiation, providing immediate feedback rather than runtime errors.
-- **Optimizes lookups**: Pre-parsed network objects enable O(1) containment
-  checks at request time using `addr in network`.
+- **Optimizes lookups**: Pre-parsed network objects avoid reparsing
+  trusted-source entries on every request; overall matching still scales with
+  the number of configured networks.
 - **Enforces correctness**: Using `strict=True` ensures CIDR notations specify
   network addresses (e.g., `10.0.0.0/24`) rather than host addresses with
   subnet masks (e.g., `10.0.0.5/24`), preventing common configuration mistakes.
@@ -1167,9 +1222,11 @@ applies only to incoming IDs from external sources.
 
 #### 4.6.8. ContextualLogFilter implementation
 
-The `ContextualLogFilter` class is defined in `middleware.py`, co-located with
-the context variables it reads (`correlation_id_var` and `user_id_var`). This
-follows the project's convention of grouping by feature rather than layer.
+The `ContextualLogFilter` class is defined in `middleware_utils.py`, alongside
+the context variables it reads (`correlation_id_var` and `user_id_var`), and is
+re-exported through `middleware.py` and the package root for user-facing import
+paths. This follows the project's convention of grouping by feature rather than
+layer while keeping utility ownership separate from middleware hook classes.
 
 The filter uses `"-"` as the placeholder string when a context variable is not
 set (i.e. its value is `None`). This is safer than forwarding `None`, which
@@ -1223,7 +1280,7 @@ middleware for the Falcon web framework. The proposed solution addresses the
 generation and retrieval of correlation IDs, their secure handling based on
 trusted sources, integration into logging systems using `contextvars` and
 `logging.Filter`, and strategies for propagation to downstream HTTP services via
- `httpx` and asynchronous Celery tasks.
+`httpx` and asynchronous Celery tasks.
 
 ### 5.1. Summary of the proposed design
 
@@ -1245,7 +1302,7 @@ methods, including client event hooks, custom transports, or wrapper functions,
 ensuring the correlation ID is passed in headers. For Celery, the
 `before_task_publish` signal is recommended to inject the ID into the task
 message's standard `correlation_id` field. On the worker side, `task_prerun` and
- `task_postrun` signals manage the lifecycle of the correlation ID within the
+`task_postrun` signals manage the lifecycle of the correlation ID within the
 task's execution context, enabling consistent logging.
 
 ### 5.2. Best practices for deployment and usage
@@ -1253,9 +1310,9 @@ task's execution context, enabling consistent logging.
 - **Middleware order:** The `CorrelationIDMiddleware` should generally be
   placed early in the middleware stack, but potentially after any middleware
   that might modify `req.remote_addr` (e.g., a proxy fixup middleware if not
-  handled by the WSGI/ASGI server itself). It should ideally run before
+  handled by the WSGI/ASGI server itself). It should ideally run after
   authentication middleware if it needs to rely on the user ID set by auth, or
-  the auth middleware should set the user ID `contextvar` itself.
+  the auth middleware should set `user_id_var` itself.
 - **Trusted source configuration:** Diligently configure and maintain the list
   of `trusted_sources`. This is critical for security and the integrity of
   correlation IDs.
@@ -1505,7 +1562,7 @@ is inaccurate: `structlog.contextvars.merge_contextvars()` only reads
 `ContextVar` instances whose internal name starts with the prefix
 `"structlog_"`, which is set by `structlog.contextvars.bind_contextvars()`. The
 library's `correlation_id_var` (name `"correlation_id"`) and `user_id_var` (name
- `"user_id"`) are not prefixed and are therefore invisible to
+`"user_id"`) are not prefixed and are therefore invisible to
 `merge_contextvars`.
 
 **Rationale:**

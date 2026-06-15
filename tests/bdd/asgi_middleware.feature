@@ -10,6 +10,7 @@ Feature: ASGI Correlation ID Middleware
     Then the ASGI response should complete successfully
     And the ASGI resource should observe correlation id "trusted-asgi"
     And the ASGI response header "X-Correlation-ID" should be "trusted-asgi"
+    And the ASGI ambient correlation ID context should be cleared
 
   Scenario: ASGI application rejects an untrusted incoming correlation ID
     Given a Falcon ASGI application with CorrelationIDMiddlewareASGI trusting "10.0.0.1" and generator "generated-asgi"
@@ -42,3 +43,12 @@ Feature: ASGI Correlation ID Middleware
     Then the ASGI response should complete successfully
     And the ASGI resource should observe correlation id "generated-asgi"
     And the ASGI response header "X-Correlation-ID" should be absent
+    And the ASGI ambient correlation ID context should be cleared
+
+  Scenario: Concurrent ASGI requests keep context variables isolated
+    Given a Falcon ASGI application with CorrelationIDMiddlewareASGI trusting "127.0.0.1"
+    And an interleaved ASGI correlation resource expecting 2 requests at "/correlation"
+    When I make concurrent ASGI GET requests to "/correlation" with correlation IDs "cid-a" and "cid-b"
+    Then each ASGI concurrent response should observe its own correlation id
+    And each ASGI concurrent response header should match its own correlation id
+    And the ASGI ambient correlation ID context should be cleared

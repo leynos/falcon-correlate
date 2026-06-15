@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import typing as typ
 
 from falcon_correlate import correlation_id_var
 
 if typ.TYPE_CHECKING:
     import falcon.asgi
+
+_NON_POSITIVE_EXPECTED_REQUESTS_ERROR = "expected_requests must be positive"
 
 
 class ASGICorrelationEchoResource:
@@ -70,3 +73,44 @@ class ASGICorrelationEchoResource:
             "context_correlation_id": req.context.correlation_id,
             "contextvar_correlation_id": correlation_id_var.get(),
         }
+
+
+class ASGIInterleavedCorrelationResource:
+    """Falcon ASGI resource that waits for concurrent requests to overlap."""
+
+    def __init__(self, *, expected_requests: int) -> None:
+        """Initialise the request barrier for the expected concurrency level."""
+        if expected_requests <= 0:
+            raise ValueError(_NON_POSITIVE_EXPECTED_REQUESTS_ERROR)
+        self._expected_requests = expected_requests
+        self._arrived_requests = 0
+        self._all_requests_arrived = asyncio.Event()
+        self._lock = asyncio.Lock()
+
+    async def on_get(
+        self,
+        req: falcon.asgi.Request,
+        resp: falcon.asgi.Response,
+    ) -> None:
+        """Return correlation state observed before and after request overlap."""
+        contextvar_before_wait = correlation_id_var.get()
+
+        async with self._lock:
+            self._arrived_requests += 1
+            if self._arrived_requests == self._expected_requests:
+                self._all_requests_arrived.set()
+
+        try:
+            await asyncio.wait_for(self._all_requests_arrived.wait(), timeout=2.0)
+            await asyncio.sleep(0)
+
+            resp.media = {
+                "context_correlation_id": req.context.correlation_id,
+                "contextvar_correlation_id": contextvar_before_wait,
+                "contextvar_correlation_id_after_wait": correlation_id_var.get(),
+            }
+        finally:
+            async with self._lock:
+                self._arrived_requests -= 1
+                if self._arrived_requests == 0:
+                    self._all_requests_arrived.clear()

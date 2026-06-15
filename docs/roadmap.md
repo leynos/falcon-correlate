@@ -193,11 +193,11 @@ Extend the middleware to support Falcon's ASGI mode.
         req_succeeded)`.
   - [x] Share configuration logic with WSGI variant.
   - [x] Test middleware functions in an ASGI application.
-- [ ] 5.1.2. Ensure context variable compatibility with async
-  - [ ] Verify `contextvars` behaviour in async context.
-  - [ ] Test with concurrent async requests.
-  - [ ] Test context isolation with concurrent async requests.
-  - [ ] Test cleanup on async request completion.
+- [x] 5.1.2. Ensure context variable compatibility with async
+  - [x] Verify `contextvars` behaviour in async context.
+  - [x] Test with concurrent async requests.
+  - [x] Test context isolation with concurrent async requests.
+  - [x] Test cleanup on async request completion.
 
 ## 6. Documentation and release
 
