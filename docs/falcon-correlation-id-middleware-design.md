@@ -212,6 +212,55 @@ token. Unit property tests, Falcon ASGI integration tests, and BDD scenarios
 verify that concurrent async request tasks observe only their own correlation
 ID while running and that ambient context is clear after request completion.
 
+**Figure 2 screen reader caption:** Sequence diagram showing the ASGI
+concurrency test driver launching overlapping requests through an async
+conductor, `CorrelationIDMiddlewareASGI` setting a distinct `correlation_id_var`
+value per task, `ASGIInterleavedCorrelationResource` waiting at a shared
+barrier before reading each task's value again, and response processing
+resetting each stored token before the test driver verifies isolation and
+post-completion cleanup.
+
+```mermaid
+sequenceDiagram
+    participant TestDriver
+    participant AsyncConductor
+    participant CorrelationIDMiddlewareASGI
+    participant correlation_id_var
+    participant ASGIInterleavedCorrelationResource
+
+    rect rgba(70, 130, 180, 0.5)
+        TestDriver->>AsyncConductor: launch concurrent simulate_get(id1, id2, ...)
+    end
+
+    par Task 1
+        AsyncConductor->>CorrelationIDMiddlewareASGI: process_request(req, id1)
+        CorrelationIDMiddlewareASGI->>correlation_id_var: set(id1)
+        AsyncConductor->>ASGIInterleavedCorrelationResource: on_get - snapshot pre-barrier id1
+    and Task 2
+        AsyncConductor->>CorrelationIDMiddlewareASGI: process_request(req, id2)
+        CorrelationIDMiddlewareASGI->>correlation_id_var: set(id2)
+        AsyncConductor->>ASGIInterleavedCorrelationResource: on_get - snapshot pre-barrier id2
+    end
+
+    rect rgba(60, 179, 113, 0.5)
+        ASGIInterleavedCorrelationResource->>ASGIInterleavedCorrelationResource: await asyncio.Event
+        ASGIInterleavedCorrelationResource->>correlation_id_var: read post-barrier per task
+    end
+
+    par Task 1 Reset
+        AsyncConductor->>CorrelationIDMiddlewareASGI: process_response
+        CorrelationIDMiddlewareASGI->>correlation_id_var: reset(token1)
+    and Task 2 Reset
+        AsyncConductor->>CorrelationIDMiddlewareASGI: process_response
+        CorrelationIDMiddlewareASGI->>correlation_id_var: reset(token2)
+    end
+
+    rect rgba(178, 34, 34, 0.5)
+        TestDriver->>correlation_id_var: assert all isolation invariants
+        TestDriver->>correlation_id_var: assert ambient is None post-completion
+    end
+```
+
 Response processing writes the configured correlation header before cleanup when
 `echo_header_in_response` is enabled and a request ID is present. Cleanup then
 clears the stored reset token and resets `correlation_id_var` in a `finally`
