@@ -51,15 +51,25 @@ def test_setup_handler_exposes_task_request_correlation_id(
     isolated_context(_logic)
 
 
-def test_setup_handler_is_noop_without_task_request_correlation_id(
+@pytest.mark.parametrize(
+    "handler",
+    [
+        pytest.param(setup_correlation_id_in_worker, id="setup"),
+        pytest.param(clear_correlation_id_in_worker, id="clear"),
+    ],
+)
+def test_handler_is_noop_when_no_correlation_state(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    handler: cabc.Callable[..., None],
 ) -> None:
-    """Worker setup should ignore tasks that do not carry a correlation ID."""
-    task = _build_task(correlation_id=None)
+    """Each handler should leave context unchanged.
+
+    No correlation state is present for either setup or cleanup.
+    """
 
     def _logic() -> None:
         """Exercise the isolated test scenario."""
-        setup_correlation_id_in_worker(task=task)
+        handler(task=_build_task())
 
         assert correlation_id_var.get() is None
         assert _celery_context_tokens.get(None) is None
@@ -111,21 +121,6 @@ def test_nested_worker_cleanup_restores_outer_then_ambient_context(
         clear_correlation_id_in_worker(task=outer_task)
 
         assert correlation_id_var.get() == "ambient-correlation-id"
-        assert _celery_context_tokens.get(None) is None
-
-    isolated_context(_logic)
-
-
-def test_clear_handler_is_noop_without_stored_token(
-    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-) -> None:
-    """Worker cleanup should tolerate missing setup state."""
-
-    def _logic() -> None:
-        """Exercise the isolated test scenario."""
-        clear_correlation_id_in_worker(task=_build_task())
-
-        assert correlation_id_var.get() is None
         assert _celery_context_tokens.get(None) is None
 
     isolated_context(_logic)
