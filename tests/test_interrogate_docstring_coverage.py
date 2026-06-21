@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import re
 import subprocess  # noqa: S404 - tests intentionally validate a CLI boundary.
 import sys
 from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-_EXPECTED_INTERROGATE_RESULT = "RESULT: PASSED (minimum: 100.0%, actual: 100.0%)"
+_INTERROGATE_RESULT_PATTERN = re.compile(
+    r"RESULT:\s+(?P<status>\w+)\s+"
+    r"\(minimum:\s+(?P<minimum>\d+\.\d+)%,\s+"
+    r"actual:\s+(?P<actual>\d+\.\d+)%\)",
+)
 
 
 def test_interrogate_reports_full_package_docstring_coverage() -> None:
@@ -29,4 +34,8 @@ def test_interrogate_reports_full_package_docstring_coverage() -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == _EXPECTED_INTERROGATE_RESULT
+    result_match = _INTERROGATE_RESULT_PATTERN.search(result.stdout)
+    assert result_match is not None, result.stdout
+    assert result_match["status"] == "PASSED"
+    assert result_match["minimum"] == "100.0"
+    assert result_match["actual"] == "100.0"

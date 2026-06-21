@@ -17,7 +17,7 @@
   explains the middleware architecture, request lifecycle, configuration model,
   and correlation ID propagation rules.
 - [ADR-001: three-tier linting](adr-001-three-tier-linting.md) records the accepted
-  linting architecture that combines Ruff with PyPy-backed Pylint.
+  linting architecture that combines Ruff, Interrogate, and PyPy-backed Pylint.
 - [Documentation style guide](documentation-style-guide.md) defines spelling,
   Markdown, document-structure, roadmap, Architecture Decision Record (ADR),
   and Request for Comments (RFC) conventions for this repository.
