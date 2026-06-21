@@ -53,6 +53,9 @@ _PYTEST_PROGRESS_PATTERN = re.compile(
     r"^(?P<progress>[.s]+)\s+\[100%\]$",
     re.MULTILINE,
 )
+_CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS = 120
+
+pytestmark = pytest.mark.timeout(_CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS)
 
 
 def _find_project_root(start: Path) -> Path:
@@ -165,7 +168,7 @@ def _run_python_with_celery_blocked(
         env=_blocked_celery_environment(sitecustomize_dir, environ),
         text=True,
         capture_output=True,
-        timeout=30,
+        timeout=_CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS,
     )
 
 

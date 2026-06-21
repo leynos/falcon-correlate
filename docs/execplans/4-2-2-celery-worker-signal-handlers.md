@@ -1,8 +1,8 @@
 # Implement Celery worker signal handlers (4.2.2)
 
 This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
-`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
-and `Outcomes & Retrospective` must be kept up to date as work proceeds.
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETED
 
@@ -361,7 +361,7 @@ worker tests remain green inside the full suite.
   `task.request.correlation_id` during eager execution, even though
   `task_prerun` and `task_postrun` still fire.
 
-## Decision Log
+## Decision log
 
 - 2026-04-08: This plan assumes worker-side behaviour belongs in
   `src/falcon_correlate/celery.py`, not in `middleware.py` or a new module,
@@ -379,7 +379,7 @@ worker tests remain green inside the full suite.
   local boundary that exposes `task.request.correlation_id` without requiring
   an external broker or long-running worker.
 
-## Outcomes & Retrospective
+## Outcomes & retrospective
 
 Implemented worker-side Celery correlation propagation in
 `src/falcon_correlate/celery.py` with:

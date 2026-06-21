@@ -69,10 +69,11 @@ ASGI middleware test infrastructure. It provides lightweight request and
 response doubles (`_Request`, `_Response`, and `_HeaderFailingResponse`) and a
 minimal `_Context` object that carries `correlation_id` plus an optional reset
 token. Its `_process_request` and `_process_response` async wrappers invoke
-`CorrelationIDMiddlewareASGI` hooks with those doubles. `_HeaderFailingResponse`
-subclasses `_Response` and raises `RuntimeError` from `set_header()`, enabling
-failure-path tests around response-header echo and cleanup. This module is
-owned by the unit-test package and must not be imported by production code.
+`CorrelationIDMiddlewareASGI` hooks with those doubles.
+`_HeaderFailingResponse` subclasses `_Response` and raises `RuntimeError` from
+`set_header()`, enabling failure-path tests around response-header echo and
+cleanup. This module is owned by the unit-test package and must not be imported
+by production code.
 
 ## Property-based testing
 
@@ -114,6 +115,7 @@ make lint
 
 ```bash
 $(UV_ENV) $(UV) run ruff check
+cd src && $(UV_ENV) $(UV) run interrogate --fail-under 100 falcon_correlate
 $(PYLINT) $(PYLINT_TARGETS)
 ```
 
@@ -131,15 +133,16 @@ make lint 2>&1 | tee /tmp/lint-falcon-correlate-$(git branch --show-current).out
 
 The lint target is configured by these Makefile variables:
 
-| Variable               | Default                                                                                       | Purpose                                                        |
-| ---------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `UV`                   | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                 | Selects the `uv` launcher used by all Python tool commands.    |
-| `UV_ENV`               | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                | Keeps project-local `uv` cache and tool directories.           |
-| `PYLINT_PYTHON`        | `pypy`                                                                                        | Selects the Python runtime used for the Pylint tool execution. |
-| `PYLINT_TARGETS`       | `src tests`                                                                                   | Defines the source trees checked by the Pylint tier.           |
-| `PYLINT_PYPY_SHIM_REF` | `726d09f968b4d729ee4b29c71fc732e744854f3b`                                                    | Pins the `pylint-pypy-shim` repository revision.               |
-| `PYLINT_PYPY_SHIM`     | `git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)`                  | Identifies the shim package installed by `uv tool run`.        |
-| `PYLINT`               | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                |
+| Variable               | Default                                                                                       | Purpose                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `UV`                   | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                 | Selects the `uv` launcher used by all Python tool commands.      |
+| `UV_ENV`               | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                | Keeps project-local `uv` cache and tool directories.             |
+| `PYLINT_PYTHON`        | `pypy`                                                                                        | Selects the Python runtime used for the Pylint tool execution.   |
+| `PYLINT_TARGETS`       | `src tests`                                                                                   | Defines the source trees checked by the Pylint tier.             |
+| `PYLINT_PYPY_SHIM_REF` | `726d09f968b4d729ee4b29c71fc732e744854f3b`                                                    | Pins the `pylint-pypy-shim` repository revision.                 |
+| `PYLINT_PYPY_SHIM`     | `git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)`                  | Identifies the shim package installed by `uv tool run`.          |
+| `PYLINT`               | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                  |
+| `INTERROGATE_TARGETS`  | `falcon_correlate`                                                                            | Defines the package tree checked by the docstring coverage gate. |
 
 Override variables at the command line for targeted investigation. For example:
 

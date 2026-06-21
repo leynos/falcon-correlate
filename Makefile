@@ -6,6 +6,7 @@ UV ?= $(shell command -v uv 2>/dev/null || printf '%s/.local/bin/uv' "$$HOME")
 TOOLS = $(MDFORMAT_ALL) ruff ty $(MDLINT) uv
 VENV_TOOLS = pytest
 UV_ENV = UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools
+INTERROGATE_TARGETS ?= falcon_correlate
 PYLINT_PYTHON ?= pypy
 PYLINT_TARGETS ?= src tests
 PYLINT_PYPY_SHIM_REF ?= 726d09f968b4d729ee4b29c71fc732e744854f3b
@@ -71,7 +72,7 @@ check-fmt: ruff ## Verify formatting
 
 lint: ruff ## Run linters
 	$(UV_ENV) $(UV) run ruff check
-	cd src && $(UV_ENV) $(UV) run interrogate --fail-under 100 falcon_correlate
+	cd src && $(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
 	$(PYLINT) $(PYLINT_TARGETS)
 
 typecheck: build ty ## Run typechecking

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import concurrent.futures as cf
+import threading
 import typing as typ
 from types import SimpleNamespace
 
@@ -124,6 +126,41 @@ def test_nested_worker_cleanup_restores_outer_then_ambient_context(
         assert _celery_context_tokens.get(None) is None
 
     isolated_context(_logic)
+
+
+def test_celery_worker_concurrent_signal_handlers() -> None:
+    """Concurrent worker runs should keep context tokens thread-local."""
+    ready = threading.Barrier(2)
+    cleanup = threading.Barrier(2)
+
+    def _run_task(worker_id: str) -> tuple[str | None, int, str | None, bool]:
+        """Exercise setup and cleanup from a dedicated worker thread."""
+        task = _build_task(correlation_id=f"task-{worker_id}")
+        correlation_id_var.set(f"ambient-{worker_id}")
+
+        ready.wait(timeout=5)
+        setup_correlation_id_in_worker(task=task)
+        correlation_id_during_task = correlation_id_var.get()
+        stored_tokens = _celery_context_tokens.get()
+        assert stored_tokens is not None
+        token_count = len(stored_tokens[_CORRELATION_ID_CONTEXT_KEY])
+
+        cleanup.wait(timeout=5)
+        clear_correlation_id_in_worker(task=task)
+
+        return (
+            correlation_id_during_task,
+            token_count,
+            correlation_id_var.get(),
+            _celery_context_tokens.get(None) is None,
+        )
+
+    with cf.ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(_run_task, "one")
+        second = executor.submit(_run_task, "two")
+
+    assert first.result(timeout=5) == ("task-one", 1, "ambient-one", True)
+    assert second.result(timeout=5) == ("task-two", 1, "ambient-two", True)
 
 
 def test_worker_signal_connection_is_idempotent() -> None:
