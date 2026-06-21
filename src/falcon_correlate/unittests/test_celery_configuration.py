@@ -67,6 +67,7 @@ class _TaskLike:
     """Minimal hashable task object for Celery signal dispatch tests."""
 
     def __init__(self, *, correlation_id: str) -> None:
+        """Initialise the test double."""
         self.request = SimpleNamespace(correlation_id=correlation_id)
 
 
@@ -95,6 +96,7 @@ def test_configure_celery_correlation_is_safe_under_concurrent_calls(
     barrier = threading.Barrier(4)
 
     def _configure_from_thread() -> None:
+        """Configure Celery correlation from a worker thread."""
         barrier.wait()
         configure_celery_correlation(celery_app)
 
@@ -177,6 +179,7 @@ def test_configure_celery_correlation_isolates_nested_task_context(
     inner_task = _TaskLike(correlation_id="inner-worker-correlation-id")
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         assert correlation_id_var.get() is None
 
         task_prerun.send(sender=outer_task, task=outer_task, args=(), kwargs={})
@@ -232,6 +235,7 @@ def test_safe_connect_signal_logs_when_signal_missing(
     from falcon_correlate.celery import _safe_connect_signal
 
     def fake_handler(**_: object) -> None:
+        """Stand in for a Celery signal receiver."""
         return
 
     module_without_signal = object()
@@ -258,6 +262,7 @@ def test_safe_connect_signal_logs_on_successful_connect(
     fake_uid = "falcon_correlate.test.debug_log_uid"
 
     def fake_handler(**_: object) -> None:
+        """Stand in for a Celery signal receiver."""
         return
 
     fake_module = SimpleNamespace(before_task_publish=before_task_publish)

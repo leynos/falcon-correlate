@@ -117,14 +117,14 @@ property is particularly beneficial for database indexing and querying logs
 based on time ranges, potentially improving performance for such operations.[^6]
 
 UUIDv7 offers precise timestamping, with RFC 9562 specifying millisecond
-precision by default.[^6] This contrasts with UUIDv4, which is
-entirely random and thus offers no inherent time ordering. UUIDv1 is time-based
-but has been criticised for potential privacy concerns due to the inclusion of
-the MAC address of the generating machine[^6], and UUIDv7 aims to provide
-better entropy characteristics than UUIDv1.[^7] The time-ordered nature of
-UUIDv7, combined with its uniqueness properties, makes it an excellent
-candidate for correlation IDs, especially in systems where IDs might be used as
-database primary keys or frequently queried in a time-sensitive manner.
+precision by default.[^6] This contrasts with UUIDv4, which is entirely random
+and thus offers no inherent time ordering. UUIDv1 is time-based but has been
+criticised for potential privacy concerns due to the inclusion of the MAC
+address of the generating machine[^6], and UUIDv7 aims to provide better
+entropy characteristics than UUIDv1.[^7] The time-ordered nature of UUIDv7,
+combined with its uniqueness properties, makes it an excellent candidate for
+correlation IDs, especially in systems where IDs might be used as database
+primary keys or frequently queried in a time-sensitive manner.
 
 ### 2.4. Survey of existing middleware and approaches in the Python ecosystem
 
@@ -214,11 +214,11 @@ ID while running and that ambient context is clear after request completion.
 
 **Figure 2 screen reader caption:** Sequence diagram showing the ASGI
 concurrency test driver launching overlapping requests through an async
-conductor, `CorrelationIDMiddlewareASGI` setting a distinct `correlation_id_var`
-value per task, `ASGIInterleavedCorrelationResource` waiting at a shared
-barrier before reading each task's value again, and response processing
-resetting each stored token before the test driver verifies isolation and
-post-completion cleanup.
+conductor, `CorrelationIDMiddlewareASGI` setting a distinct
+`correlation_id_var` value per task, `ASGIInterleavedCorrelationResource`
+waiting at a shared barrier before reading each task's value again, and
+response processing resetting each stored token before the test driver verifies
+isolation and post-completion cleanup.
 
 ```mermaid
 sequenceDiagram
@@ -284,10 +284,10 @@ In process_request:
 Falcon middleware components are executed hierarchically. If multiple
 middleware components are registered, their `process_request` methods are
 called in order, followed by `process_resource` methods in the same order, then
-the resource responder, and finally `process_response` methods in reverse order.
-[^11] This execution model ensures that once the correlation ID middleware
-sets the ID in `process_request`, it becomes available to subsequent middleware
-layers and the target resource handler.
+the resource responder, and finally `process_response` methods in reverse
+order.[^11] This execution model ensures that once the correlation ID
+middleware sets the ID in `process_request`, it becomes available to subsequent
+middleware layers and the target resource handler.
 
 Falcon provides `req.context` and `resp.context` objects for passing
 application-specific data through the request lifecycle.[^11] The correlation
@@ -706,12 +706,12 @@ into the task publishing mechanism.
 
 ##### 3.5.2.3. Method 2: Custom Celery `Task` base class
 
-Alternatively, a custom base class inheriting from `celery.Task` can be created.
-[^27] This base class can override `apply_async` to retrieve the correlation ID
-from `contextvars` and inject it into the task options (specifically
-`correlation_id=cid`) before calling the superclass method. All application
-tasks would then inherit from this custom base class. This encapsulates the
-behaviour but requires modifying task definitions.
+Alternatively, a custom base class inheriting from `celery.Task` can be
+created.[^27] This base class can override `apply_async` to retrieve the
+correlation ID from `contextvars` and inject it into the task options
+(specifically `correlation_id=cid`) before calling the superclass method. All
+application tasks would then inherit from this custom base class. This
+encapsulates the behaviour but requires modifying task definitions.
 
 ##### 3.5.2.4. Accessing correlation ID within the Celery task worker
 

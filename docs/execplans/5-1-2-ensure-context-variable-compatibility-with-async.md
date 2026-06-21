@@ -209,11 +209,11 @@ record the conflict in `Decision Log`, and ask for direction.
 - [x] Run all required gates and CodeRabbit reviews.
 - [x] Mark roadmap item 5.1.2 done after the feature is complete.
 - [x] (2026-06-14T00:00:00+02:00) Addressed post-rebase review follow-ups
-  using Wyvern verification and Scribe documentation review. Changes re-arm
-  the reusable ASGI overlap barrier between request waves, enforce the BDD
-  step preconditions for two distinct concurrent request IDs, move the ASGI
-  property test under `tests/property/`, expand ASGI property/helper module
-  docstrings, and align design documentation for Celery `Task` hooks and
+  using Wyvern verification and Scribe documentation review. Changes re-arm the
+  reusable ASGI overlap barrier between request waves, enforce the BDD step
+  preconditions for two distinct concurrent request IDs, move the ASGI property
+  test under `tests/property/`, expand ASGI property/helper module docstrings,
+  and align design documentation for Celery `Task` hooks and
   `ContextualLogFilter` ownership.
 - [x] (2026-06-14T00:00:00+02:00) Validation exposed an existing CIDR parsing
   edge case where a malformed string containing `has host bits set` was
@@ -690,8 +690,8 @@ Acceptance for this milestone:
 - The draft pull request title includes `(5.1.2)`.
 - The pull request summary mentions this execplan:
   `docs/execplans/5-1-2-ensure-context-variable-compatibility-with-async.md`.
-- The pull request description ends with a `## References` section containing the
-  collaboration session link/reference.
+- The pull request description ends with a `## References` section containing
+  the collaboration session link/reference.
 
 ## Concrete steps
 

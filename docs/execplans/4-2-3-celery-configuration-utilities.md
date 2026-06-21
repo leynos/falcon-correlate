@@ -1,9 +1,8 @@
 # Provide Celery configuration utilities (4.2.3)
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -11,11 +10,11 @@ Status: COMPLETE
 
 Roadmap item 4.2.3 adds an explicit public entry point for Celery users who
 want one obvious configuration call instead of relying on import-time side
-effects. A consumer can now call
-`configure_celery_correlation(app)` once during Celery application setup and
-know that all supported correlation propagation handlers are connected:
-publish-time propagation through `before_task_publish`, and worker lifecycle
-setup and cleanup through `task_prerun` and `task_postrun`.
+effects. A consumer can now call `configure_celery_correlation(app)` once
+during Celery application setup and know that all supported correlation
+propagation handlers are connected: publish-time propagation through
+`before_task_publish`, and worker lifecycle setup and cleanup through
+`task_prerun` and `task_postrun`.
 
 Success is observable when all of the following are true:
 
@@ -24,8 +23,8 @@ Success is observable when all of the following are true:
 - calling that helper connects the publish and worker handlers in one
   idempotent call;
 - existing Celery publish behaviour and worker behaviour still work after
-  configuration, including the `rpc://` result-backend exception and the
-  worker reset-token cleanup semantics;
+  configuration, including the `rpc://` result-backend exception and the worker
+  reset-token cleanup semantics;
 - unit tests written with `pytest` prove the helper connects every supported
   signal, is safe to call repeatedly, and remains import-safe;
 - behavioural tests written with `pytest-bdd` prove a consumer can use the new
@@ -50,8 +49,7 @@ stabilized in commit `fc92042` ("Make validation tools available to hooks",
 
 The current Celery integration already lives in
 `src/falcon_correlate/celery.py`. That file defines three public handlers:
-`propagate_correlation_id_to_celery`,
-`setup_correlation_id_in_worker`, and
+`propagate_correlation_id_to_celery`, `setup_correlation_id_in_worker`, and
 `clear_correlation_id_in_worker`. It also defines two private registration
 helpers, `_maybe_connect_celery_publish_signal()` and
 `_maybe_connect_celery_worker_signals()`, and it calls both helpers at module
@@ -213,11 +211,11 @@ print(_TASK_PRERUN_DISPATCH_UID)
 print(_TASK_POSTRUN_DISPATCH_UID)
 ```
 
-The goal of this milestone is to remove guesswork before any tests are
-written. The implementation turn should know whether it can simply compose the
-existing helpers or whether it needs a small internal refactor such as a
-single `_maybe_connect_celery_signals()` helper that both import-time startup
-and `configure_celery_correlation(app)` can call.
+The goal of this milestone is to remove guesswork before any tests are written.
+The implementation turn should know whether it can simply compose the existing
+helpers or whether it needs a small internal refactor such as a single
+`_maybe_connect_celery_signals()` helper that both import-time startup and
+`configure_celery_correlation(app)` can call.
 
 ### Milestone 2: write failing tests for the public configuration helper
 
@@ -287,10 +285,10 @@ The implementation should stay deliberately small:
    `src/falcon_correlate/__init__.py` if import safety remains intact.
 
 The helper should not introduce per-app state unless Milestone 1 proves that
-the current global-signal model is insufficient. If the `app` parameter is
-not otherwise needed, the helper may still accept and return the app for
-ergonomic, explicit configuration in application factories. That is the
-current draft direction for approval.
+the current global-signal model is insufficient. If the `app` parameter is not
+otherwise needed, the helper may still accept and return the app for ergonomic,
+explicit configuration in application factories. That is the current draft
+direction for approval.
 
 After implementation, rerun the targeted tests:
 
@@ -357,13 +355,13 @@ commands pass.
   sections, the user guide, the complexity guidance, and the completed
   execplans for 4.2.1 and 4.2.2.
 - [x] 2026-04-21: Inspected `src/falcon_correlate/celery.py`,
-  `src/falcon_correlate/__init__.py`, and the current Celery unit and BDD
-  tests to establish the real starting point for 4.2.3.
+  `src/falcon_correlate/__init__.py`, and the current Celery unit and BDD tests
+  to establish the real starting point for 4.2.3.
 - [x] 2026-04-21: Drafted this ExecPlan and recorded the proposed approach for
   approval before implementation.
 - [x] 2026-04-27: Resumed implementation on branch
-  `celery-correlation-propagation-5nogn4`; confirmed the worktree was clean
-  and the checked-in plan still represented the pre-implementation draft.
+  `celery-correlation-propagation-5nogn4`; confirmed the worktree was clean and
+  the checked-in plan still represented the pre-implementation draft.
 - [x] 2026-04-27: Treated the user's continuation request as approval to
   implement the planned functionality.
 - [x] 2026-04-27: Added targeted unit and behavioural tests for
@@ -425,10 +423,10 @@ commands pass.
   this avoids duplicating signal logic and respects the complexity guidance in
   `docs/complexity-antipatterns-and-refactoring-strategies.md`.
 - 2026-04-21: Draft decision: prefer returning the same `app` instance from
-  `configure_celery_correlation(app)` so Celery application factory code gets
-  a clean, chainable API. Rationale: the roadmap fixes the parameter name but
-  not the return type, and returning the app is the most ergonomic public
-  contract if it does not create type or import-safety problems.
+  `configure_celery_correlation(app)` so Celery application factory code gets a
+  clean, chainable API. Rationale: the roadmap fixes the parameter name but not
+  the return type, and returning the app is the most ergonomic public contract
+  if it does not create type or import-safety problems.
 - 2026-04-27: Final decision: return the same `app` instance from
   `configure_celery_correlation(app)`. Rationale: the helper does not need
   app-local state because the existing integration uses Celery's global signal
@@ -437,16 +435,16 @@ commands pass.
 ## Outcomes & Retrospective
 
 Roadmap item 4.2.3 is complete. The package now exposes
-`configure_celery_correlation(app)` from both `falcon_correlate.celery` and
-the package root. The helper reuses the existing publish and worker signal
+`configure_celery_correlation(app)` from both `falcon_correlate.celery` and the
+package root. The helper reuses the existing publish and worker signal
 registration helpers through `_maybe_connect_celery_signals()`, returns the
 same app instance, and remains idempotent through the existing Celery dispatch
 UIDs.
 
 The main implementation lesson is that tests for explicit configuration must
 first disconnect the import-time receivers by dispatch UID. Without that setup,
-automatic registration can mask a broken helper because the signals are
-already connected before the test exercises the public API.
+automatic registration can mask a broken helper because the signals are already
+connected before the test exercises the public API.
 
 Validation completed successfully on 2026-04-27:
 
@@ -458,14 +456,14 @@ Validation completed successfully on 2026-04-27:
 - `make nixie`
 
 Post-turn hook validation initially failed because the non-interactive hook
-environment did not include the user-local tool directories that provide
-`ruff`, `ty`, `uv`, `nixie`, and `markdownlint-cli2`. The Makefile now
-prepends `$(HOME)/.local/bin` and `$(HOME)/.bun/bin` to `PATH` so local and
-hook validation resolve the same project tools.
+environment did not include the user-local tool directories that provide `ruff`,
+`ty`, `uv`, `nixie`, and `markdownlint-cli2`. The Makefile now prepends
+`$(HOME)/.local/bin` and `$(HOME)/.bun/bin` to `PATH` so local and hook
+validation resolve the same project tools.
 
 Author/verification note: this ExecPlan was synchronized with the delivered
 implementation on 2026-04-27 after review of commits `7189e56` and `fc92042`,
 the updated user guide, design document, roadmap, unit tests, and BDD tests.
-Follow-up validation on 2026-05-08 added property tests and `_safe_connect_signal`
-debug logging, then passed `make check-fmt`, `make lint`, `make typecheck`, and
-`make test`.
+Follow-up validation on 2026-05-08 added property tests and
+`_safe_connect_signal` debug logging, then passed `make check-fmt`, `make lint`,
+`make typecheck`, and `make test`.

@@ -62,8 +62,8 @@ roadmap and user documentation were updated, and all quality gates passed
 The middleware lives in `src/falcon_correlate/middleware.py`. The
 `CorrelationIDMiddleware.process_request` method now reads the header and sets
 request context values when present. Unit coverage for middleware behaviour is
-in `src/falcon_correlate/unittests/test_middleware.py`. Behavioural tests are
-in `tests/bdd/middleware.feature` with step definitions in
+in `src/falcon_correlate/unittests/test_middleware.py`. Behavioural tests are in
+`tests/bdd/middleware.feature` with step definitions in
 `tests/bdd/test_middleware_steps.py` and shared helpers in `tests/conftest.py`.
 The design guidance for this change is in
 `docs/falcon-correlation-id-middleware-design.md` §3.2.1. The roadmap item to

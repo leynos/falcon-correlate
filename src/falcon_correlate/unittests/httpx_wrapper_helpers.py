@@ -50,6 +50,7 @@ def run_sync(
     captured: dict[str, typ.Any] = {}
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         if correlation_id is not None:
             correlation_id_var.set(correlation_id)
         with mock.patch("httpx.request") as mock_request:
@@ -97,6 +98,7 @@ def run_prepare_headers(
     result: dict[str, typ.Any] = {}
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         if correlation_id is not None:
             correlation_id_var.set(correlation_id)
         result["headers"] = _prepare_headers(kwargs)

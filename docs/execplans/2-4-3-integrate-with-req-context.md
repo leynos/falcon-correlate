@@ -8,8 +8,8 @@ Status: COMPLETE
 
 ## Purpose / big picture
 
-Task 2.4.2 added lifecycle management so that `correlation_id_var` is set
-during `CorrelationIDMiddleware.process_request` and reset during
+Task 2.4.2 added lifecycle management so that `correlation_id_var` is set during
+`CorrelationIDMiddleware.process_request` and reset during
 `CorrelationIDMiddleware.process_response`. The middleware also copies the
 correlation ID to `req.context.correlation_id` in `process_request`, providing
 a convenient Falcon-native access method. Task 2.4.3 makes this dual-access

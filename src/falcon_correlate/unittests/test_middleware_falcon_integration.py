@@ -69,7 +69,10 @@ class TestCorrelationIDMiddlewareWithFalcon:
         """
 
         class LoggingResource:
+            """Falcon resource that records middleware hook ordering."""
+
             def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
+                """Handle the Falcon test request."""
                 call_log.append("resource_called")
                 resp.media = {"status": "ok"}
 
@@ -113,6 +116,7 @@ class TestCorrelationIDMiddlewareWithFalcon:
                     req: falcon.Request,
                     resp: falcon.Response,
                 ) -> None:
+                    """Record that Falcon called the request hook."""
                     call_log.append(call_name)
                     super().process_request(req, resp)
 
@@ -128,6 +132,7 @@ class TestCorrelationIDMiddlewareWithFalcon:
                 resource: object,
                 req_succeeded: bool,  # noqa: FBT001 - Falcon WSGI middleware interface requirement
             ) -> None:
+                """Record that Falcon called the response hook."""
                 call_log.append(call_name)
                 super().process_response(req, resp, resource, req_succeeded)
 

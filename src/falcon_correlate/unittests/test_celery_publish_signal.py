@@ -52,6 +52,7 @@ def test_handler_updates_publish_correlation_id(
     }
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         correlation_id_var.set(context_value)
         propagate_correlation_id_to_celery(properties=properties)
 
@@ -79,6 +80,7 @@ def test_handler_preserves_task_id_correlation_for_rpc_result_backend(
     )
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         correlation_id_var.set("request-correlation-id")
         propagate_correlation_id_to_celery(properties=properties)
 
@@ -96,6 +98,7 @@ def test_handler_tolerates_missing_properties_mapping(
     """A missing Celery properties mapping should be treated as a no-op."""
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         correlation_id_var.set("request-correlation-id")
         propagate_correlation_id_to_celery(properties=None)
 
@@ -124,6 +127,7 @@ def test_signal_connection_is_idempotent_across_reload(
     probe_dispatch_uid = "test_probe_publish_receiver"
 
     def probe_receiver(**kwargs: object) -> None:
+        """Record that the Celery probe signal fired."""
         properties = typ.cast("dict[str, str] | None", kwargs.get("properties"))
         if properties is None:
             return
@@ -131,6 +135,7 @@ def test_signal_connection_is_idempotent_across_reload(
         probe_calls.append(properties["correlation_id"])
 
     def _send_signal() -> tuple[dict[str, str], list[tuple[object, object]]]:
+        """Send the Celery signal from an isolated context."""
         properties = {
             "correlation_id": "celery-task-id",
             "reply_to": "reply-queue",
@@ -138,6 +143,7 @@ def test_signal_connection_is_idempotent_across_reload(
         signal_responses: list[tuple[object, object]] = []
 
         def _logic() -> None:
+            """Exercise the isolated test scenario."""
             correlation_id_var.set("request-correlation-id")
             nonlocal signal_responses
             signal_responses = before_task_publish.send(
@@ -153,6 +159,7 @@ def test_signal_connection_is_idempotent_across_reload(
     def _count_integration_receivers(
         signal_responses: list[tuple[object, object]],
     ) -> int:
+        """Count connected integration signal receivers."""
         return sum(
             1
             for receiver, _ in signal_responses

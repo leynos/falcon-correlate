@@ -75,6 +75,7 @@ def test_sync_transport_injects_header_when_context_is_set(
     wrapped_transport = CorrelationIDTransport(transport)
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         correlation_id_var.set("sync-transport-cid")
         with httpx.Client(transport=wrapped_transport) as client:
             response = client.get("http://example.com")
@@ -96,6 +97,7 @@ def test_sync_transport_does_not_add_header_when_context_is_empty(
     wrapped_transport = CorrelationIDTransport(transport)
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         with httpx.Client(transport=wrapped_transport) as client:
             client.get("http://example.com")
 
@@ -113,6 +115,7 @@ def test_sync_transport_preserves_existing_correlation_header(
     wrapped_transport = CorrelationIDTransport(transport)
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         correlation_id_var.set("ignored-context-cid")
         with httpx.Client(transport=wrapped_transport) as client:
             client.get(
@@ -158,6 +161,7 @@ def test_sync_transport_uses_custom_header_name(
     wrapped_transport = CorrelationIDTransport(transport, header_name="X-Alt-CID")
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         correlation_id_var.set("sync-transport-alt-cid")
         with httpx.Client(transport=wrapped_transport) as client:
             response = client.get("http://example.com")
@@ -178,6 +182,7 @@ def test_sync_transport_does_not_override_existing_custom_header(
     wrapped_transport = CorrelationIDTransport(transport, header_name="X-Alt-CID")
 
     def _logic() -> None:
+        """Exercise the isolated test scenario."""
         correlation_id_var.set("sync-transport-alt-cid")
         with httpx.Client(transport=wrapped_transport) as client:
             response = client.get(

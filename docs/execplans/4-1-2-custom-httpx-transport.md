@@ -1,9 +1,8 @@
 # Implement custom httpx transport (4.1.2)
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
-proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETED
 
@@ -67,8 +66,8 @@ already large enough that transport-specific scenarios should go into new,
 dedicated files to keep the transport work easy to read and maintain.
 
 The design document section for this task is
-`docs/falcon-correlation-id-middleware-design.md` §3.5.1.3. The roadmap entry
-is `docs/roadmap.md` item 4.1.2. The complexity guidance in
+`docs/falcon-correlation-id-middleware-design.md` §3.5.1.3. The roadmap entry is
+`docs/roadmap.md` item 4.1.2. The complexity guidance in
 `docs/complexity-antipatterns-and-refactoring-strategies.md` argues against
 growing large, lumpy functions and files, so the implementation should favour
 small helpers and narrowly scoped tests.

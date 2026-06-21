@@ -1,8 +1,8 @@
 # Implement async middleware methods (5.1.1)
 
 This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
- `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
-and `Outcomes & Retrospective` must be kept up to date as work proceeds.
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -16,7 +16,7 @@ approved.
 
 Roadmap item 5.1.1 adds Falcon Asynchronous Server Gateway Interface (ASGI)
 support to `falcon-correlate`. After the change is implemented, a consumer using
- `falcon.asgi.App` can install `CorrelationIDMiddlewareASGI` and receive the
+`falcon.asgi.App` can install `CorrelationIDMiddlewareASGI` and receive the
 same request correlation behaviour that Web Server Gateway Interface (WSGI)
 consumers receive from `CorrelationIDMiddleware`.
 
