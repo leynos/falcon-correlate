@@ -26,7 +26,7 @@ runs. This keeps the slow, deeper lint tier focused on code that has already
 passed the high-volume checks and the package docstring coverage gate.
 
 The decision to use this architecture is recorded in
-[ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-two-tier-linting.md).
+[ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md).
 
 ## Internal module architecture
 
@@ -103,7 +103,7 @@ Follow the existing pattern in `tests/property/test_header_injection.py`:
 ## Roadmap notes
 
 The three-tier linting work described in
-[ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-two-tier-linting.md)
+[ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md)
 is complete. Keep future linting changes aligned with that ADR unless a new
 ADR supersedes it.
 

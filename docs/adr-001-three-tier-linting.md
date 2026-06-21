@@ -8,7 +8,7 @@ pass, executed through `pylint-pypy-shim` on PyPy, as the third lint tier.
 
 ## Date
 
-2026-05-15.
+2026-06-21.
 
 ## Context and Problem Statement
 
