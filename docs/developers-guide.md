@@ -7,22 +7,26 @@ pull request.
 
 ## Linting architecture
 
-The Python lint target uses a two-tier linting approach:
+The Python lint target uses a three-tier linting approach:
 
 - **Tier 1: Ruff.** Ruff runs first through `uv run ruff check`. It is the
   fast linting gate and owns formatting-adjacent checks, import rules, common
   correctness rules, docstring rules, security checks, complexity thresholds,
   and Ruff's Pylint-compatible rule families.
-- **Tier 2: Pylint through PyPy.** Pylint runs second through the
+- **Tier 2: Interrogate.** Interrogate runs second through
+  `uv run interrogate --fail-under 100`. It enforces package-level docstring
+  coverage after Ruff has validated docstring style.
+- **Tier 3: Pylint through PyPy.** Pylint runs third through the
   `pylint-pypy-shim` wrapper. This tier focuses on rules that complement Ruff,
   especially logging format correctness, pattern matching safety, refactoring
   suggestions, resource-handling checks, and selected design limits.
 
-Ruff must pass before Pylint runs. This keeps the slow, deeper lint tier
-focused on code that has already passed the high-volume checks.
+Ruff must pass before Interrogate runs, and Interrogate must pass before Pylint
+runs. This keeps the slow, deeper lint tier focused on code that has already
+passed the high-volume checks and the package docstring coverage gate.
 
 The decision to use this architecture is recorded in
-[ADR-001: two-tier linting with Ruff and PyPy-backed Pylint](adr-001-two-tier-linting.md).
+[ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-two-tier-linting.md).
 
 ## Internal module architecture
 
@@ -98,8 +102,8 @@ Follow the existing pattern in `tests/property/test_header_injection.py`:
 
 ## Roadmap notes
 
-The two-tier linting work described in
-[ADR-001: two-tier linting with Ruff and PyPy-backed Pylint](adr-001-two-tier-linting.md)
+The three-tier linting work described in
+[ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-two-tier-linting.md)
 is complete. Keep future linting changes aligned with that ADR unless a new
 ADR supersedes it.
 
@@ -115,7 +119,7 @@ make lint
 
 ```bash
 $(UV_ENV) $(UV) run ruff check
-cd src && $(UV_ENV) $(UV) run interrogate --fail-under 100 falcon_correlate
+$(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
 $(PYLINT) $(PYLINT_TARGETS)
 ```
 
@@ -133,16 +137,16 @@ make lint 2>&1 | tee /tmp/lint-falcon-correlate-$(git branch --show-current).out
 
 The lint target is configured by these Makefile variables:
 
-| Variable               | Default                                                                                       | Purpose                                                          |
-| ---------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `UV`                   | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                 | Selects the `uv` launcher used by all Python tool commands.      |
-| `UV_ENV`               | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                | Keeps project-local `uv` cache and tool directories.             |
-| `PYLINT_PYTHON`        | `pypy`                                                                                        | Selects the Python runtime used for the Pylint tool execution.   |
-| `PYLINT_TARGETS`       | `src tests`                                                                                   | Defines the source trees checked by the Pylint tier.             |
-| `PYLINT_PYPY_SHIM_REF` | `726d09f968b4d729ee4b29c71fc732e744854f3b`                                                    | Pins the `pylint-pypy-shim` repository revision.                 |
-| `PYLINT_PYPY_SHIM`     | `git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)`                  | Identifies the shim package installed by `uv tool run`.          |
-| `PYLINT`               | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                  |
-| `INTERROGATE_TARGETS`  | `falcon_correlate`                                                                            | Defines the package tree checked by the docstring coverage gate. |
+| Variable               | Default                                                                                       | Purpose                                                        |
+| ---------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `UV`                   | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                 | Selects the `uv` launcher used by all Python tool commands.    |
+| `UV_ENV`               | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                | Keeps project-local `uv` cache and tool directories.           |
+| `PYLINT_PYTHON`        | `pypy`                                                                                        | Selects the Python runtime used for the Pylint tool execution. |
+| `PYLINT_TARGETS`       | `src tests`                                                                                   | Defines the source trees checked by the Pylint tier.           |
+| `PYLINT_PYPY_SHIM_REF` | `726d09f968b4d729ee4b29c71fc732e744854f3b`                                                    | Pins the `pylint-pypy-shim` repository revision.               |
+| `PYLINT_PYPY_SHIM`     | `git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)`                  | Identifies the shim package installed by `uv tool run`.        |
+| `PYLINT`               | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                |
+| `INTERROGATE_TARGETS`  | `src/falcon_correlate`                                                                        | Defines the repo-root-relative tree checked by Interrogate.    |
 
 Override variables at the command line for targeted investigation. For example:
 

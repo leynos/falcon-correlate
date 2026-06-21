@@ -1,8 +1,8 @@
 # Validate optional Celery integration (4.2.4)
 
 This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
-`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
-and `Outcomes & Retrospective` must be kept up to date as work proceeds.
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 

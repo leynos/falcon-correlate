@@ -691,8 +691,7 @@ Acceptance for this milestone:
 - The pull request summary mentions this execplan:
   `docs/execplans/5-1-2-ensure-context-variable-compatibility-with-async.md`.
 - The pull request description ends with a `## References` section containing
-  the
-  collaboration session link/reference.
+  the collaboration session link/reference.
 
 ## Concrete steps
 
