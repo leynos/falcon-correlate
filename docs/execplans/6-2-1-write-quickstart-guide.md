@@ -149,7 +149,7 @@ Success is observable when:
 - [x] (2026-06-18 02:45Z) Write ExecPlan (this document).
 - [x] (2026-06-24 12:04Z) Obtain approval for this ExecPlan via user request
   to proceed with implementation.
-- [ ] (2026-06-24 12:04Z) Stage A: gate-coverage poison-pill verification and
+- [x] (2026-06-24 12:25Z) Stage A: gate-coverage poison-pill verification and
   WSGI type spike
   (go/no-go).
 - [ ] Stage B: add failing unit, BDD, snapshot, and drift-guard tests (red).
@@ -163,7 +163,29 @@ Success is observable when:
 
 ## Surprises & discoveries
 
-- Observation: none yet. Populate during implementation with evidence.
+- Observation: `ty check` already descends into top-level `examples/`. With a
+  temporary `examples/quickstart/_poison.py` returning `str` from a function
+  annotated as `-> int`, `make typecheck` failed with
+  `invalid-return-type`.
+- Observation: Ruff already descends into top-level `examples/`. With the same
+  temporary poison file carrying an unused import, `make lint` failed during
+  the Ruff phase with `F401`.
+- Observation: Pylint did not have explicit `examples/` coverage in the
+  Makefile (`PYLINT_TARGETS ?= src tests`). After pinning
+  `PYLINT_TARGETS ?= src tests examples`, a Ruff-clean poison file using
+  `value.__str__()` failed during the Pylint phase with
+  `unnecessary-dunder-call`. With the temporary file removed, `make lint`
+  passed with the expanded target list.
+- Observation: a fully annotated Falcon WSGI spike passes `ty`, Ruff, and
+  Pylint without suppressions when the resource method uses instance state.
+  Ruff reports `PLR6301` if a Falcon resource method does not use `self`.
+- Observation: the Markdown probe marker `<!-- quickstart:probe -->` and the
+  immediately following Python fence survived `make fmt`. The repository-wide
+  `make fmt` target also rewrote unrelated historical Markdown and exposed an
+  unrelated `MD013` line-length failure in
+  `docs/execplans/4-2-4-validate-optional-celery-integration.md`; those
+  generated edits were reversed because they are outside this task. The probe
+  result still confirms that the quickstart marker scheme is viable.
 
 ## Decision log
 
@@ -210,6 +232,11 @@ Success is observable when:
   argued a plain assertion suffices for one line; the snapshot is kept because
   the relevant surface is a matrix of variants, not one line, and `syrupy` is
   the user-named tool. Date/Author: 2026-06-18, planner.
+
+- Decision: expand `PYLINT_TARGETS` from `src tests` to `src tests examples`
+  in the Makefile. Rationale: Stage A proved Ruff and `ty` already inspect
+  `examples/`, but Pylint required explicit target coverage for runnable
+  documentation examples. Date/Author: 2026-06-24, implementer.
 
 ## Outcomes & retrospective
 
@@ -628,3 +655,7 @@ single-line) syrupy snapshot over the logging placeholder matrix.
 2026-06-24: User approved implementation by requesting that this plan be
 executed. Status changed to IN PROGRESS and the approval checkpoint was marked
 complete.
+
+2026-06-24: Completed Stage A. Recorded gate-coverage evidence for Ruff, `ty`,
+and Pylint; documented the Makefile target decision; recorded the WSGI typing
+spike result; and noted the Markdown formatter's unrelated historical-doc churn.
