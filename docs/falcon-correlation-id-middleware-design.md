@@ -961,7 +961,6 @@ class ContextualLogFilter(logging.Filter):
 #                 '%(asctime)s [%(levelname)s][%(correlation_id)s]'
 #                 '[%(user_id)s] %(name)s: %(message)s'
 # )
-```
 
 #     },
 #     },
@@ -1030,7 +1029,6 @@ async def async_client_request_with_correlation_id(
 # response = client_request_with_correlation_id(
 #     'GET', 'https://api.example.com/data'
 # )
-```
 
 # response = await async_client_request_with_correlation_id(
 #     'POST', 'https://api.example.com/submit', json={...}
