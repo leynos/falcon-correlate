@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: IN PROGRESS
+Status: IMPLEMENTED; CodeRabbit review follow-up remains open.
 
 ## Purpose / big picture
 
@@ -163,6 +163,17 @@ Success is observable when:
   `make test`, `make markdownlint`, and `make nixie`.
 - [x] (2026-06-24 12:31Z) Stage F tolerance exception resolved by stop-hook
   instruction to commit the completed, gated work.
+- [x] (2026-06-24 14:05Z) Rebased branch onto `origin/main`, preserving
+  main's three-tier linting ADR and Interrogate dependency while retaining the
+  quickstart ADR, examples, and `syrupy` dependency.
+- [x] (2026-06-24 14:18Z) Resolved post-turn Markdown gate failure by fixing
+  premature Python code-fence closures in the middleware design document.
+- [x] (2026-06-24 14:34Z) Resolved hosted CI `ty 0.0.53` failure by tightening
+  the middleware correlation `ContextVar` type to `str | None` and casting the
+  verified reset token before calling `ContextVar.reset`.
+- [x] (2026-06-24 14:38Z) Re-ran deterministic gates after the CI type fix:
+  `make check-fmt`, `make typecheck`, `make lint`, focused middleware context
+  tests (`18 passed`), and `make test` (`433 passed, 11 skipped`).
 - [ ] Stage F: run a `coderabbit review --agent` pass and clear all concerns.
 
 ## Surprises & discoveries
@@ -209,6 +220,27 @@ Success is observable when:
   including the generated syrupy snapshot, or 18 non-snapshot files. That meets
   the file-count tolerance. The same diff is about 902 net non-snapshot lines,
   which exceeds the 600-line tolerance and triggers the exception process.
+- Observation: rebasing onto `origin/main` brought in ADR-001's rename from
+  two-tier to three-tier linting and the Interrogate dev dependency. The merge
+  resolution kept both branches' intent: ADR-001 remains the accepted
+  three-tier linting decision, ADR-002 records tested documentation examples,
+  and the dev dependency group includes both `interrogate` and `syrupy`.
+- Observation: `uv.lock` was reset to main's side during the rebase conflict,
+  then regenerated with `uv lock`. This followed the lock-file conflict policy
+  and produced a lock containing `syrupy` alongside main's Interrogate-related
+  packages.
+- Observation: the stop-hook Markdown gate caught two premature closing fences
+  in `docs/falcon-correlation-id-middleware-design.md`. Those fences left
+  commented Python lines outside their code block, so markdownlint parsed
+  `# ...` comments as headings. Removing the premature fences restored the
+  intended Python blocks and made `make markdownlint nixie` pass.
+- Observation: hosted CI used `ty 0.0.53`, while the local `make typecheck`
+  target used `ty 0.0.32`. The newer checker inferred
+  `ContextVar.reset(...)` against `Token[Never]` when the middleware stored the
+  context variable as `ContextVar[Any]`. Typing the constructor argument as
+  `ContextVar[str | None]`, matching the exported `correlation_id_var`, and
+  casting the runtime-verified token to `Token[str | None]` satisfies both
+  checker versions without changing runtime behaviour.
 
 ## Decision log
 
@@ -285,6 +317,19 @@ Success is observable when:
   This preserves the tested guide as planned instead of weakening coverage or
   deferring documentation maintenance. Date/Author: 2026-06-24, implementer.
 
+- Decision: resolve the `origin/main` rebase conflicts by treating main's
+  three-tier linting ADR and Interrogate dependency as authoritative, while
+  preserving the branch's quickstart guide, tested-example ADR, and `syrupy`
+  snapshot dependency. Rationale: main superseded the older linting ADR text,
+  but the quickstart branch added independent documentation-example behaviour.
+  Date/Author: 2026-06-24, implementer.
+
+- Decision: keep the middleware's injectable correlation context variable
+  typed as `ContextVar[str | None]`. Rationale: the middleware only stores
+  generated or accepted string correlation IDs and the unset state is `None`;
+  preserving that concrete type gives newer `ty` enough information to accept
+  token reset after runtime validation. Date/Author: 2026-06-24, implementer.
+
 ## Outcomes & retrospective
 
 Stage A proved that examples can be held to the same quality bar as package
@@ -294,6 +339,21 @@ Stages C and D delivered runnable examples, the canonical quickstart guide, a
 passing AST drift guard, and an approved snapshot for the log-format variant
 matrix. Stage E connected the new guide and tested-example convention into the
 repository documentation set.
+
+The branch was then rebased onto `origin/main`. Conflict resolution incorporated
+main's newer three-tier linting architecture and Interrogate dependency without
+dropping the quickstart work. Post-rebase validation passed the requested gates,
+and subsequent hook/CI feedback uncovered two follow-up issues: malformed
+Markdown fence boundaries in the design document and a stricter `ty 0.0.53`
+diagnostic for `ContextVar.reset`. Both were fixed in focused commits and
+validated with the relevant deterministic gates.
+
+Current implementation status: the quickstart guide, examples, ADR-002,
+drift-guard tests, BDD coverage, snapshot coverage, and documentation links are
+implemented and pushed. The latest full Python gate set reports
+`make test` as `433 passed, 11 skipped`; `make check-fmt`, `make typecheck`,
+`make lint`, and explicit `ty 0.0.53` checking pass. The remaining recorded
+review item is to run `coderabbit review --agent` and clear any concerns.
 
 ## Context and orientation
 
@@ -716,3 +776,8 @@ spike result; and noted the Markdown formatter's unrelated historical-doc churn.
 results, added runnable quickstart examples, wrote the AST-guarded guide,
 approved the logging snapshot, added ADR-002, and updated user, developer,
 design, roadmap, contents, and README documentation.
+
+2026-06-24: Recorded post-implementation status after rebase and CI follow-up
+fixes. Added progress, observations, decisions, and outcomes for the
+`origin/main` rebase, the Markdown hook failure, and the hosted `ty 0.0.53`
+`ContextVar.reset` diagnostic.

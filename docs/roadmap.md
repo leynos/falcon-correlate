@@ -221,6 +221,16 @@ Complete documentation, examples, and prepare for initial release.
   - [x] Provide minimal working example.
   - [x] Explain basic configuration options.
   - [x] Show logging integration.
+  - [x] Ship runnable examples under `examples/quickstart/` that are covered
+        by formatting, linting, typechecking, unit tests, BDD scenarios,
+        snapshot assertions, and an AST-based Markdown drift guard.
+  - [x] Record the tested-documentation convention in
+        [ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md)
+        and link the guide from the README, contents, users' guide, developers'
+        guide, and design document.
+  - [x] Rebase the completed work onto the three-tier linting baseline from
+        `origin/main`, keeping Interrogate and `syrupy` in the dev dependency
+        set and resolving the hosted `ty 0.0.53` `ContextVar.reset` diagnostic.
 - [ ] 6.2.2. Write advanced usage guide
   - [ ] Document trusted source configuration.
   - [ ] Document custom generator and validator usage.
