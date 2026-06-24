@@ -78,7 +78,7 @@ class _CorrelationIDMiddlewareBase:
         *,
         config: CorrelationIDConfig | None = None,
         correlation_id_context_var: contextvars.ContextVar[
-            typ.Any
+            str | None
         ] = correlation_id_var,
         **kwargs: object,
     ) -> None:
@@ -273,8 +273,9 @@ class _CorrelationIDMiddlewareBase:
             )
             return
 
+        typed_reset_token = typ.cast("contextvars.Token[str | None]", reset_token)
         try:
-            self._correlation_id_var.reset(reset_token)
+            self._correlation_id_var.reset(typed_reset_token)
         except ValueError:
             logger.debug(
                 "Ignoring invalid correlation ID reset token",
