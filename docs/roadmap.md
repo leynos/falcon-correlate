@@ -217,10 +217,10 @@ Complete documentation, examples, and prepare for initial release.
 
 ### 6.2. User guide and examples
 
-- [ ] 6.2.1. Write quickstart guide
-  - [ ] Provide minimal working example.
-  - [ ] Explain basic configuration options.
-  - [ ] Show logging integration.
+- [x] 6.2.1. Write quickstart guide
+  - [x] Provide minimal working example.
+  - [x] Explain basic configuration options.
+  - [x] Show logging integration.
 - [ ] 6.2.2. Write advanced usage guide
   - [ ] Document trusted source configuration.
   - [ ] Document custom generator and validator usage.
@@ -229,6 +229,9 @@ Complete documentation, examples, and prepare for initial release.
   - [ ] Create minimal Falcon WSGI example.
   - [ ] Create Falcon ASGI example.
   - [ ] Create example with Celery integration.
+  - [ ] Keep broader examples in sibling directories such as `examples/wsgi/`,
+        `examples/asgi/`, and `examples/celery/`; `examples/quickstart/`
+        remains owned by 6.2.1.
 
 ### 6.3. Release preparation
 
