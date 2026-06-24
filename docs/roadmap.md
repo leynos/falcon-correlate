@@ -217,10 +217,20 @@ Complete documentation, examples, and prepare for initial release.
 
 ### 6.2. User guide and examples
 
-- [ ] 6.2.1. Write quickstart guide
-  - [ ] Provide minimal working example.
-  - [ ] Explain basic configuration options.
-  - [ ] Show logging integration.
+- [x] 6.2.1. Write quickstart guide
+  - [x] Provide minimal working example.
+  - [x] Explain basic configuration options.
+  - [x] Show logging integration.
+  - [x] Ship runnable examples under `examples/quickstart/` that are covered
+        by formatting, linting, typechecking, unit tests, BDD scenarios,
+        snapshot assertions, and an AST-based Markdown drift guard.
+  - [x] Record the tested-documentation convention in
+        [ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md)
+        and link the guide from the README, contents, users' guide, developers'
+        guide, and design document.
+  - [x] Rebase the completed work onto the three-tier linting baseline from
+        `origin/main`, keeping Interrogate and `syrupy` in the dev dependency
+        set and resolving the hosted `ty 0.0.53` `ContextVar.reset` diagnostic.
 - [ ] 6.2.2. Write advanced usage guide
   - [ ] Document trusted source configuration.
   - [ ] Document custom generator and validator usage.
@@ -229,6 +239,9 @@ Complete documentation, examples, and prepare for initial release.
   - [ ] Create minimal Falcon WSGI example.
   - [ ] Create Falcon ASGI example.
   - [ ] Create example with Celery integration.
+  - [ ] Keep broader examples in sibling directories such as `examples/wsgi/`,
+        `examples/asgi/`, and `examples/celery/`; `examples/quickstart/`
+        remains owned by 6.2.1.
 
 ### 6.3. Release preparation
 

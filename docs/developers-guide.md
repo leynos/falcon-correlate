@@ -100,12 +100,51 @@ Follow the existing pattern in `tests/property/test_header_injection.py`:
 - assert on the external behaviour of the property rather than the generated
   example itself.
 
+## Tested documentation examples
+
+Runnable documentation examples live under `examples/`. They are source files,
+not Markdown-only snippets, so `make check-fmt`, `make typecheck`, `make lint`,
+and `make test` can inspect them. The Pylint tier includes `examples` in
+`PYLINT_TARGETS` for this reason.
+
+The quickstart guide embeds snippets from `examples/quickstart/`. Each source
+region is delimited with sentinel comments:
+
+```python
+# [quickstart:region-id]
+app.add_route("/hello", HelloResource())
+# [/quickstart:region-id]
+```
+
+The Markdown guide places an HTML marker immediately before the corresponding
+Python fence:
+
+````markdown
+<!-- quickstart:region-id -->
+
+```python
+app.add_route("/hello", HelloResource())
+```
+````
+
+`tests/docs/test_quickstart_doc_matches_examples.py` compares the Python
+abstract syntax tree (AST) for every marked fence with its source region. This
+allows harmless formatting and comment changes while failing on semantic drift.
+When adding a guarded snippet, add both markers and run:
+
+```bash
+uv run pytest tests/docs/test_quickstart_doc_matches_examples.py -v
+```
+
 ## Roadmap notes
 
 The three-tier linting work described in
 [ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md)
 is complete. Keep future linting changes aligned with that ADR unless a new
 ADR supersedes it.
+
+The tested quickstart example convention is described in
+[ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md).
 
 ## Running lint checks
 
@@ -142,7 +181,7 @@ The lint target is configured by these Makefile variables:
 | `UV`                   | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                 | Selects the `uv` launcher used by all Python tool commands.    |
 | `UV_ENV`               | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                | Keeps project-local `uv` cache and tool directories.           |
 | `PYLINT_PYTHON`        | `pypy`                                                                                        | Selects the Python runtime used for the Pylint tool execution. |
-| `PYLINT_TARGETS`       | `src tests`                                                                                   | Defines the source trees checked by the Pylint tier.           |
+| `PYLINT_TARGETS`       | `src tests examples`                                                                          | Defines the source trees checked by the Pylint tier.           |
 | `PYLINT_PYPY_SHIM_REF` | `726d09f968b4d729ee4b29c71fc732e744854f3b`                                                    | Pins the `pylint-pypy-shim` repository revision.               |
 | `PYLINT_PYPY_SHIM`     | `git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)`                  | Identifies the shim package installed by `uv tool run`.        |
 | `PYLINT`               | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                |

@@ -822,6 +822,11 @@ Falcon correlation ID middleware. These examples assume a Falcon WSGI
 application for simplicity, but adaptations for ASGI would primarily involve
 `async` methods and type hints.
 
+The canonical quickstart tutorial is backed by runnable source files under
+`examples/quickstart/`. Its Markdown snippets are compared with those source
+regions by an AST-based drift guard, as recorded in
+[ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md).
+
 ### 4.1. Core middleware code snippet (Falcon WSGI)
 
 ```python
@@ -948,28 +953,29 @@ class ContextualLogFilter(logging.Filter):
 #     'filters': {
 #         'contextual_filter': {
 #             '()': ContextualLogFilter,  # Path to your filter class
-#         }
+# }
 #     },
 #     'formatters': {
 #         'standard': {
 #             'format': (
 #                 '%(asctime)s [%(levelname)s][%(correlation_id)s]'
 #                 '[%(user_id)s] %(name)s: %(message)s'
-#             )
-#         },
+# )
+
+#     },
 #     },
 #     'handlers': {
 #         'console': {
-#             'level': 'INFO',
+#         'level': 'INFO',
 #             'filters': ['contextual_filter'],
 #             'class': 'logging.StreamHandler',
 #             'formatter': 'standard'
-#         },
+#     },
 #     },
 #     'root': {
 #         'handlers': ['console'],
 #         'level': 'INFO',
-#     }
+# }
 # }
 # logging.config.dictConfig(LOGGING_CONFIG)
 ```
@@ -1023,6 +1029,7 @@ async def async_client_request_with_correlation_id(
 # response = client_request_with_correlation_id(
 #     'GET', 'https://api.example.com/data'
 # )
+
 # response = await async_client_request_with_correlation_id(
 #     'POST', 'https://api.example.com/submit', json={...}
 # )
