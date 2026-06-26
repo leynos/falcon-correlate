@@ -205,4 +205,7 @@ target/
 
 .crush/
 
+# memtrace daemon runtime artifacts
+.memdb/
+
 bin/act
