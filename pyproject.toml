@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "falcon>=4,<5",
+    "falcon>=4.3.1,<5",
     "uuid-utils>=0.14,<1; python_version < \"3.14\"",
 ]
 
