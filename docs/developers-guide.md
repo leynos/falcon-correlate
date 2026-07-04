@@ -104,15 +104,13 @@ Follow the existing pattern in `tests/property/test_header_injection.py`:
 ## Tested documentation examples
 
 Runnable documentation examples live under `examples/`. They are source files,
-not Markdown-only snippets, so `make check-fmt`, `make typecheck`, `make lint`,
-and `make test` can inspect them. The Pylint tier includes `examples` in
-`PYLINT_TARGETS` for this reason.
+not Markdown-only snippets. The Pylint tier includes `examples` in
+`PYLINT_TARGETS` so runnable documentation examples are covered by that tier.
 
 The quickstart guide embeds snippets from `examples/quickstart/`. Each source
 region is delimited with sentinel comments:
 
 ```python
-
 # [quickstart:region-id]
 app.add_route("/hello", HelloResource())
 

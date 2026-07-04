@@ -90,6 +90,12 @@ X-Correlation-ID: 019b...
 Use `CorrelationIDConfig` when the application needs to make the header name,
 trusted sources, and response echoing policy explicit:
 
+Add the configuration import to the same `app.py` file used above:
+
+```python
+from falcon_correlate import CorrelationIDConfig
+```
+
 <!-- quickstart:configured-config -->
 
 ```python
@@ -135,11 +141,30 @@ curl -i -H 'X-Correlation-ID: cid-quickstart-1' http://127.0.0.1:8000/hello
 
 Configure a logger with `ContextualLogFilter` and `RECOMMENDED_LOG_FORMAT`:
 
+Create `logging_setup.py` with the imports used by the logging example:
+
+```python
+import logging
+
+from falcon_correlate import RECOMMENDED_LOG_FORMAT, ContextualLogFilter
+```
+
 <!-- quickstart:logging-config -->
 
 ```python
 def configure_logging() -> logging.Logger:
     """Create a logger that includes correlation context.
+
+    Returns
+    -------
+    logging.Logger
+        Logger named ``quickstart`` with one stream handler, the recommended
+        formatter, and the contextual logging filter attached.
+
+    Notes
+    -----
+    The example clears existing handlers on the named logger so repeated
+    quickstart runs do not duplicate output.
 
     Examples
     --------
@@ -167,12 +192,22 @@ Then use the logger in request-handling code:
 def log_request(logger: logging.Logger) -> None:
     """Log one example request event.
 
+    Parameters
+    ----------
+    logger : logging.Logger
+        Logger returned by ``configure_logging()``.
+
+    Returns
+    -------
+    None
+        The function emits a log record for its side effect.
+
     Examples
     --------
     >>> logger = configure_logging()
     >>> log_request(logger)
     """
-    logger.info("handled request")
+    return logger.info("handled request")
 ```
 
 When the middleware has established a request context, emitted log lines

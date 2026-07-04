@@ -32,10 +32,15 @@ def _extract_guide_regions(path: pathlib.Path) -> dict[str, str]:
     """Extract tagged Python fences from the quickstart guide."""
     assert path.exists(), f"{path} must exist"
     text = path.read_text(encoding="utf-8")
-    return {
-        match.group("id"): match.group("src")
-        for match in _MARKER_PATTERN.finditer(text)
-    }
+    regions: dict[str, str] = {}
+    for match in _MARKER_PATTERN.finditer(text):
+        _add_region(
+            regions,
+            region_id=match.group("id"),
+            source=match.group("src"),
+            origin=path,
+        )
+    return regions
 
 
 def _extract_source_regions(directory: pathlib.Path) -> dict[str, str]:
@@ -43,7 +48,8 @@ def _extract_source_regions(directory: pathlib.Path) -> dict[str, str]:
     assert directory.exists(), f"{directory} must exist"
     regions: dict[str, str] = {}
     for path in sorted(directory.glob("*.py")):
-        regions.update(_extract_regions_from_source(path))
+        for region_id, source in _extract_regions_from_source(path).items():
+            _add_region(regions, region_id=region_id, source=source, origin=path)
     return regions
 
 
@@ -63,7 +69,12 @@ def _extract_regions_from_source(path: pathlib.Path) -> dict[str, str]:
         if current_id is not None and line == _END_TEMPLATE.format(
             region_id=current_id,
         ):
-            regions[current_id] = "\n".join(current_lines)
+            _add_region(
+                regions,
+                region_id=current_id,
+                source="\n".join(current_lines),
+                origin=path,
+            )
             current_id = None
             current_lines = []
             continue
@@ -72,6 +83,20 @@ def _extract_regions_from_source(path: pathlib.Path) -> dict[str, str]:
 
     assert current_id is None, f"unterminated quickstart region in {path}"
     return regions
+
+
+def _add_region(
+    regions: dict[str, str],
+    *,
+    region_id: str,
+    source: str,
+    origin: pathlib.Path,
+) -> None:
+    """Add one region, rejecting duplicate quickstart ids."""
+    assert region_id not in regions, (
+        f"duplicate quickstart region {region_id!r} in {origin}"
+    )
+    regions[region_id] = source
 
 
 def _normalised_ast(source: str) -> str:

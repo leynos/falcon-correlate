@@ -953,29 +953,28 @@ class ContextualLogFilter(logging.Filter):
 #     'filters': {
 #         'contextual_filter': {
 #             '()': ContextualLogFilter,  # Path to your filter class
-# }
+#         },
 #     },
 #     'formatters': {
 #         'standard': {
 #             'format': (
 #                 '%(asctime)s [%(levelname)s][%(correlation_id)s]'
 #                 '[%(user_id)s] %(name)s: %(message)s'
-# )
-
-#     },
+#             ),
+#         },
 #     },
 #     'handlers': {
 #         'console': {
-#         'level': 'INFO',
+#             'level': 'INFO',
 #             'filters': ['contextual_filter'],
 #             'class': 'logging.StreamHandler',
 #             'formatter': 'standard'
-#     },
+#         },
 #     },
 #     'root': {
 #         'handlers': ['console'],
 #         'level': 'INFO',
-# }
+#     },
 # }
 # logging.config.dictConfig(LOGGING_CONFIG)
 ```
