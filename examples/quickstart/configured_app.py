@@ -17,8 +17,21 @@ config = CorrelationIDConfig(
 
 
 # [quickstart:configured-app]
-app: falcon.App = falcon.App(
-    middleware=[CorrelationIDMiddleware(config=config)],
-)
-app.add_route("/hello", HelloResource())
+def build_app(app_config: CorrelationIDConfig) -> falcon.App:
+    """Create the configured Falcon app.
+
+    Examples
+    --------
+    >>> configured = build_app(config)
+    >>> isinstance(configured, falcon.App)
+    True
+    """
+    configured_app = falcon.App(
+        middleware=[CorrelationIDMiddleware(config=app_config)],
+    )
+    configured_app.add_route("/hello", HelloResource())
+    return configured_app
+
+
+app: falcon.App = build_app(config)
 # [/quickstart:configured-app]

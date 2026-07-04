@@ -35,6 +35,7 @@ _ASCTIME_PATTERN = re.compile(
 _LOG_FORMAT_VARIANTS = (
     ("cid-snapshot-1", "uid-snapshot-1"),
     ("cid-snapshot-1", None),
+    (None, "uid-snapshot-1"),
     (None, None),
 )
 

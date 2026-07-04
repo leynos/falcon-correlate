@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import importlib
 import io
 import logging
@@ -14,12 +15,10 @@ from pytest_bdd import given, parsers, scenarios, then, when
 
 from falcon_correlate import (
     CorrelationIDConfig,
-    CorrelationIDMiddleware,
     correlation_id_var,
     default_uuid_validator,
     user_id_var,
 )
-from tests.conftest import CorrelationEchoResource
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -106,20 +105,15 @@ def given_configured_quickstart_app(context: Context) -> Context:
     target_fixture="context",
 )
 def given_untrusted_configured_quickstart_app(context: Context) -> Context:
-    """Build a configured-style app that trusts no incoming sources."""
+    """Load the configured quickstart app with only trusted sources varied."""
     module = _load_quickstart_module("configured_app")
     config = typ.cast("CorrelationIDConfig", vars(module)["config"])
-    app = falcon.App(
-        middleware=[
-            CorrelationIDMiddleware(
-                header_name=config.header_name,
-                trusted_sources=[],
-                echo_header_in_response=config.echo_header_in_response,
-            ),
-        ],
+    build_app = typ.cast(
+        "cabc.Callable[[CorrelationIDConfig], falcon.App]",
+        vars(module)["build_app"],
     )
-    app.add_route("/hello", CorrelationEchoResource())
-    return _configure_client(context, app)
+    untrusted_config = dataclasses.replace(config, trusted_sources=frozenset())
+    return _configure_client(context, build_app(untrusted_config))
 
 
 @given("the quickstart logging configuration", target_fixture="context")

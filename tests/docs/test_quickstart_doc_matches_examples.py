@@ -6,8 +6,9 @@ import ast
 import pathlib
 import re
 
-_QUICKSTART_DOC = pathlib.Path("docs/quickstart.md")
-_EXAMPLES_DIR = pathlib.Path("examples/quickstart")
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
+_QUICKSTART_DOC = _REPO_ROOT / "docs/quickstart.md"
+_EXAMPLES_DIR = _REPO_ROOT / "examples/quickstart"
 _MARKER_PATTERN = re.compile(
     r"<!-- quickstart:(?P<id>[a-z0-9-]+) -->\s*```python\n(?P<src>.*?)\n```",
     re.DOTALL,

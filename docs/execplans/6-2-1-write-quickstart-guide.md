@@ -174,6 +174,10 @@ Success is observable when:
 - [x] (2026-06-24 14:38Z) Re-ran deterministic gates after the CI type fix:
   `make check-fmt`, `make typecheck`, `make lint`, focused middleware context
   tests (`18 passed`), and `make test` (`433 passed, 11 skipped`).
+- [x] (2026-07-04) Addressed review findings in the quickstart tests: added
+  the missing user-only logging snapshot variant, drove the untrusted
+  behavioural scenario through the configured example's app factory, and
+  anchored the drift guard to the repository root.
 - [ ] Stage F: run a `coderabbit review --agent` pass and clear all concerns.
 
 ## Surprises & discoveries
@@ -241,6 +245,18 @@ Success is observable when:
   `ContextVar[str | None]`, matching the exported `correlation_id_var`, and
   casting the runtime-verified token to `Token[str | None]` satisfies both
   checker versions without changing runtime behaviour.
+- Observation: follow-up review found two coverage gaps in the quickstart
+  tests. The logging snapshot covered `(correlation_id, user_id)`,
+  `(correlation_id, None)`, and `(None, None)`, but missed `(None, user_id)`.
+  The untrusted-ID behavioural scenario also rebuilt a bespoke app with the
+  test-only `CorrelationEchoResource`, so it did not exercise the documented
+  configured example boundary. The fix adds the missing snapshot row and
+  drives the scenario through `examples.quickstart.configured_app.build_app`,
+  varying only `trusted_sources`.
+- Observation: the first drift guard used paths relative to the process
+  current working directory. Anchoring `docs/quickstart.md` and
+  `examples/quickstart/` from `__file__` makes the guard stable when pytest is
+  invoked from outside the repository root.
 
 ## Decision log
 
@@ -329,6 +345,13 @@ Success is observable when:
   generated or accepted string correlation IDs and the unset state is `None`;
   preserving that concrete type gives newer `ty` enough information to accept
   token reset after runtime validation. Date/Author: 2026-06-24, implementer.
+
+- Decision: expose `build_app(config)` from the configured quickstart example
+  and use it in behavioural tests. Rationale: the untrusted-ID scenario needs
+  to vary `trusted_sources` to prove replacement behaviour, but it should keep
+  the documented resource, route, and middleware construction path from the
+  real example rather than rebuilding a parallel test-only app. Date/Author:
+  2026-07-04, implementer.
 
 ## Outcomes & retrospective
 

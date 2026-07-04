@@ -3,6 +3,7 @@
   '''
   <asctime> - [INFO] - [cid-snapshot-1] - [uid-snapshot-1] - quickstart.snapshot - snapshot message
   <asctime> - [INFO] - [cid-snapshot-1] - [-] - quickstart.snapshot - snapshot message
+  <asctime> - [INFO] - [-] - [uid-snapshot-1] - quickstart.snapshot - snapshot message
   <asctime> - [INFO] - [-] - [-] - quickstart.snapshot - snapshot message
   '''
 # ---
