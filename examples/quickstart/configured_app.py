@@ -20,6 +20,16 @@ config = CorrelationIDConfig(
 def build_app(app_config: CorrelationIDConfig) -> falcon.App:
     """Create the configured Falcon app.
 
+    Parameters
+    ----------
+    app_config : CorrelationIDConfig
+        Correlation-ID middleware configuration for the app.
+
+    Returns
+    -------
+    falcon.App
+        The configured Falcon application.
+
     Examples
     --------
     >>> configured = build_app(config)

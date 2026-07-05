@@ -26,6 +26,18 @@ class HelloResource:
     def on_get(self, _req: falcon.Request, resp: falcon.Response) -> None:
         """Handle ``GET /hello``.
 
+        Parameters
+        ----------
+        _req : falcon.Request
+            The incoming Falcon request.
+        resp : falcon.Response
+            The Falcon response to populate.
+
+        Returns
+        -------
+        None
+            This handler only mutates ``resp``.
+
         Examples
         --------
         >>> resource = HelloResource()

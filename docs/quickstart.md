@@ -46,6 +46,18 @@ class HelloResource:
     def on_get(self, _req: falcon.Request, resp: falcon.Response) -> None:
         """Handle ``GET /hello``.
 
+        Parameters
+        ----------
+        _req : falcon.Request
+            The incoming Falcon request.
+        resp : falcon.Response
+            The Falcon response to populate.
+
+        Returns
+        -------
+        None
+            This handler only mutates ``resp``.
+
         Examples
         --------
         >>> resource = HelloResource()
@@ -113,6 +125,16 @@ Wire the config into the middleware:
 ```python
 def build_app(app_config: CorrelationIDConfig) -> falcon.App:
     """Create the configured Falcon app.
+
+    Parameters
+    ----------
+    app_config : CorrelationIDConfig
+        Correlation-ID middleware configuration for the app.
+
+    Returns
+    -------
+    falcon.App
+        The configured Falcon application.
 
     Examples
     --------

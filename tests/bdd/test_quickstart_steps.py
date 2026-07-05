@@ -175,20 +175,28 @@ def when_example_emits_log_message(context: Context, message: str) -> None:
 @then(parsers.parse("the response status should be {status_code:d}"))
 def then_response_status_should_be(context: Context, status_code: int) -> None:
     """Verify the response status code."""
-    assert context["response"].status_code == status_code
+    actual_status = context["response"].status_code
+    assert actual_status == status_code, (
+        f"expected response status {status_code}, got {actual_status}"
+    )
 
 
 @then("the response should include a valid correlation ID header")
 def then_response_should_include_valid_correlation_id(context: Context) -> None:
     """Verify the default response correlation ID header is valid."""
     correlation_id = context["response"].headers["X-Correlation-ID"]
-    assert default_uuid_validator(correlation_id)
+    assert default_uuid_validator(correlation_id), (
+        f"expected a valid X-Correlation-ID header, got {correlation_id!r}"
+    )
 
 
 @then(parsers.parse('the response correlation ID header should be "{expected}"'))
 def then_response_correlation_id_should_be(context: Context, expected: str) -> None:
     """Verify the response correlation ID header equals the expected value."""
-    assert context["response"].headers["X-Correlation-ID"] == expected
+    actual = context["response"].headers["X-Correlation-ID"]
+    assert actual == expected, (
+        f"expected X-Correlation-ID header {expected!r}, got {actual!r}"
+    )
 
 
 @then(parsers.parse('the response correlation ID header should not be "{unexpected}"'))
@@ -197,10 +205,16 @@ def then_response_correlation_id_should_not_be(
     unexpected: str,
 ) -> None:
     """Verify the response correlation ID header is not an unexpected value."""
-    assert context["response"].headers["X-Correlation-ID"] != unexpected
+    actual = context["response"].headers["X-Correlation-ID"]
+    assert actual != unexpected, (
+        f"expected X-Correlation-ID header not to be {unexpected!r}, got {actual!r}"
+    )
 
 
 @then(parsers.parse('the log output should contain "{expected}"'))
 def then_log_output_should_contain(context: Context, expected: str) -> None:
     """Verify the logging example output contains expected text."""
-    assert expected in context["stream"].getvalue()
+    output = context["stream"].getvalue()
+    assert expected in output, (
+        f"expected log output to contain {expected!r}: {output!r}"
+    )
