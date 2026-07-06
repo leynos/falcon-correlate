@@ -211,6 +211,10 @@ $(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
 $(PYLINT) $(PYLINT_TARGETS)
 ```
 
+Continuous Integration installs `interrogate` as a uv tool before this target
+runs so the same 100% package docstring coverage gate is available locally and
+in CI.
+
 The target should be run before committing changes that affect Python code,
 tests, or lint configuration. When diagnosing failures, fix Ruff findings
 first, then rerun `make lint` so the Pylint tier sees the post-Ruff state.

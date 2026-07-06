@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: BLOCKED
+Status: IN PROGRESS
 
 ## Purpose / big picture
 
@@ -171,6 +171,12 @@ Stop and escalate when any of these is reached:
   `DOC` gate would keep the work within the original tolerance while still
   enforcing public and private runtime API docstring content.
 
+- Observation: the broader `DOC` scope is reconfirmed. Evidence: on 2026-07-06,
+  the user responded "This is fine. Please proceed." to the 99-violation
+  baseline. Impact: continue with repo-wide `DOC` coverage, including
+  package-local unit tests and helpers, despite exceeding the original
+  tolerance.
+
 - Observation: 6.1.1 is largely already implemented. Most public symbols carry
   substantial NumPy docstrings, added incrementally by the milestone plans for
   sections 2–5. Evidence: `leta show` of each `__all__` symbol; Ruff `D` is
@@ -188,6 +194,15 @@ Stop and escalate when any of these is reached:
   Evidence: `pyproject.toml` ruff section. Impact: enabling `DOC` rules needs
   only adding `"DOC"` to `select`; no extra flag.
 
+- Observation: Interrogate is already present in the local lint target and dev
+  dependency group, but CI did not install the `interrogate` uv tool before
+  `make lint`. Evidence: `Makefile` runs
+  `uv run interrogate --fail-under 100 $(INTERROGATE_TARGETS)`, while
+  `.github/workflows/ci.yml` installed only `mbake`, `ty`, and `ruff` as uv
+  tools before the lint step. Impact: install `interrogate` in CI and document
+  the 100% docstring-coverage gate in `AGENTS.md` and
+  `docs/developers-guide.md` before continuing with the `DOC` implementation.
+
 ## Decision log
 
 - Decision: Stop before enabling repo-wide `DOC` because the measured baseline
@@ -200,6 +215,13 @@ Stop and escalate when any of these is reached:
   with a per-file ignore for `src/falcon_correlate/unittests/**`; or (3) stage
   this as two commits/PRs, runtime package first and test-suite `DOC` cleanup
   later. Date/Author: 2026-06-26, implementation agent.
+
+- Decision: Proceed with the original repo-wide `DOC` scope despite the
+  99-violation baseline. Rationale: the user explicitly reconfirmed the scope
+  on 2026-07-06 after the implementation agent reported the tolerance breach.
+  The committed gate should cover `src/falcon_correlate`, including
+  package-local unit tests and helper modules. Date/Author: 2026-07-06, user +
+  implementation agent.
 
 - Decision: Document module-level public variables (`correlation_id_var`,
   `user_id_var`, `RECOMMENDED_LOG_FORMAT`) with inline attribute docstrings (a
@@ -332,8 +354,8 @@ Documentation cross-references the docstrings must stay consistent with:
 Relevant tooling and commands (verified):
 
 - `make check-fmt` → `uv run ruff format --check`.
-- `make lint` → `uv run ruff check` then a PyPy-backed Pylint pass over
-  `src tests`.
+- `make lint` → `uv run ruff check`, `uv run interrogate --fail-under 100`
+  over `src/falcon_correlate`, then a PyPy-backed Pylint pass over `src tests`.
 - `make typecheck` → `ty check`.
 - `make test` → `uv run pytest -v -n auto`.
 - `make markdownlint` → `markdownlint-cli2 '**/*.md'`; `make nixie` validates
