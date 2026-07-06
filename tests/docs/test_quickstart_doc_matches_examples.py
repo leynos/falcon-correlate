@@ -1,9 +1,12 @@
-"""Drift guard for quickstart snippets embedded in Markdown.
+"""Drift guard between quickstart documentation and runnable examples.
 
-This module keeps ``docs/quickstart.md`` aligned with the runnable examples in
-``examples/quickstart/*.py``. It extracts matching marker-delimited regions from
-the Markdown guide and Python source files, parses both snippets into ASTs, and
-compares those ASTs so formatting-only differences do not fail the test.
+This module keeps ``docs/quickstart.md`` aligned with
+``examples/quickstart/*.py``. It matches sentinel-marked Markdown fences against
+``# [quickstart:id]`` regions in the example modules, then compares their ASTs
+with ``ast.dump`` to catch semantic drift without depending on formatting.
+
+The guard implements the tested-documentation convention described in
+``docs/adr-002-tested-documentation-examples.md``.
 """
 
 from __future__ import annotations
