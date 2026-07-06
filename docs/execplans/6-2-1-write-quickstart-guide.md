@@ -54,10 +54,13 @@ Success is observable when:
 
 - Follow test-driven development: write the failing test (or `.feature`
   scenario) first, observe red for the intended reason, then implement.
-- Do not change any existing public API signature, existing test, or library
-  source under `src/falcon_correlate/`. This task adds documentation, example
-  modules, and tests only. (Edits to `Makefile`, `pyproject.toml`, and the
-  `docs/` tree are expected and in scope.)
+- Do not change any existing public API signature. Internal typing fixes under
+  `src/falcon_correlate/` are out of scope except for the already-recorded
+  narrow `ContextVar` typing fix in the middleware, which remains permitted if
+  needed to keep the documented example and tooling state consistent. This task
+  otherwise adds documentation, example modules, and tests only. (Edits to
+  `Makefile`, `pyproject.toml`, and the `docs/` tree are expected and in
+  scope.)
 - Example modules must satisfy the full gate set: `ruff format`, `ruff check`
   (including `D`, `ANN`, `RET`, `S`, `N`, `PLR`), the PyPy-backed pylint pass,
   and the `ty` type checker. No `# noqa` or `# type: ignore` without a comment

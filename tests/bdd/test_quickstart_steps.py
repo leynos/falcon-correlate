@@ -1,9 +1,13 @@
-"""Step definitions for quickstart.feature."""
+"""BDD step definitions for the quickstart guide examples.
+
+These steps execute the runnable modules that back ``docs/quickstart.md`` so
+the guide, examples, and behavioural scenarios stay aligned as the tutorial
+evolves.
+"""
 
 from __future__ import annotations
 
 import dataclasses
-import importlib
 import io
 import logging
 import typing as typ
@@ -19,11 +23,11 @@ from falcon_correlate import (
     default_uuid_validator,
     user_id_var,
 )
+from tests._quickstart_support import _load_quickstart_module
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
     import contextvars
-    import types
 
 scenarios("quickstart.feature")
 
@@ -66,11 +70,6 @@ def _cleanup_logger(context: Context) -> cabc.Generator[None, None, None]:
 def context() -> Context:
     """Provide mutable state for a quickstart scenario."""
     return {}
-
-
-def _load_quickstart_module(module_name: str) -> types.ModuleType:
-    """Import a quickstart example module by short name."""
-    return importlib.import_module(f"examples.quickstart.{module_name}")
 
 
 def _configure_client(context: Context, app: falcon.App) -> Context:

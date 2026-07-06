@@ -68,7 +68,7 @@ def log_request(logger: logging.Logger) -> None:
     >>> logger = configure_logging()
     >>> log_request(logger)
     """
-    return logger.info("handled request")
+    logger.info("handled request")
 
 
 # [/quickstart:logging-usage]

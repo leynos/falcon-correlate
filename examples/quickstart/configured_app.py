@@ -1,4 +1,10 @@
-"""Configured Falcon WSGI app from the quickstart guide."""
+"""Configured Falcon WSGI example for the quickstart guide.
+
+This module extends the minimal quickstart app with documented middleware
+configuration. The guide and tests use it to show how the configurable header
+name, trusted sources, and response echo settings fit into the same runnable
+example.
+"""
 
 from __future__ import annotations
 

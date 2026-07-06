@@ -1,4 +1,9 @@
-"""Minimal Falcon WSGI app from the quickstart guide."""
+"""Minimal Falcon WSGI example for the quickstart guide.
+
+This module holds the smallest runnable application shown in
+``docs/quickstart.md``. The tests import it to prove the guide's minimal route
+still returns the documented response and correlation ID header.
+"""
 
 from __future__ import annotations
 

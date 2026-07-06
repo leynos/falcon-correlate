@@ -1,8 +1,11 @@
-"""Tests for the quickstart example modules."""
+"""Unit tests for the quickstart example modules.
+
+The tests exercise the source modules embedded in ``docs/quickstart.md`` so
+the guide's snippets, runnable examples, and logging snapshot remain in sync.
+"""
 
 from __future__ import annotations
 
-import importlib
 import io
 import itertools
 import logging
@@ -21,6 +24,7 @@ from falcon_correlate import (
     default_uuid_validator,
     user_id_var,
 )
+from tests._quickstart_support import _load_quickstart_module
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -29,20 +33,13 @@ if typ.TYPE_CHECKING:
     from syrupy.assertion import SnapshotAssertion
 
 
-_ASCTIME_PATTERN = re.compile(
-    r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}",
-)
+_ASCTIME_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}")
 _LOG_FORMAT_VARIANTS = (
     ("cid-snapshot-1", "uid-snapshot-1"),
     ("cid-snapshot-1", None),
     (None, "uid-snapshot-1"),
     (None, None),
 )
-
-
-def _load_quickstart_module(module_name: str) -> types.ModuleType:
-    """Import a quickstart example module by short name."""
-    return importlib.import_module(f"examples.quickstart.{module_name}")
 
 
 def _example_app(module: types.ModuleType) -> falcon.App:
@@ -60,10 +57,16 @@ class TestQuickstartMinimalApp:
 
         result = client.simulate_get("/hello")
 
-        assert result.status_code == HTTPStatus.OK
-        assert result.json == {"message": "hello"}
+        assert result.status_code == HTTPStatus.OK, (
+            f"expected minimal app status {HTTPStatus.OK}, got {result.status_code}"
+        )
+        assert result.json == {"message": "hello"}, (
+            f"expected minimal app JSON body, got {result.json!r}"
+        )
         correlation_id = result.headers["X-Correlation-ID"]
-        assert default_uuid_validator(correlation_id)
+        assert default_uuid_validator(correlation_id), (
+            f"expected generated X-Correlation-ID to be a UUID, got {correlation_id!r}"
+        )
 
 
 class TestQuickstartConfiguredApp:
@@ -79,17 +82,29 @@ class TestQuickstartConfiguredApp:
             headers={"X-Correlation-ID": "cid-quickstart-1"},
         )
 
-        assert result.status_code == HTTPStatus.OK
-        assert result.headers["X-Correlation-ID"] == "cid-quickstart-1"
+        assert result.status_code == HTTPStatus.OK, (
+            f"expected configured app status {HTTPStatus.OK}, got {result.status_code}"
+        )
+        actual_correlation_id = result.headers["X-Correlation-ID"]
+        assert actual_correlation_id == "cid-quickstart-1", (
+            "expected trusted incoming X-Correlation-ID to be echoed, "
+            f"got {actual_correlation_id!r}"
+        )
 
     def test_configured_app_exports_the_documented_config(self) -> None:
         """Verify the configured example exposes the documented options."""
         module = _load_quickstart_module("configured_app")
         config = typ.cast("CorrelationIDConfig", vars(module)["config"])
 
-        assert config.header_name == "X-Correlation-ID"
-        assert config.trusted_sources == frozenset({"127.0.0.1"})
-        assert config.echo_header_in_response is True
+        assert config.header_name == "X-Correlation-ID", (
+            f"expected documented header name, got {config.header_name!r}"
+        )
+        assert config.trusted_sources == frozenset({"127.0.0.1"}), (
+            f"expected localhost trusted source, got {config.trusted_sources!r}"
+        )
+        assert config.echo_header_in_response is True, (
+            "expected configured example to echo correlation IDs in responses"
+        )
 
 
 class TestQuickstartLoggingSetup:
@@ -126,15 +141,24 @@ class TestQuickstartLoggingSetup:
                 handler.close()
 
         output = stream.getvalue()
-        assert "cid-log-1" in output
-        assert "uid-log-1" in output
-        assert "hello from quickstart" in output
+        assert "cid-log-1" in output, (
+            f"expected correlation ID in quickstart log output, got {output!r}"
+        )
+        assert "uid-log-1" in output, (
+            f"expected user ID in quickstart log output, got {output!r}"
+        )
+        assert "hello from quickstart" in output, (
+            f"expected message in quickstart log output, got {output!r}"
+        )
 
     def test_log_format_variants(self, snapshot: SnapshotAssertion) -> None:
         """Verify contextual placeholder variants keep a stable text shape."""
         rendered = list(itertools.starmap(_render_log_line, _LOG_FORMAT_VARIANTS))
 
-        assert "\n".join(rendered) == snapshot
+        actual_snapshot = "\n".join(rendered)
+        assert actual_snapshot == snapshot, (
+            "expected quickstart log format variants to match the approved snapshot"
+        )
 
 
 def _render_log_line(correlation_id: str | None, user_id: str | None) -> str:

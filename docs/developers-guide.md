@@ -52,6 +52,14 @@ provide. `middleware.py` exposes the WSGI middleware hooks, while
 `middleware_asgi.py` exposes the public ASGI class with `async`
 `process_request` and `process_response` hooks that delegate to the shared base.
 
+The middleware's request-scoped correlation ID context variable is typed as
+`contextvars.ContextVar[str | None]`, matching the exported
+`correlation_id_var`. That narrow typing keeps `ty` and Ruff's annotation
+checks aligned with the runtime state without changing any public API shape.
+The corresponding `ContextVar.reset()` calls cast the verified token back to
+`Token[str | None]`, which keeps the middleware clear to the type checker while
+preserving the runtime contract.
+
 `process_response` in `middleware.py` is responsible for the response-header
 echo and cleanup path. It copies `req.context.correlation_id` into the
 configured response header only when `echo_header_in_response` is enabled, the
