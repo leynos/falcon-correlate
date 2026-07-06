@@ -16,7 +16,7 @@ guarantees that those docstrings stay accurate. A newcomer running
 and constant; documented parameters, return values, and raised exceptions that
 match the actual signatures; and runnable usage examples.
 
-You can observe success in four ways:
+Success is observable in four ways:
 
 1. `make lint` passes with the Ruff `DOC` (pydoclint) rule group enabled, so
    any docstring whose `Parameters`/`Returns`/`Raises` sections drift from the
@@ -150,9 +150,10 @@ Stop and escalate when any of these is reached:
   group, and an Interrogate package docstring coverage tier in `make lint`.
   Evidence: `make lint` now runs
   `uv run interrogate --fail-under 100 src/falcon_correlate`; the old plan
-  reference `docs/adr-001-two-tier-linting.md` no longer exists. Impact:
-  ADR-002 should cite the three-tier linting ADR and describe `DOC` as a
-  content-accuracy complement to Interrogate's coverage threshold.
+  reference `docs/adr-001-three-tier-linting.md` supersedes the old linting ADR
+  template name. Impact: ADR-002 should cite the three-tier linting ADR and
+  describe `DOC` as a content-accuracy complement to Interrogate's coverage
+  threshold.
 
 - Observation: a `DOC` baseline over `src/falcon_correlate` reports 99
   violations across runtime modules, package-local unit tests, and test helper
@@ -225,7 +226,7 @@ Stop and escalate when any of these is reached:
   (`docs/adr-002-*`), referenced from the design document and
   `docs/contents.md`, and add a "Docstring conventions" section to
   `docs/developers-guide.md`. Rationale: user selection during planning;
-  matches the existing `adr-001-two-tier-linting.md` practice. Date/Author:
+  matches the existing `adr-001-three-tier-linting.md` practice. Date/Author:
   2026-06-17, user + planning agent.
 
 ## Outcomes & retrospective
@@ -355,7 +356,7 @@ they pass (Green), then tidy prose, spelling, and cross-references (Refactor).
 
 No code changes. Reconfirm the gap analysis against the current tree with
 `leta show <symbol>` and `leta grep`, because line numbers above are
-approximate. Read `docs/adr-001-two-tier-linting.md` as the ADR template and
+approximate. Read `docs/adr-001-three-tier-linting.md` as the ADR template and
 `docs/documentation-style-guide.md` for spelling and example conventions. Load
 the `leta`, `python-types-and-apis`, `python-testing`,
 `python-errors-and-logging`, and `en-gb-oxendict` skills (see Interfaces and
@@ -489,7 +490,7 @@ Surprises & Discoveries.
 ### Stage D — refactor and documentation (Milestone 5)
 
 1. Write `docs/adr-002-docstring-completeness-and-doctest-gates.md` in the style
-   of `docs/adr-001-two-tier-linting.md`. Capture: NumPy convention; inline
+   of `docs/adr-001-three-tier-linting.md`. Capture: NumPy convention; inline
    attribute-docstring rule for module variables; repo-wide `DOC` gate with the
    pinned Ruff version; the doctest gate and the "executable `>>>` only for
    offline examples" rule; and the rationale.
