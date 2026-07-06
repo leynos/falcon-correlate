@@ -340,6 +340,21 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
 
+[tool.mutmut]
+source_paths = ["src/falcon_correlate/"]
+# tests/test_interrogate_docstring_coverage.py and tests/workflow_contracts/
+# are excluded: they audit repository metadata (interrogate over the source
+# tree, .github/ workflow files) that is either rewritten or absent inside
+# mutmut's mutants/ working copy, and they kill no mutants.
+pytest_add_cli_args_test_selection = [
+    "tests/bdd/",
+    "tests/property/",
+    "src/falcon_correlate/unittests/",
+]
+# The in-package unit tests are test code, not product code; mutating them
+# would only produce unattributable survivors.
+do_not_mutate = ["src/falcon_correlate/unittests/*"]
+
 [tool.uv]
 package = true
 
