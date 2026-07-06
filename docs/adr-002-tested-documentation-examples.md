@@ -50,14 +50,12 @@ app.add_route("/hello", HelloResource())
 
 `tests/docs/test_quickstart_doc_matches_examples.py` parses both sides and
 compares `ast.dump(ast.parse(...), include_attributes=False)`. This checks the
-semantic Python shape while ignoring whitespace, comments, and line wrapping.
+semantic Python shape, while ignoring whitespace, comments, and line wrapping.
 
 `make lint` includes `examples` in `PYLINT_TARGETS` so the second lint tier
 inspects runnable examples as well as `src` and `tests`.
 
-## Consequences
-
-Positive consequences:
+## Architectural Rationale
 
 - Tutorial examples are importable, typechecked, linted, tested, and
   behaviourally exercised.
@@ -66,7 +64,7 @@ Positive consequences:
 - The AST guard catches semantic drift without creating brittle formatting
   failures.
 
-Negative consequences:
+## Known Risks and Limitations
 
 - Contributors must maintain sentinel comments in source and HTML markers in
   Markdown when changing quickstart snippets.

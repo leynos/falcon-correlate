@@ -1,4 +1,10 @@
-"""Drift guard for quickstart snippets embedded in Markdown."""
+"""Drift guard for quickstart snippets embedded in Markdown.
+
+This module keeps ``docs/quickstart.md`` aligned with the runnable examples in
+``examples/quickstart/*.py``. It extracts matching marker-delimited regions from
+the Markdown guide and Python source files, parses both snippets into ASTs, and
+compares those ASTs so formatting-only differences do not fail the test.
+"""
 
 from __future__ import annotations
 
