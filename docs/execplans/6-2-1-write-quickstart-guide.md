@@ -139,7 +139,7 @@ Success is observable when:
 - Risk R5: syrupy snapshots are non-deterministic under `pytest-xdist -n auto`
   because the log line embeds a timestamp (`asctime`) and a generated UUID.
   Severity: medium. Likelihood: medium. Mitigation: the snapshot test fixes the
-  correlation and user IDs to literal values and normalises `asctime` with a
+  correlation and user IDs to literal values and normalizes `asctime` with a
   regular expression before snapshotting; no generator is invoked.
 
 - Risk R6: duplication between the new `docs/quickstart.md` and the existing
@@ -282,7 +282,7 @@ Success is observable when:
   planner. (The tool survey behind this choice — Sybil, pytest-markdown-docs,
   mktestdocs, phmdoctest/phmutest, pytest-examples, pytest-codeblocks, and
   stdlib doctest, including the documented Markdown incompatibility of doctest
-  in CPython issue 116546 — is summarised in ADR-002.)
+  in CPython issue 116546 — is summarized in ADR-002.)
 
 - Decision: compare snippets to source semantically via `ast.dump`, not by
   byte equality. Rationale: byte equality is flaky under `ruff format` and
@@ -533,7 +533,7 @@ Write tests first. Each must fail for the intended reason before Stage C/D.
    - `minimal_app` happy path with an incoming trusted ID: build the app's
      middleware configured with `trusted_sources=["127.0.0.1"]` (the configured
      example) and assert the incoming `X-Correlation-ID` is echoed unchanged.
-   - `configured_app`: assert the example's config object reports the customised
+   - `configured_app`: assert the example's config object reports the customized
      `header_name`, the populated `trusted_sources`, and the
      `echo_header_in_response` value it documents; drive the app and assert the
      custom header name appears (or is suppressed) accordingly.
@@ -544,7 +544,7 @@ Write tests first. Each must fail for the intended reason before Stage C/D.
      the placeholder matrix `[(cid, uid), (cid, None), (None, uid), (None, None)]`,
      renders a `logging.LogRecord` through
      `logging.Formatter(RECOMMENDED_LOG_FORMAT)` plus `ContextualLogFilter`,
-     normalises `asctime` via a regex to `<asctime>`, and asserts the normalised
+     normalizes `asctime` via a regex to `<asctime>`, and asserts the normalized
      line equals `snapshot`. This requires `syrupy` (added in Stage E config,
      but the failing test is written now and will error on the missing import
      until the dependency is added).
@@ -596,7 +596,7 @@ and typecheck.
 Write `docs/quickstart.md` as a linear Diátaxis tutorial: one install command,
 one minimal app, one configuration example, one logging example, each with the
 expected observation, and a closing "next steps" pointer to the existing
-users-guide. State the end result up front; minimise explanation; link out
+users-guide. State the end result up front; minimize explanation; link out
 rather than enumerating every option.
 
 Each Python fence is preceded by an HTML comment naming its region. In the
