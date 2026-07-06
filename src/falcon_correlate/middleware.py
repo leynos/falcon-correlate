@@ -273,8 +273,11 @@ class _CorrelationIDMiddlewareBase:
             )
             return
 
+        # Token is invariant, so narrow the isinstance result to the stored
+        # var's parameter; the identity check above guarantees the match.
+        token = typ.cast("contextvars.Token[typ.Any]", reset_token)
         try:
-            self._correlation_id_var.reset(reset_token)
+            self._correlation_id_var.reset(token)
         except ValueError:
             logger.debug(
                 "Ignoring invalid correlation ID reset token",
