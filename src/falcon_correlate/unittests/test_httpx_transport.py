@@ -37,7 +37,14 @@ def _cid_context(cid: str) -> cabc.Generator[None, None, None]:
 
 
 def _make_delegation_request() -> httpx.Request:
-    """Return a fresh GET request suitable for delegation tests."""
+    """Return a fresh GET request suitable for delegation tests.
+
+    Returns
+    -------
+    httpx.Request
+        The value produced for the test scenario.
+
+    """
     return httpx.Request("GET", "http://example.com")
 
 
@@ -49,7 +56,14 @@ class RecordingTransport(httpx.BaseTransport):
         self.requests: list[httpx.Request] = []
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
-        """Capture the request and return a simple response."""
+        """Capture the request and return a simple response.
+
+        Returns
+        -------
+        httpx.Response
+            The value produced for the test scenario.
+
+        """
         self.requests.append(request)
         return httpx.Response(200, request=request)
 
@@ -62,7 +76,14 @@ class RecordingAsyncTransport(httpx.AsyncBaseTransport):
         self.requests: list[httpx.Request] = []
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        """Capture the request and return a simple response."""
+        """Capture the request and return a simple response.
+
+        Returns
+        -------
+        httpx.Response
+            The value produced for the test scenario.
+
+        """
         self.requests.append(request)
         return httpx.Response(200, request=request)
 

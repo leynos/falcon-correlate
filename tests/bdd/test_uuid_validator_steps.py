@@ -41,7 +41,14 @@ class Context(typ.TypedDict, total=False):
 
 @given("the default UUID validator", target_fixture="context")
 def given_default_uuid_validator() -> Context:
-    """Provide the default validator."""
+    """Provide the default validator.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     return {"validator": default_uuid_validator}
 
 

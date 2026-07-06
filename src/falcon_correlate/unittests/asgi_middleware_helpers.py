@@ -43,7 +43,14 @@ class _Request:
         self._headers = headers or {}
 
     def get_header(self, name: str) -> str | None:
-        """Return a test header by name."""
+        """Return a test header by name.
+
+        Returns
+        -------
+        str | None
+            The value produced for the test scenario.
+
+        """
         return self._headers.get(name)
 
 
@@ -59,7 +66,14 @@ class _Response:
         self.headers[name] = value
 
     def get_header(self, name: str) -> str | None:
-        """Return a recorded response header."""
+        """Return a recorded response header.
+
+        Returns
+        -------
+        str | None
+            The value produced for the test scenario.
+
+        """
         return self.headers.get(name)
 
 
@@ -72,7 +86,14 @@ class _HeaderFailingResponse(_Response):
         name: str,
         value: str,
     ) -> None:
-        """Raise when middleware tries to echo the response header."""
+        """Raise when middleware tries to echo the response header.
+
+        Raises
+        ------
+        RuntimeError
+            When the test helper intentionally exercises this failure path.
+
+        """
         msg = f"failed to set {name}={value}"
         raise RuntimeError(msg)
 
@@ -81,7 +102,14 @@ def _cast_asgi_doubles(
     req: _Request,
     resp: _Response,
 ) -> "tuple[falcon.asgi.Request, falcon.asgi.Response]":  # noqa: UP037 -- falcon.asgi types are TYPE_CHECKING-only.
-    """Return the request and response doubles cast to their Falcon ASGI types."""
+    """Return the request and response doubles cast to their Falcon ASGI types.
+
+    Returns
+    -------
+    tuple[falcon.asgi.Request, falcon.asgi.Response]
+        The value produced for the test scenario.
+
+    """
     return (
         typ.cast("falcon.asgi.Request", req),
         typ.cast("falcon.asgi.Response", resp),

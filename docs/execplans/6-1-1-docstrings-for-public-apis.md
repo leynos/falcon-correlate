@@ -131,13 +131,13 @@ Stop and escalate when any of these is reached:
 ## Progress
 
 - [x] Milestone 0 — Orientation and branch setup (no code changes).
-- [ ] Milestone 1 (Red) — Enable `DOC` rules and the doctest harness; capture
+- [x] Milestone 1 (Red) — Enable `DOC` rules and the doctest harness; capture
       the failing gate output as the red baseline.
-- [ ] Milestone 2 (Red) — Add the public-API docstring introspection test;
+- [x] Milestone 2 (Red) — Add the public-API docstring introspection test;
       observe it fail for undocumented module-level variables.
-- [ ] Milestone 3 (Green) — Public API: inline attribute docstrings and
+- [x] Milestone 3 (Green) — Public API: inline attribute docstrings and
       completed class/function/method docstrings, module by module.
-- [ ] Milestone 4 (Green) — Private helpers: complete docstrings to satisfy
+- [x] Milestone 4 (Green) — Private helpers: complete docstrings to satisfy
       repo-wide `DOC`, module by module.
 - [ ] Milestone 5 (Refactor/Docs) — ADR, developers-guide section, design-doc
       and contents.md references, users-guide check.
@@ -176,6 +176,36 @@ Stop and escalate when any of these is reached:
   baseline. Impact: continue with repo-wide `DOC` coverage, including
   package-local unit tests and helpers, despite exceeding the original
   tolerance.
+
+- Observation: `DOC` and doctest gates are now wired into deterministic
+  Makefile paths. Evidence: `pyproject.toml` selects Ruff `DOC`, `Makefile`
+  defines `doctest`, and `make test` depends on `doctest`. Impact: signature
+  documentation and executable examples now fail locally and in CI before
+  ordinary test execution completes.
+
+- Observation: public module-level values need explicit attribute-docstring
+  coverage because Interrogate and Ruff `D` do not validate variable
+  documentation. Evidence:
+  `src/falcon_correlate/unittests/test_public_exports.py` parses the owning
+  module AST for inline string expressions after assignments to
+  `correlation_id_var`, `user_id_var`, and `RECOMMENDED_LOG_FORMAT`. Impact:
+  those exported values now have a regression test for documentation presence.
+
+- Observation: satisfying repo-wide `DOC` required touching unit and BDD helper
+  modules as well as runtime modules. Evidence: Ruff reported no `DOC`
+  diagnostics under `make lint`; the helper extraction kept newly touched
+  `test_optional_celery_dependency.py`, `optional_celery_dependency_helpers.py`,
+  `test_middleware_steps.py`, and `middleware_validation_steps.py` below 400
+  lines. Impact: the chosen broad scope is green without introducing new
+  over-limit files.
+
+- Observation: the full local gate sweep passed after the docstring
+  implementation. Evidence: on 2026-07-06, `make check-fmt`, `make lint`,
+  `make typecheck`, `make test`, `make markdownlint`, and `make nixie` all
+  exited successfully; `make test` reported one doctest passed plus
+  `424 passed, 11 skipped`. Impact: Milestones 1-4 have green evidence and the
+  earlier `ty` `ContextVar.reset` diagnostic in `middleware.py` is resolved by
+  the token cast.
 
 - Observation: 6.1.1 is largely already implemented. Most public symbols carry
   substantial NumPy docstrings, added incrementally by the milestone plans for

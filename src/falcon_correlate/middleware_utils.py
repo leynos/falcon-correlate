@@ -21,9 +21,13 @@ import uuid
 correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "correlation_id", default=None
 )
+"""Request-local correlation ID storage shared by middleware and integrations."""
+
 user_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "user_id", default=None
 )
+"""Request-local user ID storage for applications that attach user context."""
+
 CORRELATION_ID_RESET_TOKEN_ATTR = "_correlation_id_reset_token"  # noqa: S105 - attribute-name string is not a secret
 MISSING_CONTEXT_PLACEHOLDER: str = "-"
 
@@ -31,6 +35,7 @@ RECOMMENDED_LOG_FORMAT: str = (
     "%(asctime)s - [%(levelname)s] - [%(correlation_id)s] - "
     "[%(user_id)s] - %(name)s - %(message)s"
 )
+"""Logging format string including correlation and user ID placeholders."""
 
 
 class ContextualLogFilter(logging.Filter):
@@ -186,7 +191,19 @@ _VALID_UUID_VERSIONS = frozenset({1, 2, 3, 4, 5, 6, 7, 8})
 
 
 def _has_valid_hyphen_placement(value: str) -> bool:
-    """Check that hyphens appear exactly at UUID separator positions."""
+    """Check that hyphens appear exactly at UUID separator positions.
+
+    Parameters
+    ----------
+    value : str
+        The candidate UUID string.
+
+    Returns
+    -------
+    bool
+        True when all hyphens appear at standard UUID separator positions.
+
+    """
     for i, char in enumerate(value):
         if char == "-":
             if i not in _HYPHEN_POSITIONS:

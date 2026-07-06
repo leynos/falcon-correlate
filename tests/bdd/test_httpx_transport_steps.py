@@ -67,7 +67,14 @@ class RecordingTransport(httpx.BaseTransport):
         self.request: httpx.Request | None = None
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
-        """Capture the request and return a success response."""
+        """Capture the request and return a success response.
+
+        Returns
+        -------
+        httpx.Response
+            The value produced for the test scenario.
+
+        """
         self.request = request
         return httpx.Response(200, request=request)
 
@@ -80,7 +87,14 @@ class RecordingAsyncTransport(httpx.AsyncBaseTransport):
         self.request: httpx.Request | None = None
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        """Capture the request and return a success response."""
+        """Capture the request and return a success response.
+
+        Returns
+        -------
+        httpx.Response
+            The value produced for the test scenario.
+
+        """
         self.request = request
         return httpx.Response(200, request=request)
 
@@ -103,14 +117,28 @@ def _reset_context_variables() -> cabc.Generator[None, None, None]:
     target_fixture="context",
 )
 def given_correlation_id_set(value: str) -> Context:
-    """Set the correlation ID context variable."""
+    """Set the correlation ID context variable.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     correlation_id_var.set(value)
     return {}
 
 
 @given("no correlation ID is set", target_fixture="context")
 def given_no_correlation_id() -> Context:
-    """Ensure no correlation ID is set."""
+    """Ensure no correlation ID is set.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     correlation_id_var.set(None)
     return {}
 
@@ -120,7 +148,14 @@ def given_no_correlation_id() -> Context:
     target_fixture="context",
 )
 def when_send_request_with_transport(context: Context) -> Context:
-    """Send a sync request with a client configured to use the transport."""
+    """Send a sync request with a client configured to use the transport.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     transport = RecordingTransport()
 
     with httpx.Client(transport=CorrelationIDTransport(transport)) as client:
@@ -138,7 +173,14 @@ def when_send_request_with_transport(context: Context) -> Context:
     target_fixture="context",
 )
 def when_send_async_request_with_transport(context: Context) -> Context:
-    """Send an async request with a client configured to use the transport."""
+    """Send an async request with a client configured to use the transport.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
 
     async def _run() -> dict[str, str]:
         transport = RecordingAsyncTransport()

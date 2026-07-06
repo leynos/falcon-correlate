@@ -217,7 +217,14 @@ class TestTrustedSourceIntegration:
         trusted_sources: list[str] | None = None,
         generator: cabc.Callable[[], str] | None = None,
     ) -> falcon.testing.TestClient:
-        """Create a test client with the configured middleware."""
+        """Create a test client with the configured middleware.
+
+        Returns
+        -------
+        falcon.testing.TestClient
+            The value produced for the test scenario.
+
+        """
         middleware = CorrelationIDMiddleware(
             trusted_sources=trusted_sources,
             generator=generator or (lambda: "generated-id"),

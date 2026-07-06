@@ -36,7 +36,14 @@ type _TrustedSourcesInput = (
 def trusted_sources_inputs(
     draw: st.DrawFn,
 ) -> _TrustedSourcesInput:
-    """Generate supported trusted-source iterable shapes."""
+    """Generate supported trusted-source iterable shapes.
+
+    Returns
+    -------
+    _TrustedSourcesInput
+        The value produced for the test scenario.
+
+    """
     sources = draw(
         st.lists(
             st.ip_addresses().map(str),

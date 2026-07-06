@@ -135,7 +135,14 @@ def test_signal_connection_is_idempotent_across_reload(
         probe_calls.append(properties["correlation_id"])
 
     def _send_signal() -> tuple[dict[str, str], list[tuple[object, object]]]:
-        """Send the Celery signal from an isolated context."""
+        """Send the Celery signal from an isolated context.
+
+        Returns
+        -------
+        tuple[dict[str, str], list[tuple[object, object]]]
+            The value produced for the test scenario.
+
+        """
         properties = {
             "correlation_id": "celery-task-id",
             "reply_to": "reply-queue",
@@ -159,7 +166,14 @@ def test_signal_connection_is_idempotent_across_reload(
     def _count_integration_receivers(
         signal_responses: list[tuple[object, object]],
     ) -> int:
-        """Count connected integration signal receivers."""
+        """Count connected integration signal receivers.
+
+        Returns
+        -------
+        int
+            The value produced for the test scenario.
+
+        """
         return sum(
             1
             for receiver, _ in signal_responses

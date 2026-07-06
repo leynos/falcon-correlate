@@ -29,7 +29,14 @@ if typ.TYPE_CHECKING:
 
 
 def _build_task(*, correlation_id: str | None = None) -> object:
-    """Build a minimal Celery-like task object for signal handler tests."""
+    """Build a minimal Celery-like task object for signal handler tests.
+
+    Returns
+    -------
+    object
+        The value produced for the test scenario.
+
+    """
     return SimpleNamespace(
         request=SimpleNamespace(correlation_id=correlation_id),
     )
@@ -134,7 +141,14 @@ def test_celery_worker_concurrent_signal_handlers() -> None:
     cleanup = threading.Barrier(2)
 
     def _run_task(worker_id: str) -> tuple[str | None, int, str | None, bool]:
-        """Exercise setup and cleanup from a dedicated worker thread."""
+        """Exercise setup and cleanup from a dedicated worker thread.
+
+        Returns
+        -------
+        tuple[str | None, int, str | None, bool]
+            The value produced for the test scenario.
+
+        """
         task = _build_task(correlation_id=f"task-{worker_id}")
         correlation_id_var.set(f"ambient-{worker_id}")
 

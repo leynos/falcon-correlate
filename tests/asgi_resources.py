@@ -48,11 +48,6 @@ class ASGICorrelationEchoResource:
             Outgoing Falcon ASGI response whose `resp.media` mapping is set by
             this handler.
 
-        Returns
-        -------
-        None
-            The method mutates `resp.media` and does not return a value.
-
         Notes
         -----
         `on_get` reads `correlation_id_var.get()` before middleware response
@@ -106,7 +101,9 @@ class ASGIInterleavedCorrelationResource:
 
             resp.media = {
                 "context_correlation_id": req.context.correlation_id,
+
                 "contextvar_correlation_id": contextvar_before_wait,
+
                 "contextvar_correlation_id_after_wait": correlation_id_var.get(),
             }
         finally:

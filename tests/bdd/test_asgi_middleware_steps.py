@@ -57,7 +57,14 @@ def _build_asgi_context(
     validator: cabc.Callable[[str], bool] | None = None,
     echo_header_in_response: bool = True,
 ) -> Context:
-    """Build a Falcon ASGI test context with CorrelationIDMiddlewareASGI."""
+    """Build a Falcon ASGI test context with CorrelationIDMiddlewareASGI.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     kwargs: dict[str, object] = {}
     if sources is not None:
         kwargs["trusted_sources"] = sources
@@ -78,7 +85,14 @@ def _build_asgi_context(
     target_fixture="context",
 )
 def given_asgi_app_with_trusted_sources(sources: str) -> Context:
-    """Create a Falcon ASGI app with trusted-source middleware."""
+    """Create a Falcon ASGI app with trusted-source middleware.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     return _build_asgi_context(
         sources=[source.strip() for source in sources.split(",")],
     )
@@ -92,7 +106,14 @@ def given_asgi_app_with_generator(
     sources: str,
     generated_id: str,
 ) -> Context:
-    """Create a Falcon ASGI app with a fixed ID generator."""
+    """Create a Falcon ASGI app with a fixed ID generator.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     return _build_asgi_context(
         sources=[source.strip() for source in sources.split(",")],
         generated_id=generated_id,
@@ -107,7 +128,14 @@ def given_asgi_app_with_rejecting_validator(
     sources: str,
     generated_id: str,
 ) -> Context:
-    """Create a Falcon ASGI app with fixed generation and rejected input."""
+    """Create a Falcon ASGI app with fixed generation and rejected input.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     return _build_asgi_context(
         sources=[source.strip() for source in sources.split(",")],
         generated_id=generated_id,
@@ -120,7 +148,14 @@ def given_asgi_app_with_rejecting_validator(
     target_fixture="context",
 )
 def given_asgi_app_with_echo_disabled(generated_id: str) -> Context:
-    """Create a Falcon ASGI app with response-header echoing disabled."""
+    """Create a Falcon ASGI app with response-header echoing disabled.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     return _build_asgi_context(
         generated_id=generated_id,
         echo_header_in_response=False,
@@ -196,7 +231,14 @@ def when_make_concurrent_asgi_get_requests(
         conductor: falcon.testing.ASGIConductor,
         correlation_id: str,
     ) -> tuple[str, falcon.testing.Result, str | None]:
-        """Perform one ASGI request and capture post-response ambient state."""
+        """Perform one ASGI request and capture post-response ambient state.
+
+        Returns
+        -------
+        tuple[str, falcon.testing.Result, str | None]
+            The value produced for the test scenario.
+
+        """
         result = await conductor.simulate_get(
             path,
             headers={"X-Correlation-ID": correlation_id},
@@ -207,7 +249,14 @@ def when_make_concurrent_asgi_get_requests(
         dict[str, falcon.testing.Result],
         dict[str, str | None],
     ]:
-        """Run both concurrent ASGI requests through one conductor."""
+        """Run both concurrent ASGI requests through one conductor.
+
+        Returns
+        -------
+        tuple[dict[str, falcon.testing.Result], dict[str, str | None]]
+            The value produced for the test scenario.
+
+        """
         async with falcon.testing.ASGIConductor(context["app"]) as conductor:
             results = await asyncio.wait_for(
                 asyncio.gather(

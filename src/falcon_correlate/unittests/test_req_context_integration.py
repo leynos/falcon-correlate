@@ -189,7 +189,14 @@ class TestReqContextIntegration:
         """
 
         def _inner() -> tuple[str | None, str | None, str | None, bool, bool]:
-            """Exercise the request lifecycle inside an isolated context."""
+            """Exercise the request lifecycle inside an isolated context.
+
+            Returns
+            -------
+            tuple[str | None, str | None, str | None, bool, bool]
+                The value produced for the test scenario.
+
+            """
             req, resp = request_response_factory(
                 correlation_id=correlation_id,
             )

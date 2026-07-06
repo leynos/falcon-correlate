@@ -98,11 +98,7 @@ class TestCorrelationIDResponseHeader:
                 req_succeeded=True,
             )
 
-            assert resp.get_header("X-Correlation-ID") == scenario.expected_header, (
-                "expected X-Correlation-ID header to equal expected_header "
-                f"{scenario.expected_header!r} but got "
-                f"{resp.get_header('X-Correlation-ID')!r}"
-            )
+            assert resp.get_header("X-Correlation-ID") == scenario.expected_header
 
         isolated_context(_inner)
 
@@ -228,10 +224,7 @@ class TestCorrelationIDResponseHeader:
                 req_succeeded=True,
             )
 
-            assert resp.get_header("X-Correlation-ID") == "trusted-id", (
-                "expected X-Correlation-ID header to equal 'trusted-id' but got "
-                f"{resp.get_header('X-Correlation-ID')!r}"
-            )
+            assert resp.get_header("X-Correlation-ID") == "trusted-id"
 
         isolated_context(_inner)
 
@@ -251,7 +244,14 @@ class TestCorrelationIDResponseHeader:
             """Falcon response that fails when setting a header."""
 
             def set_header(self, name: str, value: str) -> None:
-                """Raise to simulate Falcon response header mutation failure."""
+                """Raise to simulate Falcon response header mutation failure.
+
+                Raises
+                ------
+                RuntimeError
+                    When the test helper intentionally exercises this failure path.
+
+                """
                 msg = f"failed to set {name}={value}"
                 raise RuntimeError(msg)
 

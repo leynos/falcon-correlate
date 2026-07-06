@@ -99,7 +99,14 @@ class Context(typ.TypedDict, total=False):
 
 
 def _build_context(*, delay_seconds: float = 0.0) -> Context:
-    """Create a Falcon app/client pair for req.context parity tests."""
+    """Create a Falcon app/client pair for req.context parity tests.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     middleware = CorrelationIDMiddleware(trusted_sources=["127.0.0.1"])
     app = falcon.App(middleware=[middleware])
     app.add_route(
@@ -118,7 +125,14 @@ def _build_context(*, delay_seconds: float = 0.0) -> Context:
     target_fixture="context",
 )
 def given_app_with_req_context_parity() -> Context:
-    """Provide a Falcon app configured for req.context parity scenarios."""
+    """Provide a Falcon app configured for req.context parity scenarios.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     return _build_context()
 
 
@@ -127,7 +141,14 @@ def given_app_with_req_context_parity() -> Context:
     target_fixture="context",
 )
 def given_app_with_concurrent_req_context_parity() -> Context:
-    """Provide a Falcon app configured for concurrent parity scenarios."""
+    """Provide a Falcon app configured for concurrent parity scenarios.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     return _build_context(delay_seconds=0.05)
 
 

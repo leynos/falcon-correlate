@@ -114,7 +114,14 @@ class _CorrelationIDMiddlewareBase:
         return self._config.echo_header_in_response
 
     def _log_context(self, correlation_id: object) -> dict[str, object]:
-        """Return structured log context for middleware diagnostics."""
+        """Return structured log context for middleware diagnostics.
+
+        Returns
+        -------
+        dict[str, object]
+            Log fields shared by middleware diagnostics.
+
+        """
         return {
             "correlation_id": correlation_id,
             "header_name": self._config.header_name,
@@ -291,34 +298,7 @@ class _CorrelationIDMiddlewareBase:
 
 
 class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
-    """Middleware for managing correlation IDs in Falcon WSGI applications.
-
-    This middleware handles the lifecycle of correlation IDs, extracting
-    them from incoming request headers or generating new ones, making
-    them available throughout the request lifecycle, and optionally
-    echoing them in response headers.
-
-    Parameters
-    ----------
-    config : CorrelationIDConfig | None
-        A pre-built configuration object. If provided, no other keyword
-        arguments may be specified. Defaults to ``None``.
-    **kwargs
-        Individual configuration parameters. Valid keys are: ``header_name``,
-        ``trusted_sources``, ``generator``, ``validator``, and
-        ``echo_header_in_response``. See :meth:`CorrelationIDConfig.from_kwargs`
-        for parameter details.
-
-    Raises
-    ------
-    ValueError
-        If both ``config`` and other keyword arguments are provided, or if
-        ``header_name`` is empty or ``trusted_sources`` contains empty strings.
-    TypeError
-        If unknown keyword arguments are provided, or if ``generator`` or
-        ``validator`` is provided but not callable.
-
-    """
+    """Manage correlation IDs in Falcon WSGI applications."""
 
     def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
         """Process an incoming request to establish correlation ID context.
@@ -335,13 +315,6 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
             The incoming request object.
         resp : falcon.Response
             The response object (not yet populated).
-
-        Raises
-        ------
-        Exception
-            Any exception raised by the configured generator will propagate
-            to the caller. Custom generators are responsible for their own
-            error handling; the middleware does not catch generator exceptions.
 
         """
         self._process_request(req)

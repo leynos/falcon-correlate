@@ -65,7 +65,14 @@ def _expected_correlation_id(
     validator_mode: str,
     generated_id: str,
 ) -> str:
-    """Return the expected request correlation ID for a generated scenario."""
+    """Return the expected request correlation ID for a generated scenario.
+
+    Returns
+    -------
+    str
+        The value produced for the test scenario.
+
+    """
     normalized = incoming.strip() if incoming is not None else None
     if not normalized or not is_trusted:
         return generated_id

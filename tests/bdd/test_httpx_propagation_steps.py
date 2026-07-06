@@ -28,6 +28,11 @@ def _run_async_request(**kwargs: typ.Any) -> dict[str, str]:  # noqa: ANN401
     """Run ``async_request_with_correlation_id`` with a mocked AsyncClient.
 
     Returns the headers dict captured from the mocked request call.
+
+    Returns
+    -------
+    dict[str, str]
+        The value produced for the test scenario.
     """
     import asyncio
 
@@ -64,14 +69,28 @@ def _reset_context_variables() -> cabc.Generator[None, None, None]:
     target_fixture="context",
 )
 def given_correlation_id_set(value: str) -> Context:
-    """Set the correlation ID context variable."""
+    """Set the correlation ID context variable.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     correlation_id_var.set(value)
     return {}
 
 
 @given("no correlation ID is set", target_fixture="context")
 def given_no_correlation_id() -> Context:
-    """Ensure no correlation ID is set (default state)."""
+    """Ensure no correlation ID is set (default state).
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     correlation_id_var.set(None)
     return {}
 
@@ -81,7 +100,14 @@ def given_no_correlation_id() -> Context:
     target_fixture="context",
 )
 def when_send_request(context: Context) -> Context:
-    """Send a sync request using the wrapper and capture headers."""
+    """Send a sync request using the wrapper and capture headers.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     with mock.patch("httpx.request") as mock_request:
         mock_request.return_value = httpx.Response(200)
         request_with_correlation_id("GET", "http://example.com")
@@ -94,7 +120,14 @@ def when_send_request(context: Context) -> Context:
     target_fixture="context",
 )
 def when_send_request_with_header(context: Context, name: str, value: str) -> Context:
-    """Send a sync request with an existing header."""
+    """Send a sync request with an existing header.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     with mock.patch("httpx.request") as mock_request:
         mock_request.return_value = httpx.Response(200)
         request_with_correlation_id(
@@ -111,7 +144,14 @@ def when_send_request_with_header(context: Context, name: str, value: str) -> Co
     target_fixture="context",
 )
 def when_send_async_request(context: Context) -> Context:
-    """Send an async request using the wrapper and capture headers."""
+    """Send an async request using the wrapper and capture headers.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     context["captured_headers"] = _run_async_request()
     return context
 
@@ -125,7 +165,14 @@ def when_send_async_request(context: Context) -> Context:
 def when_send_async_request_with_header(
     context: Context, name: str, value: str
 ) -> Context:
-    """Send an async request with an existing header."""
+    """Send an async request with an existing header.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     context["captured_headers"] = _run_async_request(headers={name: value})
     return context
 

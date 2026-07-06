@@ -85,6 +85,7 @@ select = [
     "PERF",
     "TRY",
     "D",
+    "DOC",  # pydoclint: docstrings match signatures (preview)
     "ANN",
     "C90",
     "PLR",

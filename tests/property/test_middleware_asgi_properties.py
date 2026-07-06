@@ -42,7 +42,14 @@ def test_async_context_isolation_property(
         ready_lock = asyncio.Lock()
 
         async def _run_request(index: int) -> tuple[str | None, ...]:
-            """Exercise one simulated ASGI request within the concurrent batch."""
+            """Exercise one simulated ASGI request within the concurrent batch.
+
+            Returns
+            -------
+            tuple[str | None, ...]
+                The value produced for the test scenario.
+
+            """
             expected_id = f"cid-{index}"
             req = _Request(headers={"X-Correlation-ID": expected_id})
             resp = _Response()

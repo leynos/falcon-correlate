@@ -9,14 +9,28 @@ UUID_VERSION = 7
 
 
 def _validate_type(value: str) -> None:
-    """Validate that value is a string."""
+    """Validate that value is a string.
+
+    Raises
+    ------
+    TypeError
+        When the test helper intentionally exercises this failure path.
+
+    """
     if not isinstance(value, str):
         msg = "expected UUIDv7 value to be a string"
         raise TypeError(msg)
 
 
 def _validate_format(value: str) -> None:
-    """Validate hex string format (length, lowercase, hex validity)."""
+    """Validate hex string format (length, lowercase, hex validity).
+
+    Raises
+    ------
+    AssertionError
+        When the test helper intentionally exercises this failure path.
+
+    """
     if len(value) != UUID_HEX_LENGTH:
         msg = "expected 32-character UUID hex string"
         raise AssertionError(msg)
@@ -31,7 +45,19 @@ def _validate_format(value: str) -> None:
 
 
 def _parse_uuid(value: str) -> uuid.UUID:
-    """Parse hex string as UUID."""
+    """Parse hex string as UUID.
+
+    Returns
+    -------
+    uuid.UUID
+        The value produced for the test scenario.
+
+    Raises
+    ------
+    AssertionError
+        When the test helper intentionally exercises this failure path.
+
+    """
     try:
         return uuid.UUID(hex=value)
     except ValueError as exc:
@@ -40,7 +66,14 @@ def _parse_uuid(value: str) -> uuid.UUID:
 
 
 def _validate_uuid7_properties(parsed: uuid.UUID) -> None:
-    """Validate UUID version and variant bits."""
+    """Validate UUID version and variant bits.
+
+    Raises
+    ------
+    AssertionError
+        When the test helper intentionally exercises this failure path.
+
+    """
     if parsed.version != UUID_VERSION:
         msg = "expected UUIDv7 version bits"
         raise AssertionError(msg)

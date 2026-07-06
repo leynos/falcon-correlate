@@ -24,7 +24,14 @@ WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
 
 def _tool_is_available(tool_name: str, args: list[str]) -> bool:
-    """Check if a tool is available by running it with given args."""
+    """Check if a tool is available by running it with given args.
+
+    Returns
+    -------
+    bool
+        The value produced for the test scenario.
+
+    """
     tool_path = shutil.which(tool_name)
     if tool_path is None:
         return False
@@ -63,6 +70,11 @@ def run_act(config: ActConfig) -> tuple[int, Path, str]:
     -------
         Tuple of (exit code, artefact directory, combined logs).
 
+
+    Raises
+    ------
+    FileNotFoundError
+        When the test helper intentionally exercises this failure path.
     """
     config.artefact_dir.mkdir(parents=True, exist_ok=True)
 

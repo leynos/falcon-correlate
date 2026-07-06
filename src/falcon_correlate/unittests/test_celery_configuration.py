@@ -45,7 +45,14 @@ def _disconnect_integration_receivers() -> None:
 
 
 def _receiver_count(signal: _SignalWithReceivers, receiver: object) -> int:
-    """Count live receivers matching a concrete function object."""
+    """Count live receivers matching a concrete function object.
+
+    Returns
+    -------
+    int
+        The value produced for the test scenario.
+
+    """
     receivers = typ.cast("list[tuple[object, object]]", signal.receivers)
     return sum(1 for _, receiver_func in receivers if receiver_func is receiver)
 
@@ -73,7 +80,14 @@ class _TaskLike:
 
 @pytest.fixture
 def celery_app() -> Celery:
-    """Build a minimal Celery app for configuration tests."""
+    """Build a minimal Celery app for configuration tests.
+
+    Returns
+    -------
+    Celery
+        The value produced for the test scenario.
+
+    """
     return Celery("unit-celery-configuration", broker="memory://")
 
 

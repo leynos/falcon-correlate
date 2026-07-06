@@ -29,7 +29,14 @@ _UUID_PATTERN = re.compile(
 
 @st.composite
 def valid_uuids(draw: st.DrawFn) -> uuid.UUID:
-    """Generate UUIDs with validator-supported versions 1 through 8."""
+    """Generate UUIDs with validator-supported versions 1 through 8.
+
+    Returns
+    -------
+    uuid.UUID
+        The value produced for the test scenario.
+
+    """
     value = draw(st.uuids())
     version = draw(st.integers(min_value=1, max_value=8))
     hex_value = f"{value.int:032x}"
@@ -38,7 +45,14 @@ def valid_uuids(draw: st.DrawFn) -> uuid.UUID:
 
 
 def is_valid_uuid_candidate(value: str) -> bool:
-    """Return whether *value* has valid UUID syntax and version."""
+    """Return whether *value* has valid UUID syntax and version.
+
+    Returns
+    -------
+    bool
+        The value produced for the test scenario.
+
+    """
     if not _UUID_PATTERN.fullmatch(value):
         return False
 

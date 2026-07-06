@@ -45,11 +45,25 @@ def _check_tool_available(tool_name: str, args: list[str]) -> bool:
 
 @pytest.fixture(scope="session")
 def act_available() -> bool:
-    """Check if act is available."""
+    """Check if act is available.
+
+    Returns
+    -------
+    bool
+        The value produced for the test scenario.
+
+    """
     return _check_tool_available("act", ["--version"])
 
 
 @pytest.fixture(scope="session")
 def docker_available() -> bool:
-    """Check if Docker is available."""
+    """Check if Docker is available.
+
+    Returns
+    -------
+    bool
+        The value produced for the test scenario.
+
+    """
     return _check_tool_available("docker", ["info"])

@@ -56,7 +56,14 @@ def _verify_generator_called_and_id_matches(
 
 @pytest.fixture
 def correlation_echo_resource() -> CorrelationEchoResource:
-    """Provide a CorrelationEchoResource instance for testing."""
+    """Provide a CorrelationEchoResource instance for testing.
+
+    Returns
+    -------
+    CorrelationEchoResource
+        The value produced for the test scenario.
+
+    """
     return CorrelationEchoResource()
 
 
@@ -142,7 +149,14 @@ class TestGeneratorInvocationWhenHeaderMissing:
         """Verify generator output is stored on req.context.correlation_id."""
 
         def custom_gen() -> str:
-            """Generate a custom correlation ID for the test."""
+            """Generate a custom correlation ID for the test.
+
+            Returns
+            -------
+            str
+                The value produced for the test scenario.
+
+            """
             return "context-stored-id"
 
         client = create_test_client(generator=custom_gen)
@@ -208,7 +222,14 @@ class TestGeneratorInvocationWhenSourceUntrusted:
         """Verify incoming ID is rejected when source is untrusted."""
 
         def custom_gen() -> str:
-            """Generate a custom correlation ID for the test."""
+            """Generate a custom correlation ID for the test.
+
+            Returns
+            -------
+            str
+                The value produced for the test scenario.
+
+            """
             return "new-generated-id"
 
         # Trust only 10.0.0.1, but TestClient uses 127.0.0.1 by default
@@ -285,7 +306,14 @@ class TestCustomGeneratorBehaviour:
         """Verify custom generator output becomes the correlation ID."""
 
         def my_generator() -> str:
-            """Generate a custom correlation ID for the test."""
+            """Generate a custom correlation ID for the test.
+
+            Returns
+            -------
+            str
+                The value produced for the test scenario.
+
+            """
             return "my-custom-correlation-id"
 
         client = create_test_client(generator=my_generator)
@@ -306,7 +334,14 @@ class TestCustomGeneratorBehaviour:
         expected_call_count = 2
 
         def counting_generator() -> str:
-            """Generate a correlation ID and record the call."""
+            """Generate a correlation ID and record the call.
+
+            Returns
+            -------
+            str
+                The value produced for the test scenario.
+
+            """
             nonlocal call_count
             call_count += 1
             return f"request-{call_count}"
@@ -330,7 +365,14 @@ class TestCustomGeneratorBehaviour:
         """Verify middleware.generator returns the configured generator."""
 
         def my_gen() -> str:
-            """Generate a custom correlation ID for the test."""
+            """Generate a custom correlation ID for the test.
+
+            Returns
+            -------
+            str
+                The value produced for the test scenario.
+
+            """
             return "test"
 
         middleware = CorrelationIDMiddleware(generator=my_gen)

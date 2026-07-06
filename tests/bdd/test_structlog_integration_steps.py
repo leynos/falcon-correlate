@@ -53,7 +53,14 @@ def _reset_structlog() -> cabc.Generator[None, None, None]:
     target_fixture="context",
 )
 def given_structlog_configured() -> Context:
-    """Configure structlog with the correlation context processor."""
+    """Configure structlog with the correlation context processor.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     captured: list[dict[str, object]] = []
 
     def _capture(
@@ -83,7 +90,14 @@ def given_structlog_configured() -> Context:
     target_fixture="context",
 )
 def given_correlation_id_set(context: Context, value: str) -> Context:
-    """Set the correlation ID context variable."""
+    """Set the correlation ID context variable.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     context["correlation_id_token"] = correlation_id_var.set(value)
     return context
 
@@ -93,7 +107,14 @@ def given_correlation_id_set(context: Context, value: str) -> Context:
     target_fixture="context",
 )
 def given_user_id_set(context: Context, value: str) -> Context:
-    """Set the user ID context variable."""
+    """Set the user ID context variable.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     context["user_id_token"] = user_id_var.set(value)
     return context
 
@@ -111,7 +132,14 @@ def given_no_context_variables_set() -> None:
     target_fixture="context",
 )
 def when_structlog_message_emitted(context: Context, message: str) -> Context:
-    """Emit a structlog message."""
+    """Emit a structlog message.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     log = structlog.get_logger()
     log.info(message)
     return context

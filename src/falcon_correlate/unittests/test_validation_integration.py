@@ -31,7 +31,14 @@ class _MiddlewareKwargs(typ.TypedDict, total=False):
 
 @pytest.fixture
 def correlation_echo_resource() -> CorrelationEchoResource:
-    """Provide a CorrelationEchoResource instance for testing."""
+    """Provide a CorrelationEchoResource instance for testing.
+
+    Returns
+    -------
+    CorrelationEchoResource
+        The value produced for the test scenario.
+
+    """
     return CorrelationEchoResource()
 
 
@@ -55,7 +62,14 @@ def create_test_client(
         trusted_sources: cabc.Iterable[str] | None = None,
         validator: cabc.Callable[[str], bool] | None = None,
     ) -> falcon.testing.TestClient:
-        """Build a Falcon TestClient with optional middleware configuration."""
+        """Build a Falcon TestClient with optional middleware configuration.
+
+        Returns
+        -------
+        falcon.testing.TestClient
+            The value produced for the test scenario.
+
+        """
         kwargs: _MiddlewareKwargs = {}
         if generator is not None:
             kwargs["generator"] = generator
@@ -231,7 +245,14 @@ class TestValidationWithValidatorRejecting:
         call_log: list[str] = []
 
         def tracking_validator(value: str) -> bool:
-            """Record the validator input and reject it."""
+            """Record the validator input and reject it.
+
+            Returns
+            -------
+            bool
+                The value produced for the test scenario.
+
+            """
             call_log.append(value)
             return value.startswith("ok-")
 
@@ -282,7 +303,14 @@ class ValidationLoggingScenario:
 
 
 def _is_debug_log_containing(record: logging.LogRecord, text: str) -> bool:
-    """Return True if *record* is a DEBUG entry whose message contains *text*."""
+    """Return True if *record* is a DEBUG entry whose message contains *text*.
+
+    Returns
+    -------
+    bool
+        The value produced for the test scenario.
+
+    """
     return (
         record.name == "falcon_correlate.middleware"
         and record.levelno == logging.DEBUG
@@ -291,7 +319,14 @@ def _is_debug_log_containing(record: logging.LogRecord, text: str) -> bool:
 
 
 def _is_validation_failure_debug_log(record: logging.LogRecord) -> bool:
-    """Return True if *record* is a falcon_correlate DEBUG 'failed validation' entry."""
+    """Return True if *record* is a falcon_correlate DEBUG 'failed validation' entry.
+
+    Returns
+    -------
+    bool
+        The value produced for the test scenario.
+
+    """
     return (
         record.name == "falcon_correlate.middleware"
         and record.levelno == logging.DEBUG
@@ -303,7 +338,14 @@ def build_test_client(
     create_test_client: cabc.Callable[..., falcon.testing.TestClient],
     validator_result: bool | None,  # noqa: FBT001 - test scenario value
 ) -> falcon.testing.TestClient:
-    """Build a validation logging test client for the given validator result."""
+    """Build a validation logging test client for the given validator result.
+
+    Returns
+    -------
+    falcon.testing.TestClient
+        The value produced for the test scenario.
+
+    """
     if validator_result is None:
         return create_test_client(trusted_sources=["127.0.0.1"])
 

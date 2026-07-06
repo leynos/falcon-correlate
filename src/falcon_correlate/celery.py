@@ -50,13 +50,6 @@ def propagate_correlation_id_to_celery(
         mapping to a mutable mapping (typically :class:`dict`) that holds
         AMQP message properties, including ``correlation_id``.
 
-    Returns
-    -------
-    None
-        This function mutates the ``properties`` mapping in place when the
-        ambient correlation ID is set and the result backend does not use
-        RPC, overwriting Celery's default ``correlation_id`` value.
-
     Notes
     -----
     When the active Celery application uses the ``rpc://`` result backend,
@@ -82,7 +75,15 @@ def propagate_correlation_id_to_celery(
 
 
 def _current_result_backend_uses_rpc() -> bool:
-    """Return ``True`` when the active Celery app uses the RPC result backend."""
+    """Return whether the active Celery app uses the RPC result backend.
+
+    Returns
+    -------
+    bool
+        True when Celery is importable and its active result backend URI starts
+        with ``rpc://``.
+
+    """
     try:
         celery_module = importlib.import_module("celery")
     except ImportError:
@@ -137,7 +138,19 @@ def clear_correlation_id_in_worker(**_: object) -> None:
 
 
 def _get_task_request_correlation_id(task: object | None) -> str | None:
-    """Return the correlation ID carried by a Celery task request, if any."""
+    """Return the correlation ID carried by a Celery task request, if any.
+
+    Parameters
+    ----------
+    task : object | None
+        The Celery task instance supplied by the worker signal.
+
+    Returns
+    -------
+    str | None
+        The request correlation ID when it is a string; otherwise ``None``.
+
+    """
     request = getattr(task, "request", None)
     correlation_id = getattr(request, "correlation_id", None)
     return correlation_id if isinstance(correlation_id, str) else None

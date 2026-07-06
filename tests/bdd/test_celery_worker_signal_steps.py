@@ -56,7 +56,14 @@ def _reset_context_variables() -> cabc.Generator[None, None, None]:
     target_fixture="context",
 )
 def given_task_request_with_correlation_id(value: str) -> Context:
-    """Create a real Celery task with a request correlation ID."""
+    """Create a real Celery task with a request correlation ID.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     app = Celery("bdd-celery-worker", broker="memory://")
     observed: dict[str, str | None] = {}
 
@@ -81,7 +88,14 @@ def given_ambient_correlation_id(value: str) -> None:
 
 @when("the Celery worker lifecycle runs the task", target_fixture="context")
 def when_worker_runs_task(context: Context) -> Context:
-    """Drive the actual Celery task signals around the task body."""
+    """Drive the actual Celery task signals around the task body.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     task = context["task"]
 
     try:
