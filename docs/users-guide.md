@@ -207,11 +207,11 @@ Both exact IP addresses and CIDR subnet notation are supported:
 ```python
 middleware = CorrelationIDMiddleware(
     trusted_sources=[
-        "127.0.0.1",           # Exact IPv4 address
-        "10.0.0.0/8",          # IPv4 CIDR subnet
-        "192.168.1.0/24",      # Another IPv4 subnet
-        "::1",                 # Exact IPv6 address
-        "2001:db8::/32",       # IPv6 CIDR subnet
+        "127.0.0.1",  # Exact IPv4 address
+        "10.0.0.0/8",  # IPv4 CIDR subnet
+        "192.168.1.0/24",  # Another IPv4 subnet
+        "::1",  # Exact IPv6 address
+        "2001:db8::/32",  # IPv6 CIDR subnet
     ]
 )
 ```
@@ -242,8 +242,10 @@ return a string.
 ```python
 import uuid
 
+
 def custom_generator() -> str:
     return f"req-{uuid.uuid4().hex[:8]}"
+
 
 middleware = CorrelationIDMiddleware(generator=custom_generator)
 ```
@@ -284,8 +286,10 @@ UUID_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+
 def uuid_validator(value: str) -> bool:
     return bool(UUID_PATTERN.match(value))
+
 
 middleware = CorrelationIDMiddleware(validator=uuid_validator)
 ```
@@ -443,8 +447,7 @@ handler = logging.StreamHandler()
 handler.addFilter(ContextualLogFilter())
 handler.setFormatter(
     logging.Formatter(
-        "%(asctime)s [%(correlation_id)s] [%(user_id)s] "
-        "%(name)s - %(message)s"
+        "%(asctime)s [%(correlation_id)s] [%(user_id)s] %(name)s - %(message)s"
     )
 )
 
@@ -703,9 +706,7 @@ from falcon_correlate import request_with_correlation_id
 
 # The correlation ID header is injected automatically
 # when correlation_id_var is set (e.g. during a Falcon request).
-response = request_with_correlation_id(
-    "GET", "https://api.example.com/data"
-)
+response = request_with_correlation_id("GET", "https://api.example.com/data")
 ```
 
 All keyword arguments are passed through to `httpx.request`:
@@ -744,9 +745,7 @@ from falcon_correlate import CorrelationIDTransport
 
 base_transport = httpx.HTTPTransport()
 
-with httpx.Client(
-    transport=CorrelationIDTransport(base_transport)
-) as client:
+with httpx.Client(transport=CorrelationIDTransport(base_transport)) as client:
     response = client.get("https://api.example.com/data")
 ```
 
@@ -880,13 +879,17 @@ def send_invoice_email(self, user_id: str) -> None:
 import falcon
 from falcon_correlate import CorrelationIDMiddleware
 
+
 def custom_generator() -> str:
     import uuid
+
     return str(uuid.uuid4())
+
 
 def custom_validator(value: str) -> bool:
     # Accept any non-empty string up to 64 characters
     return bool(value) and len(value) <= 64
+
 
 middleware = CorrelationIDMiddleware(
     header_name="X-Request-ID",

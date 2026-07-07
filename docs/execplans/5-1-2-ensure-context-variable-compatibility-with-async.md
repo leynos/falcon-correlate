@@ -855,8 +855,7 @@ class CorrelationIDMiddlewareASGI(_CorrelationIDMiddlewareBase):
         self,
         req: falcon.asgi.Request,
         resp: falcon.asgi.Response,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     async def process_response(
         self,
@@ -864,8 +863,7 @@ class CorrelationIDMiddlewareASGI(_CorrelationIDMiddlewareBase):
         resp: falcon.asgi.Response,
         resource: object,
         req_succeeded: bool,
-    ) -> None:
-        ...
+    ) -> None: ...
 ```
 
 `correlation_id_var` remains the package-level context variable exported from

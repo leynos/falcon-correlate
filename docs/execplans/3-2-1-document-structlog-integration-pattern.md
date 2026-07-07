@@ -258,12 +258,8 @@ def inject_correlation_context(
     event_dict: dict[str, object],
 ) -> dict[str, object]:
     """Inject correlation ID and user ID into structlog event dict."""
-    event_dict.setdefault(
-        "correlation_id", correlation_id_var.get() or "-"
-    )
-    event_dict.setdefault(
-        "user_id", user_id_var.get() or "-"
-    )
+    event_dict.setdefault("correlation_id", correlation_id_var.get() or "-")
+    event_dict.setdefault("user_id", user_id_var.get() or "-")
     return event_dict
 ```
 
@@ -406,8 +402,7 @@ def inject_correlation_context(
     logger: object,
     method_name: str,
     event_dict: dict[str, object],
-) -> dict[str, object]:
-    ...
+) -> dict[str, object]: ...
 ```
 
 This follows structlog's processor protocol. It is user-side code, not library

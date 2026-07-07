@@ -16,7 +16,8 @@
 - [Falcon correlation ID middleware design](falcon-correlation-id-middleware-design.md)
   explains the middleware architecture, request lifecycle, configuration model,
   and correlation ID propagation rules.
-- [ADR-001: three-tier linting](adr-001-three-tier-linting.md) records the accepted
+- [ADR-001: three-tier linting](adr-001-three-tier-linting.md) records the
+  accepted
   linting architecture that combines Ruff, Interrogate, and PyPy-backed Pylint.
 - [Documentation style guide](documentation-style-guide.md) defines spelling,
   Markdown, document-structure, roadmap, Architecture Decision Record (ADR),

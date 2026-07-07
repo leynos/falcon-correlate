@@ -861,7 +861,9 @@ class CorrelationIDMiddleware:
         echo_header_in_response: bool = True,
     ):
         self.header_name = header_name
-        self.trusted_sources = frozenset(trusted_sources) if trusted_sources else frozenset()
+        self.trusted_sources = (
+            frozenset(trusted_sources) if trusted_sources else frozenset()
+        )
         self.generator = generator
         self.validator = validator
         self.echo_header_in_response = echo_header_in_response
@@ -1036,9 +1038,7 @@ from celery.signals import before_task_publish, task_prerun, task_postrun
 
 from falcon_correlate.middleware import correlation_id_var
 
-_celery_context_tokens = contextvars.ContextVar(
-    "celery_context_tokens", default=None
-)
+_celery_context_tokens = contextvars.ContextVar("celery_context_tokens", default=None)
 
 
 @before_task_publish.connect
@@ -1411,8 +1411,7 @@ with method stubs, deferring full functionality to subsequent tasks.
 
 ```python
 class CorrelationIDMiddleware:
-    def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
-        ...
+    def process_request(self, req: falcon.Request, resp: falcon.Response) -> None: ...
 
     def process_response(
         self,
@@ -1420,8 +1419,7 @@ class CorrelationIDMiddleware:
         resp: falcon.Response,
         resource: object,
         req_succeeded: bool,
-    ) -> None:
-        ...
+    ) -> None: ...
 ```
 
 ### A.2. Context Variable Definitions (Task 2.4.1)
