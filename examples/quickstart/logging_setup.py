@@ -50,7 +50,7 @@ def configure_logging() -> logging.Logger:
 
 
 # [quickstart:logging-usage]
-def log_request(logger: logging.Logger) -> None:
+def log_request(logger: logging.Logger) -> None:  # pylint: disable=useless-return
     """Log one example request event.
 
     Parameters
@@ -69,6 +69,7 @@ def log_request(logger: logging.Logger) -> None:
     >>> log_request(logger)
     """
     logger.info("handled request")
+    return  # noqa: PLR1711
 
 
 # [/quickstart:logging-usage]

@@ -230,6 +230,7 @@ def log_request(logger: logging.Logger) -> None:
     >>> log_request(logger)
     """
     logger.info("handled request")
+    return
 ```
 
 When the middleware has established a request context, emitted log lines
