@@ -45,22 +45,8 @@ if typ.TYPE_CHECKING:
 
     import falcon
 
+    from ._protocols import _RequestLike, _ResponseLike
     from .middleware_config import CorrelationIDConfigKwargs
-
-    class _RequestLike(typ.Protocol):
-        """Small request surface shared by Falcon WSGI and ASGI."""
-
-        context: typ.Any
-        remote_addr: str
-
-        def get_header(self, name: str) -> str | None:
-            """Return a request header by name."""
-
-    class _ResponseLike(typ.Protocol):
-        """Small response surface shared by Falcon WSGI and ASGI."""
-
-        def set_header(self, name: str, value: str) -> None:
-            """Set a response header."""
 
 
 logger = logging.getLogger(__name__)
