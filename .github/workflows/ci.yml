@@ -50,9 +50,6 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.12', '3.13', '3.14']
-    env:
-      CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
-      CODESCENE_CLI_SHA256: ${{ vars.CODESCENE_CLI_SHA256 }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -66,38 +63,33 @@ jobs:
       - name: Install code
         run: uv sync --group dev --python ${{ matrix.python-version }}
 
-      - name: Run tests with coverage
-        run: |
-          uv pip install slipcover pytest-forked
-          uv run python -m slipcover \
-            --source=./falcon_correlate \
-            --omit="*/unittests/*,*/.venv/*" \
-            --branch \
-            --out coverage-${{ matrix.python-version }}.xml \
-            -m pytest --forked -v --ignore=tests/workflows
+      - name: Run tests
+        if: matrix.python-version != '3.13' || github.event_name != 'pull_request'
+        run: uv run pytest -v -n auto --ignore=tests/workflows
 
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+      # Coverage runs on pull requests only, and on a single matrix leg
+      # (3.13). Pushes to main upload their own coverage (and advance the
+      # ratchet baseline) via coverage-main.yml, so generating it here as
+      # well would duplicate the work and the CodeScene upload for the
+      # same commit.
+      - name: Generate coverage
+        if: matrix.python-version == '3.13' && github.event_name == 'pull_request'
+        uses: leynos/shared-actions/.github/actions/generate-coverage@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
         with:
-          name: coverage-${{ matrix.python-version }}
-          path: coverage-${{ matrix.python-version }}.xml
-
-      - name: Install CodeScene Coverage CLI
-        if: env.CS_ACCESS_TOKEN != '' && matrix.python-version == '3.13'
-        run: |
-          curl -fsSL https://downloads.codescene.io/enterprise/cli/install-cs-coverage-tool.sh | bash -s -- -y
-          if [ -n "${CODESCENE_CLI_SHA256:-}" ]; then
-            echo "${CODESCENE_CLI_SHA256}  install-cs-coverage-tool.sh" | sha256sum -c -
-          fi
-
-      - name: Upload coverage to CodeScene
-        if: env.CS_ACCESS_TOKEN != '' && matrix.python-version == '3.13'
-        run: |
-          if [ ! -f coverage-${{ matrix.python-version }}.xml ]; then
-            echo "coverage-${{ matrix.python-version }}.xml not found!"
-            exit 1
-          fi
-          cs-coverage upload \
-            --format "cobertura" \
-            --metric "line-coverage" \
-            coverage-${{ matrix.python-version }}.xml
+          output-path: coverage.xml
+          format: cobertura
+          # falcon-correlate's own `make test` target already runs
+          # `pytest -n auto`, so the suite is xdist-clean; keep the
+          # shared action's default worker count rather than forcing a
+          # serial run.
+          with-ratchet: 'true'
+      # The `mode: check` step is deliberately not wired in yet: CodeScene
+      # project 75281 has no coverage-gates configuration, so
+      # `cs-coverage check` fails every run with "HTTP call succeeded,
+      # but the received project-config isn't valid. Lacks the gates
+      # configuration." — a CodeScene-side per-project setting, not a CI
+      # defect (ddlint, chutoro and cmd-mox's projects hit the
+      # byte-identical error). Add the check step in a fast-follow PR
+      # once coverage-main.yml has uploaded to main at least once and the
+      # gate is confirmed to resolve, or once CodeScene confirms the
+      # project's coverage gate is enabled.
