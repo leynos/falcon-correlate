@@ -228,7 +228,7 @@ generator or tests and re-run the focused pytest command before running the
 full suite. If documentation linting fails, run `make fmt` and rerun
 `make markdownlint`.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Keep the log files created via `tee` for evidence of passing checks, especially
 `/tmp/falcon-correlate-test.log` and the markdownlint log if documentation

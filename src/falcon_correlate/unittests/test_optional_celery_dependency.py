@@ -74,7 +74,7 @@ class _PytestRun(typ.NamedTuple):
     """Captured child pytest result and expected skip output."""
 
     result: subprocess.CompletedProcess[str]
-    normalised_stdout: str
+    normalized_stdout: str
     expected_stdout: str
 
 
@@ -177,13 +177,13 @@ def _relative_paths(paths: cabc.Iterable[Path], project_root: Path) -> tuple[str
     return tuple(str(path.relative_to(project_root)) for path in paths)
 
 
-def _normalise_pytest_output(output: str) -> str:
+def _normalize_pytest_output(output: str) -> str:
     """Redact nondeterministic pytest duration fields from quiet output."""
-    normalised_progress = _PYTEST_PROGRESS_PATTERN.sub(
+    normalized_progress = _PYTEST_PROGRESS_PATTERN.sub(
         r"\g<progress> [100%]",
         output.strip(),
     )
-    return _PYTEST_DURATION_PATTERN.sub("<duration>", normalised_progress)
+    return _PYTEST_DURATION_PATTERN.sub("<duration>", normalized_progress)
 
 
 def _run_celery_tests_with_celery_blocked(
@@ -207,7 +207,7 @@ def _run_celery_tests_with_celery_blocked(
 1 passed, {len(celery_test_paths)} skipped in <duration>"""
     return _PytestRun(
         result=result,
-        normalised_stdout=_normalise_pytest_output(result.stdout),
+        normalized_stdout=_normalize_pytest_output(result.stdout),
         expected_stdout=expected_stdout,
     )
 
@@ -361,6 +361,6 @@ def test_celery_tests_report_correct_skip_count_when_celery_is_unavailable(
 ) -> None:
     """Celery-only tests should match the skip-count snapshot."""
     assert (
-        celery_blocked_pytest_run.normalised_stdout
+        celery_blocked_pytest_run.normalized_stdout
         == celery_blocked_pytest_run.expected_stdout
     ), "Missing-Celery pytest output should match the expected skip-count snapshot."

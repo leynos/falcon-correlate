@@ -31,7 +31,7 @@ microservice architectures and distributed systems, the complexity of tracing
 individual requests or transactions has significantly increased. A single user
 interaction may trigger a cascade of calls across numerous independent
 services, each potentially generating its own logs and telemetry data. Without
-a common identifier, diagnosing issues, understanding system behavior, or
+a common identifier, diagnosing issues, understanding system behaviour, or
 performing end-to-end tracing becomes a formidable challenge.
 
 Correlation IDs address this challenge by providing a unique identifier that is
@@ -92,13 +92,13 @@ and understanding the flow of operations within complex systems.
 For HTTP-based services, correlation IDs are typically transmitted via request
 headers. While no single standard is universally mandated, several conventions
 have emerged. The user query specifies `X-Correlation-ID`, which is a common
-choice. Another widely used header is `X-Request-ID`.[^2] Organisations may
+choice. Another widely used header is `X-Request-ID`.[^2] Organizations may
 also define their own specific headers, such as `concur-correlationid` used by
 SAP Concur[^4] or the `Kong-Request-ID` header added by the Kong API gateway.[
 ^5]
 
 The existence of multiple common header names (e.g., `X-Correlation-ID`,
-`X-Request-ID`) and organisation-specific headers suggests that while a de
+`X-Request-ID`) and organization-specific headers suggests that while a de
 facto standard around "X-Something-ID" has formed, the precise name can vary.
 This implies that a robust middleware solution should ideally allow
 configuration of the header name it inspects and propagates, even if it
@@ -119,7 +119,7 @@ based on time ranges, potentially improving performance for such operations.[^6]
 UUIDv7 offers precise timestamping, with RFC 9562 specifying millisecond
 precision by default.[^6] This contrasts with UUIDv4, which is entirely random
 and thus offers no inherent time ordering. UUIDv1 is time-based but has been
-criticised for potential privacy concerns due to the inclusion of the MAC
+criticized for potential privacy concerns due to the inclusion of the MAC
 address of the generating machine[^6], and UUIDv7 aims to provide better
 entropy characteristics than UUIDv1.[^7] The time-ordered nature of UUIDv7,
 combined with its uniqueness properties, makes it an excellent candidate for
@@ -145,7 +145,7 @@ IDs serve a purpose analogous to correlation IDs for observability.
 
 The `asgi-correlation-id` library, despite its ASGI focus, serves as a strong
 conceptual blueprint for the Falcon middleware. Its comprehensive feature
-set—configurable header names, customisable ID generators and validators,
+set—configurable header names, customizable ID generators and validators,
 logging integration, and Celery support—aligns closely with the requirements
 outlined in the user query. Therefore, its design patterns and capabilities can
 inform the development of a similar middleware for Falcon, adapted to Falcon's
@@ -371,7 +371,7 @@ services are behind proxies. `req.remote_addr` will provide the IP of the
 immediate upstream client (e.g., the proxy itself). Headers like
 `X-Forwarded-For` (XFF) may contain the original client's IP address.[^13]
 However, XFF headers can be spoofed by a malicious client if the edge proxy or
-load balancer does not properly sanitise or overwrite them.[^14] Therefore, for
+load balancer does not properly sanitize or overwrite them.[^14] Therefore, for
 the purpose of trusting an *incoming correlation ID*, the most secure approach
 is to base the trust decision on `req.remote_addr` being a known, internal,
 trusted proxy or load balancer. This component is then responsible for managing
@@ -607,7 +607,7 @@ the correlation ID is request-specific, setting it directly as a static default
 header on a long-lived client is not suitable. Instead, `httpx.Client` event
 hooks (`event_hooks={'request': [hook_func]}`) could be used. The `hook_func`
 would retrieve the ID from `contextvars` and add it to `request.headers`. This
-approach centralises the logic if client instances are managed.
+approach centralizes the logic if client instances are managed.
 
 ##### 3.5.1.3. Method 2: Custom `httpx` transport
 
@@ -765,7 +765,18 @@ This end-to-end flow ensures that:
 
 ### 3.6. Security and operational considerations
 
-#### 3.6.1. Validating and sanitising incoming correlation IDs
+
+#### 3.6.1. Validating and sanitizing incoming correlation IDs
+
+Reiterating the importance of validation, even if an incoming ID is from a
+trusted source, it's good practice to ensure it meets expected formats (e.g.,
+UUID structure). If the "trusted source" check fails and a new ID is generated,
+logging the attempted (and rejected) incoming ID might be useful for security
+auditing. Validation can prevent issues like overly long IDs or potentially
+malicious content from being processed or logged if not properly handled by all
+downstream systems.
+
+#### 3.6.1. Validating and sanitizing incoming correlation IDs
 
 Reiterating the importance of validation, even if an incoming ID is from a
 trusted source, it's good practice to ensure it meets expected formats (e.g.,
@@ -794,7 +805,7 @@ negligible.
 - **IP address checking:** Comparing `req.remote_addr` against a list of
   trusted IPs is fast, especially if the list is small or implemented
   efficiently (e.g., using a set for lookups).
-- **UUIDv7 generation:** Modern UUID generation libraries are highly optimised.
+- **UUIDv7 generation:** Modern UUID generation libraries are highly optimized.
 - **`contextvars` access:** `ContextVar.get()` and `ContextVar.set()` are
   designed to be efficient. `copy_context()` is O(1).[^17]
 - **Logging filter:** Adding attributes to a `LogRecord` is a lightweight
@@ -953,7 +964,7 @@ class ContextualLogFilter(logging.Filter):
 #     'filters': {
 #         'contextual_filter': {
 #             '()': ContextualLogFilter,  # Path to your filter class
-#         },
+#     },
 #     },
 #     'formatters': {
 #         'standard': {
@@ -961,15 +972,15 @@ class ContextualLogFilter(logging.Filter):
 #                 '%(asctime)s [%(levelname)s][%(correlation_id)s]'
 #                 '[%(user_id)s] %(name)s: %(message)s'
 #             ),
-#         },
+#     },
 #     },
 #     'handlers': {
 #         'console': {
-#             'level': 'INFO',
+#         'level': 'INFO',
 #             'filters': ['contextual_filter'],
 #             'class': 'logging.StreamHandler',
 #             'formatter': 'standard'
-#         },
+#     },
 #     },
 #     'root': {
 #         'handlers': ['console'],
@@ -1028,6 +1039,7 @@ async def async_client_request_with_correlation_id(
 # response = client_request_with_correlation_id(
 #     'GET', 'https://api.example.com/data'
 # )
+```
 
 # response = await async_client_request_with_correlation_id(
 #     'POST', 'https://api.example.com/submit', json={...}
@@ -1092,7 +1104,7 @@ def clear_correlation_id_in_worker(sender=None, **kwargs):
 ### 4.5. Middleware configuration
 
 The `CorrelationIDMiddleware` is instantiated and passed to the Falcon `App`
-during its initialisation.
+during its initialization.
 
 ```python
 # Example: In your main application setup file (e.g., app.py)
@@ -1291,7 +1303,7 @@ trusted sources, integration into logging systems using `contextvars` and
 ### 5.1. Summary of the proposed design
 
 The core of the design is a Falcon middleware component that intercepts
-requests to manage the correlation ID. It prioritises incoming IDs from trusted
+requests to manage the correlation ID. It prioritizes incoming IDs from trusted
 sources via a configurable header (e.g., `X-Correlation-ID`) and generates a
 new UUIDv7 if necessary. UUIDv7 is chosen for its time-sortable properties,
 aiding in log analysis and database indexing.
@@ -1322,7 +1334,7 @@ task's execution context, enabling consistent logging.
 - **Trusted source configuration:** Diligently configure and maintain the list
   of `trusted_sources`. This is critical for security and the integrity of
   correlation IDs.
-- **Log aggregation:** To fully leverage correlation IDs, employ a centralised
+- **Log aggregation:** To fully leverage correlation IDs, employ a centralized
   log aggregation system (e.g., ELK Stack, Splunk, Grafana Loki). This allows
   for efficient searching and filtering of logs across all services using the
   correlation ID.
@@ -1919,7 +1931,7 @@ validation test that exercises pytest collection in a child process.
    validation derives Celery unit and BDD step modules from repository-relative
    glob patterns and asserts each discovered file still contains the
    `pytest.importorskip("celery")` guard. The child pytest output is compared
-   with a normalised exact snapshot so skip counts are explicit while
+   with a normalized exact snapshot so skip counts are explicit while
    nondeterministic runtime duration is redacted.
 
 **Compile-time validation:**

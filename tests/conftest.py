@@ -45,7 +45,7 @@ class TrackingMiddleware(CorrelationIDMiddleware):
     """
 
     def __init__(self, **kwargs: typ.Any) -> None:  # noqa: ANN401
-        """Initialise tracking middleware with call flags reset."""
+        """Initialize tracking middleware with call flags reset."""
         super().__init__(**kwargs)
         self.process_request_called = False
         self.process_response_called = False

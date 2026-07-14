@@ -111,7 +111,7 @@ def _inject_correlation_id_header(
 
 
 class _CorrelationIDTransportBase[WrappedTransportT]:
-    """Shared initialisation for sync and async correlation ID transports."""
+    """Shared initialization for sync and async correlation ID transports."""
 
     # Intentionally Any: this base stores either sync or async httpx transports;
     # concrete subclasses enforce the specific transport type.

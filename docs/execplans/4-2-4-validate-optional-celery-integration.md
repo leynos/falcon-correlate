@@ -661,7 +661,7 @@ guards already fully satisfy the requirement, the recovery path is to keep code
 unchanged, document the validation evidence, and close 4.2.4 with the smallest
 possible test or documentation update that proves the contract.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Wyvern agent findings from 2026-05-08:
 

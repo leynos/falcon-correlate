@@ -295,7 +295,7 @@ Documentation acceptance:
 - If concurrency tests are flaky, tighten synchronization primitives in test
   code (barriers/events) before changing production code.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Expected new files:
 

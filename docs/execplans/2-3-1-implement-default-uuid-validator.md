@@ -328,7 +328,7 @@ All steps are safe to re-run. If a test fails after implementation, adjust the
 validator or tests and re-run the focused pytest command before running the
 full suite. If formatting fails, run `make fmt` and rerun `make check-fmt`.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Keep the log files created via `tee` for evidence of passing checks:
 

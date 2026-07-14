@@ -221,6 +221,34 @@ Use the standard log pattern when capturing lint output for review:
 make lint 2>&1 | tee /tmp/lint-falcon-correlate-$(git branch --show-current).out
 ```
 
+
+## Spelling policy
+
+Run `make spelling` to enforce en-GB-oxendict prose spelling with the pinned
+Typos release. Typos checks tracked Markdown, while the phrase checker scans
+eligible tracked UTF-8 text across the repository so punctuation-sensitive
+shared corrections such as `hand-written` cannot survive in comments or tests.
+
+The tracked `typos.toml` is generated from the shared estate dictionary and the
+narrow repository policy in `typos.local.toml`; never edit the generated file
+by hand. Repository exceptions belong in the local overlay as narrow exact or
+full-line patterns, not bare accepted words for machine interfaces or formal
+names.
+
+`make spelling-config-write` invokes the exact, commit-pinned
+`typos-config-builder` CLI with Python 3.14. It refreshes the untracked shared
+dictionary cache when its authority is newer and writes the deterministic
+configuration. Use `make spelling-config` to verify cache freshness and
+generated-config drift. The builder only parses, refreshes, merges and renders
+spelling policy. Harvesting, Typos execution, phrase enforcement and Mermaid
+validation remain consumer-owned.
+
+The standalone phrase helper supports Python 3.13 and later, and its isolated
+Ruff checks target Python 3.13. Run `make spelling-helper-test` to exercise its
+three grouped policy, scanning and command-line tests. Run `make markdownlint`
+for the combined Markdown and spelling gate, and `make nixie` to validate
+Mermaid diagrams with Nixie 1.1.0 and Merman 0.7.0.
+
 ## Makefile variables
 
 The lint target is configured by these Makefile variables:

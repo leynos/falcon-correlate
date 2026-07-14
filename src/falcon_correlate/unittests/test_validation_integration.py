@@ -166,17 +166,17 @@ class TestValidationWithValidatorRejecting:
     """Tests for validator returning False (invalid ID triggers generation)."""
 
     @pytest.mark.parametrize(
-        "validator_behavior",
+        "validator_behaviour",
         ["returns_false", "raises"],
         ids=["validator_returns_false", "validator_raises"],
     )
     def test_generator_invoked_on_validation_failure(
         self,
         create_test_client: cabc.Callable[..., falcon.testing.TestClient],
-        validator_behavior: str,
+        validator_behaviour: str,
     ) -> None:
         """Verify generator is called when the validator rejects or raises."""
-        if validator_behavior == "raises":
+        if validator_behaviour == "raises":
             mock_validator = mock.MagicMock(side_effect=ValueError("boom"))
         else:
             mock_validator = mock.MagicMock(return_value=False)
@@ -362,7 +362,7 @@ class TestValidationLogging:
         ],
         ids=lambda s: s.description,
     )
-    def test_validation_logging_behavior(
+    def test_validation_logging_behaviour(
         self,
         create_test_client: cabc.Callable[..., falcon.testing.TestClient],
         caplog: pytest.LogCaptureFixture,

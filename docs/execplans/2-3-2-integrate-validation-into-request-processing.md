@@ -433,7 +433,7 @@ implementation or tests and re-run `make test`. If formatting fails, run
 `logging.getLogger(__name__)` twice would be a code issue caught by linting,
 but the edit is a single insertion).
 
-## Artifacts and notes
+## Artefacts and notes
 
 Keep the log files created via `tee` for evidence of passing checks:
 

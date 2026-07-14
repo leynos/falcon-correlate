@@ -94,8 +94,7 @@ def test_workflow_default_permissions_are_empty() -> None:
         f"{workflow.get('permissions')!r}"
     )
 
-
-def test_concurrency_serialises_per_ref_without_cancelling() -> None:
+def test_concurrency_serializes_per_ref_without_cancelling() -> None:
     """Runs queue per ref instead of cancelling one another."""
     concurrency = _as_mapping(
         _load().get("concurrency"), "the workflow must declare concurrency"
@@ -108,8 +107,19 @@ def test_concurrency_serialises_per_ref_without_cancelling() -> None:
         f"concurrency.cancel-in-progress must be false, got "
         f"{concurrency.get('cancel-in-progress')!r}"
     )
-
-
+def test_concurrency_serializes_per_ref_without_cancelling() -> None:
+    """Runs queue per ref instead of cancelling one another."""
+    concurrency = _as_mapping(
+        _load().get("concurrency"), "the workflow must declare concurrency"
+    )
+    assert concurrency.get("group") == "mutation-testing-${{ github.ref }}", (
+        f"concurrency.group must key on the triggering ref, got "
+        f"{concurrency.get('group')!r}"
+    )
+    assert concurrency.get("cancel-in-progress") is False, (
+        f"concurrency.cancel-in-progress must be false, got "
+        f"{concurrency.get('cancel-in-progress')!r}"
+    )
 def test_triggers_keep_schedule_and_plain_dispatch() -> None:
     """The daily schedule stays; dispatch declares no inputs."""
     triggers = _triggers(_load())

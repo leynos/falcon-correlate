@@ -300,7 +300,7 @@ Documentation acceptance:
   produces the same output.
 - If a quality gate fails, fix the issue and rerun from Stage D.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Expected new files:
 
@@ -331,4 +331,4 @@ documentation references existing public API exports (`correlation_id_var`,
 - 2026-02-21: Updated to COMPLETE after implementation, tests, and docs.
 - 2026-02-23: Replaced hard-coded line numbers with symbol references;
   changed "side-effect" to "side effect"; removed "capture logs" from progress
-  checklist (no durable artifact location).
+  checklist (no durable artefact location).

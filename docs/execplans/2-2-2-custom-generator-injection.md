@@ -223,7 +223,7 @@ All steps are safe to re-run. If tests fail after implementation, adjust the
 implementation or tests and re-run. If documentation linting fails, run
 `make fmt` and rerun `make markdownlint`.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Keep log files created via `tee` for evidence of passing checks.
 

@@ -84,7 +84,7 @@ Next, implement header retrieval in `CorrelationIDMiddleware.process_request`.
 Use a small helper method or local function to keep the control flow flat and
 avoid introducing a Bumpy Road pattern as described in
 `docs/complexity-antipatterns-and-refactoring-strategies.md`. The logic should
-read the configured header (via `req.get_header`), normalise it by trimming
+read the configured header (via `req.get_header`), normalize it by trimming
 whitespace, and only store it when non-empty. Do not call the generator or
 validator yet, because those are part of later roadmap tasks.
 
@@ -181,7 +181,7 @@ code or tests and re-run the specific test file before re-running the full
 suite. If documentation formatting changes introduce lint failures, run
 `make fmt` and re-check.
 
-## Artifacts and Notes
+## Artefacts and Notes
 
 Capture short evidence of success in the log files created by `tee`. For
 example, after `make test`, the tail of `/tmp/falcon-correlate-test.log` should
@@ -196,7 +196,7 @@ Implement or update these interfaces in `src/falcon_correlate/middleware.py`:
             self,
             req: falcon.Request,
         ) -> str | None:
-            """Return a normalised header value or None when missing/empty."""
+            """Return a normalized header value or None when missing/empty."""
 
         def process_request(
             self,
@@ -210,7 +210,7 @@ No new external dependencies are required for this task.
 ## Revision note (required when editing an ExecPlan)
 
 2026-01-04: Marked the plan steps complete, recorded the markdownlint table
-fix, and summarised the outcomes and validation results now that implementation
+fix, and summarized the outcomes and validation results now that implementation
 and verification are finished.
 
 2026-01-05: Expanded Behaviour-Driven Development (BDD) on first use to comply

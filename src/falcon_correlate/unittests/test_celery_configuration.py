@@ -67,7 +67,7 @@ class _TaskLike:
     """Minimal hashable task object for Celery signal dispatch tests."""
 
     def __init__(self, *, correlation_id: str) -> None:
-        """Initialise the test double."""
+        """Initialize the test double."""
         self.request = SimpleNamespace(correlation_id=correlation_id)
 
 
