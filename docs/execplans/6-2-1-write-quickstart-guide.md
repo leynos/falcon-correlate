@@ -59,8 +59,7 @@ Success is observable when:
   narrow `ContextVar` typing fix in the middleware, which remains permitted if
   needed to keep the documented example and tooling state consistent. This task
   otherwise adds documentation, example modules, and tests only. (Edits to
-  `Makefile`, `pyproject.toml`, and the `docs/` tree are expected and in
-  scope.)
+  `Makefile`, `pyproject.toml`, and the `docs/` tree are expected and in scope.)
 - Example modules must satisfy the full gate set: `ruff format`, `ruff check`
   (including `D`, `ANN`, `RET`, `S`, `N`, `PLR`), the PyPy-backed pylint pass,
   and the `ty` type checker. No `# noqa` or `# type: ignore` without a comment
@@ -182,13 +181,17 @@ Success is observable when:
 - [x] (2026-06-24 14:38Z) Re-ran deterministic gates after the CI type fix:
   `make check-fmt`, `make typecheck`, `make lint`, focused middleware context
   tests (`18 passed`), and `make test` (`433 passed, 11 skipped`).
+- [x] (2026-07-14) Resolved hosted CI `ty 0.0.57` request-protocol failures by
+  declaring `_RequestLike.remote_addr` as the read-only property exposed by
+  Falcon's WSGI and ASGI request classes. Explicit `ty 0.0.57` checking and all
+  Python commit gates pass (`439 passed, 11 skipped`).
 - [x] (2026-07-04) Addressed review findings in the quickstart tests: added
   the missing user-only logging snapshot variant, drove the untrusted
   behavioural scenario through the configured example's app factory, and
   anchored the drift guard to the repository root.
 - [x] (2026-07-04) Verified follow-up inline comments and fixed the still-valid
-  documentation and drift-guard issues while skipping findings already fixed
-  in current code.
+  documentation and drift-guard issues while skipping findings already fixed in
+  current code.
 - [ ] Stage F: run a `coderabbit review --agent` pass and clear all concerns.
 
 ## Surprises & discoveries
@@ -229,8 +232,7 @@ Success is observable when:
   reported `10 passed`.
 - Observation: the final deterministic gate chain passed before CodeRabbit:
   `mbake validate Makefile`, `make check-fmt`, `make typecheck`, `make lint`,
-  `make test` (`431 passed, 11 skipped`), `make markdownlint`, and
-  `make nixie`.
+  `make test` (`431 passed, 11 skipped`), `make markdownlint`, and `make nixie`.
 - Observation: after including intent-to-add files, the diff contains 19 files
   including the generated syrupy snapshot, or 18 non-snapshot files. That meets
   the file-count tolerance. The same diff is about 902 net non-snapshot lines,
@@ -250,20 +252,24 @@ Success is observable when:
   `# ...` comments as headings. Removing the premature fences restored the
   intended Python blocks and made `make markdownlint nixie` pass.
 - Observation: hosted CI used `ty 0.0.53`, while the local `make typecheck`
-  target used `ty 0.0.32`. The newer checker inferred
-  `ContextVar.reset(...)` against `Token[Never]` when the middleware stored the
-  context variable as `ContextVar[Any]`. Typing the constructor argument as
-  `ContextVar[str | None]`, matching the exported `correlation_id_var`, and
-  casting the runtime-verified token to `Token[str | None]` satisfies both
-  checker versions without changing runtime behaviour.
+  target used `ty 0.0.32`. The newer checker inferred `ContextVar.reset(...)`
+  against `Token[Never]`. Casting the token to the stored context variable's
+  `Any` parameter after verifying token ownership satisfies both checker
+  versions without narrowing the injectable context variable's existing
+  contract or changing runtime behaviour.
+- Observation: `ty 0.0.57` distinguishes a writable protocol attribute from a
+  read-only property. Falcon's WSGI and ASGI request classes expose
+  `remote_addr` as `@property -> str`, so `_RequestLike.remote_addr: str`
+  incorrectly required mutation support. Modelling it as a protocol property
+  accepts both request classes and matches how the middleware reads the value.
 - Observation: follow-up review found two coverage gaps in the quickstart
   tests. The logging snapshot covered `(correlation_id, user_id)`,
   `(correlation_id, None)`, and `(None, None)`, but missed `(None, user_id)`.
   The untrusted-ID behavioural scenario also rebuilt a bespoke app with the
   test-only `CorrelationEchoResource`, so it did not exercise the documented
-  configured example boundary. The fix adds the missing snapshot row and
-  drives the scenario through `examples.quickstart.configured_app.build_app`,
-  varying only `trusted_sources`.
+  configured example boundary. The fix adds the missing snapshot row and drives
+  the scenario through `examples.quickstart.configured_app.build_app`, varying
+  only `trusted_sources`.
 - Observation: the first drift guard used paths relative to the process
   current working directory. Anchoring `docs/quickstart.md` and
   `examples/quickstart/` from `__file__` makes the guard stable when pytest is
@@ -335,8 +341,8 @@ Success is observable when:
 - Decision: omit `__init__.py` package markers under `examples/quickstart/`,
   `tests/examples/`, and `tests/docs/`. Rationale: Python namespace packages
   and pytest discovery are sufficient, and omitting marker files keeps the
-  delivered file count within the ExecPlan tolerance. Date/Author:
-  2026-06-24, implementer.
+  delivered file count within the ExecPlan tolerance. Date/Author: 2026-06-24,
+  implementer.
 
 - Decision: proceed with the current green implementation despite exceeding
   the ExecPlan net-line tolerance. Rationale: the stop hook explicitly
@@ -351,11 +357,16 @@ Success is observable when:
   but the quickstart branch added independent documentation-example behaviour.
   Date/Author: 2026-06-24, implementer.
 
-- Decision: keep the middleware's injectable correlation context variable
-  typed as `ContextVar[str | None]`. Rationale: the middleware only stores
-  generated or accepted string correlation IDs and the unset state is `None`;
-  preserving that concrete type gives newer `ty` enough information to accept
-  token reset after runtime validation. Date/Author: 2026-06-24, implementer.
+- Decision: preserve the middleware's injectable correlation context variable
+  as `ContextVar[Any]` and cast only a runtime-verified reset token to
+  `Token[Any]`. Rationale: token invariance prevents the checker from deriving
+  the parameter from `isinstance`, while the token's variable-identity check
+  proves the reset is safe without narrowing the existing injection contract.
+  Date/Author: 2026-06-24, implementer; updated 2026-07-14.
+
+- Decision: model `_RequestLike.remote_addr` as a read-only protocol property.
+  Rationale: this exactly matches Falcon's WSGI and ASGI request APIs and the
+  middleware only reads the address. Date/Author: 2026-07-14, implementer.
 
 - Decision: expose `build_app(config)` from the configured quickstart example
   and use it in behavioural tests. Rationale: the untrusted-ID scenario needs
@@ -374,20 +385,22 @@ passing AST drift guard, and an approved snapshot for the log-format variant
 matrix. Stage E connected the new guide and tested-example convention into the
 repository documentation set.
 
-The branch was then rebased onto `origin/main`. Conflict resolution incorporated
-main's newer three-tier linting architecture and Interrogate dependency without
-dropping the quickstart work. Post-rebase validation passed the requested gates,
-and subsequent hook/CI feedback uncovered two follow-up issues: malformed
-Markdown fence boundaries in the design document and a stricter `ty 0.0.53`
-diagnostic for `ContextVar.reset`. Both were fixed in focused commits and
-validated with the relevant deterministic gates.
+The branch was then rebased onto `origin/main`. Conflict resolution
+incorporated main's newer three-tier linting architecture and Interrogate
+dependency without dropping the quickstart work. Post-rebase validation passed
+the requested gates, and subsequent hook/CI feedback uncovered two follow-up
+issues: malformed Markdown fence boundaries in the design document and a
+stricter `ty 0.0.53` diagnostic for `ContextVar.reset`. Both were fixed in
+focused commits and validated with the relevant deterministic gates. A later
+`ty 0.0.57` release also required the shared request protocol to model Falcon's
+read-only `remote_addr` property accurately.
 
 Current implementation status: the quickstart guide, examples, ADR-002,
 drift-guard tests, BDD coverage, snapshot coverage, and documentation links are
-implemented and pushed. The latest full Python gate set reports
-`make test` as `433 passed, 11 skipped`; `make check-fmt`, `make typecheck`,
-`make lint`, and explicit `ty 0.0.53` checking pass. The remaining recorded
-review item is to run `coderabbit review --agent` and clear any concerns.
+implemented and pushed. The latest full Python gate set reports `make test` as
+`439 passed, 11 skipped`; `make check-fmt`, `make typecheck`, `make lint`, and
+explicit `ty 0.0.57` checking pass. The remaining recorded review item is to run
+`coderabbit review --agent` and clear any concerns.
 
 ## Context and orientation
 
@@ -425,8 +438,8 @@ The reader is assumed to know nothing about this repository. Key facts:
   `pythonpath = ["."]` (so `tests.*` and a top-level `examples` package are
   importable), `timeout = 30`, one marker (`slow`). There is no `addopts` and
   no coverage threshold. `pytest-bdd`, `pytest-asyncio`, `pytest-xdist`, and
-  `hypothesis` are dev dependencies; `syrupy>=5,<6` is now present for
-  snapshot testing.
+  `hypothesis` are dev dependencies; `syrupy>=5,<6` is now present for snapshot
+  testing.
 - Existing test conventions to reuse:
   - WSGI integration: `falcon.testing.TestClient(falcon.App(middleware=[...]))`
     then `client.simulate_get(path, headers=...)`; assert on
