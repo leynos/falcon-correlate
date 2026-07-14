@@ -1,0 +1,56 @@
+name: Coverage (main)
+
+# CodeScene accepts `cs-coverage upload` only for analysed branches, so
+# main-branch coverage is uploaded here on push; pull requests generate
+# coverage (and, in a future fast-follow, run the changed-line
+# `cs-coverage check` gate) in ci.yml instead. This workflow also
+# advances the coverage ratchet baseline: caches saved on main are
+# readable by every pull-request run, so the baseline written here is
+# the one PR ratchet checks compare against.
+#
+# workflow_dispatch lets the upload be re-run on demand: merges
+# performed by the automerge workflow's GITHUB_TOKEN do not fire
+# push-event workflows at all, so automerged changes to main only pick
+# up coverage via a manual dispatch.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  coverage-upload:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
+      CODESCENE_CLI_SHA256: ${{ vars.CODESCENE_CLI_SHA256 }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install code
+        run: uv sync --group dev --python 3.13
+
+      - name: Generate coverage
+        uses: leynos/shared-actions/.github/actions/generate-coverage@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
+        with:
+          output-path: coverage.xml
+          format: cobertura
+          with-ratchet: 'true'
+
+      - name: Upload coverage data to CodeScene
+        if: env.CS_ACCESS_TOKEN != ''
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
+        with:
+          format: cobertura
+          path: coverage.xml
+          access-token: ${{ env.CS_ACCESS_TOKEN }}
+          installer-checksum: ${{ env.CODESCENE_CLI_SHA256 }}
