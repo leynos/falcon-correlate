@@ -138,6 +138,8 @@ app.add_route("/hello", HelloResource())
 `tests/docs/test_quickstart_doc_matches_examples.py` compares the Python
 abstract syntax tree (AST) for every marked fence with its source region. This
 allows harmless formatting and comment changes while failing on semantic drift.
+The `syrupy>=5,<6` development dependency supplies the snapshot fixture used by
+the quickstart logging-format test.
 When adding a guarded snippet, add both markers and run:
 
 ```bash

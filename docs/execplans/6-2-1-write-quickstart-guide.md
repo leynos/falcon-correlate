@@ -181,6 +181,13 @@ Success is observable when:
 - [x] (2026-06-24 14:38Z) Re-ran deterministic gates after the CI type fix:
   `make check-fmt`, `make typecheck`, `make lint`, focused middleware context
   tests (`18 passed`), and `make test` (`433 passed, 11 skipped`).
+- [x] (2026-07-04) Addressed review findings in the quickstart tests: added
+  the missing user-only logging snapshot variant, drove the untrusted
+  behavioural scenario through the configured example's app factory, and
+  anchored the drift guard to the repository root.
+- [x] (2026-07-04) Verified follow-up inline comments and fixed the still-valid
+  documentation and drift-guard issues while skipping findings already fixed in
+  current code.
 - [x] (2026-07-14) Resolved hosted CI `ty 0.0.57` request-protocol failures by
   declaring `_RequestLike.remote_addr` as the read-only property exposed by
   Falcon's WSGI and ASGI request classes. Explicit `ty 0.0.57` checking and all
@@ -192,13 +199,6 @@ Success is observable when:
   before regenerating it and retaining main's shared request protocol. The
   required post-rebase gates passed: `make check-fmt`, `make test`
   (`439 passed, 11 skipped`), `make typecheck`, and `make lint`.
-- [x] (2026-07-04) Addressed review findings in the quickstart tests: added
-  the missing user-only logging snapshot variant, drove the untrusted
-  behavioural scenario through the configured example's app factory, and
-  anchored the drift guard to the repository root.
-- [x] (2026-07-04) Verified follow-up inline comments and fixed the still-valid
-  documentation and drift-guard issues while skipping findings already fixed in
-  current code.
 - [ ] Stage F: run a `coderabbit review --agent` pass and clear all concerns.
 
 ## Surprises & discoveries
