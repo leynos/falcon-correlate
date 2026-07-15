@@ -279,7 +279,7 @@ All steps are safe to re-run. If a test fails after implementation, adjust the
 implementation or tests and re-run `make test`. If formatting fails, run
 `make fmt` and rerun `make check-fmt`.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Keep the log files created via `tee` for evidence of passing checks:
 

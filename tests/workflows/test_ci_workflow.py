@@ -48,7 +48,7 @@ class ActConfig:
     event: str
     job: str
     event_path: Path
-    artifact_dir: Path
+    artefact_dir: Path
     matrix: dict[str, str] = dc.field(default_factory=dict)
     dry_run: bool = False
 
@@ -61,10 +61,10 @@ def run_act(config: ActConfig) -> tuple[int, Path, str]:
 
     Returns
     -------
-        Tuple of (exit code, artifact directory, combined logs).
+        Tuple of (exit code, artefact directory, combined logs).
 
     """
-    config.artifact_dir.mkdir(parents=True, exist_ok=True)
+    config.artefact_dir.mkdir(parents=True, exist_ok=True)
 
     act_path = shutil.which("act")
     if act_path is None:
@@ -81,7 +81,7 @@ def run_act(config: ActConfig) -> tuple[int, Path, str]:
         "-P",
         "ubuntu-latest=catthehacker/ubuntu:act-latest",
         "--artifact-server-path",
-        str(config.artifact_dir),
+        str(config.artefact_dir),
         "--json",
         "-b",
         "-W",
@@ -102,7 +102,7 @@ def run_act(config: ActConfig) -> tuple[int, Path, str]:
         check=False,
     )
     logs = completed.stdout + "\n" + completed.stderr
-    return completed.returncode, config.artifact_dir, logs
+    return completed.returncode, config.artefact_dir, logs
 
 
 def parse_json_logs(logs: str) -> list[dict[str, typ.Any]]:
@@ -169,7 +169,7 @@ class TestCIWorkflowStructure:
             event="pull_request",
             job="lint",
             event_path=FIXTURES_DIR / "pull_request.event.json",
-            artifact_dir=tmp_path / "act-artifacts",
+            artefact_dir=tmp_path / "act-artefacts",
             dry_run=True,
         )
         _code, _artdir, logs = run_act(config)
@@ -200,12 +200,14 @@ class TestCIWorkflowLintJob:
         - Code formatting check
         - Ruff linting
         - Type checking
+        - Markdown linting and Oxford spelling checks
+        - Mermaid diagram validation
         """
         config = ActConfig(
             event="pull_request",
             job="lint",
             event_path=FIXTURES_DIR / "pull_request.event.json",
-            artifact_dir=tmp_path / "act-artifacts",
+            artefact_dir=tmp_path / "act-artefacts",
         )
         code, _artdir, logs = run_act(config)
         assert code == 0, f"Lint job failed:\n{logs}"
@@ -240,7 +242,7 @@ class TestCIWorkflowTestJob:
             event="pull_request",
             job="test",
             event_path=FIXTURES_DIR / "pull_request.event.json",
-            artifact_dir=tmp_path / "act-artifacts",
+            artefact_dir=tmp_path / "act-artefacts",
             matrix={"python-version": python_version},
         )
         code, _artdir, logs = run_act(config)
@@ -252,21 +254,21 @@ class TestCIWorkflowTestJob:
         )
 
     @pytest.mark.slow
-    def test_test_job_produces_coverage_artifact(self, tmp_path: Path) -> None:
-        """Verify the test job produces a coverage artifact."""
+    def test_test_job_produces_coverage_artefact(self, tmp_path: Path) -> None:
+        """Verify the test job produces a coverage artefact."""
         config = ActConfig(
             event="pull_request",
             job="test",
             event_path=FIXTURES_DIR / "pull_request.event.json",
-            artifact_dir=tmp_path / "act-artifacts",
+            artefact_dir=tmp_path / "act-artefacts",
             matrix={"python-version": "3.13"},
         )
         code, artdir, logs = run_act(config)
         assert code == 0, f"Test job failed:\n{logs}"
 
-        # Check for coverage artifact
+        # Check for coverage artefact
         coverage_files = list(artdir.rglob("coverage*.xml"))
-        assert coverage_files, f"Coverage artifact missing. Logs:\n{logs}"
+        assert coverage_files, f"Coverage artefact missing. Logs:\n{logs}"
 
 
 @pytest.mark.skipif(

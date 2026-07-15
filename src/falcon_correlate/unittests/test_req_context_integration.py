@@ -172,7 +172,7 @@ class TestReqContextIntegration:
         middleware : CorrelationIDMiddleware
             The middleware instance shared across concurrent workers.
         barrier : threading.Barrier
-            Barrier used to synchronise workers so their contexts
+            Barrier used to synchronize workers so their contexts
             overlap.
         request_response_factory : cabc.Callable
             Fixture that builds ``(Request, Response)`` pairs from

@@ -42,7 +42,7 @@ class _PropertyResponse:
     """Small response double with optional header mutation failure."""
 
     def __init__(self, *, should_fail: bool = False) -> None:
-        """Initialise the test double."""
+        """Initialize the test double."""
         self.headers: dict[str, str] = {}
         self.should_fail = should_fail
 
@@ -66,11 +66,11 @@ def _expected_correlation_id(
     generated_id: str,
 ) -> str:
     """Return the expected request correlation ID for a generated scenario."""
-    normalised = incoming.strip() if incoming is not None else None
-    if not normalised or not is_trusted:
+    normalized = incoming.strip() if incoming is not None else None
+    if not normalized or not is_trusted:
         return generated_id
     if validator_mode in {"missing", "accept"}:
-        return normalised
+        return normalized
     return generated_id
 
 

@@ -11,7 +11,7 @@ Establish the project structure, build tooling, and core middleware skeleton.
 
 ### 1.1. Project structure and tooling
 
-- [x] 1.1.1. Initialise package structure
+- [x] 1.1.1. Initialize package structure
   - [x] Create `falcon_correlate/` package directory.
   - [x] Add `__init__.py` with version and public API exports.
   - [x] Configure `pyproject.toml` with package metadata and dependencies.
@@ -247,7 +247,7 @@ Complete documentation, examples, and prepare for initial release.
 ### 6.3. Release preparation
 
 - [ ] 6.3.1. Prepare package for PyPI
-  - [ ] Finalise `pyproject.toml` metadata.
+  - [ ] Finalize `pyproject.toml` metadata.
   - [ ] Add LICENSE file.
   - [ ] Add CHANGELOG.md.
   - [ ] Configure build and publish workflow.
@@ -278,7 +278,7 @@ Post-1.0 features for consideration based on user feedback.
 
 - [ ] 7.2.1. Implement ID transformer support. See design-doc §5.3.
   - [ ] Add `transformer` parameter to middleware.
-  - [ ] Allow normalisation of incoming IDs.
+  - [ ] Allow normalization of incoming IDs.
 - [ ] 7.2.2. Implement format-specific validators
   - [ ] Add UUIDv7-specific validator.
   - [ ] Add configurable length limits.

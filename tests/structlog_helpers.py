@@ -2,7 +2,7 @@
 
 This module provides the ``inject_correlation_context`` processor
 function used by both the colocated unit tests and the BDD step
-definitions.  Centralising the implementation here avoids coupling
+definitions.  Centralizing the implementation here avoids coupling
 the BDD suite to the unit-test module and prevents divergence.
 
 The processor mirrors the example documented in the users' guide.

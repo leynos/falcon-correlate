@@ -63,7 +63,7 @@ class RecordingTransport(httpx.BaseTransport):
     """Capture sync requests made by the configured client."""
 
     def __init__(self) -> None:
-        """Initialise the transport with no captured request."""
+        """Initialize the transport with no captured request."""
         self.request: httpx.Request | None = None
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
@@ -76,7 +76,7 @@ class RecordingAsyncTransport(httpx.AsyncBaseTransport):
     """Capture async requests made by the configured client."""
 
     def __init__(self) -> None:
-        """Initialise the transport with no captured request."""
+        """Initialize the transport with no captured request."""
         self.request: httpx.Request | None = None
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:

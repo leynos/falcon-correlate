@@ -813,7 +813,7 @@ Rollback is ordinary Git rollback. Before committing, use `git diff` to inspect
 changes. After committing, use `git revert <commit>` for a public rollback
 instead of destructive reset commands.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Planning reconnaissance used one Wyvern agent to map relevant source, tests,
 docs, and Makefile gates, and another Wyvern agent to propose the ASGI

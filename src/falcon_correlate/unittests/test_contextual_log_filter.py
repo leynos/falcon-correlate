@@ -52,7 +52,7 @@ class PreservationTestCase:
 
 @pytest.fixture
 def preservation_case(request: pytest.FixtureRequest) -> PreservationTestCase:
-    """Fixture to receive parametrised PreservationTestCase instances."""
+    """Fixture to receive parametrized PreservationTestCase instances."""
     return request.param
 
 

@@ -382,7 +382,7 @@ repeated without side effects.
 Structlog configuration in tests must be reset via `structlog.reset_defaults()`
 in teardown to prevent cross-test contamination.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Keep the log files created via `tee` for evidence of passing checks:
 

@@ -80,7 +80,7 @@ class CorrelationIDConfig:
     )
 
     def __post_init__(self) -> None:
-        """Validate configuration after initialisation."""
+        """Validate configuration after initialization."""
         if isinstance(self.trusted_sources, str):
             msg = "trusted_sources must be an iterable of strings, not a string"
             raise TypeError(msg)
@@ -176,10 +176,10 @@ class CorrelationIDConfig:
             raise TypeError(msg)
 
     @staticmethod
-    def _normalise_trusted_sources(
+    def _normalize_trusted_sources(
         trusted_sources: cabc.Iterable[str] | None,
     ) -> frozenset[str]:
-        """Normalise optional trusted sources into an immutable set.
+        """Normalize optional trusted sources into an immutable set.
 
         Parameters
         ----------
@@ -252,7 +252,7 @@ class CorrelationIDConfig:
         """
         return cls(
             header_name=header_name,
-            trusted_sources=cls._normalise_trusted_sources(trusted_sources),
+            trusted_sources=cls._normalize_trusted_sources(trusted_sources),
             generator=cls._resolve_generator(generator),
             validator=validator,
             echo_header_in_response=echo_header_in_response,

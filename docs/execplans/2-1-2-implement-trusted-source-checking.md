@@ -346,7 +346,7 @@ If implementation fails validation:
 2. Re-run `make test` to verify
 3. Re-run full quality gate suite
 
-## Artifacts and Notes
+## Artefacts and Notes
 
 - Log files created in `/tmp/` by `tee` commands
 - Test coverage should remain at or above 90%

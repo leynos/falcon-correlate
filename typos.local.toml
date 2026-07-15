@@ -1,0 +1,31 @@
+# Repository-specific quotations and machine interfaces.
+
+schema = 1
+
+[oxford]
+stems = []
+
+[words]
+accepted = []
+
+[words.corrections]
+
+[patterns]
+ignore = [
+  # Composite-action inputs and expressions are machine interfaces.
+  '(?m)^  artifact-name:$',
+  '(?m)^        name: \$\{\{ inputs\.artifact-name \}\}$',
+  '(?m)^          artifact-name: wheels-\$\{\{ matrix\.os \}\}-\$\{\{ matrix\.arch \}\}$',
+  '(?m)^          artifact-name: wheels-pure$',
+  # GitHub's pull-request event value is an exact API literal.
+  '(?m)^    types: \[opened, reopened, synchronize, labeled, ready_for_review\]$',
+  # Formal terminology and quoted source titles retain upstream spelling.
+  '(?m)^# pytype static type analyzer$',
+  '(?m)^       Center \| Microsoft Learn,$',
+  # Unicode categories and Act CLI options are exact machine interfaces.
+  '(?m)^            alphabet=st\.characters\(whitelist_categories=\("Lu", "Ll", "Nd"\)\),$',
+  '(?m)^        "--artifact-server-path",\n        str\(config\.artefact_dir\),$',
+]
+
+[files]
+exclude = []

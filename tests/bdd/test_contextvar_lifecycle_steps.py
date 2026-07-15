@@ -19,7 +19,7 @@ class _LifecycleResource:
     """Falcon resource that echoes request and context variable correlation IDs."""
 
     def __init__(self, *, delay_seconds: float = 0.0) -> None:
-        """Initialise with an optional delay to encourage request overlap."""
+        """Initialize with an optional delay to encourage request overlap."""
         self._delay_seconds = delay_seconds
 
     def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:

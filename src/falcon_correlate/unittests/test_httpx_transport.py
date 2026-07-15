@@ -45,7 +45,7 @@ class RecordingTransport(httpx.BaseTransport):
     """Capture sync requests received by a client transport."""
 
     def __init__(self) -> None:
-        """Initialise an empty request log."""
+        """Initialize an empty request log."""
         self.requests: list[httpx.Request] = []
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
@@ -58,7 +58,7 @@ class RecordingAsyncTransport(httpx.AsyncBaseTransport):
     """Capture async requests received by a client transport."""
 
     def __init__(self) -> None:
-        """Initialise an empty request log."""
+        """Initialize an empty request log."""
         self.requests: list[httpx.Request] = []
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
@@ -294,7 +294,7 @@ async def test_transport_preserves_exit_return_value(
     wrapped_cls: type,
     exit_attr: str,
 ) -> None:
-    """Transport should preserve wrapped exception-suppression behavior."""
+    """Transport should preserve wrapped exception-suppression behaviour."""
     transport = mock_factory(spec=transport_spec)
     getattr(transport, exit_attr).return_value = True
     wrapped_transport = wrapped_cls(transport)

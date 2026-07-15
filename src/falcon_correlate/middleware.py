@@ -66,7 +66,7 @@ class _CorrelationIDMiddlewareBase:
         ] = correlation_id_var,
         **kwargs: object,
     ) -> None:
-        """Initialise the correlation ID middleware with configuration options."""
+        """Initialize the correlation ID middleware with configuration options."""
         self._correlation_id_var = correlation_id_context_var
         if config is not None:
             if kwargs:

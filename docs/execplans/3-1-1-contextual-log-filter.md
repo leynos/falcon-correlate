@@ -449,7 +449,7 @@ implementation or tests and re-run `make test`. If formatting fails, run
 `make fmt` and re-run `make check-fmt`. The quality gate commands can be
 repeated without side effects.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Keep the log files created via `tee` for evidence of passing checks:
 
