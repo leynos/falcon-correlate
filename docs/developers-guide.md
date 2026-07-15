@@ -221,7 +221,6 @@ Use the standard log pattern when capturing lint output for review:
 make lint 2>&1 | tee /tmp/lint-falcon-correlate-$(git branch --show-current).out
 ```
 
-
 ## Spelling policy
 
 Run `make spelling` to enforce en-GB-oxendict prose spelling with the pinned
