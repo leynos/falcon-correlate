@@ -48,9 +48,7 @@ if typ.TYPE_CHECKING:
     from ._protocols import _RequestLike, _ResponseLike
     from .middleware_config import CorrelationIDConfigKwargs
 
-
 logger = logging.getLogger(__name__)
-
 _CORRELATION_ID_RESET_TOKEN_ATTR = CORRELATION_ID_RESET_TOKEN_ATTR
 
 
@@ -381,6 +379,4 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
         self._process_response(req, resp)
 
 
-from .middleware_asgi import (  # noqa: E402 - avoids CorrelationIDMiddlewareASGI cycle.
-    CorrelationIDMiddlewareASGI,
-)
+from .middleware_asgi import CorrelationIDMiddlewareASGI  # noqa: E402 - avoids cycle.

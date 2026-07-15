@@ -5,6 +5,8 @@
 - [User's guide](users-guide.md) explains how application developers use
   `falcon-correlate` in Falcon Web Server Gateway Interface (WSGI) and
   Asynchronous Server Gateway Interface (ASGI) applications.
+- [Quickstart](quickstart.md) gives the shortest tested path to a Falcon WSGI
+  app with correlation ID response headers and logging.
 - [Developers' guide](developers-guide.md) records maintainer workflows,
   quality gates, linting policy, and implementation conventions for
   contributors.
@@ -18,6 +20,8 @@
   and correlation ID propagation rules.
 - [ADR-001: three-tier linting](adr-001-three-tier-linting.md) records the accepted
   linting architecture that combines Ruff, Interrogate, and PyPy-backed Pylint.
+- [ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md)
+  records the convention for runnable examples and AST-guarded guide snippets.
 - [Documentation style guide](documentation-style-guide.md) defines spelling,
   Markdown, document-structure, roadmap, Architecture Decision Record (ADR),
   and Request for Comments (RFC) conventions for this repository.
@@ -55,3 +59,5 @@
   - [4.2.3 Celery configuration utilities](execplans/4-2-3-celery-configuration-utilities.md).
   - [4.2.4 Optional Celery integration validation](execplans/4-2-4-validate-optional-celery-integration.md).
   - [5.1.1 Async middleware methods](execplans/5-1-1-implement-async-middleware-methods.md).
+  - [5.1.2 Async context variable compatibility](execplans/5-1-2-ensure-context-variable-compatibility-with-async.md).
+  - [6.2.1 Write quickstart guide](execplans/6-2-1-write-quickstart-guide.md).

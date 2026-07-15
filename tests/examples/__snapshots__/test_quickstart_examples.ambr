@@ -1,0 +1,9 @@
+# serializer version: 1
+# name: TestQuickstartLoggingSetup.test_log_format_variants
+  '''
+  <asctime> - [INFO] - [cid-snapshot-1] - [uid-snapshot-1] - quickstart.snapshot - snapshot message
+  <asctime> - [INFO] - [cid-snapshot-1] - [-] - quickstart.snapshot - snapshot message
+  <asctime> - [INFO] - [-] - [uid-snapshot-1] - quickstart.snapshot - snapshot message
+  <asctime> - [INFO] - [-] - [-] - quickstart.snapshot - snapshot message
+  '''
+# ---

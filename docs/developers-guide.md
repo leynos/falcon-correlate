@@ -48,9 +48,19 @@ and validator helpers used by middleware configuration.
 response-header echo, and cleanup logic. The base class uses the narrow
 `_RequestLike` and `_ResponseLike` protocols, so the shared lifecycle code only
 depends on the request and response methods that Falcon WSGI and ASGI both
-provide. `middleware.py` exposes the WSGI middleware hooks, while
+provide. `_RequestLike` defines `remote_addr` as a read-only `str` property, so
+both Falcon request classes satisfy the boundary without requiring mutation
+support. `middleware.py` exposes the WSGI middleware hooks, while
 `middleware_asgi.py` exposes the public ASGI class with `async`
 `process_request` and `process_response` hooks that delegate to the shared base.
+
+The middleware's request-scoped correlation ID context variable is typed as
+`contextvars.ContextVar[str | None]`, matching the exported
+`correlation_id_var`. That narrow typing keeps `ty` and Ruff's annotation
+checks aligned with the runtime state without changing any public API shape.
+The corresponding `ContextVar.reset()` calls cast the verified token back to
+`Token[str | None]`, which keeps the middleware clear to the type checker while
+preserving the runtime contract.
 
 `process_response` in `middleware.py` is responsible for the response-header
 echo and cleanup path. It copies `req.context.correlation_id` into the
@@ -100,6 +110,45 @@ Follow the existing pattern in `tests/property/test_header_injection.py`:
 - assert on the external behaviour of the property rather than the generated
   example itself.
 
+## Tested documentation examples
+
+Runnable documentation examples live under `examples/`. They are source files,
+not Markdown-only snippets. The Pylint tier includes `examples` in
+`PYLINT_TARGETS` so runnable documentation examples are covered by that tier.
+
+The quickstart guide embeds snippets from `examples/quickstart/`. Each source
+region is delimited with sentinel comments:
+
+```python
+# [quickstart:region-id]
+app.add_route("/hello", HelloResource())
+
+# [/quickstart:region-id]
+```
+
+The Markdown guide places an HTML marker immediately before the corresponding
+Python fence:
+
+````markdown
+<!-- quickstart:region-id -->
+
+```python
+app.add_route("/hello", HelloResource())
+```
+````
+
+`tests/docs/test_quickstart_doc_matches_examples.py` compares the Python
+abstract syntax tree (AST) for every marked fence with its source region. This
+allows harmless formatting and comment changes while failing on semantic drift.
+The `syrupy>=5,<6` development dependency supplies the snapshot fixture used by
+the quickstart logging-format test. Run `uv sync --group dev` before the test
+to install that fixture.
+When adding a guarded snippet, add both markers and run:
+
+```bash
+uv run pytest tests/docs/test_quickstart_doc_matches_examples.py -v
+```
+
 ## Workflow pins and Dependabot
 
 Dependabot owns the upgrade of GitHub Actions and reusable workflows,
@@ -143,6 +192,9 @@ The three-tier linting work described in
 is complete. Keep future linting changes aligned with that ADR unless a new
 ADR supersedes it.
 
+The tested quickstart example convention is described in
+[ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md).
+
 ## Running lint checks
 
 Run the full lint gate with:
@@ -178,7 +230,7 @@ The lint target is configured by these Makefile variables:
 | `UV`                   | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                 | Selects the `uv` launcher used by all Python tool commands.    |
 | `UV_ENV`               | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                | Keeps project-local `uv` cache and tool directories.           |
 | `PYLINT_PYTHON`        | `pypy`                                                                                        | Selects the Python runtime used for the Pylint tool execution. |
-| `PYLINT_TARGETS`       | `src tests`                                                                                   | Defines the source trees checked by the Pylint tier.           |
+| `PYLINT_TARGETS`       | `src tests examples`                                                                          | Defines the source trees checked by the Pylint tier.           |
 | `PYLINT_PYPY_SHIM_REF` | `726d09f968b4d729ee4b29c71fc732e744854f3b`                                                    | Pins the `pylint-pypy-shim` repository revision.               |
 | `PYLINT_PYPY_SHIM`     | `git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)`                  | Identifies the shim package installed by `uv tool run`.        |
 | `PYLINT`               | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                |

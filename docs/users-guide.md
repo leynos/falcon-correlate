@@ -11,61 +11,11 @@ pip install falcon-correlate
 
 ## Quick Start
 
-### Basic Usage
+Follow the [quickstart](quickstart.md) for the canonical tutorial. It shows a
+minimal Falcon WSGI app, common configuration options, and standard logging
+integration using runnable examples that are checked by the test suite.
 
-Add the `CorrelationIDMiddleware` to your Falcon application:
-
-```python
-import falcon
-from falcon_correlate import CorrelationIDMiddleware
-
-# Create the middleware instance
-middleware = CorrelationIDMiddleware()
-
-# Create your Falcon app with the middleware
-app = falcon.App(middleware=[middleware])
-
-
-# Define your resources
-class HelloResource:
-    def on_get(self, req, resp):
-        resp.media = {"message": "Hello, World!"}
-
-
-# Add routes
-app.add_route("/hello", HelloResource())
-```
-
-### Falcon ASGI Usage
-
-Use `CorrelationIDMiddlewareASGI` with `falcon.asgi.App`:
-
-```python
-import falcon.asgi
-from falcon_correlate import CorrelationIDMiddlewareASGI
-
-middleware = CorrelationIDMiddlewareASGI()
-app = falcon.asgi.App(middleware=[middleware])
-```
-
-`CorrelationIDMiddlewareASGI` accepts the same keyword arguments and
-`CorrelationIDConfig` object as the WSGI `CorrelationIDMiddleware`. During an
-ASGI request, application code can read the established ID from
-`req.context.correlation_id` or from `correlation_id_var.get()`.
-
-```python
-from falcon_correlate import correlation_id_var
-
-
-class HelloResource:
-    async def on_get(self, req, resp):
-        resp.media = {
-            "request_id": req.context.correlation_id,
-            "ambient_id": correlation_id_var.get(),
-        }
-```
-
-### How It Works
+## How It Works
 
 The middleware provides two hook points in the request/response lifecycle:
 
