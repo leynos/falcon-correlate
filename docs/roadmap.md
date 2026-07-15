@@ -236,8 +236,8 @@ Complete documentation, examples, and prepare for initial release.
   - [ ] Document custom generator and validator usage.
   - [ ] Document httpx and Celery integration.
 - [ ] 6.2.3. Create example applications
-  - [ ] Extend the existing quickstart Falcon WSGI example when a broader WSGI
-        deliverable is needed.
+  - [ ] Create a broader Falcon WSGI example under `examples/wsgi/`, building
+        on patterns from the quickstart example where useful.
   - [ ] Create Falcon ASGI example.
   - [ ] Create example with Celery integration.
   - [ ] Keep broader examples in sibling directories such as `examples/wsgi/`,
