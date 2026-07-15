@@ -185,6 +185,9 @@ Success is observable when:
   declaring `_RequestLike.remote_addr` as the read-only property exposed by
   Falcon's WSGI and ASGI request classes. Explicit `ty 0.0.57` checking and all
   Python commit gates pass (`439 passed, 11 skipped`).
+- [x] (2026-07-15) Verified current quickstart review feedback and corrected
+  the still-valid ADR references, example ownership wording, import-snippet
+  drift regions, assertion diagnostic, and explicit-return suppression notes.
 - [x] (2026-07-04) Addressed review findings in the quickstart tests: added
   the missing user-only logging snapshot variant, drove the untrusted
   behavioural scenario through the configured example's app factory, and
@@ -462,9 +465,10 @@ The reader is assumed to know nothing about this repository. Key facts:
     `isolated_context` runs a callable inside `contextvars.copy_context()`.
 - Documentation conventions: `docs/contents.md` is the index; ADRs follow
   `docs/documentation-style-guide.md` (sections Status, Date, Context,
-  Decision, Consequences) and the `adr-NNN-short-description.md` naming.
-  `docs/adr-001-three-tier-linting.md` records the accepted linting
-  architecture, and `ADR-002` records tested documentation examples.
+  Decision, Architectural Rationale, and Known Risks and Limitations) and the
+  `adr-NNN-short-description.md` naming. `docs/adr-001-three-tier-linting.md`
+  records the accepted linting architecture, and `ADR-002` records tested
+  documentation examples.
 
 ### Key files
 
@@ -665,8 +669,9 @@ followed by `make markdownlint` leaves the guide clean and the markers intact.
 - `docs/falcon-correlation-id-middleware-design.md`: add a short subsection
   referencing ADR-002.
 - `docs/adr-002-tested-documentation-examples.md`: write the ADR (Status,
-  Date, Context, Decision, Consequences) recording the decision to ship tested,
-  drift-guarded examples and the tool survey behind rejecting fence-execution.
+  Date, Context, Decision, Architectural Rationale, and Known Risks and
+  Limitations) recording the decision to ship tested, drift-guarded examples
+  and the tool survey behind rejecting fence-execution.
 - `docs/roadmap.md`: mark all 6.2.1 checkboxes `[x]`; add a one-line note under
   6.2.3 recording the `examples/` directory boundary.
 

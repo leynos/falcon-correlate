@@ -31,7 +31,9 @@ def test_quickstart_doc_snippets_match_example_regions() -> None:
     guide_regions = _extract_guide_regions(_QUICKSTART_DOC)
     source_regions = _extract_source_regions(_EXAMPLES_DIR)
 
-    assert guide_regions.keys() == source_regions.keys()
+    assert guide_regions.keys() == source_regions.keys(), (
+        "guide_regions and source_regions have mismatched quickstart region IDs."
+    )
     for region_id, guide_src in guide_regions.items():
         source_src = source_regions[region_id]
         assert _normalised_ast(guide_src) == _normalised_ast(source_src), region_id

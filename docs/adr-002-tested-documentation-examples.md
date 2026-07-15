@@ -59,7 +59,7 @@ inspects runnable examples as well as `src` and `tests`.
 
 - Tutorial examples are importable, typechecked, linted, tested, and
   behaviourally exercised.
-- The quickstart can show short snippets while source files remain the
+- The quickstart can show short snippets, while source files remain the
   executable source of truth.
 - The AST guard catches semantic drift without creating brittle formatting
   failures.

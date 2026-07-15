@@ -102,10 +102,13 @@ X-Correlation-ID: 019b...
 Use `CorrelationIDConfig` when the application needs to make the header name,
 trusted sources, and response echoing policy explicit:
 
-Add the configuration import to the same `app.py` file used above:
+Add the configuration and middleware imports to the same `app.py` file used
+above:
+
+<!-- quickstart:configured-imports -->
 
 ```python
-from falcon_correlate import CorrelationIDConfig
+from falcon_correlate import CorrelationIDConfig, CorrelationIDMiddleware
 ```
 
 <!-- quickstart:configured-config -->
@@ -164,6 +167,8 @@ curl -i -H 'X-Correlation-ID: cid-quickstart-1' http://127.0.0.1:8000/hello
 Configure a logger with `ContextualLogFilter` and `RECOMMENDED_LOG_FORMAT`:
 
 Create `logging_setup.py` with the imports used by the logging example:
+
+<!-- quickstart:logging-imports -->
 
 ```python
 import logging

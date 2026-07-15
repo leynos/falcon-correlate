@@ -11,7 +11,11 @@ from __future__ import annotations
 import falcon
 
 from examples.quickstart.minimal_app import HelloResource
+
+# [quickstart:configured-imports]
 from falcon_correlate import CorrelationIDConfig, CorrelationIDMiddleware
+
+# [/quickstart:configured-imports]
 
 # [quickstart:configured-config]
 config = CorrelationIDConfig(

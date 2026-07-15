@@ -8,9 +8,12 @@ logger with `ContextualLogFilter` and `RECOMMENDED_LOG_FORMAT` attached, and
 
 from __future__ import annotations
 
+# [quickstart:logging-imports]
 import logging
 
 from falcon_correlate import RECOMMENDED_LOG_FORMAT, ContextualLogFilter
+
+# [/quickstart:logging-imports]
 
 
 # [quickstart:logging-config]
@@ -50,7 +53,8 @@ def configure_logging() -> logging.Logger:
 
 
 # [quickstart:logging-usage]
-def log_request(logger: logging.Logger) -> None:  # pylint: disable=useless-return
+# pylint: disable-next=useless-return  # Explicit return is intentional.
+def log_request(logger: logging.Logger) -> None:
     """Log one example request event.
 
     Parameters
@@ -69,7 +73,7 @@ def log_request(logger: logging.Logger) -> None:  # pylint: disable=useless-retu
     >>> log_request(logger)
     """
     logger.info("handled request")
-    return  # noqa: PLR1711
+    return  # noqa: PLR1711 - Explicit return is intentional.
 
 
 # [/quickstart:logging-usage]
