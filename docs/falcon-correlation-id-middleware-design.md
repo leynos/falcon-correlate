@@ -765,17 +765,6 @@ This end-to-end flow ensures that:
 
 ### 3.6. Security and operational considerations
 
-
-#### 3.6.1. Validating and sanitizing incoming correlation IDs
-
-Reiterating the importance of validation, even if an incoming ID is from a
-trusted source, it's good practice to ensure it meets expected formats (e.g.,
-UUID structure). If the "trusted source" check fails and a new ID is generated,
-logging the attempted (and rejected) incoming ID might be useful for security
-auditing. Validation can prevent issues like overly long IDs or potentially
-malicious content from being processed or logged if not properly handled by all
-downstream systems.
-
 #### 3.6.1. Validating and sanitizing incoming correlation IDs
 
 Reiterating the importance of validation, even if an incoming ID is from a
@@ -964,7 +953,7 @@ class ContextualLogFilter(logging.Filter):
 #     'filters': {
 #         'contextual_filter': {
 #             '()': ContextualLogFilter,  # Path to your filter class
-#     },
+#         },
 #     },
 #     'formatters': {
 #         'standard': {
@@ -972,15 +961,15 @@ class ContextualLogFilter(logging.Filter):
 #                 '%(asctime)s [%(levelname)s][%(correlation_id)s]'
 #                 '[%(user_id)s] %(name)s: %(message)s'
 #             ),
-#     },
+#         },
 #     },
 #     'handlers': {
 #         'console': {
-#         'level': 'INFO',
+#             'level': 'INFO',
 #             'filters': ['contextual_filter'],
 #             'class': 'logging.StreamHandler',
 #             'formatter': 'standard'
-#     },
+#         },
 #     },
 #     'root': {
 #         'handlers': ['console'],
@@ -1039,7 +1028,6 @@ async def async_client_request_with_correlation_id(
 # response = client_request_with_correlation_id(
 #     'GET', 'https://api.example.com/data'
 # )
-```
 
 # response = await async_client_request_with_correlation_id(
 #     'POST', 'https://api.example.com/submit', json={...}

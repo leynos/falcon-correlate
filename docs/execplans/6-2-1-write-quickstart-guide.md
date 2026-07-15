@@ -800,7 +800,7 @@ temporary and must be deleted before committing; if a stage is interrupted,
 confirm no `_poison.py` or `_probe.md` remains (`git status`). Commit after
 each green stage so any stage can be rolled back independently.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Keep the `tee` logs under `/tmp/` as evidence of passing gates. Record, in
 `Surprises & discoveries`, the concrete outcome of the Stage A poison-pill (did
