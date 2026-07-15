@@ -188,6 +188,10 @@ Success is observable when:
 - [x] (2026-07-15) Verified current quickstart review feedback and corrected
   the still-valid ADR references, example ownership wording, import-snippet
   drift regions, assertion diagnostic, and explicit-return suppression notes.
+- [x] (2026-07-15) Rebased onto `origin/main`, resolving `uv.lock` from main
+  before regenerating it and retaining main's shared request protocol. The
+  required post-rebase gates passed: `make check-fmt`, `make test`
+  (`439 passed, 11 skipped`), `make typecheck`, and `make lint`.
 - [x] (2026-07-04) Addressed review findings in the quickstart tests: added
   the missing user-only logging snapshot variant, drove the untrusted
   behavioural scenario through the configured example's app factory, and
@@ -265,6 +269,10 @@ Success is observable when:
   `remote_addr` as `@property -> str`, so `_RequestLike.remote_addr: str`
   incorrectly required mutation support. Modelling it as a protocol property
   accepts both request classes and matches how the middleware reads the value.
+- Observation: a later `origin/main` rebase moved the read-only request and
+  response protocols into `src/falcon_correlate/_protocols.py`. The branch's
+  local protocol change conflicted only because main had already delivered the
+  same semantic fix; retaining the shared protocol avoids duplicate types.
 - Observation: follow-up review found two coverage gaps in the quickstart
   tests. The logging snapshot covered `(correlation_id, user_id)`,
   `(correlation_id, None)`, and `(None, None)`, but missed `(None, user_id)`.
@@ -370,6 +378,12 @@ Success is observable when:
 - Decision: model `_RequestLike.remote_addr` as a read-only protocol property.
   Rationale: this exactly matches Falcon's WSGI and ASGI request APIs and the
   middleware only reads the address. Date/Author: 2026-07-14, implementer.
+
+- Decision: on the 2026-07-15 rebase, retain main's shared `_protocols.py`
+  implementation for the read-only request property and regenerate `uv.lock`
+  from main's lockfile after preserving the merged manifest. Rationale: main
+  already provided the same protocol behaviour and the lockfile policy assigns
+  its resolution order to main. Date/Author: 2026-07-15, implementer.
 
 - Decision: expose `build_app(config)` from the configured quickstart example
   and use it in behavioural tests. Rationale: the untrusted-ID scenario needs

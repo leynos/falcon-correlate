@@ -108,7 +108,6 @@ Follow the existing pattern in `tests/property/test_header_injection.py`:
 - assert on the external behaviour of the property rather than the generated
   example itself.
 
-
 ## Tested documentation examples
 
 Runnable documentation examples live under `examples/`. They are source files,
