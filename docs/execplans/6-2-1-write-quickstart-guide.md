@@ -199,6 +199,9 @@ Success is observable when:
   before regenerating it and retaining main's shared request protocol. The
   required post-rebase gates passed: `make check-fmt`, `make test`
   (`439 passed, 11 skipped`), `make typecheck`, and `make lint`.
+- [x] (2026-07-15) Documented the read-only `_RequestLike.remote_addr`
+  boundary and the `syrupy` development-group setup with
+  `uv sync --group dev` in the developers' guide.
 - [ ] Stage F: run a `coderabbit review --agent` pass and clear all concerns.
 
 ## Surprises & discoveries

@@ -48,7 +48,9 @@ and validator helpers used by middleware configuration.
 response-header echo, and cleanup logic. The base class uses the narrow
 `_RequestLike` and `_ResponseLike` protocols, so the shared lifecycle code only
 depends on the request and response methods that Falcon WSGI and ASGI both
-provide. `middleware.py` exposes the WSGI middleware hooks, while
+provide. `_RequestLike` defines `remote_addr` as a read-only `str` property, so
+both Falcon request classes satisfy the boundary without requiring mutation
+support. `middleware.py` exposes the WSGI middleware hooks, while
 `middleware_asgi.py` exposes the public ASGI class with `async`
 `process_request` and `process_response` hooks that delegate to the shared base.
 
@@ -139,7 +141,8 @@ app.add_route("/hello", HelloResource())
 abstract syntax tree (AST) for every marked fence with its source region. This
 allows harmless formatting and comment changes while failing on semantic drift.
 The `syrupy>=5,<6` development dependency supplies the snapshot fixture used by
-the quickstart logging-format test.
+the quickstart logging-format test. Run `uv sync --group dev` before the test
+to install that fixture.
 When adding a guarded snippet, add both markers and run:
 
 ```bash

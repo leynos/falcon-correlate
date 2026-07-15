@@ -31,6 +31,8 @@ def test_quickstart_doc_snippets_match_example_regions() -> None:
     guide_regions = _extract_guide_regions(_QUICKSTART_DOC)
     source_regions = _extract_source_regions(_EXAMPLES_DIR)
 
+    assert guide_regions, "docs/quickstart.md must define quickstart regions."
+    assert source_regions, "examples/quickstart must define quickstart regions."
     assert guide_regions.keys() == source_regions.keys(), (
         "guide_regions and source_regions have mismatched quickstart region IDs."
     )
