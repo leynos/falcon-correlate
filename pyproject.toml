@@ -39,7 +39,7 @@ dev = [
     "ruff==0.14.10",
     "structlog>=26.1.0,<27",
     "pyright>=1.1.411,<2",
-    "ty>=0.0.56,<1",
+    "ty>=0.0.57,<1",
     "pytest-timeout>=2.3,<3",
     "pyyaml>=6.0,<7",
     "interrogate>=1.7,<2",
