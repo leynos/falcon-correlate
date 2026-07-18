@@ -101,7 +101,7 @@ jobs:
       # same commit.
       - name: Generate coverage
         if: matrix.python-version == '3.13' && github.event_name == 'pull_request'
-        uses: leynos/shared-actions/.github/actions/generate-coverage@18bed1ca49a6de3d8882bd72635a32ae3f023d57
+        uses: leynos/shared-actions/.github/actions/generate-coverage@e0d9b652b137eb15314fff188f09e1ba18d3cc5b
         with:
           output-path: coverage.xml
           format: cobertura
