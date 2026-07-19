@@ -68,12 +68,26 @@ def _cleanup_logger(context: Context) -> cabc.Generator[None, None, None]:
 
 @pytest.fixture
 def context() -> Context:
-    """Provide mutable state for a quickstart scenario."""
+    """Provide mutable state for a quickstart scenario.
+
+    Returns
+    -------
+    Context
+        Empty mutable scenario state.
+
+    """
     return {}
 
 
 def _configure_client(context: Context, app: falcon.App) -> Context:
-    """Store an app and matching test client in the scenario context."""
+    """Store an app and matching test client in the scenario context.
+
+    Returns
+    -------
+    Context
+        The updated scenario state.
+
+    """
     context["app"] = app
     context["client"] = falcon.testing.TestClient(app)
     return context
@@ -84,7 +98,14 @@ def _configure_client(context: Context, app: falcon.App) -> Context:
     target_fixture="context",
 )
 def given_minimal_quickstart_app(context: Context) -> Context:
-    """Load the minimal quickstart app."""
+    """Load the minimal quickstart app.
+
+    Returns
+    -------
+    Context
+        Scenario state containing the app and test client.
+
+    """
     module = _load_quickstart_module("minimal_app")
     return _configure_client(context, typ.cast("falcon.App", vars(module)["app"]))
 
@@ -94,7 +115,14 @@ def given_minimal_quickstart_app(context: Context) -> Context:
     target_fixture="context",
 )
 def given_configured_quickstart_app(context: Context) -> Context:
-    """Load the configured quickstart app."""
+    """Load the configured quickstart app.
+
+    Returns
+    -------
+    Context
+        Scenario state containing the app and test client.
+
+    """
     module = _load_quickstart_module("configured_app")
     return _configure_client(context, typ.cast("falcon.App", vars(module)["app"]))
 
@@ -104,7 +132,14 @@ def given_configured_quickstart_app(context: Context) -> Context:
     target_fixture="context",
 )
 def given_untrusted_configured_quickstart_app(context: Context) -> Context:
-    """Load the configured quickstart app with only trusted sources varied."""
+    """Load the configured quickstart app with only trusted sources varied.
+
+    Returns
+    -------
+    Context
+        Scenario state containing the app and test client.
+
+    """
     module = _load_quickstart_module("configured_app")
     config = typ.cast("CorrelationIDConfig", vars(module)["config"])
     build_app = typ.cast(
@@ -117,7 +152,14 @@ def given_untrusted_configured_quickstart_app(context: Context) -> Context:
 
 @given("the quickstart logging configuration", target_fixture="context")
 def given_quickstart_logging_configuration(context: Context) -> Context:
-    """Configure logging from the quickstart example."""
+    """Configure logging from the quickstart example.
+
+    Returns
+    -------
+    Context
+        Scenario state containing the configured logger and output stream.
+
+    """
     module = _load_quickstart_module("logging_setup")
     configure_logging = typ.cast(
         "cabc.Callable[[], logging.Logger]",

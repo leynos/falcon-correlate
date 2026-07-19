@@ -32,7 +32,7 @@ correctness is validated by two complementary mechanisms:
 from __future__ import annotations
 
 import os
-import typing as ty
+import typing as typ
 
 import pytest
 
@@ -49,7 +49,7 @@ from falcon_correlate.unittests.optional_celery_dependency_helpers import (
     _write_child_sentinel_test,
 )
 
-if ty.TYPE_CHECKING:
+if typ.TYPE_CHECKING:
     from pathlib import Path
 
 pytestmark = pytest.mark.timeout(_CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS)

@@ -66,7 +66,16 @@ class _CorrelationIDMiddlewareBase:
         ] = correlation_id_var,
         **kwargs: object,
     ) -> None:
-        """Initialize the correlation ID middleware with configuration options."""
+        """Initialize the correlation ID middleware with configuration options.
+
+        Raises
+        ------
+        ValueError
+            If a configuration object and individual options are both supplied.
+        TypeError
+            If an unknown individual option is supplied.
+
+        """
         self._correlation_id_var = correlation_id_context_var
         if config is not None:
             if kwargs:
@@ -132,6 +141,12 @@ class _CorrelationIDMiddlewareBase:
 
         Leading and trailing whitespace is stripped; empty or whitespace-only
         values are treated as missing.
+
+        Returns
+        -------
+        str | None
+            The stripped header value, or ``None`` when it is absent or empty.
+
         """
         incoming = req.get_header(self.header_name)
         if incoming is None:
@@ -172,7 +187,14 @@ class _CorrelationIDMiddlewareBase:
         return any(addr in network for network in self._config._parsed_networks)
 
     def _is_valid_id(self, value: str) -> bool:
-        """Return whether *value* passes the configured validator, if any."""
+        """Return whether *value* passes the configured validator, if any.
+
+        Returns
+        -------
+        bool
+            ``True`` when no validator is configured or validation succeeds.
+
+        """
         if self._config.validator is None:
             return True
         try:

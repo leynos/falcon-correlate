@@ -42,7 +42,14 @@ def test_quickstart_doc_snippets_match_example_regions() -> None:
 
 
 def _extract_guide_regions(path: pathlib.Path) -> dict[str, str]:
-    """Extract tagged Python fences from the quickstart guide."""
+    """Extract tagged Python fences from the quickstart guide.
+
+    Returns
+    -------
+    dict[str, str]
+        Region identifiers mapped to their Python source.
+
+    """
     assert path.exists(), f"{path} must exist"
     text = path.read_text(encoding="utf-8")
     regions: dict[str, str] = {}
@@ -57,7 +64,14 @@ def _extract_guide_regions(path: pathlib.Path) -> dict[str, str]:
 
 
 def _extract_source_regions(directory: pathlib.Path) -> dict[str, str]:
-    """Extract sentinel-delimited regions from quickstart source modules."""
+    """Extract sentinel-delimited regions from quickstart source modules.
+
+    Returns
+    -------
+    dict[str, str]
+        Region identifiers mapped to their Python source.
+
+    """
     assert directory.exists(), f"{directory} must exist"
     regions: dict[str, str] = {}
     for path in sorted(directory.glob("*.py")):
@@ -67,7 +81,14 @@ def _extract_source_regions(directory: pathlib.Path) -> dict[str, str]:
 
 
 def _extract_regions_from_source(path: pathlib.Path) -> dict[str, str]:
-    """Extract all quickstart regions from one source file."""
+    """Extract all quickstart regions from one source file.
+
+    Returns
+    -------
+    dict[str, str]
+        Region identifiers mapped to their Python source.
+
+    """
     regions: dict[str, str] = {}
     current_id: str | None = None
     current_lines: list[str] = []
@@ -113,5 +134,12 @@ def _add_region(
 
 
 def _normalised_ast(source: str) -> str:
-    """Return a stable AST representation for semantically comparing snippets."""
+    """Return a stable AST representation for semantically comparing snippets.
+
+    Returns
+    -------
+    str
+        The source's attribute-free AST dump.
+
+    """
     return ast.dump(ast.parse(source), include_attributes=False)

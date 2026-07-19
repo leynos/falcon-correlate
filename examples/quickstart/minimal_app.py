@@ -38,11 +38,6 @@ class HelloResource:
         resp : falcon.Response
             The Falcon response to populate.
 
-        Returns
-        -------
-        None
-            This handler only mutates ``resp``.
-
         Examples
         --------
         >>> resource = HelloResource()

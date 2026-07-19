@@ -74,7 +74,14 @@ class ASGIInterleavedCorrelationResource:
     """Falcon ASGI resource that waits for concurrent requests to overlap."""
 
     def __init__(self, *, expected_requests: int) -> None:
-        """Initialize the request barrier for the expected concurrency level."""
+        """Initialize the request barrier for the expected concurrency level.
+
+        Raises
+        ------
+        ValueError
+            If ``expected_requests`` is not positive.
+
+        """
         if expected_requests <= 0:
             raise ValueError(_NON_POSITIVE_EXPECTED_REQUESTS_ERROR)
         self._expected_requests = expected_requests
@@ -101,9 +108,7 @@ class ASGIInterleavedCorrelationResource:
 
             resp.media = {
                 "context_correlation_id": req.context.correlation_id,
-
                 "contextvar_correlation_id": contextvar_before_wait,
-
                 "contextvar_correlation_id_after_wait": correlation_id_var.get(),
             }
         finally:

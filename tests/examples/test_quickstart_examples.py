@@ -43,7 +43,14 @@ _LOG_FORMAT_VARIANTS = (
 
 
 def _example_app(module: types.ModuleType) -> falcon.App:
-    """Return the Falcon app exported by an example module."""
+    """Return the Falcon app exported by an example module.
+
+    Returns
+    -------
+    falcon.App
+        The module's exported application.
+
+    """
     return typ.cast("falcon.App", vars(module)["app"])
 
 
@@ -162,7 +169,14 @@ class TestQuickstartLoggingSetup:
 
 
 def _render_log_line(correlation_id: str | None, user_id: str | None) -> str:
-    """Render one recommended-format log line with fixed context values."""
+    """Render one recommended-format log line with fixed context values.
+
+    Returns
+    -------
+    str
+        The rendered line with its timestamp normalized.
+
+    """
     correlation_token = correlation_id_var.set(correlation_id)
     user_token = user_id_var.set(user_id)
     try:

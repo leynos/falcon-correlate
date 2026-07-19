@@ -671,7 +671,7 @@ when green, so recovery is `git checkout -- <file>` or reverting the last
 commit. The doctest and DOC gates are deterministic and repeatable. No
 destructive operations are involved.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Record here, as work proceeds: the milestone-1 `DOC` violation count and file
 list; any `# noqa: DOC...` suppressions with justification; the final "All
@@ -688,7 +688,7 @@ No new runtime or dev dependencies. Use tooling already present:
 - `ty` for typechecking; `ast` and `inspect` (stdlib) for the introspection
   test.
 
-New artifacts to exist at completion:
+New artefacts to exist at completion:
 
 - `src/falcon_correlate/unittests/test_public_exports.py` — introspection
   test over `falcon_correlate.__all__` plus AST checks for attribute docstrings.

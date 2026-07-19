@@ -47,14 +47,28 @@ class _PropertyResponse:
         self.should_fail = should_fail
 
     def set_header(self, name: str, value: str) -> None:
-        """Record a response header or raise when configured to fail."""
+        """Record a response header or raise when configured to fail.
+
+        Raises
+        ------
+        RuntimeError
+            If the response double is configured to reject header mutation.
+
+        """
         if self.should_fail:
             msg = f"failed to set {name}={value}"
             raise RuntimeError(msg)
         self.headers[name] = value
 
     def get_header(self, name: str) -> str | None:
-        """Return a recorded response header."""
+        """Return a recorded response header.
+
+        Returns
+        -------
+        str | None
+            The recorded value, or ``None`` if the header is absent.
+
+        """
         return self.headers.get(name)
 
 
@@ -82,7 +96,14 @@ def _expected_correlation_id(
 
 
 def _validator_for(mode: str) -> cabc.Callable[[str], bool] | None:
-    """Build a validator matching the generated validation mode."""
+    """Build a validator matching the generated validation mode.
+
+    Returns
+    -------
+    Callable[[str], bool] | None
+        The validator for the requested mode, or ``None`` for ``"missing"``.
+
+    """
     if mode == "missing":
         return None
     if mode == "accept":
@@ -91,7 +112,14 @@ def _validator_for(mode: str) -> cabc.Callable[[str], bool] | None:
         return lambda _value: False
 
     def _raise(_value: str) -> bool:
-        """Raise the configured validation exception."""
+        """Raise the configured validation exception.
+
+        Raises
+        ------
+        RuntimeError
+            Always, to exercise validator failure handling.
+
+        """
         msg = "validator failed"
         raise RuntimeError(msg)
 
@@ -111,7 +139,14 @@ class _RequestSelectionScenario(typ.NamedTuple):
 def _request_selection_scenarios(
     draw: "st.DrawFn",  # noqa: UP037 -- st.DrawFn is not runtime-stable.
 ) -> _RequestSelectionScenario:
-    """Composite Hypothesis strategy for request-selection property scenarios."""
+    """Composite Hypothesis strategy for request-selection property scenarios.
+
+    Returns
+    -------
+    _RequestSelectionScenario
+        A generated request-selection scenario.
+
+    """
     return _RequestSelectionScenario(
         incoming=draw(_HEADER_OR_EMPTY),
         is_trusted=draw(st.booleans()),
@@ -237,10 +272,24 @@ def test_concurrent_context_isolation_property(
     barrier = threading.Barrier(task_count)
 
     def _worker(index: int) -> tuple[str | None, str | None, str | None]:
-        """Run one concurrent request scenario."""
+        """Run one concurrent request scenario.
+
+        Returns
+        -------
+        tuple[str | None, str | None, str | None]
+            Correlation state before, during, and after request processing.
+
+        """
 
         def _inner() -> tuple[str | None, str | None, str | None]:
-            """Exercise the request lifecycle inside an isolated context."""
+            """Exercise the request lifecycle inside an isolated context.
+
+            Returns
+            -------
+            tuple[str | None, str | None, str | None]
+                Correlation state before, during, and after request processing.
+
+            """
             correlation_id = f"cid-{index}"
             req, resp = request_response_factory(correlation_id=correlation_id)
             middleware.process_request(req, resp)

@@ -35,12 +35,12 @@ import os
 import re
 import subprocess  # noqa: S404 - tests intentionally spawn isolated Python subprocesses.
 import sys
-import typing as ty
+import typing as typ
 from pathlib import Path
 
 import pytest
 
-if ty.TYPE_CHECKING:
+if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
 _CELERY_TEST_GLOBS = (
@@ -48,7 +48,9 @@ _CELERY_TEST_GLOBS = (
     "tests/bdd/test_celery_*_steps.py",
 )
 _MINIMUM_CELERY_TEST_MODULE_COUNT = 6
-_PYTEST_DURATION_PATTERN = re.compile(r"\d+\.\d+s")
+_PYTEST_DURATION_PATTERN = re.compile(
+    r"\d+\.\d+s(?: \(\d+:\d{2}:\d{2}\))?",
+)
 _PYTEST_PROGRESS_PATTERN = re.compile(
     r"^(?P<progress>[.s]+)\s+\[100%\]$",
     re.MULTILINE,
@@ -82,7 +84,7 @@ def _find_project_root(start: Path) -> Path:
 _PROJECT_ROOT = _find_project_root(Path(__file__))
 
 
-class _PytestRun(ty.NamedTuple):
+class _PytestRun(typ.NamedTuple):
     """Captured child pytest result and expected skip output."""
 
     result: subprocess.CompletedProcess[str]

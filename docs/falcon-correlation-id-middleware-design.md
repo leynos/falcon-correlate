@@ -765,7 +765,6 @@ This end-to-end flow ensures that:
 
 ### 3.6. Security and operational considerations
 
-
 #### 3.6.1. Validating and sanitizing incoming correlation IDs
 
 Reiterating the importance of validation, even if an incoming ID is from a
@@ -1972,7 +1971,6 @@ response header is left untouched.
    `process_request` prevents Falcon's response hook from returning a
    pre-existing `req.context.correlation_id` that bypassed the middleware's
    trusted-source and validation rules.
-
 
 ### A.13. Public API docstring completeness (Task 6.1.1)
 

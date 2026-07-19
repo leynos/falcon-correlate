@@ -298,7 +298,6 @@ Broad suppressions should be treated as design debt and either documented in an
 ADR, linked to a follow-up issue, or replaced with a refactor when the scope
 allows it.
 
-
 ## Docstring conventions
 
 Python docstrings follow the NumPy convention. Ruff's pydocstyle (`D`) rules
