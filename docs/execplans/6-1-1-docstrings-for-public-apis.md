@@ -28,9 +28,10 @@ Success is observable in four ways:
    shows a full docstring, and the three public module-level names
    (`correlation_id_var`, `user_id_var`, `RECOMMENDED_LOG_FORMAT`) carry inline
    attribute docstrings that Sphinx `autodata`/napoleon will pick up.
-4. The convention is written down: a new ADR (`docs/adr-002-*`), a
-   "Docstring conventions" section in `docs/developers-guide.md`, and a
-   reference from the design document and `docs/contents.md`.
+4. The convention is written down in
+   `docs/adr-003-docstring-completeness-and-doctest-gates.md`, a "Docstring
+   conventions" section in `docs/developers-guide.md`, and references from the
+   design document and `docs/contents.md`.
 
 This work is an audit-and-fill exercise, not greenfield writing. Ruff already
 enforces `D` (pydocstyle) with `convention = "numpy"`, so every function,
@@ -139,7 +140,7 @@ Stop and escalate when any of these is reached:
       completed class/function/method docstrings, module by module.
 - [x] Milestone 4 (Green) — Private helpers: complete docstrings to satisfy
       repo-wide `DOC`, module by module.
-- [ ] Milestone 5 (Refactor/Docs) — ADR, developers-guide section, design-doc
+- [x] Milestone 5 (Refactor/Docs) — ADR, developers-guide section, design-doc
       and contents.md references, users-guide check.
 - [ ] Milestone 6 — Full gate sweep, CodeRabbit review, mark roadmap 6.1.1 done.
 
@@ -151,7 +152,7 @@ Stop and escalate when any of these is reached:
   Evidence: `make lint` now runs
   `uv run interrogate --fail-under 100 src/falcon_correlate`; the old plan
   reference `docs/adr-001-three-tier-linting.md` supersedes the old linting ADR
-  template name. Impact: ADR-002 should cite the three-tier linting ADR and
+  template name. Impact: ADR-003 should cite the three-tier linting ADR and
   describe `DOC` as a content-accuracy complement to Interrogate's coverage
   threshold.
 
@@ -206,6 +207,14 @@ Stop and escalate when any of these is reached:
   `424 passed, 11 skipped`. Impact: Milestones 1-4 have green evidence and the
   earlier `ty` `ContextVar.reset` diagnostic in `middleware.py` is resolved by
   the token cast.
+
+- Observation: the Developer Documentation check identified that the planned
+  convention documents were absent after the implementation commit. Evidence:
+  the 2026-07-20 check named the missing developer-guide section, ADR-003, and
+  design/contents references. Impact: Milestone 5 was completed with an
+  accepted ADR, contributor guidance, a design appendix entry, documentation
+  index links, and a users-guide consistency audit; no users-guide change was
+  required.
 
 - Observation: 6.1.1 is largely already implemented. Most public symbols carry
   substantial NumPy docstrings, added incrementally by the milestone plans for
@@ -274,12 +283,12 @@ Stop and escalate when any of these is reached:
   usage and outcome"; an unexecuted example can rot. Date/Author: 2026-06-17,
   user + planning agent.
 
-- Decision: Record the docstring/verification convention in a new ADR
-  (`docs/adr-002-*`), referenced from the design document and
-  `docs/contents.md`, and add a "Docstring conventions" section to
-  `docs/developers-guide.md`. Rationale: user selection during planning;
-  matches the existing `adr-001-three-tier-linting.md` practice. Date/Author:
-  2026-06-17, user + planning agent.
+- Decision: Record the docstring/verification convention in
+  `docs/adr-003-docstring-completeness-and-doctest-gates.md`, referenced from
+  the design document and `docs/contents.md`, and add a "Docstring conventions"
+  section to `docs/developers-guide.md`. Rationale: user selection during
+  planning; matches the existing `adr-001-three-tier-linting.md` practice.
+  Date/Author: 2026-06-17, user + planning agent.
 
 ## Outcomes & retrospective
 
@@ -289,10 +298,12 @@ Milestone 0 is complete. The branch was already named
 validated with `make check-fmt`, `make test`, `make typecheck`, and
 `make lint`, and force-pushed with lease.
 
-Implementation is blocked before Milestone 1 because the `DOC` red baseline
-exceeds the explicit tolerance. Compare the result against the Purpose once
-scope is reconfirmed: are all public symbols documented, do the gates enforce
-it, and is the convention recorded?
+Milestones 1-5 are complete. The original `DOC` tolerance was exceeded and the
+broader scope was explicitly reconfirmed before implementation continued. All
+public symbols are documented, the committed gates enforce coverage, signature
+accuracy, exported-value documentation, and safe examples, and the convention
+is recorded in ADR-003 and maintainer documentation. Milestone 6 remains open
+until the post-documentation gate sweep and CodeRabbit review complete.
 
 ## Context and orientation
 
@@ -401,8 +412,9 @@ Relevant tooling and commands (verified):
 
 The work follows Red-Green-Refactor. Documentation is the "production code"
 here; the deterministic gates (`DOC` lint, doctest, and an introspection test)
-are the tests. We make the gates fail first (Red), then write docstrings until
-they pass (Green), then tidy prose, spelling, and cross-references (Refactor).
+are the tests. The gates fail first (Red), docstrings are then completed until
+they pass (Green), and prose, spelling, and cross-references are tidied last
+(Refactor).
 
 ### Stage A — orientation (Milestone 0)
 
@@ -443,7 +455,7 @@ Milestone 1: enable the content gates and capture the red baseline.
 Milestone 2: add the introspection test (covers what lint cannot — runtime
 docstrings on public callables and attribute docstrings on public variables).
 
-Create `src/falcon_correlate/unittests/test_public_api_docstrings.py`:
+Extend `src/falcon_correlate/unittests/test_public_exports.py`:
 
 - Parametrize over `falcon_correlate.__all__`. For callables and classes,
   assert `inspect.getdoc(obj)` is non-empty and longer than a trivial summary
@@ -541,7 +553,7 @@ Surprises & Discoveries.
 
 ### Stage D — refactor and documentation (Milestone 5)
 
-1. Write `docs/adr-002-docstring-completeness-and-doctest-gates.md` in the style
+1. Write `docs/adr-003-docstring-completeness-and-doctest-gates.md` in the style
    of `docs/adr-001-three-tier-linting.md`. Capture: NumPy convention; inline
    attribute-docstring rule for module variables; repo-wide `DOC` gate with the
    pinned Ruff version; the doctest gate and the "executable `>>>` only for
@@ -549,8 +561,8 @@ Surprises & Discoveries.
 2. Add a "Docstring conventions" section to `docs/developers-guide.md`,
    positioned just after the "Episodic lint policy" section, expanding the
    existing "keep docstrings in NumPy style" note with a short template and the
-   attribute-docstring and doctest rules. Link to ADR-002.
-3. Reference ADR-002 from `docs/falcon-correlation-id-middleware-design.md`
+   attribute-docstring and doctest rules. Link to ADR-003.
+3. Reference ADR-003 from `docs/falcon-correlation-id-middleware-design.md`
    (in the appendix/references area) and add it to `docs/contents.md` under
    "Architecture and decisions", and add this ExecPlan under "Planning
    documents".
@@ -615,11 +627,10 @@ Acceptance is behavioural and gate-based:
 
 - Red evidence (capture in Progress/Artifacts): with `"DOC"` added to Ruff
   `select`, `uv run ruff check` fails and lists the docstring-content
-  violations; the new
-  `src/falcon_correlate/unittests/test_public_api_docstrings.py` fails on the
-  three module-level variables before their attribute docstrings exist. Any
-  `xfail(strict=True)` markers used must be observed failing, then removed in
-  the green step.
+  violations; the new `src/falcon_correlate/unittests/test_public_exports.py`
+  fails on the three module-level variables before their attribute docstrings
+  exist. Any `xfail(strict=True)` markers used must be observed failing, then
+  removed in the green step.
 - Green evidence: after the docstring work, `uv run ruff check` prints "All
   checks passed!"; `make test` passes including the introspection test; the
   doctest recipe runs the `>>>` examples and reports zero failures.
@@ -635,7 +646,7 @@ Quality criteria ("done"):
   recipe green.
 - Lint/typecheck: `make check-fmt`, `make lint` (with `DOC` enabled), and
   `make typecheck` all green.
-- Docs: `make markdownlint` and `make nixie` green; ADR-002 present and linked;
+- Docs: `make markdownlint` and `make nixie` green; ADR-003 present and linked;
   developers-guide section added; design-doc and contents.md updated.
 - Review: `coderabbit review --agent` run with all concerns cleared.
 - Roadmap: 6.1.1 and its sub-bullets marked done.
@@ -679,9 +690,9 @@ No new runtime or dev dependencies. Use tooling already present:
 
 New artifacts to exist at completion:
 
-- `src/falcon_correlate/unittests/test_public_api_docstrings.py` — introspection
+- `src/falcon_correlate/unittests/test_public_exports.py` — introspection
   test over `falcon_correlate.__all__` plus AST checks for attribute docstrings.
-- `docs/adr-002-docstring-completeness-and-doctest-gates.md` — convention ADR.
+- `docs/adr-003-docstring-completeness-and-doctest-gates.md` — convention ADR.
 - A `doctest` target in `Makefile` (wired into the committed gates).
 - Inline attribute docstrings in `src/falcon_correlate/middleware_utils.py` for
   `correlation_id_var`, `user_id_var`, `RECOMMENDED_LOG_FORMAT`.

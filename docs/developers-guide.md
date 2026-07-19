@@ -298,6 +298,64 @@ Broad suppressions should be treated as design debt and either documented in an
 ADR, linked to a follow-up issue, or replaced with a refactor when the scope
 allows it.
 
+
+## Docstring conventions
+
+Python docstrings follow the NumPy convention. Ruff's pydocstyle (`D`) rules
+check presence and style, Ruff's pydoclint (`DOC`) rules check that signature
+sections agree with the implementation, and Interrogate enforces 100 percent
+coverage under `src/falcon_correlate`. The rationale and division of
+responsibilities are recorded in
+[ADR-003: docstring completeness and doctest gates](adr-003-docstring-completeness-and-doctest-gates.md).
+
+Runtime functions and methods should use only the sections that apply:
+`Parameters`, `Returns` or `Yields`, `Raises`, and `Examples`. Document
+exceptions that are raised directly or deliberately propagated. Test docstrings
+should state the behaviour under test and should omit examples that only repeat
+the test body.
+
+The following abbreviated template shows the expected order and style:
+
+```python
+def is_valid_identifier(value: str) -> bool:
+    """Return whether a value is a supported identifier.
+
+    Parameters
+    ----------
+    value : str
+        Candidate identifier.
+
+    Returns
+    -------
+    bool
+        ``True`` when the value is supported; otherwise ``False``.
+
+    Examples
+    --------
+    >>> is_valid_identifier("018f")
+    True
+
+    """
+```
+
+Exported module-level variables and constants use an inline attribute
+docstring: a bare string literal immediately after the assignment. This form
+keeps the documentation next to the value and allows Sphinx `autodata` to
+collect it later. Do not duplicate the same value in a module-level
+`Attributes` section.
+
+```python
+correlation_id_var = contextvars.ContextVar("correlation_id", default=None)
+"""ContextVar[str | None]: Correlation ID for the current execution context."""
+```
+
+Executable `>>>` examples are reserved for deterministic, offline operations
+that do not require optional dependencies. Network, Celery, HTTPX, and full
+Falcon integration examples should use non-executable Python code blocks and
+must be covered by ordinary tests. `make test` runs package doctests before the
+parallel pytest suite, while `test_public_exports.py` verifies documentation
+for exported callables and module-level values.
+
 ## `pyproject.toml` lint configuration
 
 The lint configuration lives in `pyproject.toml`.

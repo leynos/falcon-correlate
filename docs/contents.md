@@ -23,6 +23,9 @@
   linting architecture that combines Ruff, Interrogate, and PyPy-backed Pylint.
 - [ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md)
   records the convention for runnable examples and AST-guarded guide snippets.
+- [ADR-003: docstring completeness and doctest gates](adr-003-docstring-completeness-and-doctest-gates.md)
+  records the NumPy docstring convention, exported-value documentation form,
+  and layered completeness checks.
 - [Documentation style guide](documentation-style-guide.md) defines spelling,
   Markdown, document-structure, roadmap, Architecture Decision Record (ADR),
   and Request for Comments (RFC) conventions for this repository.
@@ -61,4 +64,5 @@
   - [4.2.4 Optional Celery integration validation](execplans/4-2-4-validate-optional-celery-integration.md).
   - [5.1.1 Async middleware methods](execplans/5-1-1-implement-async-middleware-methods.md).
   - [5.1.2 Async context variable compatibility](execplans/5-1-2-ensure-context-variable-compatibility-with-async.md).
+  - [6.1.1 Public API docstrings](execplans/6-1-1-docstrings-for-public-apis.md).
   - [6.2.1 Write quickstart guide](execplans/6-2-1-write-quickstart-guide.md).
