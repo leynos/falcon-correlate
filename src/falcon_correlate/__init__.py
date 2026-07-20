@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ._hello import hello
 from .celery import (
     clear_correlation_id_in_worker,
     configure_celery_correlation,
@@ -25,14 +26,6 @@ from .middleware import (
     default_uuid_validator,
     user_id_var,
 )
-
-PACKAGE_NAME = "falcon_correlate"
-
-try:  # pragma: no cover - Rust optional
-    rust = __import__(f"_{PACKAGE_NAME}_rs")
-    hello = rust.hello
-except ModuleNotFoundError:  # pragma: no cover - Python fallback
-    from .pure import hello
 
 __all__ = [
     "RECOMMENDED_LOG_FORMAT",

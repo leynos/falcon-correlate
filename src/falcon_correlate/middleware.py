@@ -170,7 +170,7 @@ class _CorrelationIDMiddlewareBase:
             return True
         try:
             result = self._config.validator(value)
-        except Exception:  # noqa: BLE001 - user-supplied; cannot narrow
+        except Exception:
             logger.warning(
                 "Validator raised an exception for correlation ID, treating as invalid",
                 extra=self._log_context(value),

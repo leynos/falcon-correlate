@@ -273,7 +273,7 @@ class ValidationLoggingScenario:
 
     @property
     def description(self) -> str:
-        """Return a human-readable description of this scenario."""
+        """Human-readable description of this scenario."""
         if self.validator_result is False:
             return "validation_failure_logs"
         if self.validator_result is True:

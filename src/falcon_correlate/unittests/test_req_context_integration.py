@@ -5,18 +5,18 @@ This module verifies that ``req.context.correlation_id`` and
 ``CorrelationIDMiddleware.process_request`` executes, across all
 correlation-ID selection paths and under concurrent request handling.
 
-Examples
---------
-Run the tests in this module with pytest::
-
-    pytest src/falcon_correlate/unittests/test_req_context_integration.py -v
-
 Notes
 -----
 These tests exercise the middleware directly (without a full Falcon
 ``App``) using the ``request_response_factory`` and ``isolated_context``
 fixtures from ``conftest.py``.  No production code changes are needed;
 the middleware already sets both access paths in ``process_request``.
+
+Examples
+--------
+Run the tests in this module with pytest::
+
+    pytest src/falcon_correlate/unittests/test_req_context_integration.py -v
 
 """
 

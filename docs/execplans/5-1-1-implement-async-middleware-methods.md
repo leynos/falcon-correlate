@@ -297,8 +297,7 @@ async def process_request(
     self,
     req: falcon.asgi.Request,
     resp: falcon.asgi.Response,
-) -> None:
-    ...
+) -> None: ...
 
 
 async def process_response(
@@ -307,8 +306,7 @@ async def process_response(
     resp: falcon.asgi.Response,
     resource: object,
     req_succeeded: bool,
-) -> None:
-    ...
+) -> None: ...
 ```
 
 If Falcon's exported type names or the project type checker reject those

@@ -36,7 +36,7 @@ dev = [
     "pytest-bdd>=8.1,<9",
     "pytest-asyncio>=1.4.0,<2",
     "pytest-xdist>=3.5,<4",
-    "ruff==0.14.10",
+    "ruff==0.15.20",
     "structlog>=26.1.0,<27",
     "pyright>=1.1.411,<2",
     "ty>=0.0.59,<1",

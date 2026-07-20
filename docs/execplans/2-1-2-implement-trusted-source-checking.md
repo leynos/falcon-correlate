@@ -360,6 +360,7 @@ If implementation fails validation:
 # In CorrelationIDConfig (private field)
 _parsed_networks: tuple[IPv4Network | IPv6Network, ...]
 
+
 # In CorrelationIDMiddleware
 def _is_trusted_source(self, remote_addr: str | None) -> bool:
     """Check if remote_addr is from a trusted source."""

@@ -212,4 +212,6 @@ target/
 .crush/
 .memdb/
 
+.memdb/
+
 bin/act
