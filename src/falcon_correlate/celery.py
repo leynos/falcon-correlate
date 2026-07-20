@@ -182,7 +182,7 @@ def _safe_connect_signal(
             signal_name,
             dispatch_uid,
         )
-    except Exception:  # noqa: BLE001
+    except Exception:
         _logger.debug(
             "falcon_correlate: exception connecting %r to %r",
             getattr(handler, "__name__", repr(handler)),

@@ -39,15 +39,6 @@ class CorrelationIDMiddlewareASGI(_CorrelationIDMiddlewareBase):
         ``echo_header_in_response``. See
         :meth:`CorrelationIDConfig.from_kwargs` for parameter details.
 
-    Raises
-    ------
-    ValueError
-        If both ``config`` and other keyword arguments are provided, or if
-        ``header_name`` is empty or ``trusted_sources`` contains empty strings.
-    TypeError
-        If unknown keyword arguments are provided, or if ``generator`` or
-        ``validator`` is provided but not callable.
-
     Attributes
     ----------
     config : CorrelationIDConfig
@@ -63,6 +54,15 @@ class CorrelationIDMiddlewareASGI(_CorrelationIDMiddlewareBase):
         Optional validator for incoming correlation IDs.
     echo_header_in_response : bool
         Whether to echo middleware-owned correlation IDs in response headers.
+
+    Raises
+    ------
+    ValueError
+        If both ``config`` and other keyword arguments are provided, or if
+        ``header_name`` is empty or ``trusted_sources`` contains empty strings.
+    TypeError
+        If unknown keyword arguments are provided, or if ``generator`` or
+        ``validator`` is provided but not callable.
 
     Examples
     --------

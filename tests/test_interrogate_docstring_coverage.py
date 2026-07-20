@@ -17,7 +17,7 @@ _INTERROGATE_RESULT_PATTERN = re.compile(
 
 def test_interrogate_reports_full_package_docstring_coverage() -> None:
     """Interrogate should enforce the package's 100 percent coverage gate."""
-    result = subprocess.run(  # noqa: S603
+    result = subprocess.run(
         [
             sys.executable,
             "-m",
