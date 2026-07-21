@@ -344,6 +344,13 @@ markers = [
 
 [tool.mutmut]
 source_paths = ["src/falcon_correlate/"]
+# tests/bdd/test_quickstart_steps.py imports the runnable quickstart example
+# (tests/_quickstart_support.py -> examples.quickstart.<module>) to keep the
+# guide, the example, and the behavioural scenario aligned. examples/ sits
+# outside source_paths, so mutmut's mutants/ sandbox would otherwise omit it
+# and the baseline would fail on ModuleNotFoundError before any mutant runs
+# (issue #100); also_copy mirrors it into the sandbox unmutated.
+also_copy = ["examples/"]
 # tests/test_interrogate_docstring_coverage.py and tests/workflow_contracts/
 # are excluded: they audit repository metadata (interrogate over the source
 # tree, .github/ workflow files) that is either rewritten or absent inside
