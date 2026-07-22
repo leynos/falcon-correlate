@@ -116,6 +116,9 @@ extend-ignore = [
 "tests/**/*.py" = ["PLR6301"]
 "tests/workflows/*.py" = ["S404"]
 
+[tool.ruff.lint.pydoclint]
+ignore-one-line-docstrings = true
+
 [tool.ruff.lint.flake8-import-conventions]
 # Declare the banned `from` imports.
 banned-from = [

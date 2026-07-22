@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import typing as typ
 
 import pytest
@@ -119,104 +120,85 @@ def test_signal_handler_is_connected_to_before_task_publish() -> None:
     ), "propagate_correlation_id_to_celery not found in before_task_publish receivers"
 
 
+def probe_receiver(probe_calls: list[str], **kwargs: object) -> None:
+    """Record that the Celery probe signal fired."""
+    properties = typ.cast("dict[str, str] | None", kwargs.get("properties"))
+    if properties is None:
+        return
+
+    probe_calls.append(properties["correlation_id"])
+
+
+def _send_signal(
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+) -> tuple[dict[str, str], list[tuple[object, object]]]:
+    """Send the Celery signal from an isolated context."""
+    properties = {
+        "correlation_id": "celery-task-id",
+        "reply_to": "reply-queue",
+    }
+    signal_responses: list[tuple[object, object]] = []
+
+    def _logic() -> None:
+        """Exercise the isolated test scenario."""
+        correlation_id_var.set("request-correlation-id")
+        nonlocal signal_responses
+        signal_responses = before_task_publish.send(
+            sender="test-sender",
+            headers={},
+            body=(),
+            properties=properties,
+        )
+
+    isolated_context(_logic)
+    return properties, signal_responses
+
+
+def _count_integration_receivers(
+    signal_responses: list[tuple[object, object]],
+) -> int:
+    """Count integration receivers represented in signal responses."""
+    return sum(
+        1
+        for receiver, _ in signal_responses
+        if getattr(receiver, "__module__", None) == "falcon_correlate.celery"
+        and getattr(receiver, "__name__", None) == "propagate_correlation_id_to_celery"
+    )
+
+
+def _assert_signal_delivery(
+    properties: dict[str, str],
+    signal_responses: list[tuple[object, object]],
+    probe_calls: list[str],
+) -> None:
+    """Assert one signal reaches the integration and probe receivers."""
+    assert properties["correlation_id"] == "request-correlation-id"
+    assert len(probe_calls) == 1
+    assert _count_integration_receivers(signal_responses) == 1
+
+
 def test_signal_connection_is_idempotent_across_reload(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
 ) -> None:
     """Test idempotency of the connection helper."""
     probe_calls: list[str] = []
     probe_dispatch_uid = "test_probe_publish_receiver"
-
-    def probe_receiver(**kwargs: object) -> None:
-        """Record that the Celery probe signal fired."""
-        properties = typ.cast("dict[str, str] | None", kwargs.get("properties"))
-        if properties is None:
-            return
-
-        probe_calls.append(properties["correlation_id"])
-
-    def _send_signal() -> tuple[dict[str, str], list[tuple[object, object]]]:
-        """Send the Celery signal from an isolated context.
-
-        Returns
-        -------
-        tuple[dict[str, str], list[tuple[object, object]]]
-            The value produced for the test scenario.
-
-        """
-        properties = {
-            "correlation_id": "celery-task-id",
-            "reply_to": "reply-queue",
-        }
-        signal_responses: list[tuple[object, object]] = []
-
-        def _logic() -> None:
-            """Exercise the isolated test scenario."""
-            correlation_id_var.set("request-correlation-id")
-            nonlocal signal_responses
-            signal_responses = before_task_publish.send(
-                sender="test-sender",
-                headers={},
-                body=(),
-                properties=properties,
-            )
-
-        isolated_context(_logic)
-        return properties, signal_responses
-
-    def _count_integration_receivers(
-        signal_responses: list[tuple[object, object]],
-    ) -> int:
-        """Count connected integration signal receivers.
-
-        Returns
-        -------
-        int
-            The value produced for the test scenario.
-
-        """
-        return sum(
-            1
-            for receiver, _ in signal_responses
-            if getattr(receiver, "__module__", None) == "falcon_correlate.celery"
-            and getattr(receiver, "__name__", None)
-            == "propagate_correlation_id_to_celery"
-        )
-
-    def _assert_signal_delivery(
-        properties: dict[str, str],
-        signal_responses: list[tuple[object, object]],
-        probe_calls: list[str],
-    ) -> None:
-        """Assert one signal reaches the integration and probe receivers.
-
-        Parameters
-        ----------
-        properties : dict[str, str]
-            Signal properties after receiver processing.
-        signal_responses : list[tuple[object, object]]
-            Responses returned by connected signal receivers.
-        probe_calls : list[str]
-            Correlation IDs observed by the probe receiver.
-
-        """
-        assert properties["correlation_id"] == "request-correlation-id"
-        assert len(probe_calls) == 1
-        assert _count_integration_receivers(signal_responses) == 1
+    receiver = functools.partial(probe_receiver, probe_calls)
 
     try:
         _maybe_connect_celery_publish_signal()
         before_task_publish.connect(
-            probe_receiver,
+            receiver,
             dispatch_uid=probe_dispatch_uid,
             weak=False,
         )
-        initial_properties, initial_responses = _send_signal()
+        initial_properties, initial_responses = _send_signal(isolated_context)
         _assert_signal_delivery(initial_properties, initial_responses, probe_calls)
 
         _maybe_connect_celery_publish_signal()
 
         probe_calls.clear()
-        reloaded_properties, reloaded_responses = _send_signal()
+        reloaded_properties, reloaded_responses = _send_signal(isolated_context)
         _assert_signal_delivery(reloaded_properties, reloaded_responses, probe_calls)
     finally:
         before_task_publish.disconnect(dispatch_uid=probe_dispatch_uid)

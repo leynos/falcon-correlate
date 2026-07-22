@@ -39,7 +39,7 @@ def given_middleware_instance() -> Context:
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        A context mapping containing a default ``CorrelationIDMiddleware``.
 
     """
     return {"middleware": CorrelationIDMiddleware()}
@@ -68,7 +68,7 @@ def given_app_with_middleware() -> Context:
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        A context mapping containing the middleware, Falcon app, and client.
     """
     middleware = TrackingMiddleware(trusted_sources=["127.0.0.1"])
     app = falcon.App(middleware=[middleware])
@@ -178,7 +178,7 @@ def given_middleware_with_header_name(header_name: str) -> Context:
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        A context mapping containing middleware with the requested header name.
 
     """
     return {"middleware": CorrelationIDMiddleware(header_name=header_name)}
@@ -200,7 +200,7 @@ def given_middleware_with_trusted_sources(sources: str) -> Context:
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        A context mapping containing middleware with the requested sources.
 
     """
     source_list = [s.strip() for s in sources.split(",")]
@@ -223,7 +223,7 @@ def given_custom_generator(return_value: str) -> Context:
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        A context mapping containing the custom generator callable.
 
     """
 
@@ -233,7 +233,7 @@ def given_custom_generator(return_value: str) -> Context:
         Returns
         -------
         str
-            The value produced for the test scenario.
+            The fixed correlation ID value supplied by the step.
 
         """
         return return_value
@@ -262,7 +262,7 @@ def given_custom_validator() -> Context:
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        A context mapping containing the custom validator callable.
 
     """
 
@@ -272,7 +272,7 @@ def given_custom_validator() -> Context:
         Returns
         -------
         bool
-            The value produced for the test scenario.
+            Always ``True`` so the step exercises the accepting path.
 
         """
         return True
@@ -304,7 +304,7 @@ def given_middleware_with_echo_disabled() -> Context:
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        A context mapping containing middleware with response echo disabled.
 
     """
     return {"middleware": CorrelationIDMiddleware(echo_header_in_response=False)}
@@ -331,7 +331,7 @@ def given_app_with_trusted_sources(sources: str) -> Context:
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        A context mapping containing the middleware, Falcon app, and client.
 
     """
     source_list = [s.strip() for s in sources.split(",")]

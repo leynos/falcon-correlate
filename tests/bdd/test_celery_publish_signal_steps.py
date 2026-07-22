@@ -75,14 +75,7 @@ def given_no_correlation_id() -> Context:
 
 
 def _publish_task(**apply_async_kwargs: str) -> Context:
-    """Publish a task and capture the final broker correlation ID.
-
-    Returns
-    -------
-    Context
-        The value produced for the test scenario.
-
-    """
+    """Publish a task and capture the final broker correlation ID."""
     app = Celery("bdd-celery-propagation", broker="memory://")
     app.conf.task_always_eager = False
 

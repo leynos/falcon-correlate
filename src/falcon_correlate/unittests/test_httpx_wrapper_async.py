@@ -26,8 +26,8 @@ def mock_async_client() -> cabc.Generator[mock.AsyncMock, None, None]:
 
     Yields
     ------
-    object
-        Control to the test while patched state is active.
+    AsyncMock
+        The patched ``httpx.AsyncClient`` instance used by the test.
 
     """
     with mock.patch("httpx.AsyncClient") as mock_client_cls:

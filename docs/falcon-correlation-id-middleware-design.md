@@ -1999,7 +1999,7 @@ doctests through `make test`. The complete convention is recorded in
    family. The committed Makefile targets provide the same validation path
    locally and in Continuous Integration (CI).
 
-**Files created/modified:**
+**Key files created/modified:**
 
 - `pyproject.toml` — Enabled Ruff `DOC` checks.
 - `Makefile` — Added the doctest gate to `make test`.

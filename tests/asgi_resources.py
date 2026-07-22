@@ -76,6 +76,12 @@ class ASGIInterleavedCorrelationResource:
     def __init__(self, *, expected_requests: int) -> None:
         """Initialize the request barrier for the expected concurrency level.
 
+        Parameters
+        ----------
+        expected_requests : int
+            The number of concurrent requests that must arrive before the
+            resource releases the barrier.
+
         Raises
         ------
         ValueError

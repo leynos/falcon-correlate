@@ -64,7 +64,7 @@ def celery_blocked_pytest_run(
     Returns
     -------
     _PytestRun
-        The value produced for the test scenario.
+        The captured child pytest result and expected skip-output snapshot.
 
     """
     tmp_path = tmp_path_factory.mktemp("celery-blocked-suite")
@@ -86,7 +86,7 @@ def project_root() -> Path:
     Returns
     -------
     Path
-        The value produced for the test scenario.
+        The repository root used to discover Celery-dependent tests.
 
     """
     return _PROJECT_ROOT

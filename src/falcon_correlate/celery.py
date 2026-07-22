@@ -165,8 +165,7 @@ def _safe_connect_signal(
     """Connect a Celery signal when the signal object exposes ``connect``.
 
     Emits ``DEBUG`` log lines for each connection attempt, skipped signal, and
-    exception so that misconfigured or missing signals are diagnosable in
-    production without raising.
+    invalid receiver so that optional integration failures are diagnosable.
 
     """
     signal = getattr(signal_module, signal_name, None)
@@ -195,9 +194,9 @@ def _safe_connect_signal(
             signal_name,
             dispatch_uid,
         )
-    except Exception:
+    except ValueError:
         _logger.debug(
-            "falcon_correlate: exception connecting %r to %r",
+            "falcon_correlate: invalid receiver %r for %r",
             getattr(handler, "__name__", repr(handler)),
             signal_name,
             exc_info=True,

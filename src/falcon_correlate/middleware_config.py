@@ -84,11 +84,14 @@ class CorrelationIDConfig:
 
         Raises
         ------
+        ValueError
+            If ``header_name`` is empty or whitespace-only, or any trusted
+            source is empty, whitespace-only, or malformed.
         TypeError
             If ``trusted_sources`` is a string or contains non-string values, or
             if ``generator`` or ``validator`` is not callable.
 
-        """
+        """  # noqa: DOC502 - validators raise indirectly.
         if isinstance(self.trusted_sources, str):
             msg = "trusted_sources must be an iterable of strings, not a string"
             raise TypeError(msg)

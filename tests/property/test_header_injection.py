@@ -155,14 +155,7 @@ class _CapturedRequest:
 
 
 def _capture_httpx_request(monkeypatch: pytest.MonkeyPatch) -> _CapturedRequest:
-    """Patch ``httpx.request`` and capture forwarded headers.
-
-    Returns
-    -------
-    _CapturedRequest
-        The value produced for the test scenario.
-
-    """
+    """Patch ``httpx.request`` and capture forwarded headers."""
     captured = _CapturedRequest()
 
     def request(
@@ -180,14 +173,7 @@ def _capture_httpx_request(monkeypatch: pytest.MonkeyPatch) -> _CapturedRequest:
 
 
 def _without_correlation_id_header(headers: dict[str, str]) -> dict[str, str]:
-    """Return headers without any case variant of the correlation ID header.
-
-    Returns
-    -------
-    dict[str, str]
-        The value produced for the test scenario.
-
-    """
+    """Return headers without any case variant of the correlation ID header."""
     return {
         key: value
         for key, value in headers.items()

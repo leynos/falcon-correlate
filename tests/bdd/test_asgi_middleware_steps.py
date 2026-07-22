@@ -57,14 +57,7 @@ def _build_asgi_context(
     validator: cabc.Callable[[str], bool] | None = None,
     echo_header_in_response: bool = True,
 ) -> Context:
-    """Build a Falcon ASGI test context with CorrelationIDMiddlewareASGI.
-
-    Returns
-    -------
-    Context
-        The value produced for the test scenario.
-
-    """
+    """Build a Falcon ASGI test context with CorrelationIDMiddlewareASGI."""
     kwargs: dict[str, object] = {}
     if sources is not None:
         kwargs["trusted_sources"] = sources
@@ -87,10 +80,15 @@ def _build_asgi_context(
 def given_asgi_app_with_trusted_sources(sources: str) -> Context:
     """Create a Falcon ASGI app with trusted-source middleware.
 
+    Parameters
+    ----------
+    sources : str
+        Comma-separated trusted source addresses used to configure the app.
+
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        The scenario state with a Falcon ASGI app and test client.
 
     """
     return _build_asgi_context(
@@ -108,10 +106,17 @@ def given_asgi_app_with_generator(
 ) -> Context:
     """Create a Falcon ASGI app with a fixed ID generator.
 
+    Parameters
+    ----------
+    sources : str
+        Comma-separated trusted source addresses used to configure the app.
+    generated_id : str
+        The fixed correlation ID returned by the configured generator.
+
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        The scenario state with a Falcon ASGI app and test client.
 
     """
     return _build_asgi_context(
@@ -130,10 +135,17 @@ def given_asgi_app_with_rejecting_validator(
 ) -> Context:
     """Create a Falcon ASGI app with fixed generation and rejected input.
 
+    Parameters
+    ----------
+    sources : str
+        Comma-separated trusted source addresses used to configure the app.
+    generated_id : str
+        The fixed correlation ID returned by the configured generator.
+
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        The scenario state with a Falcon ASGI app and test client.
 
     """
     return _build_asgi_context(
@@ -150,10 +162,15 @@ def given_asgi_app_with_rejecting_validator(
 def given_asgi_app_with_echo_disabled(generated_id: str) -> Context:
     """Create a Falcon ASGI app with response-header echoing disabled.
 
+    Parameters
+    ----------
+    generated_id : str
+        The fixed correlation ID returned by the configured generator.
+
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        The scenario state with a Falcon ASGI app and test client.
 
     """
     return _build_asgi_context(
@@ -231,14 +248,7 @@ def when_make_concurrent_asgi_get_requests(
         conductor: falcon.testing.ASGIConductor,
         correlation_id: str,
     ) -> tuple[str, falcon.testing.Result, str | None]:
-        """Perform one ASGI request and capture post-response ambient state.
-
-        Returns
-        -------
-        tuple[str, falcon.testing.Result, str | None]
-            The value produced for the test scenario.
-
-        """
+        """Perform one ASGI request and capture post-response ambient state."""
         result = await conductor.simulate_get(
             path,
             headers={"X-Correlation-ID": correlation_id},
@@ -249,14 +259,7 @@ def when_make_concurrent_asgi_get_requests(
         dict[str, falcon.testing.Result],
         dict[str, str | None],
     ]:
-        """Run both concurrent ASGI requests through one conductor.
-
-        Returns
-        -------
-        tuple[dict[str, falcon.testing.Result], dict[str, str | None]]
-            The value produced for the test scenario.
-
-        """
+        """Run both concurrent ASGI requests through one conductor."""
         async with falcon.testing.ASGIConductor(context["app"]) as conductor:
             results = await asyncio.wait_for(
                 asyncio.gather(

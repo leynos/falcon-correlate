@@ -11,5 +11,10 @@ def hello() -> str:
     str
         A friendly greeting identifying the Python implementation.
 
+    Examples
+    --------
+    >>> hello()
+    'hello from Python'
+
     """
     return "hello from Python"

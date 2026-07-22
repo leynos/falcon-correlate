@@ -28,8 +28,8 @@ def mock_async_client() -> cabc.Generator[mock.AsyncMock, None, None]:
 
     Yields
     ------
-    object
-        Control to the test while patched state is active.
+    AsyncMock
+        The patched ``httpx.AsyncClient`` instance used by the test.
 
     """
     with mock.patch("httpx.AsyncClient") as mock_client_cls:
@@ -49,13 +49,14 @@ def run_sync(
 ) -> dict[str, typ.Any]:
     """Run ``request_with_correlation_id`` in an isolated context.
 
-    Returns the keyword arguments and positional arguments (method, url)
-    captured from the mocked ``httpx.request`` call.
+    Returns the method, URL, and forwarded keyword arguments captured from the
+    mocked ``httpx.request`` call.
 
     Returns
     -------
     dict[str, typ.Any]
-        The value produced for the test scenario.
+        A mapping containing ``method``, ``url``, and the forwarded request
+        keyword arguments.
     """
     method: str = kwargs.pop("method", "GET")
     url: str = kwargs.pop("url", "http://example.com")
@@ -89,7 +90,7 @@ async def run_async(
     Returns
     -------
     dict[str, typ.Any]
-        The value produced for the test scenario.
+        The forwarded request keyword arguments captured from the async client.
     """
     token = (
         correlation_id_var.set(correlation_id) if correlation_id is not None else None
@@ -115,7 +116,8 @@ def run_prepare_headers(
     Returns
     -------
     tuple[dict[str, typ.Any], dict[str, typ.Any]]
-        The value produced for the test scenario.
+        A pair containing the prepared headers and the mutated keyword-argument
+        mapping after ``headers`` has been removed.
     """
     result: dict[str, typ.Any] = {}
 

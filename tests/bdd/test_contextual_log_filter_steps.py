@@ -44,14 +44,7 @@ class Context(typ.TypedDict, total=False):
 
 
 def _make_log_record(msg: str = "test message") -> logging.LogRecord:
-    """Create a minimal LogRecord for testing.
-
-    Returns
-    -------
-    logging.LogRecord
-        The value produced for the test scenario.
-
-    """
+    """Create a minimal LogRecord for testing."""
     return logging.LogRecord(
         name="test",
         level=logging.INFO,

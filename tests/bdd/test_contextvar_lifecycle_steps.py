@@ -44,14 +44,7 @@ class Context(typ.TypedDict, total=False):
 
 
 def _build_context(*, delay_seconds: float = 0.0) -> Context:
-    """Create a Falcon app/client pair configured for lifecycle tests.
-
-    Returns
-    -------
-    Context
-        The value produced for the test scenario.
-
-    """
+    """Create a Falcon app/client pair configured for lifecycle tests."""
     middleware = CorrelationIDMiddleware(trusted_sources=["127.0.0.1"])
     app = falcon.App(middleware=[middleware])
     app.add_route(

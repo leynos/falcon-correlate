@@ -32,27 +32,13 @@ USES_RE = re.compile(
 
 
 def _as_mapping(value: object, message: str) -> dict[object, object]:
-    """Assert ``value`` is a mapping and narrow its static type.
-
-    Returns
-    -------
-    dict[object, object]
-        The validated mapping.
-
-    """
+    """Assert ``value`` is a mapping and narrow its static type."""
     assert isinstance(value, dict), message
     return typ.cast("dict[object, object]", value)
 
 
 def _load() -> dict[object, object]:
-    """Parse the workflow file.
-
-    Returns
-    -------
-    dict[object, object]
-        The parsed workflow mapping.
-
-    """
+    """Parse the workflow file."""
     return _as_mapping(
         yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8")),
         "the workflow must parse to a mapping",
@@ -60,27 +46,13 @@ def _load() -> dict[object, object]:
 
 
 def _triggers(workflow: dict[object, object]) -> dict[object, object]:
-    """Return the ``on:`` mapping (PyYAML parses the bare key as True).
-
-    Returns
-    -------
-    dict[object, object]
-        The workflow trigger mapping.
-
-    """
+    """Return the workflow trigger mapping."""
     triggers = workflow.get("on", workflow.get(True))
     return _as_mapping(triggers, "the workflow must declare an on: mapping")
 
 
 def _mutation_job(workflow: dict[object, object]) -> dict[object, object]:
-    """Return the single calling job.
-
-    Returns
-    -------
-    dict[object, object]
-        The mutation job mapping.
-
-    """
+    """Return the single calling job."""
     jobs = _as_mapping(workflow.get("jobs"), "the workflow must declare a jobs mapping")
     assert jobs, "the workflow must declare at least one job"
     assert list(jobs) == ["mutation"], (

@@ -15,12 +15,5 @@ if typ.TYPE_CHECKING:
 
 
 def _load_quickstart_module(module_name: str) -> types.ModuleType:
-    """Import a quickstart example module by short name.
-
-    Returns
-    -------
-    types.ModuleType
-        The imported example module.
-
-    """
+    """Import a quickstart example module by short name."""
     return importlib.import_module(f"examples.quickstart.{module_name}")

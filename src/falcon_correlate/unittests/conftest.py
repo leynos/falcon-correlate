@@ -97,14 +97,7 @@ def request_response_factory() -> cabc.Callable[
         correlation_id: str | None = None,
         remote_addr: str = "127.0.0.1",
     ) -> tuple[falcon.Request, falcon.Response]:
-        """Build the requested test fixture value.
-
-        Returns
-        -------
-        tuple[falcon.Request, falcon.Response]
-            The value produced for the test scenario.
-
-        """
+        """Build a request/response pair for middleware tests."""
         headers: dict[str, str] | None = None
         if correlation_id is not None:
             headers = {"X-Correlation-ID": correlation_id}
@@ -134,7 +127,7 @@ def isolated_context() -> cabc.Callable[[cabc.Callable[[], None]], None]:
     """
 
     def runner(func: cabc.Callable[[], None]) -> None:
-        """Run the supplied callable in an isolated context."""
+        """Run a callable in an isolated context."""
         contextvars.copy_context().run(func)
 
     return runner
@@ -167,14 +160,7 @@ def logger_with_capture() -> cabc.Generator[
     cleanup: list[tuple[logging.Logger, logging.Handler, bool, int]] = []
 
     def factory(name: str) -> tuple[logging.Logger, io.StringIO]:
-        """Build the requested test fixture value.
-
-        Returns
-        -------
-        tuple[logging.Logger, io.StringIO]
-            The value produced for the test scenario.
-
-        """
+        """Build a logger and captured stream for a test."""
         stream = io.StringIO()
         handler = logging.StreamHandler(stream)
         handler.setFormatter(logging.Formatter(_CTX_LOG_FORMAT))

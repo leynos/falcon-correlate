@@ -322,7 +322,11 @@ class _CorrelationIDMiddlewareBase:
 class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
     """Manage correlation IDs in Falcon WSGI applications."""
 
-    def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
+    def process_request(
+        self,
+        req: falcon.Request,
+        resp: falcon.Response,
+    ) -> None:
         """Process an incoming request to establish correlation ID context.
 
         This method is called before routing the request to a resource.
@@ -338,7 +342,12 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
         resp : falcon.Response
             The response object (not yet populated).
 
-        """
+        Raises
+        ------
+        Exception
+            If the configured correlation ID generator raises an exception.
+
+        """  # noqa: DOC502 - generator exceptions are delegated.
         self._process_request(req)
 
     # Falcon middleware hook requires this exact callback signature; see #38.

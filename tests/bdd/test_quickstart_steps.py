@@ -80,14 +80,7 @@ def context() -> Context:
 
 
 def _configure_client(context: Context, app: falcon.App) -> Context:
-    """Store an app and matching test client in the scenario context.
-
-    Returns
-    -------
-    Context
-        The updated scenario state.
-
-    """
+    """Store an app and matching test client in the scenario context."""
     context["app"] = app
     context["client"] = falcon.testing.TestClient(app)
     return context
@@ -100,10 +93,15 @@ def _configure_client(context: Context, app: falcon.App) -> Context:
 def given_minimal_quickstart_app(context: Context) -> Context:
     """Load the minimal quickstart app.
 
+    Parameters
+    ----------
+    context : Context
+        Mutable quickstart scenario state to populate.
+
     Returns
     -------
     Context
-        Scenario state containing the app and test client.
+        The scenario state updated with the minimal example app and client.
 
     """
     module = _load_quickstart_module("minimal_app")
@@ -117,10 +115,15 @@ def given_minimal_quickstart_app(context: Context) -> Context:
 def given_configured_quickstart_app(context: Context) -> Context:
     """Load the configured quickstart app.
 
+    Parameters
+    ----------
+    context : Context
+        Mutable quickstart scenario state to populate.
+
     Returns
     -------
     Context
-        Scenario state containing the app and test client.
+        The scenario state updated with the configured example app and client.
 
     """
     module = _load_quickstart_module("configured_app")
@@ -134,10 +137,16 @@ def given_configured_quickstart_app(context: Context) -> Context:
 def given_untrusted_configured_quickstart_app(context: Context) -> Context:
     """Load the configured quickstart app with only trusted sources varied.
 
+    Parameters
+    ----------
+    context : Context
+        Mutable quickstart scenario state to populate.
+
     Returns
     -------
     Context
-        Scenario state containing the app and test client.
+        The scenario state updated with the configured example using no trusted
+        sources.
 
     """
     module = _load_quickstart_module("configured_app")
@@ -154,10 +163,16 @@ def given_untrusted_configured_quickstart_app(context: Context) -> Context:
 def given_quickstart_logging_configuration(context: Context) -> Context:
     """Configure logging from the quickstart example.
 
+    Parameters
+    ----------
+    context : Context
+        Mutable quickstart scenario state to populate.
+
     Returns
     -------
     Context
-        Scenario state containing the configured logger and output stream.
+        The scenario state updated with the configured logger, stream, and
+        handler list.
 
     """
     module = _load_quickstart_module("logging_setup")

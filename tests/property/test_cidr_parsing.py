@@ -59,14 +59,7 @@ def host_bit_violations(draw: st.DrawFn) -> str:
 
 
 def _first_host_with_bits_set(network: _IpNetwork) -> _IpAddress:
-    """Return an address inside *network* that is not the network address.
-
-    Returns
-    -------
-    _IpAddress
-        The value produced for the test scenario.
-
-    """
+    """Return the first host address inside a network."""
     address_type = type(network.network_address)
     return address_type(int(network.network_address) + 1)
 
