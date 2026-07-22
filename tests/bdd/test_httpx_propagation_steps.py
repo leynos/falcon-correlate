@@ -51,6 +51,21 @@ def _run_async_request(**kwargs: typ.Any) -> dict[str, str]:  # noqa: ANN401
     return asyncio.run(_run())
 
 
+def _run_sync_request(**kwargs: typ.Any) -> dict[str, str]:  # noqa: ANN401
+    """Run ``request_with_correlation_id`` with a mocked HTTPX request.
+
+    Returns
+    -------
+    dict[str, str]
+        The headers captured from the mocked request call.
+
+    """
+    with mock.patch("httpx.request") as mock_request:
+        mock_request.return_value = httpx.Response(200)
+        request_with_correlation_id("GET", "http://example.com", **kwargs)
+        return dict(mock_request.call_args.kwargs["headers"])
+
+
 class Context(typ.TypedDict, total=False):
     """Type definition for test context."""
 
@@ -108,10 +123,7 @@ def when_send_request(context: Context) -> Context:
         The value produced for the test scenario.
 
     """
-    with mock.patch("httpx.request") as mock_request:
-        mock_request.return_value = httpx.Response(200)
-        request_with_correlation_id("GET", "http://example.com")
-        context["captured_headers"] = dict(mock_request.call_args.kwargs["headers"])
+    context["captured_headers"] = _run_sync_request()
     return context
 
 
@@ -128,14 +140,7 @@ def when_send_request_with_header(context: Context, name: str, value: str) -> Co
         The value produced for the test scenario.
 
     """
-    with mock.patch("httpx.request") as mock_request:
-        mock_request.return_value = httpx.Response(200)
-        request_with_correlation_id(
-            "GET",
-            "http://example.com",
-            headers={name: value},
-        )
-        context["captured_headers"] = dict(mock_request.call_args.kwargs["headers"])
+    context["captured_headers"] = _run_sync_request(headers={name: value})
     return context
 
 

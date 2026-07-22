@@ -182,6 +182,27 @@ def test_signal_connection_is_idempotent_across_reload(
             == "propagate_correlation_id_to_celery"
         )
 
+    def _assert_signal_delivery(
+        properties: dict[str, str],
+        signal_responses: list[tuple[object, object]],
+        probe_calls: list[str],
+    ) -> None:
+        """Assert one signal reaches the integration and probe receivers.
+
+        Parameters
+        ----------
+        properties : dict[str, str]
+            Signal properties after receiver processing.
+        signal_responses : list[tuple[object, object]]
+            Responses returned by connected signal receivers.
+        probe_calls : list[str]
+            Correlation IDs observed by the probe receiver.
+
+        """
+        assert properties["correlation_id"] == "request-correlation-id"
+        assert len(probe_calls) == 1
+        assert _count_integration_receivers(signal_responses) == 1
+
     try:
         _maybe_connect_celery_publish_signal()
         before_task_publish.connect(
@@ -190,17 +211,13 @@ def test_signal_connection_is_idempotent_across_reload(
             weak=False,
         )
         initial_properties, initial_responses = _send_signal()
-        assert initial_properties["correlation_id"] == "request-correlation-id"
-        assert len(probe_calls) == 1
-        assert _count_integration_receivers(initial_responses) == 1
+        _assert_signal_delivery(initial_properties, initial_responses, probe_calls)
 
         _maybe_connect_celery_publish_signal()
 
         probe_calls.clear()
         reloaded_properties, reloaded_responses = _send_signal()
-        assert reloaded_properties["correlation_id"] == "request-correlation-id"
-        assert len(probe_calls) == 1
-        assert _count_integration_receivers(reloaded_responses) == 1
+        _assert_signal_delivery(reloaded_properties, reloaded_responses, probe_calls)
     finally:
         before_task_publish.disconnect(dispatch_uid=probe_dispatch_uid)
 

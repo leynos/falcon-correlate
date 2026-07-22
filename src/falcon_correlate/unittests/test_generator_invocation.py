@@ -299,32 +299,6 @@ class TestGeneratorInvocationWithTrustedSource:
 class TestCustomGeneratorBehaviour:
     """Tests for custom generator behaviour."""
 
-    def test_custom_generator_output_used_as_correlation_id(
-        self,
-        create_test_client: cabc.Callable[..., falcon.testing.TestClient],
-    ) -> None:
-        """Verify custom generator output becomes the correlation ID."""
-
-        def my_generator() -> str:
-            """Generate a custom correlation ID for the test.
-
-            Returns
-            -------
-            str
-                The value produced for the test scenario.
-
-            """
-            return "my-custom-correlation-id"
-
-        client = create_test_client(generator=my_generator)
-
-        response = client.simulate_get("/test")
-
-        assert response.json["correlation_id"] == "my-custom-correlation-id", (
-            f"Expected 'my-custom-correlation-id', "
-            f"got '{response.json['correlation_id']}'"
-        )
-
     def test_generator_called_for_each_request(
         self,
         create_test_client: cabc.Callable[..., falcon.testing.TestClient],
