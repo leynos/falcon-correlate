@@ -86,6 +86,30 @@ def _configure_client(context: Context, app: falcon.App) -> Context:
     return context
 
 
+def _configure_quickstart_app_client(
+    context: Context,
+    module_name: str,
+) -> Context:
+    """Load a quickstart module and store its app and client in the context.
+
+    Parameters
+    ----------
+    context : Context
+        Mutable quickstart scenario state to populate.
+    module_name : str
+        Short name of the quickstart module to load.
+
+    Returns
+    -------
+    Context
+        The scenario state updated with the module's app and matching client.
+
+    """
+    module = _load_quickstart_module(module_name)
+    app = typ.cast("falcon.App", vars(module)["app"])
+    return _configure_client(context, app)
+
+
 @given(
     "a Falcon app built from the quickstart minimal example",
     target_fixture="context",
@@ -104,8 +128,7 @@ def given_minimal_quickstart_app(context: Context) -> Context:
         The scenario state updated with the minimal example app and client.
 
     """
-    module = _load_quickstart_module("minimal_app")
-    return _configure_client(context, typ.cast("falcon.App", vars(module)["app"]))
+    return _configure_quickstart_app_client(context, "minimal_app")
 
 
 @given(
@@ -126,8 +149,7 @@ def given_configured_quickstart_app(context: Context) -> Context:
         The scenario state updated with the configured example app and client.
 
     """
-    module = _load_quickstart_module("configured_app")
-    return _configure_client(context, typ.cast("falcon.App", vars(module)["app"]))
+    return _configure_quickstart_app_client(context, "configured_app")
 
 
 @given(
