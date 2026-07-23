@@ -84,7 +84,6 @@ class TestCorrelationIDResponseHeader:
         def _inner() -> None:
             """Exercise the request lifecycle inside an isolated context."""
             req, resp = request_response_factory(**scenario.request_kwargs)
-
             middleware.process_request(req, resp)
             if not scenario.request_kwargs:
                 assert req.context.correlation_id == "generated-id", (
@@ -97,8 +96,10 @@ class TestCorrelationIDResponseHeader:
                 resource=None,
                 req_succeeded=True,
             )
-
-            assert resp.get_header("X-Correlation-ID") == scenario.expected_header
+            assert resp.get_header("X-Correlation-ID") == scenario.expected_header, (
+                f"expected response header {scenario.expected_header!r} "
+                f"but got {resp.get_header('X-Correlation-ID')!r}"
+            )
 
         isolated_context(_inner)
 
@@ -215,16 +216,12 @@ class TestCorrelationIDResponseHeader:
             """Exercise response echoing over an existing header value."""
             req, resp = request_response_factory(correlation_id="trusted-id")
             resp.set_header("X-Correlation-ID", "pre-existing-id")
-
             middleware.process_request(req, resp)
-            middleware.process_response(
-                req,
-                resp,
-                resource=None,
-                req_succeeded=True,
+            middleware.process_response(req, resp, resource=None, req_succeeded=True)
+            actual_header = resp.get_header("X-Correlation-ID")
+            assert actual_header == "trusted-id", (
+                f"expected 'trusted-id', got {actual_header!r}"
             )
-
-            assert resp.get_header("X-Correlation-ID") == "trusted-id"
 
         isolated_context(_inner)
 

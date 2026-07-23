@@ -17,7 +17,7 @@ Compile-time validation strategy
 This project does not use Rust-style ``trybuild`` tests. Compile-time
 correctness is validated by two complementary mechanisms:
 
-1. **Static type checking** — ``make typecheck`` runs mypy over the entire
+1. **Static type checking** — ``make typecheck`` runs ``ty check`` over the entire
    source tree, including this module, and must report zero errors before
    merge.
 
@@ -61,12 +61,25 @@ pytestmark = pytest.mark.timeout(_CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS)
 
 
 def _find_project_root(start: Path) -> Path:
-    """Return the nearest ancestor containing the repository project marker."""
+    """Return the nearest ancestor containing the repository project marker.
+
+    Returns
+    -------
+    Path
+        The nearest ancestor containing ``pyproject.toml``.
+
+    Raises
+    ------
+    FileNotFoundError
+        If no ancestor of ``start`` contains ``pyproject.toml``.
+
+    """
     start_dir = start.resolve().parent if start.is_file() else start.resolve()
     for candidate in (start_dir, *start_dir.parents):
         if (candidate / "pyproject.toml").is_file():
             return candidate
-    raise RuntimeError
+    msg = f"no ancestor containing pyproject.toml was found for {start}"
+    raise FileNotFoundError(msg)
 
 
 _PROJECT_ROOT = _find_project_root(Path(__file__))

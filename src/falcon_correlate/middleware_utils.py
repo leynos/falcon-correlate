@@ -191,19 +191,7 @@ _VALID_UUID_VERSIONS = frozenset({1, 2, 3, 4, 5, 6, 7, 8})
 
 
 def _has_valid_hyphen_placement(value: str) -> bool:
-    """Check that hyphens appear exactly at UUID separator positions.
-
-    Parameters
-    ----------
-    value : str
-        The candidate UUID string.
-
-    Returns
-    -------
-    bool
-        True when all hyphens appear at standard UUID separator positions.
-
-    """
+    """Return whether hyphens appear at standard UUID separator positions."""
     for i, char in enumerate(value):
         if char == "-":
             if i not in _HYPHEN_POSITIONS:

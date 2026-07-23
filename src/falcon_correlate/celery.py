@@ -75,15 +75,7 @@ def propagate_correlation_id_to_celery(
 
 
 def _current_result_backend_uses_rpc() -> bool:
-    """Return whether the active Celery app uses the RPC result backend.
-
-    Returns
-    -------
-    bool
-        True when Celery is importable and its active result backend URI starts
-        with ``rpc://``.
-
-    """
+    """Return whether the active Celery app uses the RPC result backend."""
     try:
         celery_module = importlib.import_module("celery")
     except ImportError:
@@ -138,19 +130,7 @@ def clear_correlation_id_in_worker(**_: object) -> None:
 
 
 def _get_task_request_correlation_id(task: object | None) -> str | None:
-    """Return the correlation ID carried by a Celery task request, if any.
-
-    Parameters
-    ----------
-    task : object | None
-        The Celery task instance supplied by the worker signal.
-
-    Returns
-    -------
-    str | None
-        The request correlation ID when it is a string; otherwise ``None``.
-
-    """
+    """Return a Celery task request correlation ID when it is a string."""
     request = getattr(task, "request", None)
     correlation_id = getattr(request, "correlation_id", None)
     return correlation_id if isinstance(correlation_id, str) else None

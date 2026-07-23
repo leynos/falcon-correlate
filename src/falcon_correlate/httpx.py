@@ -92,14 +92,7 @@ else:
 
 
 def _require_httpx() -> None:
-    """Raise ``ImportError`` if the optional ``httpx`` module is unavailable.
-
-    Raises
-    ------
-    ImportError
-        If ``httpx`` cannot be imported.
-
-    """
+    """Raise ImportError when the optional httpx dependency is unavailable."""
     try:
         importlib.import_module("httpx")
     except ImportError as exc:
@@ -147,19 +140,7 @@ class _CorrelationIDTransportBase[WrappedTransportT]:
 
     @staticmethod
     def _cast_to_none(result: object) -> None:
-        """Forward an exit return value while satisfying the type checker.
-
-        Parameters
-        ----------
-        result : object
-            The wrapped transport exit result.
-
-        Returns
-        -------
-        None
-            The original value, viewed statically as ``None``.
-
-        """
+        """Cast an exit result to None while preserving the runtime value."""
         # `typ.cast()` only changes the static type view; it intentionally keeps
         # the original runtime value so callers can forward `_wrapped_transport`
         # `__exit__` / `__aexit__` return values without changing behaviour.

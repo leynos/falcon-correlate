@@ -102,31 +102,13 @@ class CorrelationIDConfig:
         self._validate_validator()
 
     def _validate_header_name(self) -> None:
-        """Validate that header_name is not empty.
-
-        Raises
-        ------
-        ValueError
-            If ``header_name`` is empty or contains only whitespace.
-
-        """
+        """Validate that header_name is not empty or whitespace."""
         if not self.header_name or not self.header_name.strip():
             msg = "header_name must not be empty"
             raise ValueError(msg)
 
     def _validate_trusted_sources(self) -> None:
-        """Validate trusted_sources and parse IP/CIDR notations.
-
-        Each entry in trusted_sources must be a valid IP address or CIDR
-        notation. Parsed networks are stored in _parsed_networks for efficient
-        matching at request time.
-
-        Raises
-        ------
-        TypeError
-            If any trusted source is not a string.
-
-        """
+        """Validate trusted_sources and parse them into network objects."""
         parsed: list[_NetworkType] = []
         for source in self.trusted_sources:
             if not isinstance(source, str):
@@ -188,27 +170,13 @@ class CorrelationIDConfig:
             raise ValueError(msg) from err
 
     def _validate_generator(self) -> None:
-        """Validate that generator is callable.
-
-        Raises
-        ------
-        TypeError
-            If ``generator`` is not callable.
-
-        """
+        """Validate that generator is callable."""
         if not callable(self.generator):
             msg = "generator must be callable"
             raise TypeError(msg)
 
     def _validate_validator(self) -> None:
-        """Validate that validator is callable if provided.
-
-        Raises
-        ------
-        TypeError
-            If ``validator`` is not ``None`` and is not callable.
-
-        """
+        """Validate that validator is callable when provided."""
         if self.validator is not None and not callable(self.validator):
             msg = "validator must be callable"
             raise TypeError(msg)
@@ -247,19 +215,7 @@ class CorrelationIDConfig:
     def _resolve_generator(
         generator: cabc.Callable[[], str] | None,
     ) -> cabc.Callable[[], str]:
-        """Return the configured generator or the default UUIDv7 generator.
-
-        Parameters
-        ----------
-        generator : Callable[[], str] | None
-            The explicitly configured generator, if any.
-
-        Returns
-        -------
-        Callable[[], str]
-            The configured generator or ``default_uuid7_generator``.
-
-        """
+        """Return the configured generator or the default UUIDv7 generator."""
         if generator is None:
             return default_uuid7_generator
         return generator

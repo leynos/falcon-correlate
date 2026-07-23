@@ -79,14 +79,7 @@ def _expected_correlation_id(
     validator_mode: str,
     generated_id: str,
 ) -> str:
-    """Return the expected request correlation ID for a generated scenario.
-
-    Returns
-    -------
-    str
-        The value produced for the test scenario.
-
-    """
+    """Return the expected request correlation ID for a generated scenario."""
     normalized = incoming.strip() if incoming is not None else None
     if not normalized or not is_trusted:
         return generated_id
@@ -96,14 +89,7 @@ def _expected_correlation_id(
 
 
 def _validator_for(mode: str) -> cabc.Callable[[str], bool] | None:
-    """Build a validator matching the generated validation mode.
-
-    Returns
-    -------
-    Callable[[str], bool] | None
-        The validator for the requested mode, or ``None`` for ``"missing"``.
-
-    """
+    """Build a validator matching the generated validation mode."""
     if mode == "missing":
         return None
     if mode == "accept":
@@ -112,14 +98,7 @@ def _validator_for(mode: str) -> cabc.Callable[[str], bool] | None:
         return lambda _value: False
 
     def _raise(_value: str) -> bool:
-        """Raise the configured validation exception.
-
-        Raises
-        ------
-        RuntimeError
-            Always, to exercise validator failure handling.
-
-        """
+        """Raise the configured validation exception."""
         msg = "validator failed"
         raise RuntimeError(msg)
 
@@ -139,14 +118,7 @@ class _RequestSelectionScenario(typ.NamedTuple):
 def _request_selection_scenarios(
     draw: "st.DrawFn",  # noqa: UP037 -- st.DrawFn is not runtime-stable.
 ) -> _RequestSelectionScenario:
-    """Composite Hypothesis strategy for request-selection property scenarios.
-
-    Returns
-    -------
-    _RequestSelectionScenario
-        A generated request-selection scenario.
-
-    """
+    """Composite Hypothesis strategy for request-selection property scenarios."""
     return _RequestSelectionScenario(
         incoming=draw(_HEADER_OR_EMPTY),
         is_trusted=draw(st.booleans()),
@@ -272,24 +244,10 @@ def test_concurrent_context_isolation_property(
     barrier = threading.Barrier(task_count)
 
     def _worker(index: int) -> tuple[str | None, str | None, str | None]:
-        """Run one concurrent request scenario.
-
-        Returns
-        -------
-        tuple[str | None, str | None, str | None]
-            Correlation state before, during, and after request processing.
-
-        """
+        """Run one concurrent request scenario."""
 
         def _inner() -> tuple[str | None, str | None, str | None]:
-            """Exercise the request lifecycle inside an isolated context.
-
-            Returns
-            -------
-            tuple[str | None, str | None, str | None]
-                Correlation state before, during, and after request processing.
-
-            """
+            """Exercise the request lifecycle inside an isolated context."""
             correlation_id = f"cid-{index}"
             req, resp = request_response_factory(correlation_id=correlation_id)
             middleware.process_request(req, resp)

@@ -119,6 +119,16 @@ Non-goals:
   doctests.
 - Change runtime behaviour or the public API surface.
 
+## Migration plan
+
+No runtime or public API migration is required because this decision formalizes
+the documentation validation gates introduced by this change. Contributors
+must use `make lint` and `make test` to adopt and validate the gates.
+
+## Outstanding decisions
+
+No outstanding decisions remain.
+
 ## Known risks and limitations
 
 - Ruff `DOC` rules are preview rules. The pinned Ruff version keeps results

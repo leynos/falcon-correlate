@@ -123,31 +123,14 @@ class _CorrelationIDMiddlewareBase:
         return self._config.echo_header_in_response
 
     def _log_context(self, correlation_id: object) -> dict[str, object]:
-        """Return structured log context for middleware diagnostics.
-
-        Returns
-        -------
-        dict[str, object]
-            Log fields shared by middleware diagnostics.
-
-        """
+        """Build structured log context for middleware diagnostics."""
         return {
             "correlation_id": correlation_id,
             "header_name": self._config.header_name,
         }
 
     def _get_incoming_header_value(self, req: _RequestLike) -> str | None:
-        """Return the incoming correlation ID header value, if present.
-
-        Leading and trailing whitespace is stripped; empty or whitespace-only
-        values are treated as missing.
-
-        Returns
-        -------
-        str | None
-            The stripped header value, or ``None`` when it is absent or empty.
-
-        """
+        """Return the stripped incoming correlation ID header value."""
         incoming = req.get_header(self.header_name)
         if incoming is None:
             return None
@@ -187,14 +170,7 @@ class _CorrelationIDMiddlewareBase:
         return any(addr in network for network in self._config._parsed_networks)
 
     def _is_valid_id(self, value: str) -> bool:
-        """Return whether *value* passes the configured validator, if any.
-
-        Returns
-        -------
-        bool
-            ``True`` when no validator is configured or validation succeeds.
-
-        """
+        """Return whether a correlation ID passes the configured validator."""
         if self._config.validator is None:
             return True
         try:

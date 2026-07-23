@@ -25,14 +25,7 @@ _FOREIGN_VAR: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 
 
 def _make_non_token_bad_token() -> tuple[object, cabc.Callable[[], None]]:
-    """Return a non-Token sentinel and a no-op cleanup.
-
-    Returns
-    -------
-    tuple[object, cabc.Callable[[], None]]
-        The value produced for the test scenario.
-
-    """
+    """Return a non-Token sentinel and a no-op cleanup."""
     return object(), lambda: None
 
 
@@ -40,14 +33,7 @@ def _make_mismatched_bad_token() -> tuple[
     contextvars.Token[str | None],
     cabc.Callable[[], None],
 ]:
-    """Return a Token from a foreign ContextVar and its reset cleanup.
-
-    Returns
-    -------
-    tuple[contextvars.Token[str | None], cabc.Callable[[], None]]
-        The value produced for the test scenario.
-
-    """
+    """Return a Token from a foreign ContextVar and its reset cleanup."""
     t = _FOREIGN_VAR.set("foreign-value")
     return t, lambda: _FOREIGN_VAR.reset(t)
 
@@ -260,24 +246,10 @@ class TestContextVariableLifecycle:
         barrier = threading.Barrier(2)
 
         def _worker(correlation_id: str) -> tuple[str | None, str | None, str | None]:
-            """Run one concurrent request scenario.
-
-            Returns
-            -------
-            tuple[str | None, str | None, str | None]
-                The value produced for the test scenario.
-
-            """
+            """Run one concurrent request scenario."""
 
             def _inner() -> tuple[str | None, str | None, str | None]:
-                """Exercise the request lifecycle inside an isolated context.
-
-                Returns
-                -------
-                tuple[str | None, str | None, str | None]
-                    The value produced for the test scenario.
-
-                """
+                """Exercise the request lifecycle inside an isolated context."""
                 req, resp = request_response_factory(correlation_id=correlation_id)
 
                 middleware.process_request(req, resp)
