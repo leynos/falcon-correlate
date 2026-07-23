@@ -7,6 +7,8 @@ import importlib
 import inspect
 from pathlib import Path
 
+import pytest
+
 from falcon_correlate.unittests.uuid7_helpers import assert_uuid7_hex
 
 ATTRIBUTE_DOCSTRING_EXPORT_MODULES = {
@@ -91,6 +93,31 @@ def _has_inline_attribute_docstring(module_name: str, name: str) -> bool:
     return False
 
 
+def _assert_public_export_is_documented(name: str, exported: object) -> None:
+    """Assert that a public export has documentation appropriate to its kind."""
+    if name in ATTRIBUTE_DOCSTRING_EXPORT_MODULES:
+        assert _has_inline_attribute_docstring(
+            ATTRIBUTE_DOCSTRING_EXPORT_MODULES[name], name
+        ), f"expected {name} to have an inline attribute docstring"
+        return
+
+    documentation = inspect.getdoc(exported)
+    if not (inspect.isclass(exported) or callable(exported)):
+        type_documentation = inspect.getdoc(type(exported))
+        assert documentation, f"expected {name} to have value-specific documentation"
+        assert documentation != type_documentation, (
+            f"expected {name} to have value-specific documentation rather than "
+            "documentation inherited from its type"
+        )
+        msg = (
+            f"expected non-callable export {name} to be listed in "
+            "ATTRIBUTE_DOCSTRING_EXPORT_MODULES"
+        )
+        raise AssertionError(msg)
+
+    assert documentation, f"expected {name} to have a docstring"
+
+
 class TestPublicExports:
     """Tests for package public exports."""
 
@@ -122,11 +149,20 @@ class TestPublicExports:
         import falcon_correlate
 
         for name in falcon_correlate.__all__:
-            if name in ATTRIBUTE_DOCSTRING_EXPORT_MODULES:
-                assert _has_inline_attribute_docstring(
-                    ATTRIBUTE_DOCSTRING_EXPORT_MODULES[name], name
-                ), f"expected {name} to have an inline attribute docstring"
-                continue
-
             exported = getattr(falcon_correlate, name)
-            assert inspect.getdoc(exported), f"expected {name} to have a docstring"
+            _assert_public_export_is_documented(name, exported)
+
+    def test_plain_builtin_instance_requires_attribute_docstring_mapping(self) -> None:
+        """Reject builtin instances documented only by their type."""
+        exported = "plain instance"
+
+        assert inspect.getdoc(exported) == inspect.getdoc(type(exported))
+        with pytest.raises(AssertionError, match="inherited from its type"):
+            _assert_public_export_is_documented("plain_instance", exported)
+
+    def test_mapped_attribute_export_uses_inline_docstring(self) -> None:
+        """Accept mapped attributes with an inline attribute docstring."""
+        import falcon_correlate
+
+        name = "RECOMMENDED_LOG_FORMAT"
+        _assert_public_export_is_documented(name, getattr(falcon_correlate, name))
