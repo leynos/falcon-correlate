@@ -120,6 +120,11 @@ def given_configured_task_request(context: Context, value: str) -> None:
 def when_publish_configured_task(context: Context) -> Context:
     """Publish a task through Celery's normal apply_async path.
 
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
+
     Returns
     -------
     Context
@@ -148,6 +153,11 @@ def when_publish_configured_task(context: Context) -> Context:
 @when("the configured Celery worker lifecycle runs the task", target_fixture="context")
 def when_configured_worker_runs_task(context: Context) -> Context:
     """Drive the actual Celery task signals around the task body.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
 
     Returns
     -------

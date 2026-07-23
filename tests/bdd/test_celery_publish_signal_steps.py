@@ -50,6 +50,11 @@ def _reset_context_variables() -> cabc.Generator[None, None, None]:
 def given_correlation_id_set(value: str) -> Context:
     """Set the ambient correlation ID.
 
+    Parameters
+    ----------
+    value : str
+        Correlation ID to store in the context variable.
+
     Returns
     -------
     Context
@@ -113,6 +118,11 @@ def when_publish_task() -> Context:
 )
 def when_publish_task_with_explicit_correlation_id(value: str) -> Context:
     """Publish a task while the caller provides a Celery correlation ID.
+
+    Parameters
+    ----------
+    value : str
+        Correlation ID passed directly to the publish call.
 
     Returns
     -------

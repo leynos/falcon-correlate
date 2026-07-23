@@ -92,6 +92,13 @@ def given_structlog_configured() -> Context:
 def given_correlation_id_set(context: Context, value: str) -> Context:
     """Set the correlation ID context variable.
 
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
+    value : str
+        Correlation ID to store in the context variable.
+
     Returns
     -------
     Context
@@ -108,6 +115,13 @@ def given_correlation_id_set(context: Context, value: str) -> Context:
 )
 def given_user_id_set(context: Context, value: str) -> Context:
     """Set the user ID context variable.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
+    value : str
+        User ID to store in the context variable.
 
     Returns
     -------
@@ -133,6 +147,13 @@ def given_no_context_variables_set() -> None:
 )
 def when_structlog_message_emitted(context: Context, message: str) -> Context:
     """Emit a structlog message.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
+    message : str
+        Message emitted via structlog.
 
     Returns
     -------

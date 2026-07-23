@@ -69,6 +69,11 @@ class RecordingTransport(httpx.BaseTransport):
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         """Capture the request and return a success response.
 
+        Parameters
+        ----------
+        request : httpx.Request
+            Request captured for later assertions in the test.
+
         Returns
         -------
         httpx.Response
@@ -88,6 +93,11 @@ class RecordingAsyncTransport(httpx.AsyncBaseTransport):
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         """Capture the request and return a success response.
+
+        Parameters
+        ----------
+        request : httpx.Request
+            Request captured for later assertions in the test.
 
         Returns
         -------
@@ -118,6 +128,11 @@ def _reset_context_variables() -> cabc.Generator[None, None, None]:
 )
 def given_correlation_id_set(value: str) -> Context:
     """Set the correlation ID context variable.
+
+    Parameters
+    ----------
+    value : str
+        Correlation ID to store in the context variable.
 
     Returns
     -------
@@ -150,6 +165,11 @@ def given_no_correlation_id() -> Context:
 def when_send_request_with_transport(context: Context) -> Context:
     """Send a sync request with a client configured to use the transport.
 
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
+
     Returns
     -------
     Context
@@ -174,6 +194,11 @@ def when_send_request_with_transport(context: Context) -> Context:
 )
 def when_send_async_request_with_transport(context: Context) -> Context:
     """Send an async request with a client configured to use the transport.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
 
     Returns
     -------

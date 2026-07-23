@@ -58,11 +58,15 @@ class RecordingTransport(httpx.BaseTransport):
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         """Capture the request and return a simple response.
 
+        Parameters
+        ----------
+        request : httpx.Request
+            Request captured for later assertions in the test.
+
         Returns
         -------
         httpx.Response
             The value produced for the test scenario.
-
         """
         self.requests.append(request)
         return httpx.Response(200, request=request)
@@ -77,6 +81,11 @@ class RecordingAsyncTransport(httpx.AsyncBaseTransport):
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         """Capture the request and return a simple response.
+
+        Parameters
+        ----------
+        request : httpx.Request
+            Request captured for later assertions in the test.
 
         Returns
         -------

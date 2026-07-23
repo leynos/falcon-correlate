@@ -25,6 +25,15 @@ def inject_correlation_context(
     them into the event dictionary using ``setdefault`` so that
     explicitly bound values are preserved.
 
+    Parameters
+    ----------
+    logger : object
+        Structlog logger instance passed through by the processor chain.
+    method_name : str
+        Name of the logging method that triggered the processor.
+    event_dict : dict[str, object]
+        Event payload to enrich with correlation metadata.
+
     Returns
     -------
     dict[str, object]

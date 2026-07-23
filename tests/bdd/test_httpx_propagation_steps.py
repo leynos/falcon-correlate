@@ -86,6 +86,11 @@ def _reset_context_variables() -> cabc.Generator[None, None, None]:
 def given_correlation_id_set(value: str) -> Context:
     """Set the correlation ID context variable.
 
+    Parameters
+    ----------
+    value : str
+        Correlation ID to store in the context variable.
+
     Returns
     -------
     Context
@@ -117,6 +122,11 @@ def given_no_correlation_id() -> Context:
 def when_send_request(context: Context) -> Context:
     """Send a sync request using the wrapper and capture headers.
 
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
+
     Returns
     -------
     Context
@@ -134,6 +144,15 @@ def when_send_request(context: Context) -> Context:
 def when_send_request_with_header(context: Context, name: str, value: str) -> Context:
     """Send a sync request with an existing header.
 
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
+    name : str
+        Name of the pre-existing request header.
+    value : str
+        Value to use for the pre-existing request header.
+
     Returns
     -------
     Context
@@ -150,6 +169,11 @@ def when_send_request_with_header(context: Context, name: str, value: str) -> Co
 )
 def when_send_async_request(context: Context) -> Context:
     """Send an async request using the wrapper and capture headers.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
 
     Returns
     -------
@@ -171,6 +195,15 @@ def when_send_async_request_with_header(
     context: Context, name: str, value: str
 ) -> Context:
     """Send an async request with an existing header.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
+    name : str
+        Name of the pre-existing request header.
+    value : str
+        Value to use for the pre-existing request header.
 
     Returns
     -------
