@@ -296,7 +296,42 @@ class _CorrelationIDMiddlewareBase:
 
 
 class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
-    """Manage correlation IDs in Falcon WSGI applications."""
+    """Manage correlation IDs in Falcon WSGI applications.
+
+    The constructor follows ``_CorrelationIDMiddlewareBase.__init__`` and
+    accepts either a complete configuration object or individual options.
+
+    Parameters
+    ----------
+    config : CorrelationIDConfig | None, optional
+        Frozen configuration object. Cannot be combined with individual
+        options.
+    correlation_id_context_var : contextvars.ContextVar, optional
+        Context variable used for request-scoped correlation IDs. Defaults to
+        ``correlation_id_var``.
+    **kwargs : object
+        Individual configuration options passed to
+        ``CorrelationIDConfig.from_kwargs``: ``header_name``,
+        ``trusted_sources``, ``generator``, ``validator``, and
+        ``echo_header_in_response``.
+
+    Raises
+    ------
+    ValueError
+        If ``config`` is combined with individual options.
+    TypeError
+        If an individual option is unknown or invalid.
+
+    Notes
+    -----
+    Falcon calls ``process_request`` before routing. The middleware accepts a
+    validated incoming ID only from a trusted source; otherwise it generates
+    one, stores it in ``req.context.correlation_id``, and sets the configured
+    context variable. Falcon calls ``process_response`` after the resource
+    responder; the middleware optionally echoes the ID in the configured
+    response header and then resets the request-scoped context.
+
+    """
 
     def process_request(
         self,
