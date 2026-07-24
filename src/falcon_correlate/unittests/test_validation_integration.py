@@ -36,7 +36,7 @@ def correlation_echo_resource() -> CorrelationEchoResource:
     Returns
     -------
     CorrelationEchoResource
-        The value produced for the test scenario.
+        A new ``CorrelationEchoResource`` instance.
 
     """
     return CorrelationEchoResource()
@@ -62,14 +62,7 @@ def create_test_client(
         trusted_sources: cabc.Iterable[str] | None = None,
         validator: cabc.Callable[[str], bool] | None = None,
     ) -> falcon.testing.TestClient:
-        """Build a Falcon TestClient with optional middleware configuration.
-
-        Returns
-        -------
-        falcon.testing.TestClient
-            The value produced for the test scenario.
-
-        """
+        """Build a Falcon TestClient with optional middleware configuration."""
         kwargs: _MiddlewareKwargs = {}
         if generator is not None:
             kwargs["generator"] = generator
@@ -250,7 +243,7 @@ class TestValidationWithValidatorRejecting:
             Returns
             -------
             bool
-                The value produced for the test scenario.
+                Whether ``value`` starts with ``ok-``.
 
             """
             call_log.append(value)
@@ -303,14 +296,7 @@ class ValidationLoggingScenario:
 
 
 def _is_debug_log_containing(record: logging.LogRecord, text: str) -> bool:
-    """Return True if *record* is a DEBUG entry whose message contains *text*.
-
-    Returns
-    -------
-    bool
-        The value produced for the test scenario.
-
-    """
+    """Return True if *record* is a DEBUG entry whose message contains *text*."""
     return (
         record.name == "falcon_correlate.middleware"
         and record.levelno == logging.DEBUG
@@ -319,14 +305,7 @@ def _is_debug_log_containing(record: logging.LogRecord, text: str) -> bool:
 
 
 def _is_validation_failure_debug_log(record: logging.LogRecord) -> bool:
-    """Return True if *record* is a falcon_correlate DEBUG 'failed validation' entry.
-
-    Returns
-    -------
-    bool
-        The value produced for the test scenario.
-
-    """
+    """Return True if *record* is a falcon_correlate DEBUG 'failed validation' entry."""
     return (
         record.name == "falcon_correlate.middleware"
         and record.levelno == logging.DEBUG
@@ -343,7 +322,8 @@ def build_test_client(
     Returns
     -------
     falcon.testing.TestClient
-        The value produced for the test scenario.
+        A client with no validator when ``validator_result`` is ``None``;
+        otherwise, a client with a mock validator returning that result.
 
     """
     if validator_result is None:

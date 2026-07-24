@@ -61,7 +61,7 @@ def correlation_echo_resource() -> CorrelationEchoResource:
     Returns
     -------
     CorrelationEchoResource
-        The value produced for the test scenario.
+        A new ``CorrelationEchoResource`` instance.
 
     """
     return CorrelationEchoResource()
@@ -86,17 +86,7 @@ def create_test_client(
         generator: cabc.Callable[[], str] | None = None,
         trusted_sources: cabc.Iterable[str] | None = None,
     ) -> falcon.testing.TestClient:
-        """Build a test client with the specified middleware configuration.
-
-        Args:
-            generator: Optional custom generator for correlation IDs.
-            trusted_sources: Optional list of trusted source IPs/CIDRs.
-
-        Returns
-        -------
-            A configured Falcon TestClient.
-
-        """
+        """Build a test client with the specified middleware configuration."""
         kwargs: _MiddlewareKwargs = {}
         if generator is not None:
             kwargs["generator"] = generator
@@ -154,7 +144,7 @@ class TestGeneratorInvocationWhenHeaderMissing:
             Returns
             -------
             str
-                The value produced for the test scenario.
+                The literal correlation ID ``context-stored-id``.
 
             """
             return "context-stored-id"
@@ -227,7 +217,7 @@ class TestGeneratorInvocationWhenSourceUntrusted:
             Returns
             -------
             str
-                The value produced for the test scenario.
+                The literal correlation ID ``new-generated-id``.
 
             """
             return "new-generated-id"
@@ -313,7 +303,8 @@ class TestCustomGeneratorBehaviour:
             Returns
             -------
             str
-                The value produced for the test scenario.
+                A correlation ID in the form ``request-N``, where ``N`` is
+                the incremented call count.
 
             """
             nonlocal call_count
@@ -344,7 +335,7 @@ class TestCustomGeneratorBehaviour:
             Returns
             -------
             str
-                The value produced for the test scenario.
+                The literal correlation ID ``test``.
 
             """
             return "test"

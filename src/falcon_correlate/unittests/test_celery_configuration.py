@@ -45,14 +45,7 @@ def _disconnect_integration_receivers() -> None:
 
 
 def _receiver_count(signal: _SignalWithReceivers, receiver: object) -> int:
-    """Count live receivers matching a concrete function object.
-
-    Returns
-    -------
-    int
-        The value produced for the test scenario.
-
-    """
+    """Count live receivers matching a concrete function object."""
     receivers = typ.cast("list[tuple[object, object]]", signal.receivers)
     return sum(1 for _, receiver_func in receivers if receiver_func is receiver)
 
@@ -85,7 +78,7 @@ def celery_app() -> Celery:
     Returns
     -------
     Celery
-        The value produced for the test scenario.
+        The in-memory Celery app named ``unit-celery-configuration``.
 
     """
     return Celery("unit-celery-configuration", broker="memory://")

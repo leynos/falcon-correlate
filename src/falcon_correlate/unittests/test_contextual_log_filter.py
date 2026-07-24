@@ -57,21 +57,14 @@ def preservation_case(request: pytest.FixtureRequest) -> PreservationTestCase:
     Returns
     -------
     PreservationTestCase
-        The value produced for the test scenario.
+        The parameterized case for the current attribute-preservation scenario.
 
     """
     return request.param
 
 
 def _make_log_record(msg: str = "test message") -> logging.LogRecord:
-    """Create a minimal LogRecord for testing.
-
-    Returns
-    -------
-    logging.LogRecord
-        A record containing the supplied message.
-
-    """
+    """Create a minimal LogRecord for testing."""
     return logging.LogRecord(
         name="test",
         level=logging.INFO,
