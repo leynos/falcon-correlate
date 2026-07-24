@@ -398,7 +398,7 @@ Relevant tooling and commands (verified):
 - `make lint` → `uv run ruff check`, `uv run interrogate --fail-under 100`
   over `src/falcon_correlate`, then a PyPy-backed Pylint pass over `src tests`.
 - `make typecheck` → `ty check`.
-- `make test` → `uv run pytest -v -n auto`.
+- `make test` → doctest first, followed by `uv run pytest -v -n auto`.
 - `make markdownlint` → `markdownlint-cli2 '**/*.md'`; `make nixie` validates
   Mermaid.
 - Ruff config: `[tool.ruff] preview = true`, `target-version = "py312"`;
