@@ -1,4 +1,8 @@
-"""Validation step definitions for middleware.feature."""
+"""Validation step definitions for middleware.feature.
+
+These steps provide utilities for building Falcon applications and test
+clients used by trusted-source and custom-validator feature scenarios.
+"""
 
 from __future__ import annotations
 
@@ -99,11 +103,22 @@ def given_custom_prefix_rejecting_validator(prefix: str) -> Context:
 
 
 @given(parsers.parse('a Falcon application with that validator trusting "{sources}"'))
+# pylint: disable-next=useless-return  # Explicit return is intentional.
 def given_app_with_custom_validator_and_trusted_sources(
     context: Context,
     sources: str,
 ) -> None:
-    """Create a Falcon app with the custom validator and trusted sources."""
+    """Create a Falcon app with the custom validator and trusted sources.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario context containing the custom validator and receiving the
+        middleware, application and test client.
+    sources : str
+        Comma-separated trusted source addresses.
+
+    """
     source_list = [s.strip() for s in sources.split(",")]
     middleware = CorrelationIDMiddleware(
         trusted_sources=source_list,
@@ -114,3 +129,4 @@ def given_app_with_custom_validator_and_trusted_sources(
     context["middleware"] = middleware
     context["app"] = app
     context["client"] = client
+    return  # noqa: PLR1711

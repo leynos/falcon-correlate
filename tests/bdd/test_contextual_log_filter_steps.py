@@ -85,6 +85,11 @@ def given_contextual_log_filter() -> Context:
 def given_logger_with_filter(request: pytest.FixtureRequest) -> Context:
     """Create a logger with the contextual log filter attached.
 
+    Parameters
+    ----------
+    request : pytest.FixtureRequest
+        Pytest fixture used to remove the temporary handler during teardown.
+
     Returns
     -------
     Context
@@ -120,6 +125,13 @@ def given_logger_with_filter(request: pytest.FixtureRequest) -> Context:
 def given_correlation_id_set(context: Context, value: str) -> Context:
     """Set the correlation ID context variable.
 
+    Parameters
+    ----------
+    context : Context
+        Scenario context mapping to update with the context-variable token.
+    value : str
+        Correlation ID value to store in the context variable.
+
     Returns
     -------
     Context
@@ -136,6 +148,13 @@ def given_correlation_id_set(context: Context, value: str) -> Context:
 )
 def given_user_id_set(context: Context, value: str) -> Context:
     """Set the user ID context variable.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario context mapping to update with the context-variable token.
+    value : str
+        User ID value to store in the context variable.
 
     Returns
     -------
@@ -175,6 +194,13 @@ def when_filter_processes_record(context: Context) -> Context:
 )
 def when_log_message_emitted(context: Context, message: str) -> Context:
     """Emit a log message through the configured logger.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario context containing the configured logger.
+    message : str
+        Message to emit through the logger.
 
     Returns
     -------
@@ -220,6 +246,11 @@ def given_logger_with_recommended_format(
 ) -> Context:
     """Create a logger using RECOMMENDED_LOG_FORMAT.
 
+    Parameters
+    ----------
+    request : pytest.FixtureRequest
+        Pytest fixture used to remove the temporary handler during teardown.
+
     Returns
     -------
     Context
@@ -257,6 +288,11 @@ def given_logger_via_dictconfig_with_recommended_format(
     request: pytest.FixtureRequest,
 ) -> Context:
     """Create a logger via dictConfig using RECOMMENDED_LOG_FORMAT.
+
+    Parameters
+    ----------
+    request : pytest.FixtureRequest
+        Pytest fixture used to remove configured handlers during teardown.
 
     Returns
     -------

@@ -32,7 +32,7 @@ def valid_cidr_blocks(draw: st.DrawFn) -> _IpNetwork:
     Returns
     -------
     _IpNetwork
-        The value produced for the test scenario.
+        An IPv4 or IPv6 network with no host bits set.
 
     """
     address = draw(st.ip_addresses())
@@ -48,7 +48,7 @@ def host_bit_violations(draw: st.DrawFn) -> str:
     Returns
     -------
     str
-        The value produced for the test scenario.
+        A CIDR string whose address has host bits set.
 
     """
     address = draw(st.ip_addresses())
@@ -70,7 +70,8 @@ def is_parseable_network(value: str) -> bool:
     Returns
     -------
     bool
-        The value produced for the test scenario.
+        ``True`` if ``value`` parses as an IP network with ``strict=False``;
+        otherwise, ``False``.
 
     """
     try:

@@ -46,7 +46,8 @@ def given_default_uuid_validator() -> Context:
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        A context mapping containing the default validator under
+        ``validator``.
 
     """
     return {"validator": default_uuid_validator}

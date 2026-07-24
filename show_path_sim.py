@@ -3,6 +3,13 @@
 import sys
 from pathlib import Path
 
-print("sitecustomize_loaded", "sitecustomize" in sys.modules)
-print("cwd", Path.cwd())
-print("sys.path[:8]", sys.path[:8])
+
+def main() -> None:
+    """Display interpreter path diagnostics."""
+    print("sitecustomize_loaded", "sitecustomize" in sys.modules)
+    print("cwd", Path.cwd())
+    print("sys.path[:8]", sys.path[:8])
+
+
+if __name__ == "__main__":
+    main()

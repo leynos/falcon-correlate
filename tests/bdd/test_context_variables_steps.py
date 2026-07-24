@@ -26,7 +26,7 @@ def given_correlation_id_var() -> Context:
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        A context mapping containing ``correlation_id_var`` under ``var``.
 
     """
     return {"var": correlation_id_var}
@@ -39,7 +39,7 @@ def given_user_id_var() -> Context:
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        A context mapping containing ``user_id_var`` under ``var``.
 
     """
     return {"var": user_id_var}
@@ -63,7 +63,8 @@ def when_set_value(context: Context, value: str) -> Context:
     Returns
     -------
     Context
-        The value produced for the test scenario.
+        The context mapping with the retrieved value stored under ``value``.
+
     """
     var = context["var"]
 

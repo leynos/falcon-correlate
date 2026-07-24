@@ -156,7 +156,10 @@ class TestPublicExports:
         """Reject builtin instances documented only by their type."""
         exported = "plain instance"
 
-        assert inspect.getdoc(exported) == inspect.getdoc(type(exported))
+        assert inspect.getdoc(exported) == inspect.getdoc(type(exported)), (
+            "expected the plain builtin instance documentation to be inherited "
+            "from its type"
+        )
         with pytest.raises(AssertionError, match="inherited from its type"):
             _assert_public_export_is_documented("plain_instance", exported)
 

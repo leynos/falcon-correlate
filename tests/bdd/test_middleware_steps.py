@@ -69,6 +69,7 @@ def given_app_with_middleware() -> Context:
     -------
     Context
         A context mapping containing the middleware, Falcon app, and client.
+
     """
     middleware = TrackingMiddleware(trusted_sources=["127.0.0.1"])
     app = falcon.App(middleware=[middleware])

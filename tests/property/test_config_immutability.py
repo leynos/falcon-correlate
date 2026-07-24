@@ -41,7 +41,7 @@ def trusted_sources_inputs(
     Returns
     -------
     _TrustedSourcesInput
-        The value produced for the test scenario.
+        A list, tuple, set, frozenset or generator of IP-address strings.
 
     """
     sources = draw(
