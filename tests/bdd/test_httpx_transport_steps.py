@@ -59,12 +59,21 @@ if typ.TYPE_CHECKING:
 scenarios("httpx_transport.feature")
 
 
-class RecordingTransport(httpx.BaseTransport):
-    """Capture sync requests made by the configured client."""
+class _RecordingTransportBase:
+    """Provide shared request capture for test transports."""
 
     def __init__(self) -> None:
         """Initialize the transport with no captured request."""
         self.request: httpx.Request | None = None
+
+    def _record_request(self, request: httpx.Request) -> httpx.Response:
+        """Capture a request and return a successful response."""
+        self.request = request
+        return httpx.Response(200, request=request)
+
+
+class RecordingTransport(_RecordingTransportBase, httpx.BaseTransport):
+    """Capture sync requests made by the configured client."""
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         """Capture the request and return a success response.
@@ -80,16 +89,11 @@ class RecordingTransport(httpx.BaseTransport):
             The value produced for the test scenario.
 
         """
-        self.request = request
-        return httpx.Response(200, request=request)
+        return self._record_request(request)
 
 
-class RecordingAsyncTransport(httpx.AsyncBaseTransport):
+class RecordingAsyncTransport(_RecordingTransportBase, httpx.AsyncBaseTransport):
     """Capture async requests made by the configured client."""
-
-    def __init__(self) -> None:
-        """Initialize the transport with no captured request."""
-        self.request: httpx.Request | None = None
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         """Capture the request and return a success response.
@@ -105,8 +109,7 @@ class RecordingAsyncTransport(httpx.AsyncBaseTransport):
             The value produced for the test scenario.
 
         """
-        self.request = request
-        return httpx.Response(200, request=request)
+        return self._record_request(request)
 
 
 class Context(typ.TypedDict, total=False):
