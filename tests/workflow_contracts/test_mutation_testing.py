@@ -46,7 +46,7 @@ def _load() -> dict[object, object]:
 
 
 def _triggers(workflow: dict[object, object]) -> dict[object, object]:
-    """Return the ``on:`` mapping (PyYAML parses the bare key as True)."""
+    """Return the workflow trigger mapping."""
     triggers = workflow.get("on", workflow.get(True))
     return _as_mapping(triggers, "the workflow must declare an on: mapping")
 

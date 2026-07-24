@@ -71,6 +71,9 @@
 - **For Python files:**
   - **Testing:** Passes all relevant unit and behavioural tests (`make test`).
   - **Linting:** Passes lint checks (`make lint`).
+    `make lint` includes Ruff, Interrogate at 100% Python docstring coverage
+    for `src/falcon_correlate`, and PyPy-backed Pylint. CI must install the
+    `interrogate` uv tool before invoking this target.
   - **Formatting:** Adheres to formatting standards (`make check-fmt`; use
     `make fmt` to apply fixes).
   - **Typechecking:** Passes type checking (`make typecheck`).

@@ -68,7 +68,14 @@ def _cleanup_logger(context: Context) -> cabc.Generator[None, None, None]:
 
 @pytest.fixture
 def context() -> Context:
-    """Provide mutable state for a quickstart scenario."""
+    """Provide mutable state for a quickstart scenario.
+
+    Returns
+    -------
+    Context
+        Empty mutable scenario state.
+
+    """
     return {}
 
 
@@ -79,14 +86,49 @@ def _configure_client(context: Context, app: falcon.App) -> Context:
     return context
 
 
+def _configure_quickstart_app_client(
+    context: Context,
+    module_name: str,
+) -> Context:
+    """Load a quickstart module and store its app and client in the context.
+
+    Parameters
+    ----------
+    context : Context
+        Mutable quickstart scenario state to populate.
+    module_name : str
+        Short name of the quickstart module to load.
+
+    Returns
+    -------
+    Context
+        The scenario state updated with the module's app and matching client.
+
+    """
+    module = _load_quickstart_module(module_name)
+    app = typ.cast("falcon.App", vars(module)["app"])
+    return _configure_client(context, app)
+
+
 @given(
     "a Falcon app built from the quickstart minimal example",
     target_fixture="context",
 )
 def given_minimal_quickstart_app(context: Context) -> Context:
-    """Load the minimal quickstart app."""
-    module = _load_quickstart_module("minimal_app")
-    return _configure_client(context, typ.cast("falcon.App", vars(module)["app"]))
+    """Load the minimal quickstart app.
+
+    Parameters
+    ----------
+    context : Context
+        Mutable quickstart scenario state to populate.
+
+    Returns
+    -------
+    Context
+        The scenario state updated with the minimal example app and client.
+
+    """
+    return _configure_quickstart_app_client(context, "minimal_app")
 
 
 @given(
@@ -94,9 +136,20 @@ def given_minimal_quickstart_app(context: Context) -> Context:
     target_fixture="context",
 )
 def given_configured_quickstart_app(context: Context) -> Context:
-    """Load the configured quickstart app."""
-    module = _load_quickstart_module("configured_app")
-    return _configure_client(context, typ.cast("falcon.App", vars(module)["app"]))
+    """Load the configured quickstart app.
+
+    Parameters
+    ----------
+    context : Context
+        Mutable quickstart scenario state to populate.
+
+    Returns
+    -------
+    Context
+        The scenario state updated with the configured example app and client.
+
+    """
+    return _configure_quickstart_app_client(context, "configured_app")
 
 
 @given(
@@ -104,7 +157,20 @@ def given_configured_quickstart_app(context: Context) -> Context:
     target_fixture="context",
 )
 def given_untrusted_configured_quickstart_app(context: Context) -> Context:
-    """Load the configured quickstart app with only trusted sources varied."""
+    """Load the configured quickstart app with only trusted sources varied.
+
+    Parameters
+    ----------
+    context : Context
+        Mutable quickstart scenario state to populate.
+
+    Returns
+    -------
+    Context
+        The scenario state updated with the configured example using no trusted
+        sources.
+
+    """
     module = _load_quickstart_module("configured_app")
     config = typ.cast("CorrelationIDConfig", vars(module)["config"])
     build_app = typ.cast(
@@ -117,7 +183,20 @@ def given_untrusted_configured_quickstart_app(context: Context) -> Context:
 
 @given("the quickstart logging configuration", target_fixture="context")
 def given_quickstart_logging_configuration(context: Context) -> Context:
-    """Configure logging from the quickstart example."""
+    """Configure logging from the quickstart example.
+
+    Parameters
+    ----------
+    context : Context
+        Mutable quickstart scenario state to populate.
+
+    Returns
+    -------
+    Context
+        The scenario state updated with the configured logger, stream, and
+        handler list.
+
+    """
     module = _load_quickstart_module("logging_setup")
     configure_logging = typ.cast(
         "cabc.Callable[[], logging.Logger]",

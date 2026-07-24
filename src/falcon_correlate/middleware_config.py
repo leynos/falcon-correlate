@@ -80,7 +80,18 @@ class CorrelationIDConfig:
     )
 
     def __post_init__(self) -> None:
-        """Validate configuration after initialization."""
+        """Validate configuration after initialization.
+
+        Raises
+        ------
+        ValueError
+            If ``header_name`` is empty or whitespace-only, or any trusted
+            source is empty, whitespace-only, or malformed.
+        TypeError
+            If ``trusted_sources`` is a string or contains non-string values, or
+            if ``generator`` or ``validator`` is not callable.
+
+        """  # noqa: DOC502 - validators raise indirectly.
         if isinstance(self.trusted_sources, str):
             msg = "trusted_sources must be an iterable of strings, not a string"
             raise TypeError(msg)
@@ -91,18 +102,13 @@ class CorrelationIDConfig:
         self._validate_validator()
 
     def _validate_header_name(self) -> None:
-        """Validate that header_name is not empty."""
+        """Validate that header_name is not empty or whitespace."""
         if not self.header_name or not self.header_name.strip():
             msg = "header_name must not be empty"
             raise ValueError(msg)
 
     def _validate_trusted_sources(self) -> None:
-        """Validate trusted_sources and parse IP/CIDR notations.
-
-        Each entry in trusted_sources must be a valid IP address or CIDR
-        notation. Parsed networks are stored in _parsed_networks for efficient
-        matching at request time.
-        """
+        """Validate trusted_sources and parse them into network objects."""
         parsed: list[_NetworkType] = []
         for source in self.trusted_sources:
             if not isinstance(source, str):
@@ -170,7 +176,7 @@ class CorrelationIDConfig:
             raise TypeError(msg)
 
     def _validate_validator(self) -> None:
-        """Validate that validator is callable if provided."""
+        """Validate that validator is callable when provided."""
         if self.validator is not None and not callable(self.validator):
             msg = "validator must be callable"
             raise TypeError(msg)

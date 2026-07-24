@@ -73,7 +73,14 @@ def given_celery_handlers_disconnected() -> None:
 
 @given("a Celery app configured through the public helper", target_fixture="context")
 def given_configured_celery_app() -> Context:
-    """Create and configure a Celery app through the public helper."""
+    """Create and configure a Celery app through the public helper.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     app = Celery("bdd-celery-configuration", broker="memory://")
     app.conf.task_always_eager = False
     configured_app = configure_celery_correlation(app)
@@ -111,7 +118,19 @@ def given_configured_task_request(context: Context, value: str) -> None:
 
 @when("I publish a configured Celery task", target_fixture="context")
 def when_publish_configured_task(context: Context) -> Context:
-    """Publish a task through Celery's normal apply_async path."""
+    """Publish a task through Celery's normal apply_async path.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     app = context["app"]
 
     @app.task(name="bdd.configured.echo")
@@ -133,7 +152,19 @@ def when_publish_configured_task(context: Context) -> Context:
 
 @when("the configured Celery worker lifecycle runs the task", target_fixture="context")
 def when_configured_worker_runs_task(context: Context) -> Context:
-    """Drive the actual Celery task signals around the task body."""
+    """Drive the actual Celery task signals around the task body.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     task = context["task"]
 
     try:

@@ -21,13 +21,27 @@ class Context(typ.TypedDict, total=False):
 
 @given("the correlation ID context variable", target_fixture="context")
 def given_correlation_id_var() -> Context:
-    """Provide the correlation ID context variable."""
+    """Provide the correlation ID context variable.
+
+    Returns
+    -------
+    Context
+        A context mapping containing ``correlation_id_var`` under ``var``.
+
+    """
     return {"var": correlation_id_var}
 
 
 @given("the user ID context variable", target_fixture="context")
 def given_user_id_var() -> Context:
-    """Provide the user ID context variable."""
+    """Provide the user ID context variable.
+
+    Returns
+    -------
+    Context
+        A context mapping containing ``user_id_var`` under ``var``.
+
+    """
     return {"var": user_id_var}
 
 
@@ -45,6 +59,12 @@ def when_set_value(context: Context, value: str) -> Context:
     """Set the context variable to a value and retrieve it.
 
     Runs inside a copied context to prevent test pollution.
+
+    Returns
+    -------
+    Context
+        The context mapping with the retrieved value stored under ``value``.
+
     """
     var = context["var"]
 

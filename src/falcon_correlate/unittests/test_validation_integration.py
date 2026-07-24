@@ -31,7 +31,14 @@ class _MiddlewareKwargs(typ.TypedDict, total=False):
 
 @pytest.fixture
 def correlation_echo_resource() -> CorrelationEchoResource:
-    """Provide a CorrelationEchoResource instance for testing."""
+    """Provide a CorrelationEchoResource instance for testing.
+
+    Returns
+    -------
+    CorrelationEchoResource
+        A new ``CorrelationEchoResource`` instance.
+
+    """
     return CorrelationEchoResource()
 
 
@@ -231,7 +238,14 @@ class TestValidationWithValidatorRejecting:
         call_log: list[str] = []
 
         def tracking_validator(value: str) -> bool:
-            """Record the validator input and reject it."""
+            """Record the validator input and reject it.
+
+            Returns
+            -------
+            bool
+                Whether ``value`` starts with ``ok-``.
+
+            """
             call_log.append(value)
             return value.startswith("ok-")
 
@@ -303,7 +317,15 @@ def build_test_client(
     create_test_client: cabc.Callable[..., falcon.testing.TestClient],
     validator_result: bool | None,  # noqa: FBT001 - test scenario value
 ) -> falcon.testing.TestClient:
-    """Build a validation logging test client for the given validator result."""
+    """Build a validation logging test client for the given validator result.
+
+    Returns
+    -------
+    falcon.testing.TestClient
+        A client with no validator when ``validator_result`` is ``None``;
+        otherwise, a client with a mock validator returning that result.
+
+    """
     if validator_result is None:
         return create_test_client(trusted_sources=["127.0.0.1"])
 

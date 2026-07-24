@@ -66,7 +66,16 @@ class _CorrelationIDMiddlewareBase:
         ] = correlation_id_var,
         **kwargs: object,
     ) -> None:
-        """Initialize the correlation ID middleware with configuration options."""
+        """Initialize the correlation ID middleware with configuration options.
+
+        Raises
+        ------
+        ValueError
+            If a configuration object and individual options are both supplied.
+        TypeError
+            If an unknown individual option is supplied.
+
+        """
         self._correlation_id_var = correlation_id_context_var
         if config is not None:
             if kwargs:
@@ -114,18 +123,14 @@ class _CorrelationIDMiddlewareBase:
         return self._config.echo_header_in_response
 
     def _log_context(self, correlation_id: object) -> dict[str, object]:
-        """Return structured log context for middleware diagnostics."""
+        """Build structured log context for middleware diagnostics."""
         return {
             "correlation_id": correlation_id,
             "header_name": self._config.header_name,
         }
 
     def _get_incoming_header_value(self, req: _RequestLike) -> str | None:
-        """Return the incoming correlation ID header value, if present.
-
-        Leading and trailing whitespace is stripped; empty or whitespace-only
-        values are treated as missing.
-        """
+        """Return the stripped incoming correlation ID header value."""
         incoming = req.get_header(self.header_name)
         if incoming is None:
             return None
@@ -165,7 +170,7 @@ class _CorrelationIDMiddlewareBase:
         return any(addr in network for network in self._config._parsed_networks)
 
     def _is_valid_id(self, value: str) -> bool:
-        """Return whether *value* passes the configured validator, if any."""
+        """Return whether a correlation ID passes the configured validator."""
         if self._config.validator is None:
             return True
         try:
@@ -291,36 +296,48 @@ class _CorrelationIDMiddlewareBase:
 
 
 class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
-    """Middleware for managing correlation IDs in Falcon WSGI applications.
+    """Manage correlation IDs in Falcon WSGI applications.
 
-    This middleware handles the lifecycle of correlation IDs, extracting
-    them from incoming request headers or generating new ones, making
-    them available throughout the request lifecycle, and optionally
-    echoing them in response headers.
+    The constructor follows ``_CorrelationIDMiddlewareBase.__init__`` and
+    accepts either a complete configuration object or individual options.
 
     Parameters
     ----------
-    config : CorrelationIDConfig | None
-        A pre-built configuration object. If provided, no other keyword
-        arguments may be specified. Defaults to ``None``.
-    **kwargs
-        Individual configuration parameters. Valid keys are: ``header_name``,
+    config : CorrelationIDConfig | None, optional
+        Frozen configuration object. Cannot be combined with individual
+        options.
+    correlation_id_context_var : contextvars.ContextVar, optional
+        Context variable used for request-scoped correlation IDs. Defaults to
+        ``correlation_id_var``.
+    **kwargs : object
+        Individual configuration options passed to
+        ``CorrelationIDConfig.from_kwargs``: ``header_name``,
         ``trusted_sources``, ``generator``, ``validator``, and
-        ``echo_header_in_response``. See :meth:`CorrelationIDConfig.from_kwargs`
-        for parameter details.
+        ``echo_header_in_response``.
 
     Raises
     ------
     ValueError
-        If both ``config`` and other keyword arguments are provided, or if
-        ``header_name`` is empty or ``trusted_sources`` contains empty strings.
+        If ``config`` is combined with individual options.
     TypeError
-        If unknown keyword arguments are provided, or if ``generator`` or
-        ``validator`` is provided but not callable.
+        If an individual option is unknown or invalid.
+
+    Notes
+    -----
+    Falcon calls ``process_request`` before routing. The middleware accepts a
+    validated incoming ID only from a trusted source; otherwise it generates
+    one, stores it in ``req.context.correlation_id``, and sets the configured
+    context variable. Falcon calls ``process_response`` after the resource
+    responder; the middleware optionally echoes the ID in the configured
+    response header and then resets the request-scoped context.
 
     """
 
-    def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
+    def process_request(
+        self,
+        req: falcon.Request,
+        resp: falcon.Response,
+    ) -> None:
         """Process an incoming request to establish correlation ID context.
 
         This method is called before routing the request to a resource.
@@ -339,11 +356,9 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
         Raises
         ------
         Exception
-            Any exception raised by the configured generator will propagate
-            to the caller. Custom generators are responsible for their own
-            error handling; the middleware does not catch generator exceptions.
+            If the configured correlation ID generator raises an exception.
 
-        """
+        """  # noqa: DOC502 - generator exceptions are delegated.
         self._process_request(req)
 
     # Falcon middleware hook requires this exact callback signature; see #38.

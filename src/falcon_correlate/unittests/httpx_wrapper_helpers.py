@@ -24,7 +24,14 @@ EXPECTED_TIMEOUT = 5
 
 @pytest.fixture
 def mock_async_client() -> cabc.Generator[mock.AsyncMock, None, None]:
-    """Provide a pre-configured httpx.AsyncClient mock."""
+    """Provide a pre-configured httpx.AsyncClient mock.
+
+    Yields
+    ------
+    AsyncMock
+        The patched ``httpx.AsyncClient`` instance used by the test.
+
+    """
     with mock.patch("httpx.AsyncClient") as mock_client_cls:
         mock_client = mock.AsyncMock()
         mock_client.request.return_value = httpx.Response(200)
@@ -42,8 +49,14 @@ def run_sync(
 ) -> dict[str, typ.Any]:
     """Run ``request_with_correlation_id`` in an isolated context.
 
-    Returns the keyword arguments and positional arguments (method, url)
-    captured from the mocked ``httpx.request`` call.
+    Returns the method, URL, and forwarded keyword arguments captured from the
+    mocked ``httpx.request`` call.
+
+    Returns
+    -------
+    dict[str, typ.Any]
+        A mapping containing ``method``, ``url``, and the forwarded request
+        keyword arguments.
     """
     method: str = kwargs.pop("method", "GET")
     url: str = kwargs.pop("url", "http://example.com")
@@ -73,6 +86,11 @@ async def run_async(
 
     Returns the keyword arguments captured from the mocked
     ``httpx.AsyncClient.request`` call.
+
+    Returns
+    -------
+    dict[str, typ.Any]
+        The forwarded request keyword arguments captured from the async client.
     """
     token = (
         correlation_id_var.set(correlation_id) if correlation_id is not None else None
@@ -94,6 +112,12 @@ def run_prepare_headers(
 
     Returns ``(headers, remaining_kwargs)`` where *remaining_kwargs*
     is the mutated input dict after ``headers`` has been popped.
+
+    Returns
+    -------
+    tuple[dict[str, typ.Any], dict[str, typ.Any]]
+        A pair containing the prepared headers and the mutated keyword-argument
+        mapping after ``headers`` has been removed.
     """
     result: dict[str, typ.Any] = {}
 

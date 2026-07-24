@@ -63,7 +63,14 @@ def _build_context(*, delay_seconds: float = 0.0) -> Context:
     target_fixture="context",
 )
 def given_app_with_lifecycle_middleware() -> Context:
-    """Provide a Falcon app configured for lifecycle scenarios."""
+    """Provide a Falcon app configured for lifecycle scenarios.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     return _build_context()
 
 
@@ -72,7 +79,14 @@ def given_app_with_lifecycle_middleware() -> Context:
     target_fixture="context",
 )
 def given_app_with_concurrent_lifecycle_middleware() -> Context:
-    """Provide a Falcon app configured for concurrent lifecycle scenarios."""
+    """Provide a Falcon app configured for concurrent lifecycle scenarios.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     return _build_context(delay_seconds=0.05)
 
 

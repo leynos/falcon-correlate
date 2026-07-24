@@ -26,7 +26,14 @@ class Context(typ.TypedDict, total=False):
 
 @given("the default UUIDv7 generator", target_fixture="context")
 def given_default_uuid7_generator() -> Context:
-    """Provide the default generator."""
+    """Provide the default generator.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     return {"generator": default_uuid7_generator}
 
 

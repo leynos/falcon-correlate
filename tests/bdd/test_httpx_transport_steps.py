@@ -59,30 +59,57 @@ if typ.TYPE_CHECKING:
 scenarios("httpx_transport.feature")
 
 
-class RecordingTransport(httpx.BaseTransport):
+class _RecordingTransportBase:
+    """Provide shared request capture for test transports."""
+
+    def __init__(self) -> None:
+        """Initialize the transport with no captured request."""
+        self.request: httpx.Request | None = None
+
+    def _record_request(self, request: httpx.Request) -> httpx.Response:
+        """Capture a request and return a successful response."""
+        self.request = request
+        return httpx.Response(200, request=request)
+
+
+class RecordingTransport(_RecordingTransportBase, httpx.BaseTransport):
     """Capture sync requests made by the configured client."""
 
-    def __init__(self) -> None:
-        """Initialize the transport with no captured request."""
-        self.request: httpx.Request | None = None
-
     def handle_request(self, request: httpx.Request) -> httpx.Response:
-        """Capture the request and return a success response."""
-        self.request = request
-        return httpx.Response(200, request=request)
+        """Capture the request and return a success response.
+
+        Parameters
+        ----------
+        request : httpx.Request
+            Request captured for later assertions in the test.
+
+        Returns
+        -------
+        httpx.Response
+            The value produced for the test scenario.
+
+        """
+        return self._record_request(request)
 
 
-class RecordingAsyncTransport(httpx.AsyncBaseTransport):
+class RecordingAsyncTransport(_RecordingTransportBase, httpx.AsyncBaseTransport):
     """Capture async requests made by the configured client."""
 
-    def __init__(self) -> None:
-        """Initialize the transport with no captured request."""
-        self.request: httpx.Request | None = None
-
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        """Capture the request and return a success response."""
-        self.request = request
-        return httpx.Response(200, request=request)
+        """Capture the request and return a success response.
+
+        Parameters
+        ----------
+        request : httpx.Request
+            Request captured for later assertions in the test.
+
+        Returns
+        -------
+        httpx.Response
+            The value produced for the test scenario.
+
+        """
+        return self._record_request(request)
 
 
 class Context(typ.TypedDict, total=False):
@@ -103,14 +130,33 @@ def _reset_context_variables() -> cabc.Generator[None, None, None]:
     target_fixture="context",
 )
 def given_correlation_id_set(value: str) -> Context:
-    """Set the correlation ID context variable."""
+    """Set the correlation ID context variable.
+
+    Parameters
+    ----------
+    value : str
+        Correlation ID to store in the context variable.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     correlation_id_var.set(value)
     return {}
 
 
 @given("no correlation ID is set", target_fixture="context")
 def given_no_correlation_id() -> Context:
-    """Ensure no correlation ID is set."""
+    """Ensure no correlation ID is set.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     correlation_id_var.set(None)
     return {}
 
@@ -120,7 +166,19 @@ def given_no_correlation_id() -> Context:
     target_fixture="context",
 )
 def when_send_request_with_transport(context: Context) -> Context:
-    """Send a sync request with a client configured to use the transport."""
+    """Send a sync request with a client configured to use the transport.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     transport = RecordingTransport()
 
     with httpx.Client(transport=CorrelationIDTransport(transport)) as client:
@@ -138,7 +196,19 @@ def when_send_request_with_transport(context: Context) -> Context:
     target_fixture="context",
 )
 def when_send_async_request_with_transport(context: Context) -> Context:
-    """Send an async request with a client configured to use the transport."""
+    """Send an async request with a client configured to use the transport.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
 
     async def _run() -> dict[str, str]:
         transport = RecordingAsyncTransport()

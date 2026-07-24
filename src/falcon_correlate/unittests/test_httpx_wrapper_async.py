@@ -22,7 +22,14 @@ if typ.TYPE_CHECKING:
 
 @pytest.fixture
 def mock_async_client() -> cabc.Generator[mock.AsyncMock, None, None]:
-    """Provide a pre-configured httpx.AsyncClient mock."""
+    """Provide a pre-configured httpx.AsyncClient mock.
+
+    Yields
+    ------
+    AsyncMock
+        The patched ``httpx.AsyncClient`` instance used by the test.
+
+    """
     with mock.patch("httpx.AsyncClient") as mock_client_cls:
         mock_client = mock.AsyncMock()
         mock_client.request.return_value = httpx.Response(200)

@@ -56,7 +56,14 @@ def _verify_generator_called_and_id_matches(
 
 @pytest.fixture
 def correlation_echo_resource() -> CorrelationEchoResource:
-    """Provide a CorrelationEchoResource instance for testing."""
+    """Provide a CorrelationEchoResource instance for testing.
+
+    Returns
+    -------
+    CorrelationEchoResource
+        A new ``CorrelationEchoResource`` instance.
+
+    """
     return CorrelationEchoResource()
 
 
@@ -79,17 +86,7 @@ def create_test_client(
         generator: cabc.Callable[[], str] | None = None,
         trusted_sources: cabc.Iterable[str] | None = None,
     ) -> falcon.testing.TestClient:
-        """Build a test client with the specified middleware configuration.
-
-        Args:
-            generator: Optional custom generator for correlation IDs.
-            trusted_sources: Optional list of trusted source IPs/CIDRs.
-
-        Returns
-        -------
-            A configured Falcon TestClient.
-
-        """
+        """Build a test client with the specified middleware configuration."""
         kwargs: _MiddlewareKwargs = {}
         if generator is not None:
             kwargs["generator"] = generator
@@ -142,7 +139,14 @@ class TestGeneratorInvocationWhenHeaderMissing:
         """Verify generator output is stored on req.context.correlation_id."""
 
         def custom_gen() -> str:
-            """Generate a custom correlation ID for the test."""
+            """Generate a custom correlation ID for the test.
+
+            Returns
+            -------
+            str
+                The literal correlation ID ``context-stored-id``.
+
+            """
             return "context-stored-id"
 
         client = create_test_client(generator=custom_gen)
@@ -208,7 +212,14 @@ class TestGeneratorInvocationWhenSourceUntrusted:
         """Verify incoming ID is rejected when source is untrusted."""
 
         def custom_gen() -> str:
-            """Generate a custom correlation ID for the test."""
+            """Generate a custom correlation ID for the test.
+
+            Returns
+            -------
+            str
+                The literal correlation ID ``new-generated-id``.
+
+            """
             return "new-generated-id"
 
         # Trust only 10.0.0.1, but TestClient uses 127.0.0.1 by default
@@ -278,25 +289,6 @@ class TestGeneratorInvocationWithTrustedSource:
 class TestCustomGeneratorBehaviour:
     """Tests for custom generator behaviour."""
 
-    def test_custom_generator_output_used_as_correlation_id(
-        self,
-        create_test_client: cabc.Callable[..., falcon.testing.TestClient],
-    ) -> None:
-        """Verify custom generator output becomes the correlation ID."""
-
-        def my_generator() -> str:
-            """Generate a custom correlation ID for the test."""
-            return "my-custom-correlation-id"
-
-        client = create_test_client(generator=my_generator)
-
-        response = client.simulate_get("/test")
-
-        assert response.json["correlation_id"] == "my-custom-correlation-id", (
-            f"Expected 'my-custom-correlation-id', "
-            f"got '{response.json['correlation_id']}'"
-        )
-
     def test_generator_called_for_each_request(
         self,
         create_test_client: cabc.Callable[..., falcon.testing.TestClient],
@@ -306,7 +298,15 @@ class TestCustomGeneratorBehaviour:
         expected_call_count = 2
 
         def counting_generator() -> str:
-            """Generate a correlation ID and record the call."""
+            """Generate a correlation ID and record the call.
+
+            Returns
+            -------
+            str
+                A correlation ID in the form ``request-N``, where ``N`` is
+                the incremented call count.
+
+            """
             nonlocal call_count
             call_count += 1
             return f"request-{call_count}"
@@ -330,7 +330,14 @@ class TestCustomGeneratorBehaviour:
         """Verify middleware.generator returns the configured generator."""
 
         def my_gen() -> str:
-            """Generate a custom correlation ID for the test."""
+            """Generate a custom correlation ID for the test.
+
+            Returns
+            -------
+            str
+                The literal correlation ID ``test``.
+
+            """
             return "test"
 
         middleware = CorrelationIDMiddleware(generator=my_gen)

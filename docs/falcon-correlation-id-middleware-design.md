@@ -955,7 +955,7 @@ class ContextualLogFilter(logging.Filter):
 #     'filters': {
 #         'contextual_filter': {
 #             '()': ContextualLogFilter,  # Path to your filter class
-#         },
+#     },
 #     },
 #     'formatters': {
 #         'standard': {
@@ -963,15 +963,15 @@ class ContextualLogFilter(logging.Filter):
 #                 '%(asctime)s [%(levelname)s][%(correlation_id)s]'
 #                 '[%(user_id)s] %(name)s: %(message)s'
 #             ),
-#         },
+#     },
 #     },
 #     'handlers': {
 #         'console': {
-#             'level': 'INFO',
+#         'level': 'INFO',
 #             'filters': ['contextual_filter'],
 #             'class': 'logging.StreamHandler',
 #             'formatter': 'standard'
-#         },
+#     },
 #     },
 #     'root': {
 #         'handlers': ['console'],
@@ -1970,3 +1970,42 @@ response header is left untouched.
    `process_request` prevents Falcon's response hook from returning a
    pre-existing `req.context.correlation_id` that bypassed the middleware's
    trusted-source and validation rules.
+
+### A.13. Public API docstring completeness (Task 6.1.1)
+
+**Decision:** Public and internal package APIs use NumPy-style docstrings whose
+signature sections are validated by Ruff `DOC`. Exported module-level values
+use inline attribute docstrings, and deterministic offline examples are run as
+doctests through `make test`. The complete convention is recorded in
+[ADR-003: docstring completeness and doctest gates](adr-003-docstring-completeness-and-doctest-gates.md).
+
+**Rationale:**
+
+1. **Complementary checks:** Interrogate proves that docstrings exist, Ruff
+   `DOC` checks that `Parameters`, `Returns`, `Yields`, and `Raises` sections
+   correspond to implementations, and the public-export test checks values that
+   runtime introspection cannot associate with attribute docstrings.
+
+2. **Generated-reference readiness:** Inline strings immediately after
+   `correlation_id_var`, `user_id_var`, and `RECOMMENDED_LOG_FORMAT` preserve
+   documentation in the form expected by future Sphinx `autodata` generation.
+
+3. **Reproducible examples:** Only offline, deterministic examples use doctest
+   prompts. Integration examples that require Falcon applications, HTTPX,
+   Celery, asynchronous resources, or network access remain non-executable and
+   are validated by the corresponding test suites.
+
+4. **Stable tooling:** Ruff is pinned while `DOC` remains a preview rule
+   family. The committed Makefile targets provide the same validation path
+   locally and in Continuous Integration (CI).
+
+**Key files created/modified:**
+
+- `pyproject.toml` — Enabled Ruff `DOC` checks.
+- `Makefile` — Added the doctest gate to `make test`.
+- `src/falcon_correlate/middleware_utils.py` — Added inline attribute
+  docstrings for the exported context variables and logging format constant.
+- `src/falcon_correlate/unittests/test_public_exports.py` — Added public
+  callable and attribute-docstring regression checks.
+- `docs/adr-003-docstring-completeness-and-doctest-gates.md` — Recorded the
+  accepted convention and validation architecture.

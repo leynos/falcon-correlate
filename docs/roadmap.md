@@ -205,11 +205,11 @@ Complete documentation, examples, and prepare for initial release.
 
 ### 6.1. API documentation
 
-- [ ] 6.1.1. Write docstrings for all public APIs
-  - [ ] Document `CorrelationIDMiddleware` class and parameters.
-  - [ ] Document context variables and access patterns.
-  - [ ] Document logging filter and configuration.
-  - [ ] Document propagation utilities.
+- [x] 6.1.1. Write docstrings for all public APIs
+  - [x] Document `CorrelationIDMiddleware` class and parameters.
+  - [x] Document context variables and access patterns.
+  - [x] Document logging filter and configuration.
+  - [x] Document propagation utilities.
 - [ ] 6.1.2. Generate API reference documentation
   - [ ] Configure Sphinx or MkDocs.
   - [ ] Generate autodoc from docstrings.

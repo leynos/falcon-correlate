@@ -92,7 +92,7 @@ else:
 
 
 def _require_httpx() -> None:
-    """Raise ``ImportError`` if the optional ``httpx`` module is unavailable."""
+    """Raise ImportError when the optional httpx dependency is unavailable."""
     try:
         importlib.import_module("httpx")
     except ImportError as exc:
@@ -123,7 +123,14 @@ class _CorrelationIDTransportBase[WrappedTransportT]:
         wrapped_transport: WrappedTransportT,
         header_name: str = DEFAULT_HEADER_NAME,
     ) -> None:
-        """Store the wrapped transport and configured outbound header name."""
+        """Store the wrapped transport and configured outbound header name.
+
+        Raises
+        ------
+        ValueError
+            If ``header_name`` is empty or contains only whitespace.
+
+        """
         _require_httpx()
         if not header_name or not header_name.strip():
             msg = "header_name must not be empty or whitespace"
@@ -133,7 +140,7 @@ class _CorrelationIDTransportBase[WrappedTransportT]:
 
     @staticmethod
     def _cast_to_none(result: object) -> None:
-        """Forward an exit return value while satisfying the type checker."""
+        """Cast an exit result to None while preserving the runtime value."""
         # `typ.cast()` only changes the static type view; it intentionally keeps
         # the original runtime value so callers can forward `_wrapped_transport`
         # `__exit__` / `__aexit__` return values without changing behaviour.
@@ -158,7 +165,14 @@ class CorrelationIDTransport(
         self,
         request: httpx.Request,
     ) -> httpx.Response:
-        """Add the correlation ID header and delegate the request."""
+        """Add the correlation ID header and delegate the request.
+
+        Returns
+        -------
+        httpx.Response
+            The response returned by the wrapped transport.
+
+        """
         _inject_correlation_id_header(request.headers, self._header_name)
         return self._wrapped_transport.handle_request(request)
 
@@ -167,7 +181,14 @@ class CorrelationIDTransport(
         self._wrapped_transport.close()
 
     def __enter__(self) -> CorrelationIDTransport:
-        """Enter the transport context (required by httpx.Client)."""
+        """Enter the transport context (required by httpx.Client).
+
+        Returns
+        -------
+        CorrelationIDTransport
+            This transport instance.
+
+        """
         self._wrapped_transport.__enter__()
         return self
 
@@ -200,7 +221,14 @@ class AsyncCorrelationIDTransport(
         self,
         request: httpx.Request,
     ) -> httpx.Response:
-        """Add the correlation ID header and delegate the request."""
+        """Add the correlation ID header and delegate the request.
+
+        Returns
+        -------
+        httpx.Response
+            The response returned by the wrapped transport.
+
+        """
         _inject_correlation_id_header(request.headers, self._header_name)
         return await self._wrapped_transport.handle_async_request(request)
 
@@ -209,7 +237,14 @@ class AsyncCorrelationIDTransport(
         await self._wrapped_transport.aclose()
 
     async def __aenter__(self) -> AsyncCorrelationIDTransport:
-        """Enter the async transport context (required by httpx.AsyncClient)."""
+        """Enter the async transport context (required by httpx.AsyncClient).
+
+        Returns
+        -------
+        AsyncCorrelationIDTransport
+            This transport instance.
+
+        """
         await self._wrapped_transport.__aenter__()
         return self
 

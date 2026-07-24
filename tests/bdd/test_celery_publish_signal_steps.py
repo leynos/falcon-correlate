@@ -48,14 +48,33 @@ def _reset_context_variables() -> cabc.Generator[None, None, None]:
     target_fixture="context",
 )
 def given_correlation_id_set(value: str) -> Context:
-    """Set the ambient correlation ID."""
+    """Set the ambient correlation ID.
+
+    Parameters
+    ----------
+    value : str
+        Correlation ID to store in the context variable.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     correlation_id_var.set(value)
     return {}
 
 
 @given("no correlation ID is set", target_fixture="context")
 def given_no_correlation_id() -> Context:
-    """Clear any ambient correlation ID."""
+    """Clear any ambient correlation ID.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     correlation_id_var.set(None)
     return {}
 
@@ -82,7 +101,14 @@ def _publish_task(**apply_async_kwargs: str) -> Context:
 
 @when("I publish a Celery task", target_fixture="context")
 def when_publish_task() -> Context:
-    """Publish a task through Celery's normal apply_async path."""
+    """Publish a task through Celery's normal apply_async path.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     return _publish_task()
 
 
@@ -91,7 +117,19 @@ def when_publish_task() -> Context:
     target_fixture="context",
 )
 def when_publish_task_with_explicit_correlation_id(value: str) -> Context:
-    """Publish a task while the caller provides a Celery correlation ID."""
+    """Publish a task while the caller provides a Celery correlation ID.
+
+    Parameters
+    ----------
+    value : str
+        Correlation ID passed directly to the publish call.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     return _publish_task(correlation_id=value)
 
 

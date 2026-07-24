@@ -85,6 +85,7 @@ select = [
     "PERF",
     "TRY",
     "D",
+    "DOC",  # pydoclint: docstrings match signatures (preview)
     "ANN",
     "C90",
     "PLR",
@@ -114,6 +115,9 @@ extend-ignore = [
 "src/falcon_correlate/unittests/**/*.py" = ["PLR0904"]
 "tests/**/*.py" = ["PLR6301"]
 "tests/workflows/*.py" = ["S404"]
+
+[tool.ruff.lint.pydoclint]
+ignore-one-line-docstrings = true
 
 [tool.ruff.lint.flake8-import-conventions]
 # Declare the banned `from` imports.

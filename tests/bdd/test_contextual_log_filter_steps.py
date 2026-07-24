@@ -67,7 +67,14 @@ def _reset_context_variables() -> cabc.Generator[None, None, None]:
 
 @given("a contextual log filter", target_fixture="context")
 def given_contextual_log_filter() -> Context:
-    """Create a contextual log filter instance."""
+    """Create a contextual log filter instance.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     return {"log_filter": ContextualLogFilter()}
 
 
@@ -76,7 +83,19 @@ def given_contextual_log_filter() -> Context:
     target_fixture="context",
 )
 def given_logger_with_filter(request: pytest.FixtureRequest) -> Context:
-    """Create a logger with the contextual log filter attached."""
+    """Create a logger with the contextual log filter attached.
+
+    Parameters
+    ----------
+    request : pytest.FixtureRequest
+        Pytest fixture used to remove the temporary handler during teardown.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     stream = io.StringIO()
     handler = logging.StreamHandler(stream)
     handler.setFormatter(
@@ -104,7 +123,21 @@ def given_logger_with_filter(request: pytest.FixtureRequest) -> Context:
     target_fixture="context",
 )
 def given_correlation_id_set(context: Context, value: str) -> Context:
-    """Set the correlation ID context variable."""
+    """Set the correlation ID context variable.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario context mapping to update with the context-variable token.
+    value : str
+        Correlation ID value to store in the context variable.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     context["correlation_id_token"] = correlation_id_var.set(value)
     return context
 
@@ -114,7 +147,21 @@ def given_correlation_id_set(context: Context, value: str) -> Context:
     target_fixture="context",
 )
 def given_user_id_set(context: Context, value: str) -> Context:
-    """Set the user ID context variable."""
+    """Set the user ID context variable.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario context mapping to update with the context-variable token.
+    value : str
+        User ID value to store in the context variable.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     context["user_id_token"] = user_id_var.set(value)
     return context
 
@@ -127,7 +174,14 @@ def given_no_context_variables_set() -> None:
 
 @when("the filter processes a log record", target_fixture="context")
 def when_filter_processes_record(context: Context) -> Context:
-    """Pass a log record through the filter."""
+    """Pass a log record through the filter.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     record = _make_log_record()
     context["result"] = context["log_filter"].filter(record)
     context["record"] = record
@@ -139,7 +193,21 @@ def when_filter_processes_record(context: Context) -> Context:
     target_fixture="context",
 )
 def when_log_message_emitted(context: Context, message: str) -> Context:
-    """Emit a log message through the configured logger."""
+    """Emit a log message through the configured logger.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario context containing the configured logger.
+    message : str
+        Message to emit through the logger.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     context["logger"].info(message)
     return context
 
@@ -176,7 +244,19 @@ def then_output_contains(context: Context, expected: str) -> None:
 def given_logger_with_recommended_format(
     request: pytest.FixtureRequest,
 ) -> Context:
-    """Create a logger using RECOMMENDED_LOG_FORMAT."""
+    """Create a logger using RECOMMENDED_LOG_FORMAT.
+
+    Parameters
+    ----------
+    request : pytest.FixtureRequest
+        Pytest fixture used to remove the temporary handler during teardown.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     stream = io.StringIO()
     handler = logging.StreamHandler(stream)
     handler.setFormatter(
@@ -207,7 +287,19 @@ def given_logger_with_recommended_format(
 def given_logger_via_dictconfig_with_recommended_format(
     request: pytest.FixtureRequest,
 ) -> Context:
-    """Create a logger via dictConfig using RECOMMENDED_LOG_FORMAT."""
+    """Create a logger via dictConfig using RECOMMENDED_LOG_FORMAT.
+
+    Parameters
+    ----------
+    request : pytest.FixtureRequest
+        Pytest fixture used to remove configured handlers during teardown.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     logger_name = "bdd_recommended_dictconfig_test"
     config = {
         "version": 1,

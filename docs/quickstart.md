@@ -53,11 +53,6 @@ class HelloResource:
         resp : falcon.Response
             The Falcon response to populate.
 
-        Returns
-        -------
-        None
-            This handler only mutates ``resp``.
-
         Examples
         --------
         >>> resource = HelloResource()
@@ -223,11 +218,6 @@ def log_request(logger: logging.Logger) -> None:
     ----------
     logger : logging.Logger
         Logger returned by ``configure_logging()``.
-
-    Returns
-    -------
-    None
-        The function emits a log record for its side effect.
 
     Examples
     --------

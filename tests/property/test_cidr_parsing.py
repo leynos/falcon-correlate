@@ -27,7 +27,14 @@ type _IpAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 
 @st.composite
 def valid_cidr_blocks(draw: st.DrawFn) -> _IpNetwork:
-    """Generate valid CIDR blocks with no host bits set."""
+    """Generate valid CIDR blocks with no host bits set.
+
+    Returns
+    -------
+    _IpNetwork
+        An IPv4 or IPv6 network with no host bits set.
+
+    """
     address = draw(st.ip_addresses())
     max_prefix = address.max_prefixlen
     prefix = draw(st.integers(min_value=0, max_value=max_prefix))
@@ -36,7 +43,14 @@ def valid_cidr_blocks(draw: st.DrawFn) -> _IpNetwork:
 
 @st.composite
 def host_bit_violations(draw: st.DrawFn) -> str:
-    """Generate CIDR strings where the address has host bits set."""
+    """Generate CIDR strings where the address has host bits set.
+
+    Returns
+    -------
+    str
+        A CIDR string whose address has host bits set.
+
+    """
     address = draw(st.ip_addresses())
     prefix = draw(st.integers(min_value=0, max_value=address.max_prefixlen - 1))
     network = ipaddress.ip_network((address, prefix), strict=False)
@@ -45,13 +59,21 @@ def host_bit_violations(draw: st.DrawFn) -> str:
 
 
 def _first_host_with_bits_set(network: _IpNetwork) -> _IpAddress:
-    """Return an address inside *network* that is not the network address."""
+    """Return the first host address inside a network."""
     address_type = type(network.network_address)
     return address_type(int(network.network_address) + 1)
 
 
 def is_parseable_network(value: str) -> bool:
-    """Return whether *value* parses as any IP network shape."""
+    """Return whether *value* parses as any IP network shape.
+
+    Returns
+    -------
+    bool
+        ``True`` if ``value`` parses as an IP network with ``strict=False``;
+        otherwise, ``False``.
+
+    """
     try:
         ipaddress.ip_network(value, strict=False)
     except ValueError:

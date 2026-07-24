@@ -23,6 +23,11 @@ class TestCorrelationIDHeaderRetrieval:
 
         The middleware is configured to trust 127.0.0.1 (TestClient's default
         remote_addr) so that header retrieval can be tested independently.
+
+        Returns
+        -------
+        falcon.testing.TestClient
+            The value produced for the test scenario.
         """
         middleware = CorrelationIDMiddleware(trusted_sources=["127.0.0.1"])
         app = falcon.App(middleware=[middleware])
