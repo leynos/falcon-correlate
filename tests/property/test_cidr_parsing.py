@@ -29,6 +29,12 @@ type _IpAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 def valid_cidr_blocks(draw: st.DrawFn) -> _IpNetwork:
     """Generate valid CIDR blocks with no host bits set.
 
+    Parameters
+    ----------
+    draw : st.DrawFn
+        Hypothesis draw callable that samples values from composed
+        strategies.
+
     Returns
     -------
     _IpNetwork
@@ -44,6 +50,12 @@ def valid_cidr_blocks(draw: st.DrawFn) -> _IpNetwork:
 @st.composite
 def host_bit_violations(draw: st.DrawFn) -> str:
     """Generate CIDR strings where the address has host bits set.
+
+    Parameters
+    ----------
+    draw : st.DrawFn
+        Hypothesis draw callable that samples values from composed
+        strategies.
 
     Returns
     -------
@@ -66,6 +78,11 @@ def _first_host_with_bits_set(network: _IpNetwork) -> _IpAddress:
 
 def is_parseable_network(value: str) -> bool:
     """Return whether *value* parses as any IP network shape.
+
+    Parameters
+    ----------
+    value : str
+        Candidate network string tested for parseability.
 
     Returns
     -------

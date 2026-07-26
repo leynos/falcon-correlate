@@ -103,7 +103,6 @@ def given_custom_prefix_rejecting_validator(prefix: str) -> Context:
 
 
 @given(parsers.parse('a Falcon application with that validator trusting "{sources}"'))
-# pylint: disable-next=useless-return  # Explicit return is intentional.
 def given_app_with_custom_validator_and_trusted_sources(
     context: Context,
     sources: str,
@@ -129,4 +128,3 @@ def given_app_with_custom_validator_and_trusted_sources(
     context["middleware"] = middleware
     context["app"] = app
     context["client"] = client
-    return  # noqa: PLR1711

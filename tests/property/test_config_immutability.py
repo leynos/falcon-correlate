@@ -38,6 +38,12 @@ def trusted_sources_inputs(
 ) -> _TrustedSourcesInput:
     """Generate supported trusted-source iterable shapes.
 
+    Parameters
+    ----------
+    draw : st.DrawFn
+        Hypothesis draw callable that samples values from composed
+        strategies.
+
     Returns
     -------
     _TrustedSourcesInput

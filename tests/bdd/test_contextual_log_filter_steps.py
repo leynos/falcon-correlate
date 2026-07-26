@@ -176,6 +176,12 @@ def given_no_context_variables_set() -> None:
 def when_filter_processes_record(context: Context) -> Context:
     """Pass a log record through the filter.
 
+    Parameters
+    ----------
+    context : Context
+        Scenario context mapping holding the filter and log record it
+        processes.
+
     Returns
     -------
     Context

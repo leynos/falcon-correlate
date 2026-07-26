@@ -208,6 +208,9 @@ def _run_celery_tests_with_celery_blocked(
     project_root: Path,
 ) -> _PytestRun:
     """Run selected Celery tests in a child process with Celery unavailable."""
+    # Force plain output so the captured snapshot is deterministic regardless
+    # of an ambient ``FORCE_COLOR``/``PY_COLORS`` that would otherwise make the
+    # child emit ANSI escapes the normaliser cannot strip.
     result = _run_python_with_celery_blocked(
         sitecustomize_dir,
         os.environ,
@@ -215,6 +218,7 @@ def _run_celery_tests_with_celery_blocked(
         "-m",
         "pytest",
         "-q",
+        "--color=no",
         str(sentinel_test),
         *_relative_paths(celery_test_paths, project_root),
     )

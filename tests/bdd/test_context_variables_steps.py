@@ -60,6 +60,15 @@ def when_set_value(context: Context, value: str) -> Context:
 
     Runs inside a copied context to prevent test pollution.
 
+    Parameters
+    ----------
+    context : Context
+        Scenario context mapping containing the context variable under
+        ``var`` and updated with the retrieved value.
+    value : str
+        The value assigned to the correlation ID context variable before
+        it is retrieved.
+
     Returns
     -------
     Context

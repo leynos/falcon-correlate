@@ -318,9 +318,11 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
     Raises
     ------
     ValueError
-        If ``config`` is combined with individual options.
+        If ``config`` is combined with individual options, or an option
+        value is rejected by ``CorrelationIDConfig.from_kwargs``.
     TypeError
-        If an individual option is unknown or invalid.
+        If an unknown keyword option is supplied, or an option type is
+        rejected by ``CorrelationIDConfig.from_kwargs``.
 
     Notes
     -----

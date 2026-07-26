@@ -112,6 +112,9 @@ extend-ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "**/test_*.py" = ["S101", "PLR0913", "PLR0917", "PLR2004", "PLR6301"]
+# Non-``test_``-prefixed BDD step-helper modules are test code registered via
+# ``pytest_plugins``; grant them the same assertion/test allowances.
+"tests/bdd/*_steps.py" = ["S101", "PLR0913", "PLR0917", "PLR2004", "PLR6301"]
 "src/falcon_correlate/unittests/**/*.py" = ["PLR0904"]
 "tests/**/*.py" = ["PLR6301"]
 "tests/workflows/*.py" = ["S404"]
