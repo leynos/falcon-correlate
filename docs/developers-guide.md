@@ -246,11 +246,14 @@ generated-config drift. The builder only parses, refreshes, merges and renders
 spelling policy. Harvesting, Typos execution, phrase enforcement and Mermaid
 validation remain consumer-owned.
 
-The standalone phrase helper supports Python 3.13 and later, and its isolated
-Ruff checks target Python 3.13. Run `make spelling-helper-test` to exercise its
-three grouped policy, scanning and command-line tests. Run `make markdownlint`
-for the combined Markdown and spelling gate, and `make nixie` to validate
-Mermaid diagrams with Nixie 1.1.0 and Merman 0.7.0.
+The standalone phrase helper supports Python 3.13 and later. Its sources under
+`scripts/` are linted, formatted and type-checked to the same standard as the
+package by the shared `make check-fmt`, `make lint` and `make typecheck` gates,
+so they carry no bespoke Ruff configuration. Run `make spelling-helper-test` to
+exercise its three grouped policy, scanning and command-line tests under the
+pinned standalone runtime. Run `make markdownlint` for the combined Markdown
+and spelling gate, and `make nixie` to validate Mermaid diagrams with Nixie
+1.1.0 and Merman 0.7.0.
 
 ## Makefile variables
 
@@ -261,11 +264,11 @@ The lint target is configured by these Makefile variables:
 | `UV`                   | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                 | Selects the `uv` launcher used by all Python tool commands.    |
 | `UV_ENV`               | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                | Keeps project-local `uv` cache and tool directories.           |
 | `PYLINT_PYTHON`        | `pypy`                                                                                        | Selects the Python runtime used for the Pylint tool execution. |
-| `PYLINT_TARGETS`       | `src tests examples`                                                                          | Defines the source trees checked by the Pylint tier.           |
+| `PYLINT_TARGETS`       | `src tests examples scripts`                                                                  | Defines the source trees checked by the Pylint tier.           |
 | `PYLINT_PYPY_SHIM_REF` | `726d09f968b4d729ee4b29c71fc732e744854f3b`                                                    | Pins the `pylint-pypy-shim` repository revision.               |
 | `PYLINT_PYPY_SHIM`     | `git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)`                  | Identifies the shim package installed by `uv tool run`.        |
 | `PYLINT`               | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                |
-| `INTERROGATE_TARGETS`  | `src/falcon_correlate`                                                                        | Defines the repo-root-relative tree checked by Interrogate.    |
+| `INTERROGATE_TARGETS`  | `src/falcon_correlate scripts`                                                                | Defines the repo-root-relative trees checked by Interrogate.   |
 
 Override variables at the command line for targeted investigation. For example:
 

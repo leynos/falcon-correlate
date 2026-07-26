@@ -1,9 +1,10 @@
 """Test exact phrase-policy enforcement."""
 
 import importlib
-from pathlib import Path
-import subprocess
+import shutil
+import subprocess  # noqa: S404 - fixtures shell out to git to build tracked-file trees.
 import types
+from pathlib import Path
 
 import pytest
 
@@ -26,8 +27,11 @@ def initialize(path: Path, files: dict[str, str]) -> None:
         target = path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content)
-    subprocess.run(["git", "init", "--quiet"], cwd=path, check=True)
-    subprocess.run(["git", "add", "."], cwd=path, check=True)
+    git = shutil.which("git")
+    if git is None:
+        pytest.skip("git executable not found on PATH")
+    subprocess.run([git, "init", "--quiet"], cwd=path, check=True)  # noqa: S603
+    subprocess.run([git, "add", "."], cwd=path, check=True)  # noqa: S603
 
 
 def policy_files(*, local_phrase: str = "") -> dict[str, str]:
@@ -83,9 +87,9 @@ class TestPhrasePolicyChecker:
             {
                 "README.md": (
                     f"{PROHIBITED}\n{TITLE_PROHIBITED} prose\n"
-                    + "pre-hand"
-                    + "-written\n"
-                    + f"`{PROHIBITED}`\n"
+                    "pre-hand"
+                    "-written\n"
+                    f"`{PROHIBITED}`\n"
                 ),
                 "skip.md": f"{PROHIBITED}\n",
                 **policy_files(),

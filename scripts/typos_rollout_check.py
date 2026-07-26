@@ -16,25 +16,27 @@ Run it from the repository root with
 from __future__ import annotations
 
 import argparse
-from collections.abc import Iterator, Sequence
-from dataclasses import dataclass
-from pathlib import Path
+import dataclasses
 import re
-import subprocess
+import shutil
+import subprocess  # noqa: S404 - the checker shells out to git to list tracked files.
 import tomllib
+import typing as typ
+from pathlib import Path
 
 from pathspec import GitIgnoreSpec
 
-POLICY_PATHS = frozenset(
-    {
-        Path(".typos-oxendict-base.toml"),
-        Path("typos.local.toml"),
-        Path("typos.toml"),
-    }
-)
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
+
+POLICY_PATHS = frozenset({
+    Path(".typos-oxendict-base.toml"),
+    Path("typos.local.toml"),
+    Path("typos.toml"),
+})
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class PhraseFinding:
     """Describe one prohibited phrase in tracked text.
 
@@ -59,7 +61,7 @@ class PhraseFinding:
     correction: str
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class PhrasePolicy:
     """Hold the effective policy needed by the consumer phrase scanner.
 
@@ -87,7 +89,7 @@ def _document(path: Path) -> dict[str, object]:
 def _table(document: dict[str, object], name: str) -> dict[str, object]:
     """Return a TOML table or an empty table when it is absent."""
     value = document.get(name, {})
-    return value if isinstance(value, dict) else {}
+    return typ.cast("dict[str, object]", value) if isinstance(value, dict) else {}
 
 
 def _strings(table: dict[str, object], key: str) -> tuple[str, ...]:
@@ -150,9 +152,21 @@ def load_policy(repository: Path) -> PhrasePolicy:
 
 
 def _tracked(repository: Path) -> tuple[Path, ...]:
-    """Return tracked paths in deterministic order."""
-    raw = subprocess.run(
-        ["git", "-C", str(repository), "ls-files", "-z"],
+    """Return tracked paths in deterministic order.
+
+    Raises
+    ------
+    FileNotFoundError
+        The ``git`` executable is not available on ``PATH``.
+    subprocess.CalledProcessError
+        Git cannot enumerate the repository's tracked files.
+    """
+    git = shutil.which("git")
+    if git is None:
+        message = "git executable not found on PATH"
+        raise FileNotFoundError(message)
+    raw = subprocess.run(  # noqa: S603 - fixed git argv, no shell, no untrusted input.
+        [git, "-C", str(repository), "ls-files", "-z"],
         check=True,
         capture_output=True,
         text=True,
@@ -174,6 +188,7 @@ def _masked(text: str, patterns: tuple[str, ...]) -> str:
     """Blank ignored spans while preserving line and column positions."""
 
     def blank(match: re.Match[str]) -> str:
+        """Replace a matched span with spaces, keeping newlines intact."""
         return "".join(
             "\n" if character == "\n" else " " for character in match.group()
         )
@@ -188,7 +203,7 @@ def _phrase_findings(
     text: str,
     masked: str,
     phrase_corrections: tuple[tuple[str, str], ...],
-) -> Iterator[PhraseFinding]:
+) -> cabc.Iterator[PhraseFinding]:
     """Yield exact phrase findings from one masked tracked file."""
     for phrase, correction in phrase_corrections:
         for match in re.finditer(
@@ -223,6 +238,8 @@ def check_phrase_corrections(
 
     Raises
     ------
+    FileNotFoundError
+        The ``git`` executable is not available on ``PATH``.
     subprocess.CalledProcessError
         Git cannot enumerate the repository's tracked files.
     """
@@ -242,7 +259,7 @@ def check_phrase_corrections(
     return tuple(found)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: cabc.Sequence[str] | None = None) -> int:
     """Report prohibited phrases and return the spelling-gate status.
 
     Parameters
