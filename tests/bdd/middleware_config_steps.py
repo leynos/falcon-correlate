@@ -61,7 +61,9 @@ def given_middleware_with_custom_generator(context: Context) -> None:
 @then("the middleware should use the custom generator")
 def then_middleware_uses_custom_generator(context: Context) -> None:
     """Verify middleware uses the custom generator."""
-    assert context["middleware"].generator is context["custom_generator"]
+    assert context["middleware"].generator is context["custom_generator"], (
+        "the configured generator must be retained"
+    )
 
 
 @given("a custom validator that accepts any string", target_fixture="context")
@@ -105,7 +107,9 @@ def given_middleware_with_custom_validator(context: Context) -> None:
 @then("the middleware should use the custom validator")
 def then_middleware_uses_custom_validator(context: Context) -> None:
     """Verify middleware uses the custom validator."""
-    assert context["middleware"].validator is context["custom_validator"]
+    assert context["middleware"].validator is context["custom_validator"], (
+        "the configured validator must be retained"
+    )
 
 
 @given(
@@ -127,4 +131,6 @@ def given_middleware_with_echo_disabled() -> Context:
 @then("the middleware should have echo_header_in_response set to False")
 def then_middleware_echo_disabled(context: Context) -> None:
     """Verify echo_header_in_response is False."""
-    assert context["middleware"].echo_header_in_response is False
+    assert context["middleware"].echo_header_in_response is False, (
+        "response-header echoing must be disabled"
+    )

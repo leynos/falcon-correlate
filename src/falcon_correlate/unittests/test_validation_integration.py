@@ -48,8 +48,10 @@ def create_test_client(
 ) -> cabc.Callable[..., falcon.testing.TestClient]:
     """Build test clients with configurable middleware.
 
-    Args:
-        correlation_echo_resource: The resource fixture to add to the app.
+    Parameters
+    ----------
+    correlation_echo_resource : CorrelationEchoResource
+        The resource fixture added to the built app.
 
     Returns
     -------
@@ -240,6 +242,12 @@ class TestValidationWithValidatorRejecting:
         def tracking_validator(value: str) -> bool:
             """Record the validator input and reject it.
 
+            Parameters
+            ----------
+            value : str
+                The candidate correlation ID passed to the validator, which
+                is recorded before deciding whether to accept it.
+
             Returns
             -------
             bool
@@ -318,6 +326,14 @@ def build_test_client(
     validator_result: bool | None,  # noqa: FBT001 - test scenario value
 ) -> falcon.testing.TestClient:
     """Build a validation logging test client for the given validator result.
+
+    Parameters
+    ----------
+    create_test_client : cabc.Callable[..., falcon.testing.TestClient]
+        Factory fixture that builds a configured test client.
+    validator_result : bool | None
+        The value the mock validator should return, or ``None`` to build
+        a client with no validator.
 
     Returns
     -------

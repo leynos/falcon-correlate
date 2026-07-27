@@ -342,11 +342,11 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
     ) -> None:
         """Process an incoming request to establish correlation ID context.
 
-        This method is called before routing the request to a resource.
-        It will retrieve or generate a correlation ID and store it in
-        the request context and `correlation_id_var`. If the source is trusted,
-        an incoming header is present, and the ID passes validation, the
-        incoming ID is used; otherwise a new ID is generated.
+        This method is called before routing the request to a resource. It
+        will retrieve or generate a correlation ID and store it in the request
+        context and the configured `correlation_id_context_var`. If the source
+        is trusted, an incoming header is present, and the ID passes
+        validation, the incoming ID is used; otherwise a new ID is generated.
 
         Parameters
         ----------
@@ -374,11 +374,11 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
     ) -> None:
         """Post-process the response and clean up request-scoped context.
 
-        This method is called after the resource responder has been invoked.
-        When response-header echoing is enabled, it writes
-        `req.context.correlation_id` to the configured response header before
-        cleanup happens. It then resets `correlation_id_var` to the state that
-        existed before `process_request` set it for the current request.
+        This method is called after the resource responder has been invoked. When
+        response-header echoing is enabled, it writes `req.context.correlation_id`
+        to the configured response header before cleanup happens. It then resets
+        the configured `correlation_id_context_var` to the state that existed
+        before `process_request` set it for the current request.
 
         Parameters
         ----------
