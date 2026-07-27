@@ -142,8 +142,8 @@ abstract syntax tree (AST) for every marked fence with its source region. This
 allows harmless formatting and comment changes while failing on semantic drift.
 The `syrupy>=5,<6` development dependency supplies the snapshot fixture used by
 the quickstart logging-format test. Run `uv sync --group dev` before the test
-to install that fixture.
-When adding a guarded snippet, add both markers and run:
+to install that fixture. When adding a guarded snippet, add both markers and
+run:
 
 ```bash
 uv run pytest tests/docs/test_quickstart_doc_matches_examples.py -v
@@ -151,15 +151,15 @@ uv run pytest tests/docs/test_quickstart_doc_matches_examples.py -v
 
 ## Workflow pins and Dependabot
 
-Dependabot owns the upgrade of GitHub Actions and reusable workflows,
-including calls into `leynos/shared-actions`. Contract tests that assert a
-caller's exact commit SHA create a lockstep dependency: every time Dependabot
-opens a bump PR, the test fails until a human edits the pinned constant to
-match. That defeats the purpose of automated dependency updates and turns a
-routine bump into a manual chore.
+Dependabot owns the upgrade of GitHub Actions and reusable workflows, including
+calls into `leynos/shared-actions`. Contract tests that assert a caller's exact
+commit SHA create a lockstep dependency: every time Dependabot opens a bump PR,
+the test fails until a human edits the pinned constant to match. That defeats
+the purpose of automated dependency updates and turns a routine bump into a
+manual chore.
 
-Contract tests may still verify the *shape* of a reusable-workflow caller.
-They must not verify the specific SHA value.
+Contract tests may still verify the *shape* of a reusable-workflow caller. They
+must not verify the specific SHA value.
 
 - Do assert the workflow references the correct reusable workflow path.
 - Do assert the ref is pinned to a full 40-character commit SHA, not a
