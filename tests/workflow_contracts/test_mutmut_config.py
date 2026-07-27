@@ -54,41 +54,52 @@ def _import_root(path: str) -> str:
     return parts[0]
 
 
+def _is_import_module(function: ast.expr) -> bool:
+    """Return whether an expression names ``importlib.import_module``."""
+    return bool(
+        isinstance(function, ast.Name) and function.id == "import_module"
+    ) or bool(isinstance(function, ast.Attribute) and function.attr == "import_module")
+
+
+def _literal_module_name(argument: ast.expr) -> str | None:
+    """Return the statically known module name prefix in an expression."""
+    match argument:
+        case ast.Constant(value=str() as module_name):
+            return module_name
+        case ast.JoinedStr(values=[ast.Constant(value=str() as prefix), *_]):
+            return prefix.rstrip(".") or None
+        case _:
+            return None
+
+
 def _dynamic_import_name(call: ast.Call) -> str | None:
     """Return the statically known portion of an ``import_module`` call."""
-    function = call.func
-    is_import_module = (
-        isinstance(function, ast.Name) and function.id == "import_module"
-    ) or (isinstance(function, ast.Attribute) and function.attr == "import_module")
-    if not is_import_module or not call.args:
+    if not _is_import_module(call.func) or not call.args:
         return None
+    return _literal_module_name(call.args[0])
 
-    argument = call.args[0]
-    if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
-        return argument.value
-    if isinstance(argument, ast.JoinedStr):
-        prefix = ""
-        for value in argument.values:
-            if not isinstance(value, ast.Constant) or not isinstance(value.value, str):
-                break
-            prefix += value.value
-        return prefix.rstrip(".") or None
-    return None
+
+def _modules_for_node(node: ast.AST) -> tuple[str, ...]:
+    """Return the absolute module names represented by one AST node."""
+    match node:
+        case ast.Import(names=names):
+            return tuple(alias.name for alias in names)
+        case ast.ImportFrom(level=0, module=str() as module_name):
+            return (module_name,)
+        case ast.Call():
+            module_name = _dynamic_import_name(node)
+            return (module_name,) if module_name else ()
+        case _:
+            return ()
 
 
 def _imported_modules(source: str) -> set[str]:
     """Return absolute module names imported by Python source."""
-    modules: set[str] = set()
-    for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Import):
-            modules.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom):
-            module_name = node.module if node.level == 0 else None
-            if module_name:
-                modules.add(module_name)
-        elif isinstance(node, ast.Call) and (module_name := _dynamic_import_name(node)):
-            modules.add(module_name)
-    return modules
+    return {
+        module_name
+        for node in ast.walk(ast.parse(source))
+        for module_name in _modules_for_node(node)
+    }
 
 
 def _selected_python_files(config: dict[str, typ.Any]) -> set[Path]:
