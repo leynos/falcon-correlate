@@ -123,3 +123,20 @@ class TestPhrasePolicyChecker:
         assert capsys.readouterr().out == (
             f"README.md:1:8: {PROHIBITED} -> handwritten\n"
         ), "the diagnostic omitted its source location or correction"
+
+    def test_check_phrase_corrections_requires_git(
+        self,
+        checker: types.ModuleType,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Raise ``FileNotFoundError`` when git is absent from ``PATH``."""
+        # Write the policy fixtures directly; enumerating tracked files needs
+        # git, which this test forces to be unavailable.
+        for relative, content in policy_files().items():
+            (tmp_path / relative).write_text(content)
+        policy = checker.load_policy(tmp_path)
+        monkeypatch.setattr(checker.shutil, "which", lambda _command: None)
+
+        with pytest.raises(FileNotFoundError, match="git executable not found"):
+            checker.check_phrase_corrections(tmp_path, policy)
