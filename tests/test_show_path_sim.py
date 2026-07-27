@@ -37,4 +37,4 @@ def test_main_prints_interpreter_diagnostics(
         f"sitecustomize_loaded {sitecustomize_present}\n"
         "cwd /fake/cwd\n"
         f"sys.path[:8] {fake_path}\n"
-    )
+    ), "main() printed unexpected interpreter diagnostics"
