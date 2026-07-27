@@ -222,8 +222,19 @@ def _run_celery_tests_with_celery_blocked(
         str(sentinel_test),
         *_relative_paths(celery_test_paths, project_root),
     )
-    expected_stdout = f""". [100%]
-1 passed, {len(celery_test_paths)} skipped in <duration>"""
+    # Build the expected snapshot from ``celery_test_paths`` rather than a bare
+    # literal. Progress markers come only from *collected, runnable* items: each
+    # Celery module skips at collection via module-level
+    # ``pytest.importorskip`` (pytest reports "collected 1 item / N skipped"),
+    # so it never becomes an item and never emits an ``s`` marker. The sole
+    # runnable item is the passing sentinel, yielding a lone ``.``; the skipped
+    # modules affect only the summary count, which scales with
+    # ``celery_test_paths``.
+    sentinel_progress = "."
+    skipped_count = len(celery_test_paths)
+    expected_stdout = (
+        f"{sentinel_progress} [100%]\n1 passed, {skipped_count} skipped in <duration>"
+    )
     return _PytestRun(
         result=result,
         normalized_stdout=_normalize_pytest_output(result.stdout),
