@@ -11,10 +11,18 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-celery = pytest.importorskip("celery")
+try:
+    from celery import Celery
+    from celery.signals import before_task_publish, task_postrun, task_prerun
+except ImportError:  # pragma: no cover - exercised only in the blocked child
+    _HAS_CELERY = False
+else:
+    _HAS_CELERY = True
 
-from celery import Celery  # noqa: E402
-from celery.signals import before_task_publish, task_postrun, task_prerun  # noqa: E402
+pytestmark = pytest.mark.skipif(
+    not _HAS_CELERY,
+    reason="celery is not installed",
+)
 
 from falcon_correlate.celery import (  # noqa: E402
     _BEFORE_TASK_PUBLISH_DISPATCH_UID,

@@ -7,9 +7,17 @@ import typing as typ
 
 import pytest
 
-celery = pytest.importorskip("celery")
+try:
+    from celery.signals import before_task_publish
+except ImportError:  # pragma: no cover - exercised only in the blocked child
+    _HAS_CELERY = False
+else:
+    _HAS_CELERY = True
 
-from celery.signals import before_task_publish  # noqa: E402
+pytestmark = pytest.mark.skipif(
+    not _HAS_CELERY,
+    reason="celery is not installed",
+)
 
 from falcon_correlate import correlation_id_var  # noqa: E402
 from falcon_correlate.celery import (  # noqa: E402

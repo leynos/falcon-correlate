@@ -7,9 +7,18 @@ from unittest import mock
 
 import pytest
 
-celery = pytest.importorskip("celery")
+try:
+    from celery import Celery
+except ImportError:  # pragma: no cover - exercised only in the blocked child
+    _HAS_CELERY = False
+else:
+    _HAS_CELERY = True
 
-from celery import Celery  # noqa: E402
+pytestmark = pytest.mark.skipif(
+    not _HAS_CELERY,
+    reason="celery is not installed",
+)
+
 from pytest_bdd import given, parsers, scenarios, then, when  # noqa: E402
 
 from falcon_correlate import correlation_id_var  # noqa: E402

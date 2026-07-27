@@ -6,11 +6,12 @@ These tests exercise the missing-dependency path without uninstalling Celery by
 launching child Python processes with a temporary ``sitecustomize.py`` import
 hook that blocks only ``celery`` and ``celery.*``.
 
-The subprocess boundary matters because pytest evaluates module-level
-``pytest.importorskip("celery")`` guards during collection. Running pytest in a
-child process verifies the same collection behaviour a downstream test suite
-would see: Celery-dependent unit and Behaviour-Driven Development (BDD) step
-modules are skipped, while non-Celery tests continue to run.
+The subprocess boundary matters because the Celery test modules guard their
+Celery imports and mark themselves ``pytest.mark.skipif`` when Celery is
+missing. Running pytest in a child process verifies the same behaviour a
+downstream test suite would see: every Celery-dependent unit and
+Behaviour-Driven Development (BDD) step test is skipped, while non-Celery
+tests continue to run.
 
 Compile-time validation strategy
 ---------------------------------
@@ -201,6 +202,26 @@ def _normalize_pytest_output(output: str) -> str:
     return _PYTEST_DURATION_PATTERN.sub("<duration>", normalized_progress)
 
 
+def _count_collected_test_items(
+    sitecustomize_dir: Path,
+    paths: cabc.Iterable[Path],
+    project_root: Path,
+) -> int:
+    """Return how many test items the blocked child collects from ``paths``."""
+    result = _run_python_with_celery_blocked(
+        sitecustomize_dir,
+        os.environ,
+        project_root,
+        "-m",
+        "pytest",
+        "--collect-only",
+        "-q",
+        "--color=no",
+        *_relative_paths(paths, project_root),
+    )
+    return sum(1 for line in result.stdout.splitlines() if "::" in line)
+
+
 def _run_celery_tests_with_celery_blocked(
     sitecustomize_dir: Path,
     sentinel_test: Path,
@@ -222,18 +243,20 @@ def _run_celery_tests_with_celery_blocked(
         str(sentinel_test),
         *_relative_paths(celery_test_paths, project_root),
     )
-    # Build the expected snapshot from ``celery_test_paths`` rather than a bare
-    # literal. Progress markers come only from *collected, runnable* items: each
-    # Celery module skips at collection via module-level
-    # ``pytest.importorskip`` (pytest reports "collected 1 item / N skipped"),
-    # so it never becomes an item and never emits an ``s`` marker. The sole
-    # runnable item is the passing sentinel, yielding a lone ``.``; the skipped
-    # modules affect only the summary count, which scales with
-    # ``celery_test_paths``.
-    sentinel_progress = "."
-    skipped_count = len(celery_test_paths)
+    # Build the expected snapshot from the child's own collection rather than a
+    # bare literal. Each Celery module imports cleanly but marks itself
+    # ``pytest.mark.skipif`` when Celery is absent, so every collected item
+    # skips at setup and emits one ``s`` marker. The sentinel is the only
+    # passing item and prints the leading ``.``; the remaining markers and the
+    # skip count are both the number of collected Celery items.
+    skipped_count = _count_collected_test_items(
+        sitecustomize_dir,
+        celery_test_paths,
+        project_root,
+    )
+    progress = "." + "s" * skipped_count
     expected_stdout = (
-        f"{sentinel_progress} [100%]\n1 passed, {skipped_count} skipped in <duration>"
+        f"{progress} [100%]\n1 passed, {skipped_count} skipped in <duration>"
     )
     return _PytestRun(
         result=result,
