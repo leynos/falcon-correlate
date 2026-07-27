@@ -31,8 +31,9 @@ def test_main_prints_interpreter_diagnostics(
     else:
         monkeypatch.delitem(sys.modules, "sitecustomize", raising=False)
 
-    show_path_sim.main()
+    result = show_path_sim.main()
 
+    assert result is None, "main() should return None"
     assert capsys.readouterr().out == (
         f"sitecustomize_loaded {sitecustomize_present}\n"
         "cwd /fake/cwd\n"
