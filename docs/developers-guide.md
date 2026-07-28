@@ -250,10 +250,10 @@ The standalone phrase helper supports Python 3.13 and later. Its sources under
 `scripts/` are linted, formatted and type-checked to the same standard as the
 package by the shared `make check-fmt`, `make lint` and `make typecheck` gates,
 so they carry no bespoke Ruff configuration. Run `make spelling-helper-test` to
-exercise its three grouped policy, scanning and command-line tests under the
-pinned standalone runtime. Run `make markdownlint` for the combined Markdown
-and spelling gate, and `make nixie` to validate Mermaid diagrams with Nixie
-1.1.0 and Merman 0.7.0.
+exercise its four grouped policy, scanning, command-line and missing-git tests
+under the pinned standalone runtime. Run `make markdownlint` for the combined
+Markdown and spelling gate, and `make nixie` to validate Mermaid diagrams with
+Nixie 1.1.0 and Merman 0.7.0.
 
 ## Makefile variables
 
