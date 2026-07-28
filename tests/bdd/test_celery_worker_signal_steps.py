@@ -9,7 +9,9 @@ import pytest
 try:
     from celery import Celery
     from celery.signals import task_postrun, task_prerun
-except ImportError:  # pragma: no cover - exercised only in the blocked child
+except ModuleNotFoundError as error:  # pragma: no cover - blocked child only
+    if error.name != "celery":
+        raise
     _HAS_CELERY = False
 else:
     _HAS_CELERY = True

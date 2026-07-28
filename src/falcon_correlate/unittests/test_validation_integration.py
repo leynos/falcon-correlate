@@ -240,20 +240,7 @@ class TestValidationWithValidatorRejecting:
         call_log: list[str] = []
 
         def tracking_validator(value: str) -> bool:
-            """Record the validator input and reject it.
-
-            Parameters
-            ----------
-            value : str
-                The candidate correlation ID passed to the validator, which
-                is recorded before deciding whether to accept it.
-
-            Returns
-            -------
-            bool
-                Whether ``value`` starts with ``ok-``.
-
-            """
+            """Record the input and reject values that do not start with ``ok-``."""
             call_log.append(value)
             return value.startswith("ok-")
 
