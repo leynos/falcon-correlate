@@ -7,14 +7,21 @@ from unittest import mock
 
 import pytest
 
-celery = pytest.importorskip("celery")
+try:
+    from celery import Celery
+    from celery.signals import before_task_publish, task_postrun, task_prerun
+except ModuleNotFoundError as error:  # pragma: no cover - blocked child only
+    if error.name != "celery":
+        raise
+    _HAS_CELERY = False
+else:
+    _HAS_CELERY = True
 
-from celery import Celery  # noqa: E402 -- after Celery availability check
-from celery.signals import (  # noqa: E402 -- after Celery availability check
-    before_task_publish,
-    task_postrun,
-    task_prerun,
+pytestmark = pytest.mark.skipif(
+    not _HAS_CELERY,
+    reason="celery is not installed",
 )
+
 from pytest_bdd import (  # noqa: E402 -- after optional Celery test setup
     given,
     parsers,
@@ -36,6 +43,8 @@ from falcon_correlate.celery import (  # noqa: E402 -- after Celery skip setup
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
+
+    import celery
 
 scenarios("celery_configuration.feature")
 
@@ -73,7 +82,14 @@ def given_celery_handlers_disconnected() -> None:
 
 @given("a Celery app configured through the public helper", target_fixture="context")
 def given_configured_celery_app() -> Context:
-    """Create and configure a Celery app through the public helper."""
+    """Create and configure a Celery app through the public helper.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     app = Celery("bdd-celery-configuration", broker="memory://")
     app.conf.task_always_eager = False
     configured_app = configure_celery_correlation(app)
@@ -111,7 +127,19 @@ def given_configured_task_request(context: Context, value: str) -> None:
 
 @when("I publish a configured Celery task", target_fixture="context")
 def when_publish_configured_task(context: Context) -> Context:
-    """Publish a task through Celery's normal apply_async path."""
+    """Publish a task through Celery's normal apply_async path.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     app = context["app"]
 
     @app.task(name="bdd.configured.echo")
@@ -133,7 +161,19 @@ def when_publish_configured_task(context: Context) -> Context:
 
 @when("the configured Celery worker lifecycle runs the task", target_fixture="context")
 def when_configured_worker_runs_task(context: Context) -> Context:
-    """Drive the actual Celery task signals around the task body."""
+    """Drive the actual Celery task signals around the task body.
+
+    Parameters
+    ----------
+    context : Context
+        Scenario state passed through the step chain.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     task = context["task"]
 
     try:

@@ -24,6 +24,20 @@ def inject_correlation_context(
     It reads from ``falcon-correlate``'s context variables and injects
     them into the event dictionary using ``setdefault`` so that
     explicitly bound values are preserved.
+
+    Parameters
+    ----------
+    logger : object
+        Structlog logger instance passed through by the processor chain.
+    method_name : str
+        Name of the logging method that triggered the processor.
+    event_dict : dict[str, object]
+        Event payload to enrich with correlation metadata.
+
+    Returns
+    -------
+    dict[str, object]
+        The value produced for the test scenario.
     """
     event_dict.setdefault("correlation_id", correlation_id_var.get() or "-")
     event_dict.setdefault("user_id", user_id_var.get() or "-")

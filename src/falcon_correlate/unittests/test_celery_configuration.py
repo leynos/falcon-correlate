@@ -11,10 +11,20 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-celery = pytest.importorskip("celery")
+try:
+    from celery import Celery
+    from celery.signals import before_task_publish, task_postrun, task_prerun
+except ModuleNotFoundError as error:  # pragma: no cover - blocked child only
+    if error.name != "celery":
+        raise
+    _HAS_CELERY = False
+else:
+    _HAS_CELERY = True
 
-from celery import Celery  # noqa: E402
-from celery.signals import before_task_publish, task_postrun, task_prerun  # noqa: E402
+pytestmark = pytest.mark.skipif(
+    not _HAS_CELERY,
+    reason="celery is not installed",
+)
 
 from falcon_correlate.celery import (  # noqa: E402
     _BEFORE_TASK_PUBLISH_DISPATCH_UID,
@@ -73,7 +83,14 @@ class _TaskLike:
 
 @pytest.fixture
 def celery_app() -> Celery:
-    """Build a minimal Celery app for configuration tests."""
+    """Build a minimal Celery app for configuration tests.
+
+    Returns
+    -------
+    Celery
+        The in-memory Celery app named ``unit-celery-configuration``.
+
+    """
     return Celery("unit-celery-configuration", broker="memory://")
 
 
@@ -278,3 +295,43 @@ def test_safe_connect_signal_logs_on_successful_connect(
         assert any(fake_uid in record.message for record in caplog.records)
     finally:
         before_task_publish.disconnect(dispatch_uid=fake_uid)
+
+
+def test_safe_connect_signal_suppresses_invalid_receiver(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Invalid receiver signatures should remain an optional integration failure."""
+    import logging
+
+    from falcon_correlate.celery import _safe_connect_signal
+
+    def reject_receiver(*_: object, **__: object) -> None:
+        """Reject the receiver as Celery does for an invalid signature."""
+        msg = "Signal receiver must accept keyword arguments"
+        raise ValueError(msg)
+
+    fake_module = SimpleNamespace(
+        before_task_publish=SimpleNamespace(connect=reject_receiver)
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="falcon_correlate.celery"):
+        _safe_connect_signal(fake_module, "before_task_publish", lambda: None, "uid")
+
+    assert any("invalid receiver" in record.message for record in caplog.records)
+
+
+def test_safe_connect_signal_propagates_unexpected_failure() -> None:
+    """Unexpected registration failures should remain visible to callers."""
+    from falcon_correlate.celery import _safe_connect_signal
+
+    def fail_connection(*_: object, **__: object) -> None:
+        """Raise an unexpected registration failure."""
+        msg = "unexpected registration failure"
+        raise RuntimeError(msg)
+
+    fake_module = SimpleNamespace(
+        before_task_publish=SimpleNamespace(connect=fail_connection)
+    )
+
+    with pytest.raises(RuntimeError, match="unexpected registration failure"):
+        _safe_connect_signal(fake_module, "before_task_publish", lambda: None, "uid")

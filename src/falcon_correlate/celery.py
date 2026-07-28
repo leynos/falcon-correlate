@@ -50,13 +50,6 @@ def propagate_correlation_id_to_celery(
         mapping to a mutable mapping (typically :class:`dict`) that holds
         AMQP message properties, including ``correlation_id``.
 
-    Returns
-    -------
-    None
-        This function mutates the ``properties`` mapping in place when the
-        ambient correlation ID is set and the result backend does not use
-        RPC, overwriting Celery's default ``correlation_id`` value.
-
     Notes
     -----
     When the active Celery application uses the ``rpc://`` result backend,
@@ -82,7 +75,7 @@ def propagate_correlation_id_to_celery(
 
 
 def _current_result_backend_uses_rpc() -> bool:
-    """Return ``True`` when the active Celery app uses the RPC result backend."""
+    """Return whether the active Celery app uses the RPC result backend."""
     try:
         celery_module = importlib.import_module("celery")
     except ImportError:
@@ -137,7 +130,7 @@ def clear_correlation_id_in_worker(**_: object) -> None:
 
 
 def _get_task_request_correlation_id(task: object | None) -> str | None:
-    """Return the correlation ID carried by a Celery task request, if any."""
+    """Return a Celery task request correlation ID when it is a string."""
     request = getattr(task, "request", None)
     correlation_id = getattr(request, "correlation_id", None)
     return correlation_id if isinstance(correlation_id, str) else None
@@ -152,8 +145,7 @@ def _safe_connect_signal(
     """Connect a Celery signal when the signal object exposes ``connect``.
 
     Emits ``DEBUG`` log lines for each connection attempt, skipped signal, and
-    exception so that misconfigured or missing signals are diagnosable in
-    production without raising.
+    invalid receiver so that optional integration failures are diagnosable.
 
     """
     signal = getattr(signal_module, signal_name, None)
@@ -182,9 +174,9 @@ def _safe_connect_signal(
             signal_name,
             dispatch_uid,
         )
-    except Exception:
+    except ValueError:
         _logger.debug(
-            "falcon_correlate: exception connecting %r to %r",
+            "falcon_correlate: invalid receiver %r for %r",
             getattr(handler, "__name__", repr(handler)),
             signal_name,
             exc_info=True,

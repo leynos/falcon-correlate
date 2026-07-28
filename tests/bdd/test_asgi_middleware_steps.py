@@ -78,7 +78,19 @@ def _build_asgi_context(
     target_fixture="context",
 )
 def given_asgi_app_with_trusted_sources(sources: str) -> Context:
-    """Create a Falcon ASGI app with trusted-source middleware."""
+    """Create a Falcon ASGI app with trusted-source middleware.
+
+    Parameters
+    ----------
+    sources : str
+        Comma-separated trusted source addresses used to configure the app.
+
+    Returns
+    -------
+    Context
+        The scenario state with a Falcon ASGI app and test client.
+
+    """
     return _build_asgi_context(
         sources=[source.strip() for source in sources.split(",")],
     )
@@ -92,7 +104,21 @@ def given_asgi_app_with_generator(
     sources: str,
     generated_id: str,
 ) -> Context:
-    """Create a Falcon ASGI app with a fixed ID generator."""
+    """Create a Falcon ASGI app with a fixed ID generator.
+
+    Parameters
+    ----------
+    sources : str
+        Comma-separated trusted source addresses used to configure the app.
+    generated_id : str
+        The fixed correlation ID returned by the configured generator.
+
+    Returns
+    -------
+    Context
+        The scenario state with a Falcon ASGI app and test client.
+
+    """
     return _build_asgi_context(
         sources=[source.strip() for source in sources.split(",")],
         generated_id=generated_id,
@@ -107,7 +133,21 @@ def given_asgi_app_with_rejecting_validator(
     sources: str,
     generated_id: str,
 ) -> Context:
-    """Create a Falcon ASGI app with fixed generation and rejected input."""
+    """Create a Falcon ASGI app with fixed generation and rejected input.
+
+    Parameters
+    ----------
+    sources : str
+        Comma-separated trusted source addresses used to configure the app.
+    generated_id : str
+        The fixed correlation ID returned by the configured generator.
+
+    Returns
+    -------
+    Context
+        The scenario state with a Falcon ASGI app and test client.
+
+    """
     return _build_asgi_context(
         sources=[source.strip() for source in sources.split(",")],
         generated_id=generated_id,
@@ -120,7 +160,19 @@ def given_asgi_app_with_rejecting_validator(
     target_fixture="context",
 )
 def given_asgi_app_with_echo_disabled(generated_id: str) -> Context:
-    """Create a Falcon ASGI app with response-header echoing disabled."""
+    """Create a Falcon ASGI app with response-header echoing disabled.
+
+    Parameters
+    ----------
+    generated_id : str
+        The fixed correlation ID returned by the configured generator.
+
+    Returns
+    -------
+    Context
+        The scenario state with a Falcon ASGI app and test client.
+
+    """
     return _build_asgi_context(
         generated_id=generated_id,
         echo_header_in_response=False,

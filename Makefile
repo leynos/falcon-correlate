@@ -29,7 +29,7 @@ PYLINT_PYPY_SHIM_REF ?= 726d09f968b4d729ee4b29c71fc732e744854f3b
 PYLINT_PYPY_SHIM = git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)
 PYLINT = $(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy
 
-.PHONY: help all clean build build-release lint fmt check-fmt \
+.PHONY: help all clean build build-release lint fmt check-fmt doctest \
         markdownlint nixie spelling spelling-config spelling-config-write \
         spelling-phrase-check spelling-helper-test test typecheck \
         $(TOOLS) $(VENV_TOOLS)
@@ -123,7 +123,10 @@ nixie: ## Validate Mermaid diagrams
 	$(call ensure_tool,nixie)
 	$(NIXIE) --no-sandbox
 
-test: build uv $(VENV_TOOLS) ## Run tests
+doctest: build uv $(VENV_TOOLS) ## Run docstring examples
+	$(UV_ENV) $(UV) run pytest --doctest-modules --import-mode=importlib src/falcon_correlate --ignore=src/falcon_correlate/unittests
+
+test: build uv $(VENV_TOOLS) doctest ## Run tests
 	$(UV_ENV) $(UV) run pytest -v -n auto $(PROJECT_PYTEST_EXCLUDES)
 
 help: ## Show available targets

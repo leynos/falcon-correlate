@@ -17,13 +17,27 @@ class TestCorrelationIDMiddlewareWithFalcon:
 
     @pytest.fixture
     def app_with_middleware(self) -> falcon.App:
-        """Create a Falcon app with CorrelationIDMiddleware installed."""
+        """Create a Falcon app with CorrelationIDMiddleware installed.
+
+        Returns
+        -------
+        falcon.App
+            The value produced for the test scenario.
+
+        """
         middleware = CorrelationIDMiddleware()
         return falcon.App(middleware=[middleware])
 
     @pytest.fixture
     def client(self, app_with_middleware: falcon.App) -> falcon.testing.TestClient:
-        """Create a test client for the Falcon app."""
+        """Create a test client for the Falcon app.
+
+        Returns
+        -------
+        falcon.testing.TestClient
+            The value produced for the test scenario.
+
+        """
         return falcon.testing.TestClient(app_with_middleware)
 
     def test_middleware_can_be_added_to_falcon_app(

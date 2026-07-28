@@ -6,10 +6,21 @@ import typing as typ
 
 import pytest
 
-celery = pytest.importorskip("celery")
+try:
+    from celery import Celery
+    from celery.signals import task_postrun, task_prerun
+except ModuleNotFoundError as error:  # pragma: no cover - blocked child only
+    if error.name != "celery":
+        raise
+    _HAS_CELERY = False
+else:
+    _HAS_CELERY = True
 
-from celery import Celery  # noqa: E402
-from celery.signals import task_postrun, task_prerun  # noqa: E402
+pytestmark = pytest.mark.skipif(
+    not _HAS_CELERY,
+    reason="celery is not installed",
+)
+
 from pytest_bdd import given, parsers, scenarios, then, when  # noqa: E402
 
 from falcon_correlate import correlation_id_var  # noqa: E402
@@ -20,6 +31,8 @@ from falcon_correlate.celery import (  # noqa: E402
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
+
+    import celery
 
 scenarios("celery_worker_signal.feature")
 
@@ -56,7 +69,14 @@ def _reset_context_variables() -> cabc.Generator[None, None, None]:
     target_fixture="context",
 )
 def given_task_request_with_correlation_id(value: str) -> Context:
-    """Create a real Celery task with a request correlation ID."""
+    """Create a real Celery task with a request correlation ID.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     app = Celery("bdd-celery-worker", broker="memory://")
     observed: dict[str, str | None] = {}
 
@@ -81,7 +101,14 @@ def given_ambient_correlation_id(value: str) -> None:
 
 @when("the Celery worker lifecycle runs the task", target_fixture="context")
 def when_worker_runs_task(context: Context) -> Context:
-    """Drive the actual Celery task signals around the task body."""
+    """Drive the actual Celery task signals around the task body.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
     task = context["task"]
 
     try:

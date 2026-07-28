@@ -16,6 +16,11 @@ from falcon_correlate import CorrelationIDMiddleware
 from falcon_correlate.unittests.uuid7_helpers import assert_uuid7_hex
 from tests.conftest import CorrelationEchoResource, SimpleResource, TrackingMiddleware
 
+pytest_plugins = (
+    "tests.bdd.middleware_validation_steps",
+    "tests.bdd.middleware_config_steps",
+)
+
 scenarios("middleware.feature")
 
 
@@ -32,7 +37,14 @@ class Context(typ.TypedDict, total=False):
 
 @given("a new CorrelationIDMiddleware instance", target_fixture="context")
 def given_middleware_instance() -> Context:
-    """Create a new middleware instance."""
+    """Create a new middleware instance.
+
+    Returns
+    -------
+    Context
+        A context mapping containing a default ``CorrelationIDMiddleware``.
+
+    """
     return {"middleware": CorrelationIDMiddleware()}
 
 
@@ -55,6 +67,12 @@ def given_app_with_middleware() -> Context:
 
     The middleware is configured to trust 127.0.0.1 (TestClient's default
     remote_addr) so that header capture tests work correctly.
+
+    Returns
+    -------
+    Context
+        A context mapping containing the middleware, Falcon app, and client.
+
     """
     middleware = TrackingMiddleware(trusted_sources=["127.0.0.1"])
     app = falcon.App(middleware=[middleware])
@@ -159,7 +177,20 @@ def then_response_has_no_correlation_id(context: Context) -> None:
     target_fixture="context",
 )
 def given_middleware_with_header_name(header_name: str) -> Context:
-    """Create middleware with custom header name."""
+    """Create middleware with custom header name.
+
+    Parameters
+    ----------
+    header_name : str
+        Name of the HTTP header the middleware should use for the
+        correlation ID.
+
+    Returns
+    -------
+    Context
+        A context mapping containing middleware with the requested header name.
+
+    """
     return {"middleware": CorrelationIDMiddleware(header_name=header_name)}
 
 
@@ -174,7 +205,19 @@ def then_middleware_uses_header_name(context: Context, header_name: str) -> None
     target_fixture="context",
 )
 def given_middleware_with_trusted_sources(sources: str) -> Context:
-    """Create middleware with trusted sources (comma-separated)."""
+    """Create middleware with trusted sources (comma-separated).
+
+    Parameters
+    ----------
+    sources : str
+        Comma-separated trusted source addresses.
+
+    Returns
+    -------
+    Context
+        A context mapping containing middleware with the requested sources.
+
+    """
     source_list = [s.strip() for s in sources.split(",")]
     return {"middleware": CorrelationIDMiddleware(trusted_sources=source_list)}
 
@@ -183,74 +226,6 @@ def given_middleware_with_trusted_sources(sources: str) -> Context:
 def then_middleware_has_trusted_sources_count(context: Context, count: int) -> None:
     """Verify middleware has expected number of trusted sources."""
     assert len(context["middleware"].trusted_sources) == count
-
-
-@given(
-    parsers.parse('a custom ID generator that returns "{return_value}"'),
-    target_fixture="context",
-)
-def given_custom_generator(return_value: str) -> Context:
-    """Create a custom generator function."""
-
-    def custom_gen() -> str:
-        """Return the configured custom correlation ID."""
-        return return_value
-
-    return {"custom_generator": custom_gen}
-
-
-@given("a CorrelationIDMiddleware with that generator")
-def given_middleware_with_custom_generator(context: Context) -> None:
-    """Create middleware with the custom generator from context."""
-    context["middleware"] = CorrelationIDMiddleware(
-        generator=context["custom_generator"],
-    )
-
-
-@then("the middleware should use the custom generator")
-def then_middleware_uses_custom_generator(context: Context) -> None:
-    """Verify middleware uses the custom generator."""
-    assert context["middleware"].generator is context["custom_generator"]
-
-
-@given("a custom validator that accepts any string", target_fixture="context")
-def given_custom_validator() -> Context:
-    """Create a custom validator function."""
-
-    def custom_val(value: str) -> bool:
-        """Accept any supplied correlation ID value."""
-        return True
-
-    return {"custom_validator": custom_val}
-
-
-@given("a CorrelationIDMiddleware with that validator")
-def given_middleware_with_custom_validator(context: Context) -> None:
-    """Create middleware with the custom validator from context."""
-    context["middleware"] = CorrelationIDMiddleware(
-        validator=context["custom_validator"],
-    )
-
-
-@then("the middleware should use the custom validator")
-def then_middleware_uses_custom_validator(context: Context) -> None:
-    """Verify middleware uses the custom validator."""
-    assert context["middleware"].validator is context["custom_validator"]
-
-
-@given(
-    "a CorrelationIDMiddleware with echo_header_in_response disabled",
-    target_fixture="context",
-)
-def given_middleware_with_echo_disabled() -> Context:
-    """Create middleware with echo_header_in_response disabled."""
-    return {"middleware": CorrelationIDMiddleware(echo_header_in_response=False)}
-
-
-@then("the middleware should have echo_header_in_response set to False")
-def then_middleware_echo_disabled(context: Context) -> None:
-    """Verify echo_header_in_response is False."""
-    assert context["middleware"].echo_header_in_response is False
 
 
 # Trusted source scenario steps
@@ -263,7 +238,19 @@ def then_middleware_echo_disabled(context: Context) -> None:
     target_fixture="context",
 )
 def given_app_with_trusted_sources(sources: str) -> Context:
-    """Create a Falcon app with middleware configured with trusted sources."""
+    """Create a Falcon app with middleware configured with trusted sources.
+
+    Parameters
+    ----------
+    sources : str
+        Comma-separated trusted source addresses.
+
+    Returns
+    -------
+    Context
+        A context mapping containing the middleware, Falcon app, and client.
+
+    """
     source_list = [s.strip() for s in sources.split(",")]
     middleware = CorrelationIDMiddleware(trusted_sources=source_list)
     app = falcon.App(middleware=[middleware])
@@ -314,80 +301,3 @@ def then_correlation_id_is_uuid7(context: Context) -> None:
     )
     # assert_uuid7_hex raises AssertionError with detailed message on failure
     assert_uuid7_hex(data["correlation_id"])
-
-
-# Validation scenario steps
-
-
-@given(
-    parsers.parse(
-        "a Falcon application with CorrelationIDMiddleware trusting"
-        ' "{sources}" and a rejecting validator'
-    ),
-    target_fixture="context",
-)
-def given_app_with_trusted_sources_and_rejecting_validator(
-    sources: str,
-) -> Context:
-    """Create a Falcon app with trusted sources and a validator that rejects all IDs."""
-    source_list = [s.strip() for s in sources.split(",")]
-    middleware = CorrelationIDMiddleware(
-        trusted_sources=source_list,
-        validator=lambda value: False,
-    )
-    app = falcon.App(middleware=[middleware])
-    client = falcon.testing.TestClient(app)
-    return {"middleware": middleware, "app": app, "client": client}
-
-
-@given(
-    parsers.parse(
-        "a Falcon application with CorrelationIDMiddleware trusting"
-        ' "{sources}" and an accepting validator'
-    ),
-    target_fixture="context",
-)
-def given_app_with_trusted_sources_and_accepting_validator(
-    sources: str,
-) -> Context:
-    """Create a Falcon app with trusted sources and a validator that accepts all IDs."""
-    source_list = [s.strip() for s in sources.split(",")]
-    middleware = CorrelationIDMiddleware(
-        trusted_sources=source_list,
-        validator=lambda value: True,
-    )
-    app = falcon.App(middleware=[middleware])
-    client = falcon.testing.TestClient(app)
-    return {"middleware": middleware, "app": app, "client": client}
-
-
-@given(
-    parsers.parse('a custom validator that rejects IDs starting with "{prefix}"'),
-    target_fixture="context",
-)
-def given_custom_prefix_rejecting_validator(prefix: str) -> Context:
-    """Create a custom validator that rejects IDs starting with the given prefix."""
-
-    def prefix_validator(value: str) -> bool:
-        """Reject correlation IDs that begin with the configured prefix."""
-        return not value.startswith(prefix)
-
-    return {"custom_validator": prefix_validator}
-
-
-@given(parsers.parse('a Falcon application with that validator trusting "{sources}"'))
-def given_app_with_custom_validator_and_trusted_sources(
-    context: Context,
-    sources: str,
-) -> None:
-    """Create a Falcon app with the custom validator and trusted sources."""
-    source_list = [s.strip() for s in sources.split(",")]
-    middleware = CorrelationIDMiddleware(
-        trusted_sources=source_list,
-        validator=context["custom_validator"],
-    )
-    app = falcon.App(middleware=[middleware])
-    client = falcon.testing.TestClient(app)
-    context["middleware"] = middleware
-    context["app"] = app
-    context["client"] = client

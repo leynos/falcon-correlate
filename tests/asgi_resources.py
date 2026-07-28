@@ -48,11 +48,6 @@ class ASGICorrelationEchoResource:
             Outgoing Falcon ASGI response whose `resp.media` mapping is set by
             this handler.
 
-        Returns
-        -------
-        None
-            The method mutates `resp.media` and does not return a value.
-
         Notes
         -----
         `on_get` reads `correlation_id_var.get()` before middleware response
@@ -79,7 +74,20 @@ class ASGIInterleavedCorrelationResource:
     """Falcon ASGI resource that waits for concurrent requests to overlap."""
 
     def __init__(self, *, expected_requests: int) -> None:
-        """Initialize the request barrier for the expected concurrency level."""
+        """Initialize the request barrier for the expected concurrency level.
+
+        Parameters
+        ----------
+        expected_requests : int
+            The number of concurrent requests that must arrive before the
+            resource releases the barrier.
+
+        Raises
+        ------
+        ValueError
+            If ``expected_requests`` is not positive.
+
+        """
         if expected_requests <= 0:
             raise ValueError(_NON_POSITIVE_EXPECTED_REQUESTS_ERROR)
         self._expected_requests = expected_requests

@@ -47,14 +47,28 @@ class _PropertyResponse:
         self.should_fail = should_fail
 
     def set_header(self, name: str, value: str) -> None:
-        """Record a response header or raise when configured to fail."""
+        """Record a response header or raise when configured to fail.
+
+        Raises
+        ------
+        RuntimeError
+            If the response double is configured to reject header mutation.
+
+        """
         if self.should_fail:
             msg = f"failed to set {name}={value}"
             raise RuntimeError(msg)
         self.headers[name] = value
 
     def get_header(self, name: str) -> str | None:
-        """Return a recorded response header."""
+        """Return a recorded response header.
+
+        Returns
+        -------
+        str | None
+            The recorded value, or ``None`` if the header is absent.
+
+        """
         return self.headers.get(name)
 
 

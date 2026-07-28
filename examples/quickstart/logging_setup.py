@@ -62,11 +62,6 @@ def log_request(logger: logging.Logger) -> None:
     logger : logging.Logger
         Logger returned by ``configure_logging()``.
 
-    Returns
-    -------
-    None
-        The function emits a log record for its side effect.
-
     Examples
     --------
     >>> logger = configure_logging()

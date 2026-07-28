@@ -31,7 +31,14 @@ class _MiddlewareKwargs(typ.TypedDict, total=False):
 
 @pytest.fixture
 def correlation_echo_resource() -> CorrelationEchoResource:
-    """Provide a CorrelationEchoResource instance for testing."""
+    """Provide a CorrelationEchoResource instance for testing.
+
+    Returns
+    -------
+    CorrelationEchoResource
+        A new ``CorrelationEchoResource`` instance.
+
+    """
     return CorrelationEchoResource()
 
 
@@ -41,8 +48,10 @@ def create_test_client(
 ) -> cabc.Callable[..., falcon.testing.TestClient]:
     """Build test clients with configurable middleware.
 
-    Args:
-        correlation_echo_resource: The resource fixture to add to the app.
+    Parameters
+    ----------
+    correlation_echo_resource : CorrelationEchoResource
+        The resource fixture added to the built app.
 
     Returns
     -------
@@ -231,7 +240,7 @@ class TestValidationWithValidatorRejecting:
         call_log: list[str] = []
 
         def tracking_validator(value: str) -> bool:
-            """Record the validator input and reject it."""
+            """Record the input and reject values that do not start with ``ok-``."""
             call_log.append(value)
             return value.startswith("ok-")
 
@@ -303,7 +312,23 @@ def build_test_client(
     create_test_client: cabc.Callable[..., falcon.testing.TestClient],
     validator_result: bool | None,  # noqa: FBT001 - test scenario value
 ) -> falcon.testing.TestClient:
-    """Build a validation logging test client for the given validator result."""
+    """Build a validation logging test client for the given validator result.
+
+    Parameters
+    ----------
+    create_test_client : cabc.Callable[..., falcon.testing.TestClient]
+        Factory fixture that builds a configured test client.
+    validator_result : bool | None
+        The value the mock validator should return, or ``None`` to build
+        a client with no validator.
+
+    Returns
+    -------
+    falcon.testing.TestClient
+        A client with no validator when ``validator_result`` is ``None``;
+        otherwise, a client with a mock validator returning that result.
+
+    """
     if validator_result is None:
         return create_test_client(trusted_sources=["127.0.0.1"])
 
