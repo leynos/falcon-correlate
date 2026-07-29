@@ -127,10 +127,11 @@ def load_policy(repository: Path) -> PhrasePolicy:
     ------
     FileNotFoundError
         A required generated or shared policy file is missing.
-    OSError
-        A policy file cannot be read.
-    tomllib.TOMLDecodeError
-        A policy file contains invalid TOML.
+
+    Notes
+    -----
+    Reading a policy document propagates ``OSError`` when the file cannot be
+    read and ``tomllib.TOMLDecodeError`` when it contains invalid TOML.
     """
     generated = _document(repository / "typos.toml")
     shared_cache = repository / ".typos-oxendict-base.toml"
@@ -154,12 +155,20 @@ def load_policy(repository: Path) -> PhrasePolicy:
 def _tracked(repository: Path) -> tuple[Path, ...]:
     """Return tracked paths in deterministic order.
 
+    Returns
+    -------
+    tuple[Path, ...]
+        Repository-relative tracked paths, sorted deterministically.
+
     Raises
     ------
     FileNotFoundError
         The ``git`` executable is not available on ``PATH``.
-    subprocess.CalledProcessError
-        Git cannot enumerate the repository's tracked files.
+
+    Notes
+    -----
+    The checked ``git ls-files`` call propagates
+    ``subprocess.CalledProcessError`` when git cannot enumerate tracked files.
     """
     git = shutil.which("git")
     if git is None:
@@ -236,12 +245,11 @@ def check_phrase_corrections(
     tuple[PhraseFinding, ...]
         Findings in deterministic path, phrase, and source order.
 
-    Raises
-    ------
-    FileNotFoundError
-        The ``git`` executable is not available on ``PATH``.
-    subprocess.CalledProcessError
-        Git cannot enumerate the repository's tracked files.
+    Notes
+    -----
+    Enumerating tracked files propagates ``FileNotFoundError`` when ``git`` is
+    absent from ``PATH`` and ``subprocess.CalledProcessError`` when git cannot
+    enumerate the repository's tracked files.
     """
     found = []
     exclusion_spec = _exclusion_spec(policy)
@@ -273,16 +281,13 @@ def main(argv: cabc.Sequence[str] | None = None) -> int:
     int
         Two when prohibited phrases are found, otherwise zero.
 
-    Raises
-    ------
-    FileNotFoundError
-        A required generated or shared policy file is missing.
-    OSError
-        A policy file cannot be read.
-    subprocess.CalledProcessError
-        Git cannot enumerate the repository's tracked files.
-    tomllib.TOMLDecodeError
-        A policy file contains invalid TOML.
+    Notes
+    -----
+    Loading policy and enumerating tracked files propagate their failures to
+    the caller: ``FileNotFoundError`` for a missing policy file or absent
+    ``git``, ``OSError`` for an unreadable policy file,
+    ``tomllib.TOMLDecodeError`` for invalid TOML, and
+    ``subprocess.CalledProcessError`` when git cannot enumerate tracked files.
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", type=Path, default=Path.cwd())
