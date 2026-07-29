@@ -1,9 +1,10 @@
 """Test exact phrase-policy enforcement."""
 
 import importlib
-from pathlib import Path
-import subprocess
+import shutil
+import subprocess  # noqa: S404 - fixtures shell out to git to build tracked-file trees.
 import types
+from pathlib import Path
 
 import pytest
 
@@ -26,8 +27,11 @@ def initialize(path: Path, files: dict[str, str]) -> None:
         target = path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content)
-    subprocess.run(["git", "init", "--quiet"], cwd=path, check=True)
-    subprocess.run(["git", "add", "."], cwd=path, check=True)
+    git = shutil.which("git")
+    if git is None:
+        pytest.skip("git executable not found on PATH")
+    subprocess.run([git, "init", "--quiet"], cwd=path, check=True)  # noqa: S603
+    subprocess.run([git, "add", "."], cwd=path, check=True)  # noqa: S603
 
 
 def policy_files(*, local_phrase: str = "") -> dict[str, str]:
@@ -83,9 +87,9 @@ class TestPhrasePolicyChecker:
             {
                 "README.md": (
                     f"{PROHIBITED}\n{TITLE_PROHIBITED} prose\n"
-                    + "pre-hand"
-                    + "-written\n"
-                    + f"`{PROHIBITED}`\n"
+                    "pre-hand"
+                    "-written\n"
+                    f"`{PROHIBITED}`\n"
                 ),
                 "skip.md": f"{PROHIBITED}\n",
                 **policy_files(),
@@ -119,3 +123,20 @@ class TestPhrasePolicyChecker:
         assert capsys.readouterr().out == (
             f"README.md:1:8: {PROHIBITED} -> handwritten\n"
         ), "the diagnostic omitted its source location or correction"
+
+    def test_check_phrase_corrections_requires_git(
+        self,
+        checker: types.ModuleType,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Raise ``FileNotFoundError`` when git is absent from ``PATH``."""
+        # Write the policy fixtures directly; enumerating tracked files needs
+        # git, which this test forces to be unavailable.
+        for relative, content in policy_files().items():
+            (tmp_path / relative).write_text(content)
+        policy = checker.load_policy(tmp_path)
+        monkeypatch.setattr(checker.shutil, "which", lambda _command: None)
+
+        with pytest.raises(FileNotFoundError, match="git executable not found"):
+            checker.check_phrase_corrections(tmp_path, policy)
