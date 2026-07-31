@@ -14,22 +14,30 @@ class TestHttpxWrapperExports:
         """Verify request_with_correlation_id is in __all__."""
         import falcon_correlate
 
-        assert "request_with_correlation_id" in falcon_correlate.__all__
+        assert "request_with_correlation_id" in falcon_correlate.__all__, (
+            "expected condition: 'request_with_correlation_id' in falcon_c..."
+        )
 
     def test_async_request_with_correlation_id_in_all(self) -> None:
         """Verify async_request_with_correlation_id is in __all__."""
         import falcon_correlate
 
-        assert "async_request_with_correlation_id" in falcon_correlate.__all__
+        assert "async_request_with_correlation_id" in falcon_correlate.__all__, (
+            "expected condition: 'async_request_with_correlation_id' in fa..."
+        )
 
     def test_request_with_correlation_id_importable(self) -> None:
         """Verify request_with_correlation_id is importable from root."""
         from falcon_correlate import request_with_correlation_id
 
-        assert callable(request_with_correlation_id)
+        assert callable(request_with_correlation_id), (
+            "expected callable(request_with_correlation_id) to be truthy"
+        )
 
     def test_async_request_with_correlation_id_importable(self) -> None:
         """Verify async_request_with_correlation_id is importable."""
         from falcon_correlate import async_request_with_correlation_id
 
-        assert callable(async_request_with_correlation_id)
+        assert callable(async_request_with_correlation_id), (
+            "expected condition: callable(async_request_with_correlation_i..."
+        )

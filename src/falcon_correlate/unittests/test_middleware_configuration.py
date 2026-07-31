@@ -20,53 +20,71 @@ class TestCorrelationIDMiddlewareConfiguration:
     def test_default_header_name(self) -> None:
         """Verify default header_name is X-Correlation-ID."""
         middleware = CorrelationIDMiddleware()
-        assert middleware.header_name == "X-Correlation-ID"
+        assert middleware.header_name == "X-Correlation-ID", (
+            "expected middleware.header_name to equal 'X-Correlation-ID'"
+        )
 
     def test_default_trusted_sources_is_empty_frozenset(self) -> None:
         """Verify default trusted_sources is an empty frozenset."""
         middleware = CorrelationIDMiddleware()
-        assert middleware.trusted_sources == frozenset()
-        assert isinstance(middleware.trusted_sources, frozenset)
+        assert middleware.trusted_sources == frozenset(), (
+            "expected middleware.trusted_sources to equal frozenset()"
+        )
+        assert isinstance(middleware.trusted_sources, frozenset), (
+            "expected condition: isinstance(middleware.trusted_sources, fr..."
+        )
 
     def test_default_generator_is_default_uuid7_generator(self) -> None:
         """Verify default generator is default_uuid7_generator."""
         middleware = CorrelationIDMiddleware()
-        assert middleware.generator is default_uuid7_generator
+        assert middleware.generator is default_uuid7_generator, (
+            "expected middleware.generator to be default_uuid7_generator"
+        )
 
     def test_default_validator_is_none(self) -> None:
         """Verify default validator is None."""
         middleware = CorrelationIDMiddleware()
-        assert middleware.validator is None
+        assert middleware.validator is None, "expected middleware.validator to be None"
 
     def test_default_echo_header_in_response_is_true(self) -> None:
         """Verify default echo_header_in_response is True."""
         middleware = CorrelationIDMiddleware()
-        assert middleware.echo_header_in_response is True
+        assert middleware.echo_header_in_response is True, (
+            "expected middleware.echo_header_in_response to be True"
+        )
 
     # Custom configuration tests
 
     def test_custom_header_name(self) -> None:
         """Verify custom header_name is stored."""
         middleware = CorrelationIDMiddleware(header_name="X-Request-ID")
-        assert middleware.header_name == "X-Request-ID"
+        assert middleware.header_name == "X-Request-ID", (
+            "expected middleware.header_name to equal 'X-Request-ID'"
+        )
 
     def test_custom_trusted_sources_from_list(self) -> None:
         """Verify trusted_sources from list is stored as frozenset."""
         sources = ["127.0.0.1", "10.0.0.1"]
         middleware = CorrelationIDMiddleware(trusted_sources=sources)
-        assert middleware.trusted_sources == frozenset(sources)
+        assert middleware.trusted_sources == frozenset(sources), (
+            "expected middleware.trusted_sources to equal frozenset(sources)"
+        )
 
     def test_custom_trusted_sources_from_tuple(self) -> None:
         """Verify trusted_sources from tuple is stored as frozenset."""
         sources = ("127.0.0.1", "192.168.1.1")
         middleware = CorrelationIDMiddleware(trusted_sources=sources)
-        assert middleware.trusted_sources == frozenset(sources)
+        assert middleware.trusted_sources == frozenset(sources), (
+            "expected middleware.trusted_sources to equal frozenset(sources)"
+        )
 
     def test_custom_trusted_sources_from_set(self) -> None:
         """Verify trusted_sources from set is stored as frozenset."""
         sources = {"127.0.0.1", "10.0.0.1"}
         middleware = CorrelationIDMiddleware(trusted_sources=sources)
-        assert middleware.trusted_sources == frozenset(sources)
+        assert middleware.trusted_sources == frozenset(sources), (
+            "expected middleware.trusted_sources to equal frozenset(sources)"
+        )
 
     def test_custom_generator(self) -> None:
         """Verify custom generator is stored."""
@@ -83,7 +101,9 @@ class TestCorrelationIDMiddlewareConfiguration:
             return "custom-id"
 
         middleware = CorrelationIDMiddleware(generator=custom_gen)
-        assert middleware.generator is custom_gen
+        assert middleware.generator is custom_gen, (
+            "expected middleware.generator to be custom_gen"
+        )
 
     def test_custom_validator(self) -> None:
         """Verify custom validator is stored."""
@@ -100,12 +120,16 @@ class TestCorrelationIDMiddlewareConfiguration:
             return len(value) > 0
 
         middleware = CorrelationIDMiddleware(validator=custom_validator)
-        assert middleware.validator is custom_validator
+        assert middleware.validator is custom_validator, (
+            "expected middleware.validator to be custom_validator"
+        )
 
     def test_echo_header_in_response_false(self) -> None:
         """Verify echo_header_in_response can be set to False."""
         middleware = CorrelationIDMiddleware(echo_header_in_response=False)
-        assert middleware.echo_header_in_response is False
+        assert middleware.echo_header_in_response is False, (
+            "expected middleware.echo_header_in_response to be False"
+        )
 
     # Validation and error handling tests
 
@@ -151,8 +175,10 @@ class TestCorrelationIDMiddlewareConfiguration:
             CorrelationIDMiddleware(foo=1)
 
         message = str(excinfo.value)
-        assert "foo" in message
-        assert "Unknown keyword arguments" in message
+        assert "foo" in message, "expected 'foo' to be present in message"
+        assert "Unknown keyword arguments" in message, (
+            "expected 'Unknown keyword arguments' to be present in message"
+        )
 
     def test_config_and_kwargs_conflict_raises_value_error(self) -> None:
         """Verify providing both config and other kwargs raises ValueError."""
@@ -175,7 +201,9 @@ class TestCorrelationIDMiddlewareConfiguration:
         middleware = CorrelationIDMiddleware(trusted_sources=sources)
         # Modifying original list should not affect middleware
         sources.append("10.0.0.1")
-        assert middleware.trusted_sources == frozenset(["127.0.0.1"])
+        assert middleware.trusted_sources == frozenset(["127.0.0.1"]), (
+            "expected condition: middleware.trusted_sources == frozenset([..."
+        )
 
     def test_config_trusted_sources_is_frozen_from_mutable_input(self) -> None:
         """Verify direct config construction freezes trusted source inputs."""
@@ -184,8 +212,12 @@ class TestCorrelationIDMiddlewareConfiguration:
 
         sources.add("10.0.0.1")
 
-        assert config.trusted_sources == frozenset(["127.0.0.1"])
-        assert isinstance(config.trusted_sources, frozenset)
+        assert config.trusted_sources == frozenset(["127.0.0.1"]), (
+            "expected condition: config.trusted_sources == frozenset(['127..."
+        )
+        assert isinstance(config.trusted_sources, frozenset), (
+            "expected condition: isinstance(config.trusted_sources, frozen..."
+        )
 
     # Combined configuration tests
 
@@ -221,11 +253,17 @@ class TestCorrelationIDMiddlewareConfiguration:
             validator=val,
             echo_header_in_response=False,
         )
-        assert middleware.header_name == "X-Custom-ID"
-        assert middleware.trusted_sources == frozenset(["10.0.0.1"])
-        assert middleware.generator is gen
-        assert middleware.validator is val
-        assert middleware.echo_header_in_response is False
+        assert middleware.header_name == "X-Custom-ID", (
+            "expected middleware.header_name to equal 'X-Custom-ID'"
+        )
+        assert middleware.trusted_sources == frozenset(["10.0.0.1"]), (
+            "expected condition: middleware.trusted_sources == frozenset([..."
+        )
+        assert middleware.generator is gen, "expected middleware.generator to be gen"
+        assert middleware.validator is val, "expected middleware.validator to be val"
+        assert middleware.echo_header_in_response is False, (
+            "expected middleware.echo_header_in_response to be False"
+        )
 
     # Config-based construction tests
 
@@ -240,12 +278,18 @@ class TestCorrelationIDMiddlewareConfiguration:
         middleware = CorrelationIDMiddleware(config=cfg)
 
         # The middleware should hold a reference to the exact config object
-        assert middleware.config is cfg
+        assert middleware.config is cfg, "expected middleware.config to be cfg"
 
         # And its exposed properties should reflect the config values
-        assert middleware.header_name == cfg.header_name
-        assert middleware.echo_header_in_response == cfg.echo_header_in_response
-        assert middleware.trusted_sources == cfg.trusted_sources
+        assert middleware.header_name == cfg.header_name, (
+            "expected middleware.header_name to equal cfg.header_name"
+        )
+        assert middleware.echo_header_in_response == cfg.echo_header_in_response, (
+            "expected condition: middleware.echo_header_in_response == cfg..."
+        )
+        assert middleware.trusted_sources == cfg.trusted_sources, (
+            "expected middleware.trusted_sources to equal cfg.trusted_sources"
+        )
 
     def test_config_from_kwargs_equivalence(self) -> None:
         """Verify CorrelationIDConfig.from_kwargs matches direct construction."""
@@ -265,9 +309,13 @@ class TestCorrelationIDMiddlewareConfiguration:
         )
 
         # from_kwargs should produce an equivalent configuration
-        assert cfg_from_kwargs.header_name == cfg_direct.header_name
+        assert cfg_from_kwargs.header_name == cfg_direct.header_name, (
+            "expected condition: cfg_from_kwargs.header_name == cfg_direct..."
+        )
         assert (
             cfg_from_kwargs.echo_header_in_response
             == cfg_direct.echo_header_in_response
+        ), "expected condition: cfg_from_kwargs.echo_header_in_response =..."
+        assert cfg_from_kwargs.trusted_sources == cfg_direct.trusted_sources, (
+            "expected condition: cfg_from_kwargs.trusted_sources == cfg_di..."
         )
-        assert cfg_from_kwargs.trusted_sources == cfg_direct.trusted_sources
