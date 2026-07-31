@@ -12,8 +12,10 @@ httpx = pytest.importorskip("httpx")
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
-from falcon_correlate import correlation_id_var  # noqa: E402
-from falcon_correlate.httpx import (  # noqa: E402
+from falcon_correlate import (  # noqa: E402 -- dependency probe first.
+    correlation_id_var,
+)
+from falcon_correlate.httpx import (  # noqa: E402 -- dependency probe first.
     _prepare_headers,
     async_request_with_correlation_id,
     request_with_correlation_id,

@@ -14,37 +14,47 @@ class TestContextVariableDefinitions:
         """Verify correlation_id_var is a ContextVar instance."""
         from falcon_correlate import correlation_id_var
 
-        assert isinstance(correlation_id_var, contextvars.ContextVar)
+        assert isinstance(correlation_id_var, contextvars.ContextVar), (
+            "expected condition: isinstance(correlation_id_var, contextvar..."
+        )
 
     def test_user_id_var_is_context_var(self) -> None:
         """Verify user_id_var is a ContextVar instance."""
         from falcon_correlate import user_id_var
 
-        assert isinstance(user_id_var, contextvars.ContextVar)
+        assert isinstance(user_id_var, contextvars.ContextVar), (
+            "expected condition: isinstance(user_id_var, contextvars.Conte..."
+        )
 
     def test_correlation_id_var_name(self) -> None:
         """Verify correlation_id_var has the expected name."""
         from falcon_correlate import correlation_id_var
 
-        assert correlation_id_var.name == "correlation_id"
+        assert correlation_id_var.name == "correlation_id", (
+            "expected correlation_id_var.name to equal 'correlation_id'"
+        )
 
     def test_user_id_var_name(self) -> None:
         """Verify user_id_var has the expected name."""
         from falcon_correlate import user_id_var
 
-        assert user_id_var.name == "user_id"
+        assert user_id_var.name == "user_id", (
+            "expected user_id_var.name to equal 'user_id'"
+        )
 
     def test_correlation_id_var_default_is_none(self) -> None:
         """Verify correlation_id_var defaults to None."""
         from falcon_correlate import correlation_id_var
 
-        assert correlation_id_var.get() is None
+        assert correlation_id_var.get() is None, (
+            "expected correlation_id_var.get() to be None"
+        )
 
     def test_user_id_var_default_is_none(self) -> None:
         """Verify user_id_var defaults to None."""
         from falcon_correlate import user_id_var
 
-        assert user_id_var.get() is None
+        assert user_id_var.get() is None, "expected user_id_var.get() to be None"
 
 
 class TestContextVariableOperations:
@@ -66,14 +76,14 @@ class TestContextVariableOperations:
         def _inner() -> None:
             """Exercise the request lifecycle inside an isolated context."""
             token = var.set(test_value)
-            assert var.get() == test_value
+            assert var.get() == test_value, "expected var.get() to equal test_value"
             var.reset(token)
 
         ctx = contextvars.copy_context()
         ctx.run(_inner)
 
         # Values set in the copied context must not leak into the outer context.
-        assert var.get() is None
+        assert var.get() is None, "expected var.get() to be None"
 
     @pytest.mark.parametrize(
         "var_name",
@@ -89,7 +99,7 @@ class TestContextVariableOperations:
             """Exercise the request lifecycle inside an isolated context."""
             token = var.set("temporary-value")
             var.reset(token)
-            assert var.get() is None
+            assert var.get() is None, "expected var.get() to be None"
 
         ctx = contextvars.copy_context()
         ctx.run(_inner)
@@ -102,22 +112,30 @@ class TestContextVariableExports:
         """Verify correlation_id_var is listed in __all__."""
         import falcon_correlate
 
-        assert "correlation_id_var" in falcon_correlate.__all__
+        assert "correlation_id_var" in falcon_correlate.__all__, (
+            "expected condition: 'correlation_id_var' in falcon_correlate...."
+        )
 
     def test_user_id_var_in_all(self) -> None:
         """Verify user_id_var is listed in __all__."""
         import falcon_correlate
 
-        assert "user_id_var" in falcon_correlate.__all__
+        assert "user_id_var" in falcon_correlate.__all__, (
+            "expected 'user_id_var' to be present in falcon_correlate.__all__"
+        )
 
     def test_correlation_id_var_importable_from_root(self) -> None:
         """Verify correlation_id_var can be imported from package root."""
         from falcon_correlate import correlation_id_var
 
-        assert isinstance(correlation_id_var, contextvars.ContextVar)
+        assert isinstance(correlation_id_var, contextvars.ContextVar), (
+            "expected condition: isinstance(correlation_id_var, contextvar..."
+        )
 
     def test_user_id_var_importable_from_root(self) -> None:
         """Verify user_id_var can be imported from package root."""
         from falcon_correlate import user_id_var
 
-        assert isinstance(user_id_var, contextvars.ContextVar)
+        assert isinstance(user_id_var, contextvars.ContextVar), (
+            "expected condition: isinstance(user_id_var, contextvars.Conte..."
+        )
