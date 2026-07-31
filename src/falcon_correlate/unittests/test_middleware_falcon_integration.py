@@ -45,7 +45,9 @@ class TestCorrelationIDMiddlewareWithFalcon:
         app_with_middleware: falcon.App,
     ) -> None:
         """Verify middleware can be added to a Falcon application."""
-        assert app_with_middleware is not None
+        assert app_with_middleware is not None, (
+            "expected app_with_middleware not to be None"
+        )
 
     def test_request_completes_with_middleware(
         self,
@@ -55,7 +57,9 @@ class TestCorrelationIDMiddlewareWithFalcon:
         # Request to non-existent route returns 404, but the middleware runs
         result = client.simulate_get("/")
         # 404 is expected since no routes are defined
-        assert result.status_code == HTTPStatus.NOT_FOUND
+        assert result.status_code == HTTPStatus.NOT_FOUND, (
+            "expected result.status_code to equal HTTPStatus.NOT_FOUND"
+        )
 
     def _verify_middleware_hook_called(
         self,
@@ -95,7 +99,7 @@ class TestCorrelationIDMiddlewareWithFalcon:
         client = falcon.testing.TestClient(app)
         client.simulate_get("/test")
 
-        assert call_log == expected_calls
+        assert call_log == expected_calls, "expected call_log to equal expected_calls"
 
     def _create_tracking_middleware(
         self,

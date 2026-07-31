@@ -17,7 +17,9 @@ from .middleware_config import (
     CorrelationIDConfig,
 )
 from .middleware_utils import (
-    CORRELATION_ID_RESET_TOKEN_ATTR,
+    CORRELATION_ID_RESET_TOKEN_ATTR as _CORRELATION_ID_RESET_TOKEN_ATTR,
+)
+from .middleware_utils import (
     RECOMMENDED_LOG_FORMAT,
     ContextualLogFilter,
     correlation_id_var,
@@ -49,7 +51,6 @@ if typ.TYPE_CHECKING:
     from .middleware_config import CorrelationIDConfigKwargs
 
 logger = logging.getLogger(__name__)
-_CORRELATION_ID_RESET_TOKEN_ATTR = CORRELATION_ID_RESET_TOKEN_ATTR
 
 
 class _CorrelationIDMiddlewareBase:
@@ -202,7 +203,7 @@ class _CorrelationIDMiddlewareBase:
 
         req.context.correlation_id = correlation_id
         reset_token = self._correlation_id_var.set(correlation_id)
-        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, reset_token)
+        setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, reset_token)
 
     def _echo_correlation_id_header(
         self,
@@ -250,7 +251,7 @@ class _CorrelationIDMiddlewareBase:
         reset_token: object,
     ) -> None:
         """Clear request reset token state and restore ContextVar state."""
-        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
+        setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
 
         if not isinstance(reset_token, contextvars.Token):
             return
@@ -276,7 +277,7 @@ class _CorrelationIDMiddlewareBase:
 
     def _process_response(self, req: _RequestLike, resp: _ResponseLike) -> None:
         """Echo the response header if configured, then clear request state."""
-        reset_token = getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
+        reset_token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
         try:
             if (
                 isinstance(reset_token, contextvars.Token)

@@ -2,16 +2,17 @@
 
 ## Status
 
-Accepted on 2026-05-15 and amended on 2026-06-21 and on 2026-09-25. The project
-uses Ruff as the first lint tier, Interrogate as the second lint tier, and a
-focused Pylint pass, executed directly under a pinned PyPy interpreter, as the
-third lint tier. See
+Accepted on 2026-05-15 and amended on 2026-06-21, 2026-07-31, and 2026-09-25.
+The project uses Ruff as the first lint tier, Interrogate as the second lint
+tier, and a focused Pylint pass executed directly under a pinned PyPy
+interpreter. It also runs `df12-python-lints` under CPython 3.14 and scans
+Syrupy snapshots with `ambrleaks`. See
 [Amendment (2026-09-25): plain Pylint on PyPy 3.12](#amendment-2026-09-25-plain-pylint-on-pypy-312)
 for the current execution mechanism.
 
 ## Date
 
-2026-06-21.
+2026-07-31.
 
 ## Context and Problem Statement
 
@@ -36,6 +37,7 @@ the lint integration.
 - Pin the shim revision so the PyPy-backed Pylint execution path is
   reproducible.
 - Keep Pylint focused on rules that add value beyond Ruff.
+- Run the tagged df12 Pylint plug-in and snapshot scanner under CPython 3.14.
 - Allow narrow suppressions for framework callback signatures, tests, and
   legacy module boundaries.
 
@@ -112,6 +114,8 @@ Non-goals:
 
 - Pylint must run through `pylint-pypy-shim` under PyPy.
 - The shim package must be pinned to a known revision for reproducibility.
+- `df12-python-lints` must be pinned to `v0.1.0` and run under CPython 3.14.
+- `ambrleaks` must scan the repository's Syrupy snapshots.
 - The lint workflow must keep Ruff first so common failures return quickly.
 - The Makefile must expose variables for the Interrogate targets, PyPy runtime,
   shim reference, and Pylint targets.
@@ -119,16 +123,19 @@ Non-goals:
 ## Decision Outcome / Proposed Direction
 
 Choose option D. `make lint` runs `uv run ruff check` first, then runs
-Interrogate with `--fail-under 100`, then runs Pylint under the pinned
-`pypy@3.12` interpreter with `PYLINT_TARGETS` defaulting to `src tests`. See the
-[2026-09-25 amendment](#amendment-2026-09-25-plain-pylint-on-pypy-312) for the
-current execution mechanism.
+Interrogate with `--fail-under 100`, Pylint under pinned PyPy 3.12, then the
+`df12-python-lints` messages and `ambrleaks` under CPython 3.14. The classic
+Pylint pass covers `src tests examples`; see the
+[2026-09-25 amendment](#amendment-2026-09-25-plain-pylint-on-pypy-312) for its
+execution mechanism.
 
 Ruff owns the broad lint policy, import policy, docstring style, type-checking
 import rules, security checks, and most complexity checks. Interrogate owns the
 package docstring coverage threshold. Pylint owns the focused third tier for
 logging, pattern matching, refactoring suggestions, resource handling, and
-selected design limits.
+selected design limits. The df12 plug-in owns house-style structural checks,
+suppression explanations, and snapshot-assertion guidance. `ambrleaks` owns
+snapshot redaction checks.
 
 ## Known Risks and Limitations
 
@@ -138,6 +145,8 @@ selected design limits.
   records why that disable was removed.
 - The Pylint tier may be slower than Ruff. Running Ruff first keeps most
   high-volume feedback fast.
+- The df12 tools need a managed CPython 3.14 installation in addition to the
+  project's supported interpreter and the PyPy runtime.
 - Interrogate reports paths relative to its invocation directory. The Makefile
   runs it from the repository root and keeps `INTERROGATE_TARGETS`
   repo-root-relative for transparent overrides.

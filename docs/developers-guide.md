@@ -596,15 +596,20 @@ Run `make markdownlint` for the combined Markdown and spelling gate, and
 
 The lint target is configured by these Makefile variables:
 
-| Variable              | Default                                                                                                         | Purpose                                                        |
-| --------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `UV`                  | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                                   | Selects the `uv` launcher used by all Python tool commands.    |
-| `UV_ENV`              | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                                  | Keeps project-local `uv` cache and tool directories.           |
-| `PYLINT_PYTHON`       | `pypy@3.12`                                                                                                     | Selects the Python runtime used for the Pylint tool execution. |
-| `PYLINT_VERSION`      | `4.0.9`                                                                                                         | Pins the Pylint version installed by `uv tool run`.            |
-| `PYLINT_TARGETS`      | `src tests examples`                                                                                            | Defines the source trees checked by the Pylint tier.           |
-| `PYLINT`              | `$(UV_ENV) $(UV) tool run --managed-python --python $(PYLINT_PYTHON) --from 'pylint==$(PYLINT_VERSION)' pylint` | Expands to the full PyPy-backed Pylint command.                |
-| `INTERROGATE_TARGETS` | `src/falcon_correlate`                                                                                          | Defines the repo-root-relative trees checked by Interrogate.   |
+| Variable                | Default                                                                                                         | Purpose                                                        |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `UV`                    | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                                   | Selects the `uv` launcher used by all Python tool commands.    |
+| `UV_ENV`                | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                                  | Keeps project-local `uv` cache and tool directories.           |
+| `PYLINT_PYTHON`         | `pypy@3.12`                                                                                                     | Selects the Python runtime used for the classic Pylint pass.   |
+| `PYLINT_VERSION`        | `4.0.9`                                                                                                         | Pins the Pylint version installed by `uv tool run`.            |
+| `PYLINT_TARGETS`        | `src tests examples`                                                                                            | Defines the source trees checked by classic Pylint.           |
+| `PYLINT`                | `$(UV_ENV) $(UV) tool run --managed-python --python $(PYLINT_PYTHON) --from 'pylint==$(PYLINT_VERSION)' pylint` | Expands to the PyPy-backed classic Pylint command.             |
+| `DF12_PYTHON_LINTS_REF` | `v0.1.0`                                                                                                        | Pins the df12 plug-in and `ambrleaks` tool source.             |
+| `DF12_PYTHON`           | `3.14`                                                                                                          | Selects CPython 3.14 for the df12 Pylint and snapshot passes.   |
+| `DF12_PYLINT_MESSAGES`  | All twelve messages supplied by `v0.1.0`                                                                        | Keeps adoption of df12 checks explicit and reviewable.         |
+| `DF12_PYLINT`           | `$(UV_ENV) $(UV) run --python $(DF12_PYTHON) pylint`                                                            | Runs the isolated CPython 3.14 plug-in pass.                    |
+| `AMBRLEAKS`             | `$(UV_ENV) $(UV) tool run --python $(DF12_PYTHON) ... ambrleaks`                                                | Scans the Syrupy snapshots under CPython 3.14.                  |
+| `INTERROGATE_TARGETS`   | `src/falcon_correlate`                                                                                          | Defines the repo-root-relative trees checked by Interrogate.   |
 
 Override variables at the command line for targeted investigation. For example:
 
@@ -616,6 +621,8 @@ make lint PYLINT_TARGETS=src/falcon_correlate/middleware.py
 PyPy release cannot change the parsed grammar without a commit. Do not change
 `PYLINT_PYTHON` or `PYLINT_VERSION` casually; either one changes the lint
 execution environment and should be reviewed as a tooling change.
+Update the `df12-python-lints` dependency and `DF12_PYTHON_LINTS_REF` together
+so the Pylint plug-in and `ambrleaks` keep the same rule implementation.
 
 ## Episodic lint policy
 
@@ -630,8 +637,8 @@ The policy is:
   `collections.abc as cabc`, `datetime as dt`, and `unittest.mock as mock`;
 - keep docstrings in NumPy style;
 - use a focused Pylint allow-list rather than enabling every Pylint message;
-- run Pylint directly under a pinned PyPy interpreter as a second tier after
-  Ruff; and
+- run built-in Pylint checks directly under a pinned PyPy interpreter;
+- run all `df12-python-lints` checks and `ambrleaks` under CPython 3.14; and
 - add narrow suppressions only when framework callbacks, tests, or existing
   module boundaries make a rule unsuitable for the current change.
 

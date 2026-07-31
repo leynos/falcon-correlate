@@ -31,6 +31,15 @@ PYLINT_PYTHON ?= pypy@3.12
 PYLINT_VERSION ?= 4.0.9
 PYLINT_TARGETS ?= src tests examples
 PYLINT = $(UV_ENV) $(UV) tool run --managed-python --python $(PYLINT_PYTHON) --from 'pylint==$(PYLINT_VERSION)' pylint
+DF12_PYTHON_LINTS_REF ?= v0.1.0
+DF12_PYTHON_LINTS = git+https://github.com/leynos/df12-python-lints.git@$(DF12_PYTHON_LINTS_REF)
+DF12_PYTHON ?= 3.14
+DF12_PYLINT_MESSAGES = R9101,C9102,R9103,R9104,C9105,C9106,C9107,R9108,R9109,R9110,R9111,C9112
+DF12_PYLINT = $(UV_ENV) $(UV) run --python $(DF12_PYTHON) pylint \
+	--disable=all --load-plugins=df12_python_lints \
+	--enable=$(DF12_PYLINT_MESSAGES)
+AMBRLEAKS = $(UV_ENV) $(UV) tool run --python $(DF12_PYTHON) \
+	--from '$(DF12_PYTHON_LINTS)' ambrleaks
 
 .PHONY: help all clean build build-release lint fmt check-fmt doctest \
         markdownlint nixie spelling test typecheck \
@@ -98,6 +107,8 @@ lint: ruff ## Run linters
 	$(UV_ENV) $(UV) run ruff check
 	$(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
 	$(PYLINT) $(PYLINT_TARGETS)
+	$(DF12_PYLINT) $(PYLINT_TARGETS)
+	$(AMBRLEAKS) tests
 
 typecheck: build ty ## Run typechecking
 	ty --version
@@ -111,7 +122,8 @@ spelling: ## Enforce en-GB-oxendict spelling
 
 nixie: ## Validate Mermaid diagrams
 	$(call ensure_tool,nixie)
-	$(NIXIE) --no-sandbox
+	@git ls-files -z '*.md' | \
+		xargs -0 -n 1 $(NIXIE) --no-sandbox --max-concurrency 1
 
 doctest: build uv $(VENV_TOOLS) ## Run docstring examples
 	$(UV_ENV) $(UV) run pytest --doctest-modules --import-mode=importlib src/falcon_correlate --ignore=src/falcon_correlate/unittests

@@ -21,8 +21,10 @@ pytestmark = pytest.mark.skipif(
     reason="celery is not installed",
 )
 
-from falcon_correlate import correlation_id_var  # noqa: E402
-from falcon_correlate.celery import (  # noqa: E402
+from falcon_correlate import (  # noqa: E402 -- dependency probe first.
+    correlation_id_var,
+)
+from falcon_correlate.celery import (  # noqa: E402 -- dependency probe first.
     _maybe_connect_celery_publish_signal,
     propagate_correlation_id_to_celery,
 )
@@ -72,7 +74,7 @@ def test_handler_updates_publish_correlation_id(
     assert properties == {
         "correlation_id": expected_correlation_id,
         "reply_to": "reply-queue",
-    }
+    }, "expected condition: properties == {'correlation_id': expected..."
 
 
 def test_handler_preserves_task_id_correlation_for_rpc_result_backend(
@@ -100,7 +102,7 @@ def test_handler_preserves_task_id_correlation_for_rpc_result_backend(
     assert properties == {
         "correlation_id": "celery-task-id",
         "reply_to": "reply-queue",
-    }
+    }, "expected condition: properties == {'correlation_id': 'celery-..."
 
 
 def test_handler_tolerates_missing_properties_mapping(
@@ -182,9 +184,13 @@ def _assert_signal_delivery(
     probe_calls: list[str],
 ) -> None:
     """Assert one signal reaches the integration and probe receivers."""
-    assert properties["correlation_id"] == "request-correlation-id"
-    assert len(probe_calls) == 1
-    assert _count_integration_receivers(signal_responses) == 1
+    assert properties["correlation_id"] == "request-correlation-id", (
+        "expected condition: properties['correlation_id'] == 'request-..."
+    )
+    assert len(probe_calls) == 1, "expected len(probe_calls) to equal 1"
+    assert _count_integration_receivers(signal_responses) == 1, (
+        "expected condition: _count_integration_receivers(signal_respo..."
+    )
 
 
 def test_signal_connection_is_idempotent_across_reload(
@@ -218,8 +224,10 @@ def test_publish_signal_handler_is_exported_from_package_root() -> None:
     """The Celery publish handler should be re-exported from the package root."""
     import falcon_correlate
 
-    assert "propagate_correlation_id_to_celery" in falcon_correlate.__all__
+    assert "propagate_correlation_id_to_celery" in falcon_correlate.__all__, (
+        "expected condition: 'propagate_correlation_id_to_celery' in f..."
+    )
     assert (
         falcon_correlate.propagate_correlation_id_to_celery
         is propagate_correlation_id_to_celery
-    )
+    ), "expected condition: falcon_correlate.propagate_correlation_id..."

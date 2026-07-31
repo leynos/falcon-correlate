@@ -98,7 +98,7 @@ def run_act(config: ActConfig) -> tuple[int, Path, str]:
     if config.dry_run:
         cmd.append("--list")
 
-    completed = subprocess.run(  # noqa: S603
+    completed = subprocess.run(  # noqa: S603 -- resolved act path and structured arguments.
         cmd,
         text=True,
         capture_output=True,

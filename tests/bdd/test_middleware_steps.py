@@ -57,8 +57,10 @@ def when_create_app_with_middleware(context: Context) -> None:
 @then("the application should be created successfully")
 def then_app_created(context: Context) -> None:
     """Verify the app was created."""
-    assert context["app"] is not None
-    assert isinstance(context["app"], falcon.App)
+    assert context["app"] is not None, "expected context['app'] not to be None"
+    assert isinstance(context["app"], falcon.App), (
+        "expected isinstance(context['app'], falcon.App) to be truthy"
+    )
 
 
 @given("a Falcon application with CorrelationIDMiddleware", target_fixture="context")
@@ -119,30 +121,44 @@ def when_make_get_request_with_header(
 @then("the request should complete successfully")
 def then_request_complete(context: Context) -> None:
     """Verify the request completed successfully."""
-    assert context["response"].status_code == HTTPStatus.OK
+    assert context["response"].status_code == HTTPStatus.OK, (
+        "expected context['response'].status_code to equal HTTPStatus.OK"
+    )
 
 
 @then("the response should be returned")
 def then_response_returned(context: Context) -> None:
     """Verify a response was returned."""
-    assert context["response"] is not None
-    assert context["response"].status_code == HTTPStatus.OK
+    assert context["response"] is not None, (
+        "expected context['response'] not to be None"
+    )
+    assert context["response"].status_code == HTTPStatus.OK, (
+        "expected context['response'].status_code to equal HTTPStatus.OK"
+    )
 
 
 @then("process_response should have been called")
 def then_process_response_called(context: Context) -> None:
     """Verify process_response was called."""
     middleware = context["middleware"]
-    assert isinstance(middleware, TrackingMiddleware)
-    assert middleware.process_response_called
+    assert isinstance(middleware, TrackingMiddleware), (
+        "expected isinstance(middleware, TrackingMiddleware) to be truthy"
+    )
+    assert middleware.process_response_called, (
+        "expected middleware.process_response_called to be truthy"
+    )
 
 
 @then(parsers.parse('the response correlation id should be "{expected_id}"'))
 def then_response_has_correlation_id(context: Context, expected_id: str) -> None:
     """Verify the response includes the expected correlation ID."""
     data = context["response"].json
-    assert data["has_correlation_id"] is True
-    assert data["correlation_id"] == expected_id
+    assert data["has_correlation_id"] is True, (
+        "expected data['has_correlation_id'] to be True"
+    )
+    assert data["correlation_id"] == expected_id, (
+        "expected data['correlation_id'] to equal expected_id"
+    )
 
 
 @then(
@@ -165,8 +181,10 @@ def then_http_response_header_matches(
 def then_response_has_no_correlation_id(context: Context) -> None:
     """Verify the response does not include a correlation ID."""
     data = context["response"].json
-    assert data["has_correlation_id"] is False
-    assert data["correlation_id"] is None
+    assert data["has_correlation_id"] is False, (
+        "expected data['has_correlation_id'] to be False"
+    )
+    assert data["correlation_id"] is None, "expected data['correlation_id'] to be None"
 
 
 # Configuration scenario steps
@@ -197,7 +215,9 @@ def given_middleware_with_header_name(header_name: str) -> Context:
 @then(parsers.parse('the middleware should use "{header_name}" as the header name'))
 def then_middleware_uses_header_name(context: Context, header_name: str) -> None:
     """Verify middleware uses specified header name."""
-    assert context["middleware"].header_name == header_name
+    assert context["middleware"].header_name == header_name, (
+        "expected context['middleware'].header_name to equal header_name"
+    )
 
 
 @given(
@@ -225,7 +245,9 @@ def given_middleware_with_trusted_sources(sources: str) -> Context:
 @then(parsers.parse("the middleware should have {count:d} trusted sources"))
 def then_middleware_has_trusted_sources_count(context: Context, count: int) -> None:
     """Verify middleware has expected number of trusted sources."""
-    assert len(context["middleware"].trusted_sources) == count
+    assert len(context["middleware"].trusted_sources) == count, (
+        "expected condition: len(context['middleware'].trusted_sources..."
+    )
 
 
 # Trusted source scenario steps
