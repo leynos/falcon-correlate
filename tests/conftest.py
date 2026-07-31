@@ -44,7 +44,7 @@ class TrackingMiddleware(CorrelationIDMiddleware):
     to verify middleware lifecycle behaviour.
     """
 
-    def __init__(self, **kwargs: typ.Any) -> None:  # noqa: ANN401
+    def __init__(self, **kwargs: typ.Any) -> None:  # noqa: ANN401 -- mirrors middleware options.
         """Initialize tracking middleware with call flags reset."""
         super().__init__(**kwargs)
         self.process_request_called = False

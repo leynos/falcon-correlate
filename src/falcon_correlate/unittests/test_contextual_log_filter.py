@@ -361,14 +361,9 @@ class TestContextualLogFilterLoggingIntegration:
         isolated_context(test_logic)
 
         output = stream.getvalue()
-        assert "[log-cid-001]" in output, (
-            f"expected '[log-cid-001]' in output, got {output!r}"
-        )
-        assert "[log-uid-001]" in output, (
-            f"expected '[log-uid-001]' in output, got {output!r}"
-        )
-        assert "hello from test" in output, (
-            f"expected 'hello from test' in output, got {output!r}"
+        expected_output = "[log-cid-001][log-uid-001] hello from test\n"
+        assert output == expected_output, (
+            f"expected complete formatted log {expected_output!r}, got {output!r}"
         )
 
     def test_filter_works_with_dict_config(
@@ -541,14 +536,12 @@ class TestRecommendedLogFormat:
             isolated_context(test_logic)
 
             output = stream.getvalue()
-            assert "[rec-cid-001]" in output, (
-                f"expected '[rec-cid-001]' in output, got {output!r}"
+            expected_suffix = (
+                " - [INFO] - [rec-cid-001] - [rec-uid-001] - "
+                "test_recommended_fmt - recommended format test\n"
             )
-            assert "[rec-uid-001]" in output, (
-                f"expected '[rec-uid-001]' in output, got {output!r}"
-            )
-            assert "recommended format test" in output, (
-                f"expected message in output, got {output!r}"
+            assert output.endswith(expected_suffix), (
+                f"expected formatted log suffix {expected_suffix!r}, got {output!r}"
             )
         finally:
             test_logger.removeHandler(handler)

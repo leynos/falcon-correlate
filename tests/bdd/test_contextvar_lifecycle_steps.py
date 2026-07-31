@@ -132,14 +132,20 @@ def when_send_concurrent_requests(
 def then_resource_observes_context_value(context: Context, expected: str) -> None:
     """Verify the in-request context variable value matches the correlation ID."""
     payload = typ.cast("dict[str, str | None]", context["response"].json)
-    assert payload["correlation_id"] == expected
-    assert payload["context_var_id"] == expected
+    assert payload["correlation_id"] == expected, (
+        "expected payload['correlation_id'] to equal expected"
+    )
+    assert payload["context_var_id"] == expected, (
+        "expected payload['context_var_id'] to equal expected"
+    )
 
 
 @then("the correlation ID context variable should be cleared")
 def then_context_variable_cleared() -> None:
     """Verify request handling left no lingering correlation ID context."""
-    assert correlation_id_var.get() is None
+    assert correlation_id_var.get() is None, (
+        "expected correlation_id_var.get() to be None"
+    )
 
 
 @then("each lifecycle response should contain its own correlation ID")
@@ -148,5 +154,9 @@ def then_each_response_contains_own_correlation_id(context: Context) -> None:
     results = context["concurrent_results"]
 
     for expected_id, payload in results.items():
-        assert payload["correlation_id"] == expected_id
-        assert payload["context_var_id"] == expected_id
+        assert payload["correlation_id"] == expected_id, (
+            "expected payload['correlation_id'] to equal expected_id"
+        )
+        assert payload["context_var_id"] == expected_id, (
+            "expected payload['context_var_id'] to equal expected_id"
+        )

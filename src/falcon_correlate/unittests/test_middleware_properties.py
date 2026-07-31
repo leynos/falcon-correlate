@@ -69,7 +69,10 @@ class _PropertyResponse:
             The recorded value, or ``None`` if the header is absent.
 
         """
-        return self.headers.get(name)
+        try:
+            return self.headers[name]
+        except KeyError:
+            return None
 
 
 def _expected_correlation_id(

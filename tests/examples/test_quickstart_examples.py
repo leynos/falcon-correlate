@@ -157,7 +157,7 @@ class TestQuickstartLoggingSetup:
 
         actual_snapshot = "\n".join(rendered)
         assert actual_snapshot == snapshot, (
-            "expected quickstart log format variants to match the approved snapshot"
+            "expected condition: actual_snapshot == snapshot..."
         )
 
 

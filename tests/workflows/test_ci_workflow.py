@@ -28,7 +28,7 @@ def _tool_is_available(tool_name: str, args: list[str]) -> bool:
     tool_path = shutil.which(tool_name)
     if tool_path is None:
         return False
-    result = subprocess.run(  # noqa: S603
+    result = subprocess.run(  # noqa: S603 -- resolved tool path and fixed arguments.
         [tool_path, *args],
         capture_output=True,
         check=False,
@@ -101,7 +101,7 @@ def run_act(config: ActConfig) -> tuple[int, Path, str]:
     if config.dry_run:
         cmd.append("--list")
 
-    completed = subprocess.run(  # noqa: S603
+    completed = subprocess.run(  # noqa: S603 -- resolved act path and structured arguments.
         cmd,
         text=True,
         capture_output=True,
