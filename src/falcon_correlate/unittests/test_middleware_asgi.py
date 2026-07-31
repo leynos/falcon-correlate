@@ -69,10 +69,10 @@ class TestCorrelationIDMiddlewareASGIConfiguration:
         """Verify Falcon ASGI hooks are explicit coroutine functions."""
         assert inspect.iscoroutinefunction(
             CorrelationIDMiddlewareASGI.process_request,
-        ), "expected CorrelationIDMiddlewareASGI.process_request to be a coroutine"
+        ), "expected condition: inspect.iscoroutinefunction(CorrelationID..."
         assert inspect.iscoroutinefunction(
             CorrelationIDMiddlewareASGI.process_response,
-        ), "expected CorrelationIDMiddlewareASGI.process_response to be a coroutine"
+        ), "expected condition: inspect.iscoroutinefunction(CorrelationID..."
 
 
 class TestCorrelationIDMiddlewareASGIRequestLifecycle:

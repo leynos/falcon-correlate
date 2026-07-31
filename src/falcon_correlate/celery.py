@@ -27,7 +27,7 @@ _CORRELATION_ID_CONTEXT_KEY = "correlation_id"
 _logger = logging.getLogger(__name__)
 
 _ContextToken = contextvars.Token[str | None]
-_CeleryContextTokens = dict[str, list[_ContextToken]]
+type _CeleryContextTokens = dict[str, list[_ContextToken]]
 _celery_context_tokens: contextvars.ContextVar[_CeleryContextTokens | None] = (
     contextvars.ContextVar("celery_context_tokens", default=None)
 )

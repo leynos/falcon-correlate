@@ -36,6 +36,12 @@ def test_interrogate_reports_full_package_docstring_coverage() -> None:
     assert result.returncode == 0, result.stderr
     result_match = _INTERROGATE_RESULT_PATTERN.search(result.stdout)
     assert result_match is not None, result.stdout
-    assert result_match["status"] == "PASSED"
-    assert result_match["minimum"] == "100.0"
-    assert result_match["actual"] == "100.0"
+    assert result_match["status"] == "PASSED", (
+        "expected result_match['status'] to equal 'PASSED'"
+    )
+    assert result_match["minimum"] == "100.0", (
+        "expected result_match['minimum'] to equal '100.0'"
+    )
+    assert result_match["actual"] == "100.0", (
+        "expected result_match['actual'] to equal '100.0'"
+    )

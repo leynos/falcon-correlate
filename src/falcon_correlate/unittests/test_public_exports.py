@@ -126,16 +126,19 @@ class TestPublicExports:
         import falcon_correlate
         from falcon_correlate import CorrelationIDMiddlewareASGI
 
-        assert "CorrelationIDMiddleware" in falcon_correlate.__all__
-        assert "CorrelationIDMiddlewareASGI" in falcon_correlate.__all__
-        assert "CorrelationIDConfig" in falcon_correlate.__all__
-        assert "default_uuid7_generator" in falcon_correlate.__all__
+        expected_exports = {
+            "CorrelationIDConfig",
+            "CorrelationIDMiddleware",
+            "CorrelationIDMiddlewareASGI",
+            "default_uuid7_generator",
+        }
+        missing_exports = expected_exports.difference(falcon_correlate.__all__)
+        assert not missing_exports, (
+            f"expected exports missing from __all__: {missing_exports}"
+        )
         assert (
             CorrelationIDMiddlewareASGI is falcon_correlate.CorrelationIDMiddlewareASGI
-        ), (
-            "expected imported CorrelationIDMiddlewareASGI to be "
-            "falcon_correlate.CorrelationIDMiddlewareASGI but got different objects"
-        )
+        ), "expected condition: CorrelationIDMiddlewareASGI is falcon_cor..."
 
     def test_default_uuid7_generator_importable_from_root(self) -> None:
         """Verify default_uuid7_generator can be imported from package root."""
@@ -157,8 +160,7 @@ class TestPublicExports:
         exported = "plain instance"
 
         assert inspect.getdoc(exported) == inspect.getdoc(type(exported)), (
-            "expected the plain builtin instance documentation to be inherited "
-            "from its type"
+            "expected condition: inspect.getdoc(exported) == inspect.getdo..."
         )
         with pytest.raises(AssertionError, match="inherited from its type"):
             _assert_public_export_is_documented("plain_instance", exported)

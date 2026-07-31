@@ -177,7 +177,7 @@ def _run_python_with_celery_blocked(
     *args: str,
 ) -> subprocess.CompletedProcess[str]:
     """Run a Python child process where importing Celery raises ImportError."""
-    return subprocess.run(  # noqa: S603
+    return subprocess.run(  # noqa: S603 -- fixed child interpreter and arguments.
         [sys.executable, *args],
         check=False,
         cwd=cwd,

@@ -8,12 +8,20 @@ import pytest
 
 httpx = pytest.importorskip("httpx")
 
-from unittest import mock  # noqa: E402
+from unittest import mock  # noqa: E402 -- dependency probe first.
 
-from pytest_bdd import given, parsers, scenarios, then, when  # noqa: E402
+from pytest_bdd import (  # noqa: E402 -- dependency probe first.
+    given,
+    parsers,
+    scenarios,
+    then,
+    when,
+)
 
-from falcon_correlate import correlation_id_var  # noqa: E402
-from falcon_correlate.httpx import (  # noqa: E402
+from falcon_correlate import (  # noqa: E402 -- dependency probe first.
+    correlation_id_var,
+)
+from falcon_correlate.httpx import (  # noqa: E402 -- dependency probe first.
     async_request_with_correlation_id,
     request_with_correlation_id,
 )
@@ -24,7 +32,7 @@ if typ.TYPE_CHECKING:
 scenarios("httpx_propagation.feature")
 
 
-def _run_async_request(**kwargs: typ.Any) -> dict[str, str]:  # noqa: ANN401
+def _run_async_request(**kwargs: typ.Any) -> dict[str, str]:  # noqa: ANN401 -- mirrors httpx kwargs.
     """Run ``async_request_with_correlation_id`` with a mocked AsyncClient.
 
     Returns the headers dict captured from the mocked request call.
@@ -51,7 +59,7 @@ def _run_async_request(**kwargs: typ.Any) -> dict[str, str]:  # noqa: ANN401
     return asyncio.run(_run())
 
 
-def _run_sync_request(**kwargs: typ.Any) -> dict[str, str]:  # noqa: ANN401
+def _run_sync_request(**kwargs: typ.Any) -> dict[str, str]:  # noqa: ANN401 -- mirrors httpx kwargs.
     """Run ``request_with_correlation_id`` with a mocked HTTPX request.
 
     Returns

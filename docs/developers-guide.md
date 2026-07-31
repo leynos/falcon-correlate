@@ -259,6 +259,9 @@ The lint target is configured by these Makefile variables:
 | `PYLINT_PYPY_SHIM_REF` | `726d09f968b4d729ee4b29c71fc732e744854f3b`                                                    | Pins the `pylint-pypy-shim` repository revision.               |
 | `PYLINT_PYPY_SHIM`     | `git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)`                  | Identifies the shim package installed by `uv tool run`.        |
 | `PYLINT`               | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                |
+| `DF12_PYTHON_LINTS_REF` | `v0.1.0`                                                                                      | Pins the df12 plug-in and `ambrleaks` tool source.             |
+| `DF12_PYTHON`           | `3.14`                                                                                        | Selects CPython 3.14 for the df12 Pylint and snapshot passes.  |
+| `DF12_PYLINT_MESSAGES`  | All twelve messages supplied by `v0.1.0`                                                      | Keeps adoption of df12 checks explicit and reviewable.         |
 | `INTERROGATE_TARGETS`  | `src/falcon_correlate`                                                                        | Defines the repo-root-relative trees checked by Interrogate.   |
 
 Override variables at the command line for targeted investigation. For example:
@@ -269,6 +272,8 @@ make lint PYLINT_TARGETS=src/falcon_correlate/middleware.py
 
 Do not change `PYLINT_PYPY_SHIM_REF` casually. Updating the shim changes the
 lint execution environment and should be reviewed as a tooling change.
+Update the `df12-python-lints` dependency and `DF12_PYTHON_LINTS_REF` together
+so the Pylint plug-in and `ambrleaks` keep the same rule implementation.
 
 ## Episodic lint policy
 
@@ -283,7 +288,8 @@ The policy is:
   `collections.abc as cabc`, `datetime as dt`, and `unittest.mock as mock`;
 - keep docstrings in NumPy style;
 - use a focused Pylint allow-list rather than enabling every Pylint message;
-- run Pylint under PyPy through the shim as a second tier after Ruff; and
+- run built-in Pylint checks under PyPy through the shim;
+- run all `df12-python-lints` checks and `ambrleaks` under CPython 3.14; and
 - add narrow suppressions only when framework callbacks, tests, or existing
   module boundaries make a rule unsuitable for the current change.
 

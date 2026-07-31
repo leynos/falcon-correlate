@@ -51,7 +51,10 @@ class _Request:
             The value produced for the test scenario.
 
         """
-        return self._headers.get(name)
+        try:
+            return self._headers[name]
+        except KeyError:
+            return None
 
 
 class _Response:
@@ -74,7 +77,10 @@ class _Response:
             The value produced for the test scenario.
 
         """
-        return self.headers.get(name)
+        try:
+            return self.headers[name]
+        except KeyError:
+            return None
 
 
 class _HeaderFailingResponse(_Response):
