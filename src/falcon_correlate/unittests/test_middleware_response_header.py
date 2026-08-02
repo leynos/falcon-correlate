@@ -393,6 +393,7 @@ class TestCorrelationIDResponseHeader:
             )
 
         isolated_context(_inner)
-        assert "Correlation ID response header echoed" in caplog.text, (
+        failure_message = (
             "expected condition: 'Correlation ID response header echoed' i..."
         )
+        assert "Correlation ID response header echoed" in caplog.text, failure_message

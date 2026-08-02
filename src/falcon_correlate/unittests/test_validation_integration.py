@@ -403,9 +403,8 @@ class TestValidationLogging:
             )
 
         if scenario.expect_log:
-            assert scenario.log_contains is not None, (
-                "expected scenario.log_contains not to be None"
-            )
+            failure_message = "expected scenario.log_contains not to be None"
+            assert scenario.log_contains is not None, failure_message
             assert_validation_logged(caplog, scenario.log_contains)
         else:
             assert_validation_not_logged(caplog)
@@ -528,9 +527,8 @@ class TestValidatorExceptionHandling:
 
         assert response.status == "200 OK", f"Expected 200 OK, got {response.status}"
         # A correlation ID should still be present (generated, not the incoming one)
-        assert response.json["correlation_id"] is not None, (
-            "expected response.json['correlation_id'] not to be None"
-        )
+        failure_message = "expected response.json['correlation_id'] not to be None"
+        assert response.json["correlation_id"] is not None, failure_message
         assert response.json["correlation_id"] != "will-crash-validator", (
             "Expected incoming ID not used when validator raises"
         )

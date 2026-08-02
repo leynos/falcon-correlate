@@ -70,12 +70,12 @@ class TestCorrelationIDConfigValidation:
         """Verify from_kwargs preserves empty trusted source containers."""
         config = CorrelationIDConfig.from_kwargs(trusted_sources=trusted_sources)
 
-        assert config.trusted_sources == frozenset(), (
-            "expected config.trusted_sources to equal frozenset()"
-        )
-        assert isinstance(config.trusted_sources, frozenset), (
+        failure_message = "expected config.trusted_sources to equal frozenset()"
+        assert config.trusted_sources == frozenset(), failure_message
+        failure_message = (
             "expected condition: isinstance(config.trusted_sources, frozen..."
         )
+        assert isinstance(config.trusted_sources, frozenset), failure_message
 
     def test_config_non_callable_generator_raises_type_error(self) -> None:
         """Verify non-callable generator on CorrelationIDConfig raises TypeError."""

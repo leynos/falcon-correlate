@@ -45,29 +45,25 @@ def _assert_header(
 ) -> None:
     """Assert that the sole recorded request has the expected header."""
     request = _recorded_request(transport)
-    assert request.headers[name] == expected, (
-        f"expected header {name!r}={expected!r}, got {request.headers!r}"
-    )
+    failure_message = f"expected header {name!r}={expected!r}, got {request.headers!r}"
+    assert request.headers[name] == expected, failure_message
 
 
 def _assert_header_absent(transport: _RecordingTransportT, name: str) -> None:
     """Assert that the sole recorded request omits a header."""
     request = _recorded_request(transport)
-    assert name not in request.headers, (
-        f"expected header {name!r} to be absent, got {request.headers!r}"
-    )
+    failure_message = f"expected header {name!r} to be absent, got {request.headers!r}"
+    assert name not in request.headers, failure_message
 
 
 def _assert_response_ok(response: httpx.Response) -> None:
     """Assert that a transport response has the expected success status."""
-    assert response.status_code == _OK_STATUS, (
-        f"expected status {_OK_STATUS}, got {response.status_code}"
-    )
+    failure_message = f"expected status {_OK_STATUS}, got {response.status_code}"
+    assert response.status_code == _OK_STATUS, failure_message
 
 
 def _recorded_request(transport: _RecordingTransportT) -> httpx.Request:
     """Return the single request captured by a recording transport."""
-    assert len(transport.requests) == 1, (
-        f"expected one recorded request, got {transport.requests!r}"
-    )
+    failure_message = f"expected one recorded request, got {transport.requests!r}"
+    assert len(transport.requests) == 1, failure_message
     return transport.requests[0]

@@ -362,9 +362,10 @@ class TestContextualLogFilterLoggingIntegration:
 
         output = stream.getvalue()
         expected_output = "[log-cid-001][log-uid-001] hello from test\n"
-        assert output == expected_output, (
+        failure_message = (
             f"expected complete formatted log {expected_output!r}, got {output!r}"
         )
+        assert output == expected_output, failure_message
 
     def test_filter_works_with_dict_config(
         self, isolated_context: cabc.Callable[[cabc.Callable[[], None]], None]
@@ -540,9 +541,10 @@ class TestRecommendedLogFormat:
                 " - [INFO] - [rec-cid-001] - [rec-uid-001] - "
                 "test_recommended_fmt - recommended format test\n"
             )
-            assert output.endswith(expected_suffix), (
+            failure_message = (
                 f"expected formatted log suffix {expected_suffix!r}, got {output!r}"
             )
+            assert output.endswith(expected_suffix), failure_message
         finally:
             test_logger.removeHandler(handler)
             handler.close()

@@ -56,13 +56,15 @@ def test_setup_handler_exposes_task_request_correlation_id(
         setup_correlation_id_in_worker(task=task)
 
         stored_tokens = _celery_context_tokens.get(None)
-        assert correlation_id_var.get() == "worker-correlation-id", (
+        failure_message = (
             "expected condition: correlation_id_var.get() == 'worker-corre..."
         )
+        assert correlation_id_var.get() == "worker-correlation-id", failure_message
         assert stored_tokens is not None, "expected stored_tokens not to be None"
-        assert _CORRELATION_ID_CONTEXT_KEY in stored_tokens, (
+        failure_message = (
             "expected condition: _CORRELATION_ID_CONTEXT_KEY in stored_tok..."
         )
+        assert _CORRELATION_ID_CONTEXT_KEY in stored_tokens, failure_message
 
     isolated_context(_logic)
 
@@ -87,12 +89,10 @@ def test_handler_is_noop_when_no_correlation_state(
         """Exercise the isolated test scenario."""
         handler(task=_build_task())
 
-        assert correlation_id_var.get() is None, (
-            "expected correlation_id_var.get() to be None"
-        )
-        assert _celery_context_tokens.get(None) is None, (
-            "expected _celery_context_tokens.get(None) to be None"
-        )
+        failure_message = "expected correlation_id_var.get() to be None"
+        assert correlation_id_var.get() is None, failure_message
+        failure_message = "expected _celery_context_tokens.get(None) to be None"
+        assert _celery_context_tokens.get(None) is None, failure_message
 
     isolated_context(_logic)
 
@@ -110,12 +110,12 @@ def test_clear_handler_resets_context_to_previous_value(
 
         clear_correlation_id_in_worker(task=task)
 
-        assert correlation_id_var.get() == "ambient-correlation-id", (
+        failure_message = (
             "expected condition: correlation_id_var.get() == 'ambient-corr..."
         )
-        assert _celery_context_tokens.get(None) is None, (
-            "expected _celery_context_tokens.get(None) to be None"
-        )
+        assert correlation_id_var.get() == "ambient-correlation-id", failure_message
+        failure_message = "expected _celery_context_tokens.get(None) to be None"
+        assert _celery_context_tokens.get(None) is None, failure_message
 
     isolated_context(_logic)
 
@@ -133,29 +133,36 @@ def test_nested_worker_cleanup_restores_outer_then_ambient_context(
         setup_correlation_id_in_worker(task=outer_task)
         setup_correlation_id_in_worker(task=inner_task)
 
-        assert correlation_id_var.get() == "inner-worker-correlation-id", (
+        failure_message = (
             "expected condition: correlation_id_var.get() == 'inner-worker..."
+        )
+        assert correlation_id_var.get() == "inner-worker-correlation-id", (
+            failure_message
         )
 
         clear_correlation_id_in_worker(task=inner_task)
 
         stored_tokens = _celery_context_tokens.get(None)
-        assert correlation_id_var.get() == "outer-worker-correlation-id", (
+        failure_message = (
             "expected condition: correlation_id_var.get() == 'outer-worker..."
         )
+        assert correlation_id_var.get() == "outer-worker-correlation-id", (
+            failure_message
+        )
         assert stored_tokens is not None, "expected stored_tokens not to be None"
-        assert len(stored_tokens[_CORRELATION_ID_CONTEXT_KEY]) == 1, (
+        failure_message = (
             "expected condition: len(stored_tokens[_CORRELATION_ID_CONTEXT..."
         )
+        assert len(stored_tokens[_CORRELATION_ID_CONTEXT_KEY]) == 1, failure_message
 
         clear_correlation_id_in_worker(task=outer_task)
 
-        assert correlation_id_var.get() == "ambient-correlation-id", (
+        failure_message = (
             "expected condition: correlation_id_var.get() == 'ambient-corr..."
         )
-        assert _celery_context_tokens.get(None) is None, (
-            "expected _celery_context_tokens.get(None) to be None"
-        )
+        assert correlation_id_var.get() == "ambient-correlation-id", failure_message
+        failure_message = "expected _celery_context_tokens.get(None) to be None"
+        assert _celery_context_tokens.get(None) is None, failure_message
 
     isolated_context(_logic)
 
@@ -191,11 +198,13 @@ def test_celery_worker_concurrent_signal_handlers() -> None:
         first = executor.submit(_run_task, "one")
         second = executor.submit(_run_task, "two")
 
+    failure_message = "expected condition: first.result(timeout=5) == ('task-one', 1..."
     assert first.result(timeout=5) == ("task-one", 1, "ambient-one", True), (
-        "expected condition: first.result(timeout=5) == ('task-one', 1..."
+        failure_message
     )
+    failure_message = "expected condition: second.result(timeout=5) == ('task-two', ..."
     assert second.result(timeout=5) == ("task-two", 1, "ambient-two", True), (
-        "expected condition: second.result(timeout=5) == ('task-two', ..."
+        failure_message
     )
 
 
@@ -213,6 +222,7 @@ def test_worker_signal_connection_is_idempotent() -> None:
         task_postrun.receivers,
     )
 
+    failure_message = "expected condition: sum((1 for _, receiver_func in prerun_rec..."
     assert (
         sum(
             1
@@ -220,7 +230,8 @@ def test_worker_signal_connection_is_idempotent() -> None:
             if receiver_func is setup_correlation_id_in_worker
         )
         == 1
-    ), "expected condition: sum((1 for _, receiver_func in prerun_rec..."
+    ), failure_message
+    failure_message = "expected condition: sum((1 for _, receiver_func in postrun_re..."
     assert (
         sum(
             1
@@ -228,24 +239,24 @@ def test_worker_signal_connection_is_idempotent() -> None:
             if receiver_func is clear_correlation_id_in_worker
         )
         == 1
-    ), "expected condition: sum((1 for _, receiver_func in postrun_re..."
+    ), failure_message
 
 
 def test_worker_signal_handlers_are_exported_from_package_root() -> None:
     """The worker handlers should be re-exported from the package root."""
     import falcon_correlate
 
-    assert "setup_correlation_id_in_worker" in falcon_correlate.__all__, (
-        "expected condition: 'setup_correlation_id_in_worker' in falco..."
-    )
-    assert "clear_correlation_id_in_worker" in falcon_correlate.__all__, (
-        "expected condition: 'clear_correlation_id_in_worker' in falco..."
-    )
+    failure_message = "expected condition: 'setup_correlation_id_in_worker' in falco..."
+    assert "setup_correlation_id_in_worker" in falcon_correlate.__all__, failure_message
+    failure_message = "expected condition: 'clear_correlation_id_in_worker' in falco..."
+    assert "clear_correlation_id_in_worker" in falcon_correlate.__all__, failure_message
+    failure_message = "expected condition: falcon_correlate.setup_correlation_id_in_..."
     assert (
         falcon_correlate.setup_correlation_id_in_worker
         is setup_correlation_id_in_worker
-    ), "expected condition: falcon_correlate.setup_correlation_id_in_..."
+    ), failure_message
+    failure_message = "expected condition: falcon_correlate.clear_correlation_id_in_..."
     assert (
         falcon_correlate.clear_correlation_id_in_worker
         is clear_correlation_id_in_worker
-    ), "expected condition: falcon_correlate.clear_correlation_id_in_..."
+    ), failure_message
