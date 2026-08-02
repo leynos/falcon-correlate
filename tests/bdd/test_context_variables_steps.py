@@ -91,10 +91,10 @@ def when_set_value(context: Context, value: str) -> Context:
 @then("the value should be None")
 def then_value_is_none(context: Context) -> None:
     """Verify the retrieved value is None."""
-    assert context["value"] is None
+    assert context["value"] is None, "expected context['value'] to be None"
 
 
 @then(parsers.parse('the retrieved value should be "{expected}"'))
 def then_retrieved_value_matches(context: Context, expected: str) -> None:
     """Verify the retrieved value matches the expected string."""
-    assert context["value"] == expected
+    assert context["value"] == expected, "expected context['value'] to equal expected"

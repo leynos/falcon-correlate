@@ -67,12 +67,18 @@ class TestCorrelationIDMiddlewareASGIConfiguration:
 
     def test_process_hooks_are_coroutines(self) -> None:
         """Verify Falcon ASGI hooks are explicit coroutine functions."""
+        failure_message = (
+            "expected condition: inspect.iscoroutinefunction(CorrelationID..."
+        )
         assert inspect.iscoroutinefunction(
             CorrelationIDMiddlewareASGI.process_request,
-        ), "expected CorrelationIDMiddlewareASGI.process_request to be a coroutine"
+        ), failure_message
+        failure_message = (
+            "expected condition: inspect.iscoroutinefunction(CorrelationID..."
+        )
         assert inspect.iscoroutinefunction(
             CorrelationIDMiddlewareASGI.process_response,
-        ), "expected CorrelationIDMiddlewareASGI.process_response to be a coroutine"
+        ), failure_message
 
 
 class TestCorrelationIDMiddlewareASGIRequestLifecycle:

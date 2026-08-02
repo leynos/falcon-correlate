@@ -28,7 +28,18 @@ class _Context:
     _correlation_id_reset_token: cv.Token[str | None] | None = None
 
 
-class _Request:
+class _HeaderLookup:
+    """Provide shared header lookup behaviour for ASGI test doubles."""
+
+    headers: dict[str, str]
+
+    @typ.final
+    def get_header(self, name: str) -> str | None:
+        """Return the named header when present."""
+        return self.headers.get(name)
+
+
+class _Request(_HeaderLookup):
     """Minimal ASGI request double for middleware hook tests."""
 
     def __init__(
@@ -40,21 +51,10 @@ class _Request:
         """Create a request double with optional headers and remote address."""
         self.context = _Context()
         self.remote_addr = remote_addr
-        self._headers = headers or {}
-
-    def get_header(self, name: str) -> str | None:
-        """Return a test header by name.
-
-        Returns
-        -------
-        str | None
-            The value produced for the test scenario.
-
-        """
-        return self._headers.get(name)
+        self.headers = headers or {}
 
 
-class _Response:
+class _Response(_HeaderLookup):
     """Minimal ASGI response double for middleware hook tests."""
 
     def __init__(self) -> None:
@@ -64,17 +64,6 @@ class _Response:
     def set_header(self, name: str, value: str) -> None:
         """Record a response header."""
         self.headers[name] = value
-
-    def get_header(self, name: str) -> str | None:
-        """Return a recorded response header.
-
-        Returns
-        -------
-        str | None
-            The value produced for the test scenario.
-
-        """
-        return self.headers.get(name)
 
 
 class _HeaderFailingResponse(_Response):
