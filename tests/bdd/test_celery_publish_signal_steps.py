@@ -155,14 +155,12 @@ def when_publish_task_with_explicit_correlation_id(value: str) -> Context:
 @then(parsers.parse('the outgoing task message should use correlation ID "{value}"'))
 def then_published_correlation_id_matches(context: Context, value: str) -> None:
     """Assert the broker publish call used the expected correlation ID."""
-    assert context["published_correlation_id"] == value, (
-        "expected context['published_correlation_id'] to equal value"
-    )
+    failure_message = "expected context['published_correlation_id'] to equal value"
+    assert context["published_correlation_id"] == value, failure_message
 
 
 @then("the outgoing task message should keep the generated task ID as correlation ID")
 def then_published_correlation_id_matches_generated_task_id(context: Context) -> None:
     """Assert Celery's generated task ID remains the broker correlation ID."""
-    assert context["published_correlation_id"] == context["task_id"], (
-        "expected condition: context['published_correlation_id'] == co..."
-    )
+    failure_message = "expected condition: context['published_correlation_id'] == co..."
+    assert context["published_correlation_id"] == context["task_id"], failure_message
