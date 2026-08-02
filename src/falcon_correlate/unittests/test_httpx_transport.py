@@ -122,9 +122,8 @@ def test_sync_transport_delegates_same_request_object() -> None:
         wrapped_transport.handle_request(request)
 
     transport.handle_request.assert_called_once_with(request)
-    assert request.headers[DEFAULT_HEADER_NAME] == cid, (
-        "expected request.headers[DEFAULT_HEADER_NAME] to equal cid"
-    )
+    failure_message = "expected request.headers[DEFAULT_HEADER_NAME] to equal cid"
+    assert request.headers[DEFAULT_HEADER_NAME] == cid, failure_message
 
 
 def test_sync_transport_delegates_close() -> None:
@@ -234,9 +233,8 @@ async def test_async_transport_delegates_same_request_object() -> None:
         await wrapped_transport.handle_async_request(request)
 
     transport.handle_async_request.assert_awaited_once_with(request)
-    assert request.headers[DEFAULT_HEADER_NAME] == cid, (
-        "expected request.headers[DEFAULT_HEADER_NAME] to equal cid"
-    )
+    failure_message = "expected request.headers[DEFAULT_HEADER_NAME] to equal cid"
+    assert request.headers[DEFAULT_HEADER_NAME] == cid, failure_message
 
 
 @pytest.mark.asyncio
@@ -338,11 +336,11 @@ def test_sync_transport_is_exported_from_package_root() -> None:
     """Sync transport should be re-exported from ``falcon_correlate``."""
     import falcon_correlate
 
-    assert "CorrelationIDTransport" in falcon_correlate.__all__, (
-        "expected condition: 'CorrelationIDTransport' in falcon_correl..."
-    )
+    failure_message = "expected condition: 'CorrelationIDTransport' in falcon_correl..."
+    assert "CorrelationIDTransport" in falcon_correlate.__all__, failure_message
+    failure_message = "expected condition: falcon_correlate.CorrelationIDTransport i..."
     assert falcon_correlate.CorrelationIDTransport is CorrelationIDTransport, (
-        "expected condition: falcon_correlate.CorrelationIDTransport i..."
+        failure_message
     )
 
 
@@ -350,9 +348,9 @@ def test_async_transport_is_exported_from_package_root() -> None:
     """Async transport should be re-exported from ``falcon_correlate``."""
     import falcon_correlate
 
-    assert "AsyncCorrelationIDTransport" in falcon_correlate.__all__, (
-        "expected condition: 'AsyncCorrelationIDTransport' in falcon_c..."
-    )
+    failure_message = "expected condition: 'AsyncCorrelationIDTransport' in falcon_c..."
+    assert "AsyncCorrelationIDTransport" in falcon_correlate.__all__, failure_message
+    failure_message = "expected condition: falcon_correlate.AsyncCorrelationIDTransp..."
     assert (
         falcon_correlate.AsyncCorrelationIDTransport is AsyncCorrelationIDTransport
-    ), "expected condition: falcon_correlate.AsyncCorrelationIDTransp..."
+    ), failure_message

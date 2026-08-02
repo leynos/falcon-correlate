@@ -14,41 +14,40 @@ class TestContextVariableDefinitions:
         """Verify correlation_id_var is a ContextVar instance."""
         from falcon_correlate import correlation_id_var
 
-        assert isinstance(correlation_id_var, contextvars.ContextVar), (
+        failure_message = (
             "expected condition: isinstance(correlation_id_var, contextvar..."
         )
+        assert isinstance(correlation_id_var, contextvars.ContextVar), failure_message
 
     def test_user_id_var_is_context_var(self) -> None:
         """Verify user_id_var is a ContextVar instance."""
         from falcon_correlate import user_id_var
 
-        assert isinstance(user_id_var, contextvars.ContextVar), (
+        failure_message = (
             "expected condition: isinstance(user_id_var, contextvars.Conte..."
         )
+        assert isinstance(user_id_var, contextvars.ContextVar), failure_message
 
     def test_correlation_id_var_name(self) -> None:
         """Verify correlation_id_var has the expected name."""
         from falcon_correlate import correlation_id_var
 
-        assert correlation_id_var.name == "correlation_id", (
-            "expected correlation_id_var.name to equal 'correlation_id'"
-        )
+        failure_message = "expected correlation_id_var.name to equal 'correlation_id'"
+        assert correlation_id_var.name == "correlation_id", failure_message
 
     def test_user_id_var_name(self) -> None:
         """Verify user_id_var has the expected name."""
         from falcon_correlate import user_id_var
 
-        assert user_id_var.name == "user_id", (
-            "expected user_id_var.name to equal 'user_id'"
-        )
+        failure_message = "expected user_id_var.name to equal 'user_id'"
+        assert user_id_var.name == "user_id", failure_message
 
     def test_correlation_id_var_default_is_none(self) -> None:
         """Verify correlation_id_var defaults to None."""
         from falcon_correlate import correlation_id_var
 
-        assert correlation_id_var.get() is None, (
-            "expected correlation_id_var.get() to be None"
-        )
+        failure_message = "expected correlation_id_var.get() to be None"
+        assert correlation_id_var.get() is None, failure_message
 
     def test_user_id_var_default_is_none(self) -> None:
         """Verify user_id_var defaults to None."""
@@ -112,30 +111,34 @@ class TestContextVariableExports:
         """Verify correlation_id_var is listed in __all__."""
         import falcon_correlate
 
-        assert "correlation_id_var" in falcon_correlate.__all__, (
+        failure_message = (
             "expected condition: 'correlation_id_var' in falcon_correlate...."
         )
+        assert "correlation_id_var" in falcon_correlate.__all__, failure_message
 
     def test_user_id_var_in_all(self) -> None:
         """Verify user_id_var is listed in __all__."""
         import falcon_correlate
 
-        assert "user_id_var" in falcon_correlate.__all__, (
+        failure_message = (
             "expected 'user_id_var' to be present in falcon_correlate.__all__"
         )
+        assert "user_id_var" in falcon_correlate.__all__, failure_message
 
     def test_correlation_id_var_importable_from_root(self) -> None:
         """Verify correlation_id_var can be imported from package root."""
         from falcon_correlate import correlation_id_var
 
-        assert isinstance(correlation_id_var, contextvars.ContextVar), (
+        failure_message = (
             "expected condition: isinstance(correlation_id_var, contextvar..."
         )
+        assert isinstance(correlation_id_var, contextvars.ContextVar), failure_message
 
     def test_user_id_var_importable_from_root(self) -> None:
         """Verify user_id_var can be imported from package root."""
         from falcon_correlate import user_id_var
 
-        assert isinstance(user_id_var, contextvars.ContextVar), (
+        failure_message = (
             "expected condition: isinstance(user_id_var, contextvars.Conte..."
         )
+        assert isinstance(user_id_var, contextvars.ContextVar), failure_message

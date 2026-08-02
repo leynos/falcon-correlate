@@ -96,6 +96,22 @@ token. Its `_process_request` and `_process_response` async wrappers invoke
 cleanup. This module is owned by the unit-test package and must not be imported
 by production code.
 
+## Assertion diagnostics and coverage
+
+Every test assertion must carry a useful failure message. The shared coverage
+action instruments test modules as well as production modules, so a message
+expression on its own continuation line is counted as executable code that the
+passing path does not visit. Keep a short literal on the assertion line when it
+fits. Prepare longer or dynamic diagnostics eagerly before the assertion:
+
+```python
+failure_message = f"expected {expected!r}, got {actual!r}"
+assert actual == expected, failure_message
+```
+
+This preserves the diagnostic, keeps the passing path covered, and avoids
+coverage exclusions or ratchet-baseline adjustments for test-only syntax.
+
 ## Property-based testing
 
 Property-based tests live under `tests/property/` and use Hypothesis for input
