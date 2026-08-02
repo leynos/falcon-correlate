@@ -41,19 +41,19 @@ type _RecordingTransportT = _RecordingTransport | _RecordingAsyncTransport
 def _assert_header(
     transport: _RecordingTransportT,
     name: str,
-    expected: str,
+    expected: str | None,
 ) -> None:
     """Assert that the sole recorded request has the expected header."""
     request = _recorded_request(transport)
+    if expected is None:
+        failure_message = (
+            f"expected header {name!r} to be absent, got {request.headers!r}"
+        )
+        assert name not in request.headers, failure_message
+        return
+
     failure_message = f"expected header {name!r}={expected!r}, got {request.headers!r}"
     assert request.headers[name] == expected, failure_message
-
-
-def _assert_header_absent(transport: _RecordingTransportT, name: str) -> None:
-    """Assert that the sole recorded request omits a header."""
-    request = _recorded_request(transport)
-    failure_message = f"expected header {name!r} to be absent, got {request.headers!r}"
-    assert name not in request.headers, failure_message
 
 
 def _assert_response_ok(response: httpx.Response) -> None:
