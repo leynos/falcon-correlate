@@ -133,12 +133,14 @@ class TestPublicExports:
             "default_uuid7_generator",
         }
         missing_exports = expected_exports.difference(falcon_correlate.__all__)
-        assert not missing_exports, (
-            f"expected exports missing from __all__: {missing_exports}"
+        failure_message = f"expected exports missing from __all__: {missing_exports}"
+        assert not missing_exports, failure_message
+        failure_message = (
+            "expected condition: CorrelationIDMiddlewareASGI is falcon_cor..."
         )
         assert (
             CorrelationIDMiddlewareASGI is falcon_correlate.CorrelationIDMiddlewareASGI
-        ), "expected condition: CorrelationIDMiddlewareASGI is falcon_cor..."
+        ), failure_message
 
     def test_default_uuid7_generator_importable_from_root(self) -> None:
         """Verify default_uuid7_generator can be imported from package root."""
@@ -159,8 +161,11 @@ class TestPublicExports:
         """Reject builtin instances documented only by their type."""
         exported = "plain instance"
 
-        assert inspect.getdoc(exported) == inspect.getdoc(type(exported)), (
+        failure_message = (
             "expected condition: inspect.getdoc(exported) == inspect.getdo..."
+        )
+        assert inspect.getdoc(exported) == inspect.getdoc(type(exported)), (
+            failure_message
         )
         with pytest.raises(AssertionError, match="inherited from its type"):
             _assert_public_export_is_documented("plain_instance", exported)
