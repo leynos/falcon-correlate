@@ -20,7 +20,6 @@ from falcon_correlate.httpx import (
 from falcon_correlate.middleware import DEFAULT_HEADER_NAME
 from falcon_correlate.unittests.test_httpx_transport_helpers import (
     _assert_header,
-    _assert_header_absent,
     _assert_response_ok,
     _RecordingAsyncTransport,
     _RecordingTransport,
@@ -84,7 +83,7 @@ def test_sync_transport_does_not_add_header_when_context_is_empty(
         with httpx.Client(transport=wrapped_transport) as client:
             client.get("http://example.com")
 
-        _assert_header_absent(transport, DEFAULT_HEADER_NAME)
+        _assert_header(transport, DEFAULT_HEADER_NAME, None)
 
     isolated_context(_logic)
 
@@ -151,7 +150,7 @@ def test_sync_transport_uses_custom_header_name(
 
         _assert_response_ok(response)
         _assert_header(transport, "X-Alt-CID", "sync-transport-alt-cid")
-        _assert_header_absent(transport, DEFAULT_HEADER_NAME)
+        _assert_header(transport, DEFAULT_HEADER_NAME, None)
 
     isolated_context(_logic)
 
@@ -201,7 +200,7 @@ async def test_async_transport_does_not_add_header_when_context_is_empty() -> No
     async with httpx.AsyncClient(transport=wrapped_transport) as client:
         await client.get("http://example.com")
 
-    _assert_header_absent(transport, DEFAULT_HEADER_NAME)
+    _assert_header(transport, DEFAULT_HEADER_NAME, None)
 
 
 @pytest.mark.asyncio
@@ -309,7 +308,7 @@ async def test_async_transport_uses_custom_header_name() -> None:
 
     _assert_response_ok(response)
     _assert_header(transport, "X-Alt-CID", "async-transport-alt-cid")
-    _assert_header_absent(transport, DEFAULT_HEADER_NAME)
+    _assert_header(transport, DEFAULT_HEADER_NAME, None)
 
 
 @pytest.mark.asyncio
