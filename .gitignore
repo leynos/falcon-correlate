@@ -213,3 +213,9 @@ target/
 .memdb/
 
 bin/act
+.vtcode/
+.claude/
+.grepai/
+*.swp
+*.swo
+*~
