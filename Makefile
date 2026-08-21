@@ -26,14 +26,15 @@ PYLINT_PYPY_SHIM_REF ?= 726d09f968b4d729ee4b29c71fc732e744854f3b
 PYLINT_PYPY_SHIM = git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)
 PYLINT = $(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy
 SKYLOS_VERSION ?= 4.33.2
-SKYLOS = $(UV_ENV) $(UV) tool run --from 'skylos==$(SKYLOS_VERSION)' skylos \
-	--config-file pyproject.toml
+SKYLOS_COMMAND = $(UV_ENV) $(UV) tool run --from 'skylos==$(SKYLOS_VERSION)' skylos
+SKYLOS = $(SKYLOS_COMMAND) --config-file pyproject.toml
+SKYLOS_WHITELIST = $(SKYLOS_COMMAND) whitelist
 SKYLOS_PRODUCTION_TARGETS ?= src/falcon_correlate
 SKYLOS_EXCLUDES ?= unittests
 
 .PHONY: help all clean build build-release lint fmt check-fmt doctest \
         markdownlint nixie spelling spelling-config spelling-config-write \
-        spelling-phrase-check spelling-helper-test skylos-allow test \
+	spelling-phrase-check spelling-helper-test makeutil skylos-allow test \
         test-optional-celery typecheck \
         $(TOOLS) $(VENV_TOOLS)
 
@@ -100,17 +101,12 @@ lint: ruff ## Run linters
 		--no-grep-verify
 
 skylos-allow: export SKYLOS_NAME = $(value NAME)
-skylos-allow: export SKYLOS_REASON = $(value REASON)
 skylos-allow: ## Document one named Skylos exception, not an entry point
 	@test -n "$${SKYLOS_NAME}" || { \
 		printf "Error: NAME is required for a named whitelist exception\\n" >&2; \
 		exit 2; \
 	}
-	@test -n "$${SKYLOS_REASON}" || { \
-		printf "Error: REASON is required for a named whitelist exception\\n" >&2; \
-		exit 2; \
-	}
-	$(SKYLOS) whitelist "$${SKYLOS_NAME}" --reason "$${SKYLOS_REASON}"
+	$(SKYLOS_WHITELIST) "$${SKYLOS_NAME}"
 
 typecheck: build ty ## Run typechecking
 	ty --version
@@ -143,7 +139,10 @@ nixie: ## Validate Mermaid diagrams
 doctest: build uv $(VENV_TOOLS) ## Run docstring examples
 	$(UV_ENV) $(UV) run pytest --doctest-modules --import-mode=importlib src/falcon_correlate --ignore=src/falcon_correlate/unittests
 
-test: build uv $(VENV_TOOLS) doctest ## Run tests
+makeutil: ## Verify the Makefile parser used by contract tests
+	$(call ensure_tool,$@)
+
+test: build uv $(VENV_TOOLS) doctest makeutil ## Run tests
 	$(UV_ENV) $(UV) run pytest -v -n auto $(PROJECT_PYTEST_EXCLUDES)
 
 test-optional-celery: build uv $(VENV_TOOLS) ## Validate missing-Celery support

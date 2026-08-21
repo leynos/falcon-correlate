@@ -235,10 +235,15 @@ a precise `[[tool.skylos.dead_code.entrypoints]]` rule with the fully qualified
 symbol, its actual kind, and a reason naming the verified caller. Use
 `type = "method"` for instance methods.
 
-Use `make skylos-allow NAME=symbol REASON="Verified runtime caller"` only when
-an entry-point rule cannot describe the boundary. This records a reasoned named
-exception in `[tool.skylos.whitelist.documented]`; do not add unexplained bulk
-exceptions or baselines.
+Use `make skylos-allow NAME=symbol` only when an entry-point rule cannot
+describe the boundary. Skylos's `whitelist` subcommand accepts the name only,
+so record the verified caller-specific rationale in the reviewing change. Do
+not add unexplained bulk exceptions or baselines.
+
+The Skylos Makefile contract is parsed by the pinned `makeutil` executable in
+`test_skylos_lint_contract.py`. `make test` verifies the parser is available
+before running the suite, and Continuous Integration installs the pinned
+revision before it runs that test.
 
 Use the standard log pattern when capturing lint output for review:
 
@@ -291,7 +296,9 @@ The lint target is configured by these Makefile variables:
 | `PYLINT`                    | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                |
 | `INTERROGATE_TARGETS`       | `src/falcon_correlate scripts`                                                                | Defines the repo-root-relative trees checked by Interrogate.   |
 | `SKYLOS_VERSION`            | `4.33.2`                                                                                      | Pins the separately provisioned Skylos release.                |
-| `SKYLOS`                    | `uv tool run --from 'skylos==$(SKYLOS_VERSION)' skylos --config-file pyproject.toml`          | Expands to the configured Skylos command.                      |
+| `SKYLOS_COMMAND`            | `uv tool run --from 'skylos==$(SKYLOS_VERSION)' skylos`                                       | Expands to the Skylos executable without scan options.         |
+| `SKYLOS`                    | `$(SKYLOS_COMMAND) --config-file pyproject.toml`                                              | Expands to the configured Skylos scan command.                 |
+| `SKYLOS_WHITELIST`          | `$(SKYLOS_COMMAND) whitelist`                                                                 | Expands to Skylos's standalone whitelist command.              |
 | `SKYLOS_PRODUCTION_TARGETS` | `src/falcon_correlate`                                                                        | Defines the production source scanned for dead code.           |
 | `SKYLOS_EXCLUDES`           | `unittests`                                                                                   | Excludes test-only package infrastructure from the scan.       |
 

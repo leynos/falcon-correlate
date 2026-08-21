@@ -406,11 +406,6 @@ full_name = [
 ]
 reason = "Falcon requires these callback parameters even though this middleware does not need their values."
 
-[tool.skylos.whitelist]
-names = []
-
-[tool.skylos.whitelist.documented]
-
 [build-system]
 requires = ["uv_build>=0.12.2,<0.13.0"]
 build-backend = "uv_build"
