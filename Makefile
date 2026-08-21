@@ -13,7 +13,8 @@ TYPOS_CONFIG_BUILDER_SOURCE := git+https://github.com/leynos/typos-config-builde
 TYPOS_CONFIG_BUILDER := $(UV_ENV) $(UV) tool run --python 3.14 \
 	--from "$(TYPOS_CONFIG_BUILDER_SOURCE)" typos-config-builder
 SPELLING_PY_TESTS := scripts/tests/test_typos_rollout_check.py
-PROJECT_PYTEST_EXCLUDES := $(foreach source,$(SPELLING_PY_TESTS),--ignore=$(source))
+OPTIONAL_CELERY_TEST := src/falcon_correlate/unittests/test_optional_celery_dependency.py
+PROJECT_PYTEST_EXCLUDES := $(foreach source,$(SPELLING_PY_TESTS) $(OPTIONAL_CELERY_TEST),--ignore=$(source))
 SPELLING_COVERAGE_ARGS := --cov=typos_rollout_check --cov-fail-under=90
 SPELLING_HELPER_PYTEST = PYTHONPATH=scripts $(UV_ENV) $(UV) run --no-project \
 	--python 3.14 --with pathspec==$(PATHSPEC_VERSION) --with pytest==9.0.2 \
@@ -24,10 +25,16 @@ PYLINT_TARGETS ?= src tests examples scripts
 PYLINT_PYPY_SHIM_REF ?= 726d09f968b4d729ee4b29c71fc732e744854f3b
 PYLINT_PYPY_SHIM = git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)
 PYLINT = $(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy
+SKYLOS_VERSION ?= 4.33.2
+SKYLOS = $(UV_ENV) $(UV) tool run --from 'skylos==$(SKYLOS_VERSION)' skylos \
+	--config-file pyproject.toml
+SKYLOS_PRODUCTION_TARGETS ?= src/falcon_correlate
+SKYLOS_EXCLUDES ?= unittests
 
 .PHONY: help all clean build build-release lint fmt check-fmt doctest \
         markdownlint nixie spelling spelling-config spelling-config-write \
-        spelling-phrase-check spelling-helper-test test typecheck \
+        spelling-phrase-check spelling-helper-test skylos-allow test \
+        test-optional-celery typecheck \
         $(TOOLS) $(VENV_TOOLS)
 
 .DEFAULT_GOAL := all
@@ -88,6 +95,22 @@ lint: ruff ## Run linters
 	$(UV_ENV) $(UV) run ruff check
 	$(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
 	$(PYLINT) $(PYLINT_TARGETS)
+	$(SKYLOS) $(SKYLOS_PRODUCTION_TARGETS) --exclude $(SKYLOS_EXCLUDES) \
+		--category dead_code --gate --format concise --no-upload --no-provenance \
+		--no-grep-verify
+
+skylos-allow: export SKYLOS_NAME = $(value NAME)
+skylos-allow: export SKYLOS_REASON = $(value REASON)
+skylos-allow: ## Document one named Skylos exception, not an entry point
+	@test -n "$${SKYLOS_NAME}" || { \
+		printf "Error: NAME is required for a named whitelist exception\\n" >&2; \
+		exit 2; \
+	}
+	@test -n "$${SKYLOS_REASON}" || { \
+		printf "Error: REASON is required for a named whitelist exception\\n" >&2; \
+		exit 2; \
+	}
+	$(SKYLOS) whitelist "$${SKYLOS_NAME}" --reason "$${SKYLOS_REASON}"
 
 typecheck: build ty ## Run typechecking
 	ty --version
@@ -122,6 +145,9 @@ doctest: build uv $(VENV_TOOLS) ## Run docstring examples
 
 test: build uv $(VENV_TOOLS) doctest ## Run tests
 	$(UV_ENV) $(UV) run pytest -v -n auto $(PROJECT_PYTEST_EXCLUDES)
+
+test-optional-celery: build uv $(VENV_TOOLS) ## Validate missing-Celery support
+	$(UV_ENV) $(UV) run pytest -v $(OPTIONAL_CELERY_TEST)
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \

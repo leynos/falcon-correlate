@@ -368,6 +368,49 @@ do_not_mutate = ["src/falcon_correlate/unittests/*"]
 [tool.uv]
 package = true
 
+[tool.skylos.gate]
+strict = true
+
+[[tool.skylos.dead_code.entrypoints]]
+type = "method"
+full_name = [
+    "falcon_correlate.middleware_config.CorrelationIDConfig.__post_init__",
+    "falcon_correlate.middleware_config.CorrelationIDConfig._validate_header_name",
+    "falcon_correlate.middleware_config.CorrelationIDConfig._validate_trusted_sources",
+    "falcon_correlate.middleware_config.CorrelationIDConfig._validate_source_not_empty",
+    "falcon_correlate.middleware_config.CorrelationIDConfig._parse_network",
+    "falcon_correlate.middleware_config.CorrelationIDConfig._validate_generator",
+    "falcon_correlate.middleware_config.CorrelationIDConfig._validate_validator",
+]
+reason = "The generated dataclass initializer invokes this validation chain after configuration construction."
+
+[[tool.skylos.dead_code.entrypoints]]
+type = "method"
+full_name = [
+    "falcon_correlate.middleware.CorrelationIDMiddleware.process_request",
+    "falcon_correlate.middleware.CorrelationIDMiddleware.process_response",
+    "falcon_correlate.middleware_asgi.CorrelationIDMiddlewareASGI.process_request",
+    "falcon_correlate.middleware_asgi.CorrelationIDMiddlewareASGI.process_response",
+]
+reason = "Falcon invokes these middleware lifecycle callbacks through its WSGI and ASGI protocols."
+
+[[tool.skylos.dead_code.entrypoints]]
+type = "parameter"
+full_name = [
+    "falcon_correlate.middleware.CorrelationIDMiddleware.process_request.resp",
+    "falcon_correlate.middleware.CorrelationIDMiddleware.process_response.resource",
+    "falcon_correlate.middleware.CorrelationIDMiddleware.process_response.req_succeeded",
+    "falcon_correlate.middleware_asgi.CorrelationIDMiddlewareASGI.process_request.resp",
+    "falcon_correlate.middleware_asgi.CorrelationIDMiddlewareASGI.process_response.resource",
+    "falcon_correlate.middleware_asgi.CorrelationIDMiddlewareASGI.process_response.req_succeeded",
+]
+reason = "Falcon requires these callback parameters even though this middleware does not need their values."
+
+[tool.skylos.whitelist]
+names = []
+
+[tool.skylos.whitelist.documented]
+
 [build-system]
 requires = ["uv_build>=0.12.2,<0.13.0"]
 build-backend = "uv_build"

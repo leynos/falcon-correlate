@@ -42,7 +42,7 @@ jobs:
       - name: Check formatting
         run: make check-fmt
 
-      - name: Run ruff
+      - name: Run lint gates
         run: make lint
 
       - name: Run typechecker

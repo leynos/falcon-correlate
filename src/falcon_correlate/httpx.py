@@ -78,12 +78,6 @@ if typ.TYPE_CHECKING:
             """
             ...
 
-    _ExitArgs = tuple[
-        type[BaseException] | None,
-        BaseException | None,
-        TracebackType | None,
-    ]
-
     _SyncWrappedTransport = httpx.BaseTransport
     _AsyncWrappedTransport = httpx.AsyncBaseTransport
 else:
