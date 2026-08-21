@@ -31,9 +31,17 @@ PYLINT_PYTHON ?= pypy@3.12
 PYLINT_VERSION ?= 4.0.9
 PYLINT_TARGETS ?= src tests examples
 PYLINT = $(UV_ENV) $(UV) tool run --managed-python --python $(PYLINT_PYTHON) --from 'pylint==$(PYLINT_VERSION)' pylint
+OPTIONAL_CELERY_TEST := src/falcon_correlate/unittests/test_optional_celery_dependency.py
+PROJECT_PYTEST_EXCLUDES := --ignore=$(OPTIONAL_CELERY_TEST)
+SKYLOS_VERSION ?= 4.33.2
+SKYLOS = $(UV_ENV) $(UV) tool run --from 'skylos==$(SKYLOS_VERSION)' skylos \
+	--config-file pyproject.toml
+SKYLOS_PRODUCTION_TARGETS ?= src/falcon_correlate
+SKYLOS_EXCLUDES ?= unittests
 
 .PHONY: help all clean build build-release lint fmt check-fmt doctest \
-        markdownlint nixie spelling test typecheck \
+        markdownlint nixie spelling skylos-allow test \
+        test-optional-celery typecheck \
         $(TOOLS) $(VENV_TOOLS) test-workflow-contracts
 
 .DEFAULT_GOAL := all
@@ -98,6 +106,22 @@ lint: ruff ## Run linters
 	$(UV_ENV) $(UV) run ruff check
 	$(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
 	$(PYLINT) $(PYLINT_TARGETS)
+	$(SKYLOS) $(SKYLOS_PRODUCTION_TARGETS) --exclude $(SKYLOS_EXCLUDES) \
+		--category dead_code --gate --format concise --no-upload --no-provenance \
+		--no-grep-verify
+
+skylos-allow: export SKYLOS_NAME = $(value NAME)
+skylos-allow: export SKYLOS_REASON = $(value REASON)
+skylos-allow: ## Document one named Skylos exception, not an entry point
+	@test -n "$${SKYLOS_NAME}" || { \
+		printf "Error: NAME is required for a named whitelist exception\\n" >&2; \
+		exit 2; \
+	}
+	@test -n "$${SKYLOS_REASON}" || { \
+		printf "Error: REASON is required for a named whitelist exception\\n" >&2; \
+		exit 2; \
+	}
+	$(SKYLOS) whitelist "$${SKYLOS_NAME}" --reason "$${SKYLOS_REASON}"
 
 typecheck: build ty ## Run typechecking
 	ty --version
@@ -117,7 +141,10 @@ doctest: build uv $(VENV_TOOLS) ## Run docstring examples
 	$(UV_ENV) $(UV) run pytest --doctest-modules --import-mode=importlib src/falcon_correlate --ignore=src/falcon_correlate/unittests
 
 test: build uv $(VENV_TOOLS) doctest ## Run tests
-	$(UV_ENV) $(UV) run pytest -v -n auto
+	$(UV_ENV) $(UV) run pytest -v -n auto $(PROJECT_PYTEST_EXCLUDES)
+
+test-optional-celery: build uv $(VENV_TOOLS) ## Validate missing-Celery support
+	$(UV_ENV) $(UV) run pytest -v $(OPTIONAL_CELERY_TEST)
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \

@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from falcon_correlate import CorrelationIDMiddleware, correlation_id_var
-from falcon_correlate.middleware import _CORRELATION_ID_RESET_TOKEN_ATTR
+from falcon_correlate.middleware_utils import CORRELATION_ID_RESET_TOKEN_ATTR
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -51,7 +51,7 @@ class TestContextVariableLifecycle:
             f"Expected contextvar correlation ID {expected_id!r}, "
             f"got {correlation_id_var.get()!r}"
         )
-        token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
+        token = getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
         assert isinstance(token, contextvars.Token), (
             "Expected reset token on request context"
         )
@@ -214,7 +214,7 @@ class TestContextVariableLifecycle:
             original_token = correlation_id_var.set("original-correlation-id")
             bad_token, cleanup = setup_bad_token()
             req, resp = request_response_factory()
-            setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, bad_token)
+            setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, bad_token)
 
             middleware.process_response(
                 req,
@@ -227,7 +227,7 @@ class TestContextVariableLifecycle:
                 "Expected correlation_id_var to remain unchanged for "
                 "invalid reset token"
             )
-            assert getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR) is None, (
+            assert getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR) is None, (
                 "Expected invalid reset token attribute to be cleared"
             )
             cleanup()
