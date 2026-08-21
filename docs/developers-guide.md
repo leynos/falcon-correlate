@@ -7,7 +7,7 @@ pull request.
 
 ## Linting architecture
 
-The Python lint target uses a three-tier linting approach:
+The Python lint target uses a four-tier linting approach:
 
 - **Tier 1: Ruff.** Ruff runs first through `uv run ruff check`. It is the
   fast linting gate and owns formatting-adjacent checks, import rules, common
@@ -21,13 +21,18 @@ The Python lint target uses a three-tier linting approach:
   that complement Ruff, especially logging format correctness, pattern matching
   safety, refactoring suggestions, resource-handling checks, and selected
   design limits.
+- **Tier 4: Skylos.** Skylos runs last as a blocking dead-code gate over
+  production sources. It is separately provisioned at an exact version, so it
+  does not expand the project's application dependency set.
 
-Ruff must pass before Interrogate runs, and Interrogate must pass before Pylint
-runs. This keeps the slow, deeper lint tier focused on code that has already
-passed the high-volume checks and the package docstring coverage gate.
+Ruff must pass before Interrogate runs, Interrogate must pass before Pylint
+runs, and Skylos runs after the established lint tiers. This keeps the
+dead-code analysis focused on code that has already passed the high-volume
+checks and package docstring coverage gate.
 
-The decision to use this architecture is recorded in
+The initial three-tier architecture is recorded in
 [ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md).
+Skylos extends that established gate with production dead-code detection.
 
 ## Internal module architecture
 
@@ -544,15 +549,32 @@ make lint
 $(UV_ENV) $(UV) run ruff check
 $(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
 $(PYLINT) $(PYLINT_TARGETS)
+$(SKYLOS) $(SKYLOS_SCAN_OPTIONS) $(SKYLOS_PRODUCTION_TARGETS) \
+  --exclude $(SKYLOS_EXCLUDES) --category dead_code --gate --format concise \
+  --no-upload --no-provenance --no-grep-verify
 ```
 
-Continuous Integration installs `interrogate` as a uv tool before this target
-runs so the same 100% package docstring coverage gate is available locally and
-in CI.
+Continuous Integration runs the same `make lint` target. Skylos is provisioned
+by that target at the pinned version, while Continuous Integration installs
+Interrogate separately for the 100% package docstring coverage gate.
 
 The target should be run before committing changes that affect Python code,
 tests, or lint configuration. When diagnosing failures, fix Ruff findings
-first, then rerun `make lint` so the Pylint tier sees the post-Ruff state.
+first, then rerun `make lint` so the later tiers see the post-Ruff state.
+
+Skylos parses source with the Python runtime's own abstract syntax tree (AST),
+so the CLI is pinned to Python 3.14 to avoid phantom findings on newer Python
+syntax. The production scan excludes unit-test modules and uses strict gate
+mode. Investigate every finding: remove genuine dead code, and record only
+verified false positives. Prefer typed
+`[[tool.skylos.dead_code.entrypoints]]` rules for implicit runtime callers.
+Use the `skylos-allow` helper only when an entry-point rule cannot model the
+boundary.
+
+For a verified named exception, run
+`make skylos-allow SYMBOL=symbol REASON="Verified runtime caller"`. Both
+values must contain non-whitespace text. `SYMBOL` is intentional: WSL sets
+`NAME` to the host name. Updates are serialized with a repository-local lock.
 
 Use the standard log pattern when capturing lint output for review:
 
@@ -594,6 +616,11 @@ The lint target is configured by these Makefile variables:
 | `PYLINT_TARGETS`      | `src tests examples`                                                                                            | Defines the source trees checked by the Pylint tier.           |
 | `PYLINT`              | `$(UV_ENV) $(UV) tool run --managed-python --python $(PYLINT_PYTHON) --from 'pylint==$(PYLINT_VERSION)' pylint` | Expands to the full PyPy-backed Pylint command.                |
 | `INTERROGATE_TARGETS` | `src/falcon_correlate`                                                                                          | Defines the repo-root-relative trees checked by Interrogate.   |
+| `SKYLOS_VERSION`      | `4.33.2`                                                                                                       | Pins the separately provisioned Skylos release.                |
+| `SKYLOS_CLI`          | `uv tool run --python 3.14 --from 'skylos==$(SKYLOS_VERSION)' skylos`                                         | Expands to the pinned Skylos CLI command.                       |
+| `SKYLOS_SCAN_OPTIONS` | `--config-file pyproject.toml`                                                                                  | Holds scan-only global options.                                 |
+| `SKYLOS_PRODUCTION_TARGETS` | `src/falcon_correlate`                                                                                    | Defines the production source scanned for dead code.           |
+| `SKYLOS_EXCLUDES`     | `unittests`                                                                                                    | Excludes test-only package infrastructure from the scan.       |
 
 Override variables at the command line for targeted investigation. For example:
 
