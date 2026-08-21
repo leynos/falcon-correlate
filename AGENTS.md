@@ -92,7 +92,10 @@
     dead-code detection over production sources. Investigate every Skylos
     finding, remove genuine dead code, and record verified false positives as
     precise entry points or reasoned named exceptions. CI runs the same target;
-    Skylos is provisioned at its pinned version by the Makefile.
+    Skylos is provisioned at its pinned version by the Makefile. Use
+    `make skylos-allow NAME=symbol` only when an entry-point rule cannot model
+    the runtime boundary; Skylos records only the name, so retain the verified
+    caller-specific rationale in the reviewing change.
   - **Formatting:** Adheres to formatting standards (`make check-fmt`; use
     `make fmt` to apply fixes).
   - **Typechecking:** Passes type checking (`make typecheck`).

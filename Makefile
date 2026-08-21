@@ -25,13 +25,19 @@ PYLINT = $(UV_ENV) $(UV) tool run --managed-python --python $(PYLINT_PYTHON) --f
 OPTIONAL_CELERY_TEST := src/falcon_correlate/unittests/test_optional_celery_dependency.py
 PROJECT_PYTEST_EXCLUDES := --ignore=$(OPTIONAL_CELERY_TEST)
 SKYLOS_VERSION ?= 4.33.2
-SKYLOS = $(UV_ENV) $(UV) tool run --from 'skylos==$(SKYLOS_VERSION)' skylos \
-	--config-file pyproject.toml
+# Skylos parses source with its own runtime AST; pin Python 3.14 so newer
+# project syntax does not produce phantom findings.
+SKYLOS_CLI = $(UV_ENV) $(UV) tool run --python 3.14 \
+	--from 'skylos==$(SKYLOS_VERSION)' skylos
+SKYLOS_SCAN_OPTIONS = --config-file pyproject.toml
+SKYLOS = $(SKYLOS_CLI) $(SKYLOS_SCAN_OPTIONS)
+SKYLOS_WHITELIST = $(SKYLOS_CLI) whitelist
 SKYLOS_PRODUCTION_TARGETS ?= src/falcon_correlate
 SKYLOS_EXCLUDES ?= unittests
+SKYLOS_WHITELIST_LOCK ?= .skylos-whitelist.lock
 
 .PHONY: help all clean build build-release lint fmt check-fmt doctest \
-        markdownlint nixie spelling skylos-allow test \
+        markdownlint nixie spelling makeutil skylos-allow test \
         test-optional-celery typecheck \
         $(TOOLS) $(VENV_TOOLS)
 
@@ -98,18 +104,16 @@ lint: ruff ## Run linters
 		--category dead_code --gate --format concise --no-upload --no-provenance \
 		--no-grep-verify
 
-skylos-allow: export SKYLOS_NAME = $(value NAME)
+skylos-allow: export SKYLOS_SYMBOL = $(value SYMBOL)
 skylos-allow: export SKYLOS_REASON = $(value REASON)
 skylos-allow: ## Document one named Skylos exception, not an entry point
-	@test -n "$${SKYLOS_NAME}" || { \
-		printf "Error: NAME is required for a named whitelist exception\\n" >&2; \
-		exit 2; \
-	}
-	@test -n "$${SKYLOS_REASON}" || { \
+	@case "$${SKYLOS_SYMBOL}" in *[![:space:]]*) ;; *) \
+		printf "Error: SYMBOL is required for a named whitelist exception\\n" >&2; \
+		exit 2;; esac
+	@case "$${SKYLOS_REASON}" in *[![:space:]]*) ;; *) \
 		printf "Error: REASON is required for a named whitelist exception\\n" >&2; \
-		exit 2; \
-	}
-	$(SKYLOS) whitelist "$${SKYLOS_NAME}" --reason "$${SKYLOS_REASON}"
+		exit 2;; esac
+	flock "$(SKYLOS_WHITELIST_LOCK)" env $(SKYLOS_WHITELIST) "$${SKYLOS_SYMBOL}" --reason "$${SKYLOS_REASON}"
 
 typecheck: build ty ## Run typechecking
 	ty --version
@@ -128,7 +132,10 @@ nixie: ## Validate Mermaid diagrams
 doctest: build uv $(VENV_TOOLS) ## Run docstring examples
 	$(UV_ENV) $(UV) run pytest --doctest-modules --import-mode=importlib src/falcon_correlate --ignore=src/falcon_correlate/unittests
 
-test: build uv $(VENV_TOOLS) doctest ## Run tests
+makeutil: ## Verify the Makefile parser used by contract tests
+	$(call ensure_tool,$@)
+
+test: build uv $(VENV_TOOLS) doctest makeutil ## Run tests
 	$(UV_ENV) $(UV) run pytest -v -n auto $(PROJECT_PYTEST_EXCLUDES)
 
 test-optional-celery: build uv $(VENV_TOOLS) ## Validate missing-Celery support
