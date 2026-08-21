@@ -560,7 +560,7 @@ make lint
 $(UV_ENV) $(UV) run ruff check
 $(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
 $(PYLINT) $(PYLINT_TARGETS)
-$(SKYLOS) $(SKYLOS_SCAN_OPTIONS) $(SKYLOS_PRODUCTION_TARGETS) \
+$(SKYLOS_CLI) $(SKYLOS_SCAN_OPTIONS) $(SKYLOS_PRODUCTION_TARGETS) \
   --exclude $(SKYLOS_EXCLUDES) --category dead_code --gate --format concise \
   --no-upload --no-provenance --no-grep-verify
 ```
@@ -585,7 +585,26 @@ boundary.
 For a verified named exception, run
 `make skylos-allow SYMBOL=symbol REASON="Verified runtime caller"`. Both
 values must contain non-whitespace text. `SYMBOL` is intentional: WSL sets
-`NAME` to the host name. Updates are serialized with a repository-local lock.
+`NAME` to the host name. Updates are serialized with `flock` on the ignored
+repository-local `.skylos-whitelist.lock` file.
+
+The Skylos Makefile contract is parsed from `makeutil parse Makefile` JSON by
+`tests/test_skylos_lint_contract.py`. `make test` checks that the pinned
+Makeutil executable is available before running the full suite. The test and
+coverage jobs independently install the same parser because each runs all
+pytest tests.
+
+For local full-suite runs, install the exact parser and toolchain first:
+
+```bash
+rustup toolchain install nightly-2026-05-28 --profile minimal
+RUSTFLAGS="-Zpolonius=next" cargo +nightly-2026-05-28 install \
+  --git https://github.com/leynos/makeutil \
+  --rev 29fc5a1634ffbaa18a773eed9dff1b2838a45d9c \
+  --locked \
+  --force \
+  makeutil
+```
 
 Use the standard log pattern when capturing lint output for review:
 
