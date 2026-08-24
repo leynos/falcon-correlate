@@ -52,7 +52,10 @@ from falcon_correlate.unittests.optional_celery_dependency_helpers import (
 if typ.TYPE_CHECKING:
     from pathlib import Path
 
-pytestmark = pytest.mark.timeout(_CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS)
+# The child must fail within 120 seconds, but the parent needs enough time for
+# ``subprocess.run`` to observe that timeout and reap the child cleanly.
+_CELERY_BLOCKED_PARENT_TIMEOUT_SECONDS = _CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS + 10
+pytestmark = pytest.mark.timeout(_CELERY_BLOCKED_PARENT_TIMEOUT_SECONDS)
 
 
 @pytest.fixture(scope="module")

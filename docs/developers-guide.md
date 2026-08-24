@@ -29,9 +29,9 @@ runs, and Skylos runs after the established lint tiers. This keeps the
 dead-code analysis focused on code that has already passed the high-volume
 checks and package docstring coverage gate.
 
-The initial three-tier architecture is recorded in
+The original three-tier architecture and its fourth-tier Skylos addendum are
+recorded in
 [ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md).
-Skylos extends that established gate with production dead-code detection.
 
 ## Internal module architecture
 
@@ -192,10 +192,10 @@ as a test assertion on the SHA string.
 
 ## Roadmap notes
 
-The three-tier linting work described in
+The linting architecture described in
 [ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md)
-is complete. Keep future linting changes aligned with that ADR unless a new
-ADR supersedes it.
+is complete. Keep future linting changes aligned with its four-tier policy
+unless a new ADR supersedes it.
 
 The tested quickstart example convention is described in
 [ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md).
@@ -219,9 +219,13 @@ $(SKYLOS) $(SKYLOS_PRODUCTION_TARGETS) --exclude $(SKYLOS_EXCLUDES) \\
   --no-grep-verify
 ```
 
-Continuous Integration runs the same `make lint` target. Skylos is provisioned
-by that target at the pinned `SKYLOS_VERSION`, while Continuous Integration
-installs Interrogate separately for the 100% package docstring coverage gate.
+Continuous Integration runs the same `make lint` target. `$(SKYLOS_CLI)`
+provisions Skylos at the pinned `SKYLOS_VERSION` with Python 3.14. Skylos
+parses source using its own runtime Abstract Syntax Tree (AST), so this pin
+prevents phantom dead-code findings from newer project syntax. `$(SKYLOS)` adds
+scan-specific global options such as `--config-file` separately, leaving the
+standalone CLI suitable for Skylos subcommands. Continuous Integration installs
+Interrogate separately for the 100% package docstring coverage gate.
 
 The target should be run before committing changes that affect Python code,
 tests, or lint configuration. When diagnosing failures, fix Ruff findings
@@ -235,15 +239,29 @@ a precise `[[tool.skylos.dead_code.entrypoints]]` rule with the fully qualified
 symbol, its actual kind, and a reason naming the verified caller. Use
 `type = "method"` for instance methods.
 
-Use `make skylos-allow NAME=symbol` only when an entry-point rule cannot
-describe the boundary. Skylos's `whitelist` subcommand accepts the name only,
-so record the verified caller-specific rationale in the reviewing change. Do
-not add unexplained bulk exceptions or baselines.
+Use `make skylos-allow SYMBOL=symbol REASON="Verified runtime caller"` only
+when an entry-point rule cannot describe the boundary. The target requires both
+values and runs `skylos whitelist <symbol> --reason <reason>`, preserving the
+reason in Skylos's allow list. `SYMBOL` deliberately avoids `NAME`, because
+Windows Subsystem for Linux (WSL) injects `NAME` with the hostname. Do not add
+unexplained bulk exceptions or baselines.
 
 The Skylos Makefile contract is parsed by the pinned `makeutil` executable in
 `test_skylos_lint_contract.py`. `make test` verifies the parser is available
-before running the suite, and Continuous Integration installs the pinned
-revision before it runs that test.
+before running the suite. The test and coverage jobs independently install the
+same parser because each runs the full pytest suite.
+
+For local full-suite runs, install the exact parser and toolchain first:
+
+```bash
+rustup toolchain install nightly-2026-05-28 --profile minimal
+RUSTFLAGS="-Zpolonius=next" cargo +nightly-2026-05-28 install \
+  --git https://github.com/leynos/makeutil \
+  --rev 29fc5a1634ffbaa18a773eed9dff1b2838a45d9c \
+  --locked \
+  --force \
+  makeutil
+```
 
 Use the standard log pattern when capturing lint output for review:
 
@@ -296,9 +314,8 @@ The lint target is configured by these Makefile variables:
 | `PYLINT`                    | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                |
 | `INTERROGATE_TARGETS`       | `src/falcon_correlate scripts`                                                                | Defines the repo-root-relative trees checked by Interrogate.   |
 | `SKYLOS_VERSION`            | `4.33.2`                                                                                      | Pins the separately provisioned Skylos release.                |
-| `SKYLOS_COMMAND`            | `uv tool run --from 'skylos==$(SKYLOS_VERSION)' skylos`                                       | Expands to the Skylos executable without scan options.         |
-| `SKYLOS`                    | `$(SKYLOS_COMMAND) --config-file pyproject.toml`                                              | Expands to the configured Skylos scan command.                 |
-| `SKYLOS_WHITELIST`          | `$(SKYLOS_COMMAND) whitelist`                                                                 | Expands to Skylos's standalone whitelist command.              |
+| `SKYLOS_CLI`                | `$(UV_ENV) $(UV) tool run --python 3.14 --from 'skylos==$(SKYLOS_VERSION)' skylos`            | Expands to the command-only Python 3.14 Skylos CLI.            |
+| `SKYLOS`                    | `$(SKYLOS_CLI) --config-file pyproject.toml`                                                  | Expands to the configured Skylos scan command.                 |
 | `SKYLOS_PRODUCTION_TARGETS` | `src/falcon_correlate`                                                                        | Defines the production source scanned for dead code.           |
 | `SKYLOS_EXCLUDES`           | `unittests`                                                                                   | Excludes test-only package infrastructure from the scan.       |
 
@@ -324,7 +341,9 @@ The policy is:
   `collections.abc as cabc`, `datetime as dt`, and `unittest.mock as mock`;
 - keep docstrings in NumPy style;
 - use a focused Pylint allow-list rather than enabling every Pylint message;
-- run Pylint under PyPy through the shim as a second tier after Ruff; and
+- run Pylint under PyPy through the shim as the third tier after Ruff and
+  Interrogate;
+- run Skylos as the strict fourth tier over production sources only; and
 - add narrow suppressions only when framework callbacks, tests, or existing
   module boundaries make a rule unsuitable for the current change.
 

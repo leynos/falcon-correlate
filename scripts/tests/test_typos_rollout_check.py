@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1]
+REPOSITORY_ROOT = SCRIPTS.parent
 PROHIBITED = "hand" + "-written"
 TITLE_PROHIBITED = "Hand" + "-written"
 
@@ -35,13 +36,9 @@ def initialize(path: Path, files: dict[str, str]) -> None:
 
 
 def policy_files(*, local_phrase: str = "") -> dict[str, str]:
-    """Return minimal generated, shared, and local policy documents."""
+    """Return committed generated policy with minimal phrase-policy overlays."""
     return {
-        "typos.toml": (
-            f"# Policy for {PROHIBITED} corrections.\n"
-            '[files]\nextend-exclude = ["*.md", "!README.md"]\n\n'
-            '[default]\nextend-ignore-re = ["`[^`\\\\n]+`"]\n'
-        ),
+        "typos.toml": (REPOSITORY_ROOT / "typos.toml").read_text(encoding="utf-8"),
         ".typos-oxendict-base.toml": (
             f'[phrases.corrections]\n"{PROHIBITED}" = "handwritten"\n'
         ),
@@ -67,11 +64,11 @@ class TestPhrasePolicyChecker:
             ("fit-for-purpose", "suitable"),
             (PROHIBITED, "handwritten"),
         ), "shared and local phrase corrections were not combined"
-        assert policy.ignore_patterns == (r"`[^`\n]+`",), (
-            "generated ignore patterns were not loaded"
+        assert r"`[^`\n]+`" in policy.ignore_patterns, (
+            "the committed inline-code ignore pattern was not loaded"
         )
-        assert policy.excluded_files == ("*.md", "!README.md"), (
-            "generated file exclusions were not loaded"
+        assert "target" in policy.excluded_files, (
+            "the committed generated file exclusions were not loaded"
         )
 
         (tmp_path / ".typos-oxendict-base.toml").unlink()
@@ -91,7 +88,7 @@ class TestPhrasePolicyChecker:
                     "-written\n"
                     f"`{PROHIBITED}`\n"
                 ),
-                "skip.md": f"{PROHIBITED}\n",
+                "target/skip.md": f"{PROHIBITED}\n",
                 **policy_files(),
             },
         )
