@@ -92,10 +92,12 @@
     dead-code detection over production sources. Investigate every Skylos
     finding, remove genuine dead code, and record verified false positives as
     precise entry points or reasoned named exceptions. CI runs the same target;
-    Skylos is provisioned at its pinned version by the Makefile. Use
-    `make skylos-allow NAME=symbol` only when an entry-point rule cannot model
-    the runtime boundary; Skylos records only the name, so retain the verified
-    caller-specific rationale in the reviewing change.
+    Skylos is provisioned at its pinned version with Python 3.14 because it
+    parses source with its own runtime AST. The test and coverage CI jobs each
+    install the pinned Makeutil parser before their full pytest suite. Use
+    `make skylos-allow SYMBOL=symbol REASON="Verified runtime caller"` only when
+    an entry-point rule cannot model the runtime boundary. Skylos records the
+    verified caller-specific reason with the named exception.
   - **Formatting:** Adheres to formatting standards (`make check-fmt`; use
     `make fmt` to apply fixes).
   - **Typechecking:** Passes type checking (`make typecheck`).

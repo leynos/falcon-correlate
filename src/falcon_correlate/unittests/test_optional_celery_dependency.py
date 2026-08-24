@@ -52,7 +52,14 @@ from falcon_correlate.unittests.optional_celery_dependency_helpers import (
 if typ.TYPE_CHECKING:
     from pathlib import Path
 
-pytestmark = pytest.mark.timeout(_CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS)
+# The fixture runs two bounded child processes sequentially. The parent budget
+# covers both child timeouts plus time to reap them and finish fixture cleanup.
+_CELERY_BLOCKED_PARENT_CLEANUP_SECONDS = 30
+_CELERY_BLOCKED_PARENT_TIMEOUT_SECONDS = (
+    2 * _CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS
+    + _CELERY_BLOCKED_PARENT_CLEANUP_SECONDS
+)
+pytestmark = pytest.mark.timeout(_CELERY_BLOCKED_PARENT_TIMEOUT_SECONDS)
 
 
 @pytest.fixture(scope="module")
