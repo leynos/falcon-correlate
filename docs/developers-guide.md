@@ -538,10 +538,10 @@ does not accept a Boolean there at all.
 
 ## Roadmap notes
 
-The three-tier linting work described in
+The linting architecture described in
 [ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md)
-is complete. Keep future linting changes aligned with that ADR unless a new
-ADR supersedes it.
+is complete. Keep future changes aligned with its four-tier policy unless a
+new ADR supersedes it.
 
 The tested quickstart example convention is described in
 [ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md).
@@ -651,6 +651,7 @@ The lint target is configured by these Makefile variables:
 | `SKYLOS_SCAN_OPTIONS` | `--config-file pyproject.toml`                                                                                  | Holds scan-only global options.                                 |
 | `SKYLOS_PRODUCTION_TARGETS` | `src/falcon_correlate`                                                                                    | Defines the production source scanned for dead code.           |
 | `SKYLOS_EXCLUDES`     | `unittests`                                                                                                    | Excludes test-only package infrastructure from the scan.       |
+| `SKYLOS_WHITELIST_LOCK` | `.skylos-whitelist.lock`                                                                                    | Serializes whitelist read-modify-write updates.                |
 
 Override variables at the command line for targeted investigation. For example:
 
