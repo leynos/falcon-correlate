@@ -1,23 +1,17 @@
-"""Falcon Correlation ID middleware implementation.
-
-Provides the WSGI middleware and shared lifecycle base reused by ASGI.
-"""
+"""Falcon WSGI correlation ID middleware and public middleware exports."""
 
 from __future__ import annotations
 
-import contextvars
-import ipaddress
-import logging
 import typing as typ
 import uuid
 
-from .middleware_config import (
-    DEFAULT_HEADER_NAME,
-    VALID_CONFIG_KWARGS,
-    CorrelationIDConfig,
+from .middleware_asgi import CorrelationIDMiddlewareASGI
+from .middleware_base import (
+    _CORRELATION_ID_RESET_TOKEN_ATTR as _CORRELATION_ID_RESET_TOKEN_ATTR,
 )
+from .middleware_base import _CorrelationIDMiddlewareBase
+from .middleware_config import DEFAULT_HEADER_NAME, CorrelationIDConfig
 from .middleware_utils import (
-    CORRELATION_ID_RESET_TOKEN_ATTR,
     RECOMMENDED_LOG_FORMAT,
     ContextualLogFilter,
     correlation_id_var,
@@ -41,258 +35,7 @@ __all__ = [
 ]
 
 if typ.TYPE_CHECKING:
-    import collections.abc as cabc
-
     import falcon
-
-    from ._protocols import _RequestLike, _ResponseLike
-    from .middleware_config import CorrelationIDConfigKwargs
-
-logger = logging.getLogger(__name__)
-_CORRELATION_ID_RESET_TOKEN_ATTR = CORRELATION_ID_RESET_TOKEN_ATTR
-
-
-class _CorrelationIDMiddlewareBase:
-    """Shared lifecycle logic for Falcon correlation ID middleware variants."""
-
-    __slots__ = ("_config", "_correlation_id_var")
-
-    def __init__(
-        self,
-        *,
-        config: CorrelationIDConfig | None = None,
-        correlation_id_context_var: contextvars.ContextVar[
-            typ.Any
-        ] = correlation_id_var,
-        **kwargs: object,
-    ) -> None:
-        """Initialize the correlation ID middleware with configuration options.
-
-        Raises
-        ------
-        ValueError
-            If a configuration object and individual options are both supplied.
-        TypeError
-            If an unknown individual option is supplied.
-
-        """
-        self._correlation_id_var = correlation_id_context_var
-        if config is not None:
-            if kwargs:
-                msg = "Cannot specify both 'config' and individual parameters"
-                raise ValueError(msg)
-            self._config = config
-        else:
-            unknown_keys = set(kwargs.keys()) - VALID_CONFIG_KWARGS
-            if unknown_keys:
-                msg = f"Unknown keyword arguments: {', '.join(sorted(unknown_keys))}"
-                raise TypeError(msg)
-            # Cast to TypedDict after validating keys - runtime will verify values
-            typed_kwargs = typ.cast("CorrelationIDConfigKwargs", kwargs)
-            self._config = CorrelationIDConfig.from_kwargs(**typed_kwargs)
-
-    # @CodeScene(disable:"Bumpy Road Ahead")
-    @property
-    def config(self) -> CorrelationIDConfig:
-        """The middleware configuration."""
-        return self._config
-
-    @property
-    def header_name(self) -> str:
-        """The HTTP header name for correlation IDs."""
-        return self._config.header_name
-
-    @property
-    def trusted_sources(self) -> frozenset[str]:
-        """The set of trusted IP addresses."""
-        return typ.cast("frozenset[str]", self._config.trusted_sources)
-
-    @property
-    def generator(self) -> cabc.Callable[[], str]:
-        """The correlation ID generator function."""
-        return self._config.generator
-
-    @property
-    def validator(self) -> cabc.Callable[[str], bool] | None:
-        """The correlation ID validator function, or None if not set."""
-        return self._config.validator
-
-    @property
-    def echo_header_in_response(self) -> bool:
-        """Whether to echo the correlation ID in response headers."""
-        return self._config.echo_header_in_response
-
-    def _log_context(self, correlation_id: object) -> dict[str, object]:
-        """Build structured log context for middleware diagnostics."""
-        return {
-            "correlation_id": correlation_id,
-            "header_name": self._config.header_name,
-        }
-
-    def _get_incoming_header_value(self, req: _RequestLike) -> str | None:
-        """Return the stripped incoming correlation ID header value."""
-        incoming = req.get_header(self.header_name)
-        if incoming is None:
-            return None
-
-        incoming = incoming.strip()
-        if not incoming:
-            return None
-
-        return incoming
-
-    def _is_trusted_source(self, remote_addr: str | None) -> bool:
-        """Check if remote_addr is from a trusted source.
-
-        Parameters
-        ----------
-        remote_addr : str | None
-            The IP address of the request source, from req.remote_addr.
-
-        Returns
-        -------
-        bool
-            True if remote_addr matches any trusted source, False otherwise.
-
-        """
-        if not remote_addr:
-            return False
-
-        if not self._config._parsed_networks:
-            return False
-
-        try:
-            addr = ipaddress.ip_address(remote_addr)
-        except ValueError:
-            # Malformed address, cannot be trusted
-            return False
-
-        return any(addr in network for network in self._config._parsed_networks)
-
-    def _is_valid_id(self, value: str) -> bool:
-        """Return whether a correlation ID passes the configured validator."""
-        if self._config.validator is None:
-            return True
-        try:
-            result = self._config.validator(value)
-        except Exception:
-            logger.warning(
-                "Validator raised an exception for correlation ID, treating as invalid",
-                extra=self._log_context(value),
-                exc_info=True,
-            )
-            return False
-        return result
-
-    def _process_request(self, req: _RequestLike) -> None:
-        """Establish request-local correlation ID state."""
-        incoming = self._get_incoming_header_value(req)
-
-        if incoming is not None and self._is_trusted_source(req.remote_addr):
-            if self._is_valid_id(incoming):
-                correlation_id = incoming
-            else:
-                logger.debug(
-                    "Correlation ID failed validation, generating new ID",
-                    extra=self._log_context(incoming),
-                )
-                correlation_id = self._config.generator()
-        else:
-            correlation_id = self._config.generator()
-
-        req.context.correlation_id = correlation_id
-        reset_token = self._correlation_id_var.set(correlation_id)
-        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, reset_token)
-
-    def _echo_correlation_id_header(
-        self,
-        req: _RequestLike,
-        resp: _ResponseLike,
-    ) -> None:
-        """Write the active correlation ID to the configured response header.
-
-        Does nothing when echoing is disabled or the correlation ID is absent.
-        Re-raises any exception from ``resp.set_header`` so that the caller's
-        ``finally`` block still runs.
-        """
-        if not self._config.echo_header_in_response:
-            logger.debug(
-                "Correlation ID response header echo disabled",
-                extra=self._log_context(getattr(req.context, "correlation_id", None)),
-            )
-            return
-
-        correlation_id = getattr(req.context, "correlation_id", None)
-        if correlation_id is None:
-            logger.debug(
-                "Correlation ID response header echo skipped; ID absent",
-                extra=self._log_context(None),
-            )
-            return
-
-        try:
-            resp.set_header(self._config.header_name, correlation_id)
-        except Exception:
-            logger.warning(
-                "Failed to echo correlation ID response header",
-                extra=self._log_context(correlation_id),
-                exc_info=True,
-            )
-            raise
-        logger.debug(
-            "Correlation ID response header echoed",
-            extra=self._log_context(correlation_id),
-        )
-
-    def _reset_correlation_id_context(
-        self,
-        req: _RequestLike,
-        reset_token: object,
-    ) -> None:
-        """Clear request reset token state and restore ContextVar state."""
-        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
-
-        if not isinstance(reset_token, contextvars.Token):
-            return
-
-        if reset_token.var is not self._correlation_id_var:
-            logger.debug(
-                "Ignoring mismatched correlation ID reset token",
-                extra=self._log_context(getattr(req.context, "correlation_id", None)),
-            )
-            return
-
-        # Token is invariant, so narrow the isinstance result to the stored
-        # var's parameter; the identity check above guarantees the match.
-        token = typ.cast("contextvars.Token[typ.Any]", reset_token)
-        try:
-            self._correlation_id_var.reset(token)
-        except ValueError:
-            logger.debug(
-                "Ignoring invalid correlation ID reset token",
-                extra=self._log_context(getattr(req.context, "correlation_id", None)),
-                exc_info=True,
-            )
-
-    def _process_response(self, req: _RequestLike, resp: _ResponseLike) -> None:
-        """Echo the response header if configured, then clear request state."""
-        reset_token = getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
-        try:
-            if (
-                isinstance(reset_token, contextvars.Token)
-                and reset_token.var is self._correlation_id_var
-            ):
-                self._echo_correlation_id_header(req, resp)
-            else:
-                logger.debug(
-                    "Correlation ID response header echo skipped; "
-                    "middleware token absent",
-                    extra=self._log_context(
-                        getattr(req.context, "correlation_id", None)
-                    ),
-                )
-        finally:
-            self._reset_correlation_id_context(req, reset_token)
 
 
 class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
@@ -360,7 +103,7 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
         Exception
             If the configured correlation ID generator raises an exception.
 
-        """  # noqa: DOC502 - generator exceptions are delegated.
+        """  # ruff: ignore[docstring-extraneous-exception] - generator exceptions are delegated.
         self._process_request(req)
 
     # Falcon middleware hook requires this exact callback signature; see #38.
@@ -370,7 +113,7 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
         req: falcon.Request,
         resp: falcon.Response,
         resource: object,
-        req_succeeded: bool,  # noqa: FBT001 - Falcon WSGI middleware interface requirement
+        req_succeeded: bool,  # ruff: ignore[boolean-type-hint-positional-argument] - Falcon WSGI middleware interface requirement
     ) -> None:
         """Post-process the response and clean up request-scoped context.
 
@@ -394,6 +137,3 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
 
         """
         self._process_response(req, resp)
-
-
-from .middleware_asgi import CorrelationIDMiddlewareASGI  # noqa: E402 - avoids cycle.

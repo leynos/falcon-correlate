@@ -21,6 +21,10 @@ if typ.TYPE_CHECKING:
     from types import TracebackType
 
     import httpx
+    from httpx import AsyncBaseTransport as _AsyncBaseTransport
+    from httpx import AsyncBaseTransport as _AsyncWrappedTransport
+    from httpx import BaseTransport as _SyncBaseTransport
+    from httpx import BaseTransport as _SyncWrappedTransport
 
     class _SupportsSyncExit(typ.Protocol):
         """Protocol for synchronous transport context manager exits."""
@@ -78,16 +82,15 @@ if typ.TYPE_CHECKING:
             """
             ...
 
-    _ExitArgs = tuple[
+    type _ExitArgs = tuple[
         type[BaseException] | None,
         BaseException | None,
         TracebackType | None,
     ]
-
-    _SyncWrappedTransport = httpx.BaseTransport
-    _AsyncWrappedTransport = httpx.AsyncBaseTransport
 else:
+    _SyncBaseTransport = object
     _SyncWrappedTransport = object
+    _AsyncBaseTransport = object
     _AsyncWrappedTransport = object
 
 
@@ -147,12 +150,6 @@ class _CorrelationIDTransportBase[WrappedTransportT]:
         return typ.cast("None", result)
 
 
-if typ.TYPE_CHECKING:
-    _SyncBaseTransport = httpx.BaseTransport
-else:
-    _SyncBaseTransport = object
-
-
 class CorrelationIDTransport(
     _CorrelationIDTransportBase[_SyncWrappedTransport],
     _SyncBaseTransport,
@@ -178,7 +175,8 @@ class CorrelationIDTransport(
 
     def close(self) -> None:
         """Delegate transport shutdown to the wrapped transport."""
-        self._wrapped_transport.close()
+        result = self._wrapped_transport.close()
+        return self._cast_to_none(result)
 
     def __enter__(self) -> CorrelationIDTransport:
         """Enter the transport context (required by httpx.Client).
@@ -201,12 +199,6 @@ class CorrelationIDTransport(
         """Exit the transport context (required by httpx.Client)."""
         wrapped = typ.cast("_SupportsSyncExit", self._wrapped_transport)
         return self._cast_to_none(wrapped.__exit__(exc_type, exc_value, traceback))
-
-
-if typ.TYPE_CHECKING:
-    _AsyncBaseTransport = httpx.AsyncBaseTransport
-else:
-    _AsyncBaseTransport = object
 
 
 class AsyncCorrelationIDTransport(
@@ -264,7 +256,7 @@ class AsyncCorrelationIDTransport(
 def request_with_correlation_id(
     method: str,
     url: str,
-    **kwargs: typ.Any,  # noqa: ANN401
+    **kwargs: typ.Any,  # ruff: ignore[any-type] -- mirrors flexible httpx request kwargs.
 ) -> httpx.Response:
     """Send an HTTP request, injecting the correlation ID header.
 
@@ -299,7 +291,7 @@ def request_with_correlation_id(
 async def async_request_with_correlation_id(
     method: str,
     url: str,
-    **kwargs: typ.Any,  # noqa: ANN401
+    **kwargs: typ.Any,  # ruff: ignore[any-type] -- mirrors flexible httpx request kwargs.
 ) -> httpx.Response:
     """Send an async HTTP request, injecting the correlation ID header.
 

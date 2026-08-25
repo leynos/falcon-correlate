@@ -156,9 +156,8 @@ class TestQuickstartLoggingSetup:
         rendered = list(itertools.starmap(_render_log_line, _LOG_FORMAT_VARIANTS))
 
         actual_snapshot = "\n".join(rendered)
-        assert actual_snapshot == snapshot, (
-            "expected quickstart log format variants to match the approved snapshot"
-        )
+        failure_message = "expected condition: actual_snapshot == snapshot..."
+        assert actual_snapshot == snapshot, failure_message
 
 
 def _render_log_line(correlation_id: str | None, user_id: str | None) -> str:

@@ -45,10 +45,18 @@ import pytest
 # in environments where httpx is not available.
 httpx = pytest.importorskip("httpx")
 
-from pytest_bdd import given, parsers, scenarios, then, when  # noqa: E402
+from pytest_bdd import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    given,
+    parsers,
+    scenarios,
+    then,
+    when,
+)
 
-from falcon_correlate import correlation_id_var  # noqa: E402
-from falcon_correlate.httpx import (  # noqa: E402
+from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    correlation_id_var,
+)
+from falcon_correlate.httpx import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     AsyncCorrelationIDTransport,
     CorrelationIDTransport,
 )
@@ -65,11 +73,6 @@ class _RecordingTransportBase:
     def __init__(self) -> None:
         """Initialize the transport with no captured request."""
         self.request: httpx.Request | None = None
-
-    def _record_request(self, request: httpx.Request) -> httpx.Response:
-        """Capture a request and return a successful response."""
-        self.request = request
-        return httpx.Response(200, request=request)
 
 
 class RecordingTransport(_RecordingTransportBase, httpx.BaseTransport):
@@ -89,7 +92,8 @@ class RecordingTransport(_RecordingTransportBase, httpx.BaseTransport):
             The value produced for the test scenario.
 
         """
-        return self._record_request(request)
+        self.request = request
+        return httpx.Response(200, request=request)
 
 
 class RecordingAsyncTransport(_RecordingTransportBase, httpx.AsyncBaseTransport):
@@ -109,7 +113,8 @@ class RecordingAsyncTransport(_RecordingTransportBase, httpx.AsyncBaseTransport)
             The value produced for the test scenario.
 
         """
-        return self._record_request(request)
+        self.request = request
+        return httpx.Response(200, request=request)
 
 
 class Context(typ.TypedDict, total=False):

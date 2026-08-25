@@ -12,10 +12,21 @@ if typ.TYPE_CHECKING:
     import collections.abc as cabc
     import contextvars
 
-from pytest_bdd import given, parsers, scenarios, then, when  # noqa: E402
+from pytest_bdd import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    given,
+    parsers,
+    scenarios,
+    then,
+    when,
+)
 
-from falcon_correlate import correlation_id_var, user_id_var  # noqa: E402
-from tests.structlog_helpers import inject_correlation_context  # noqa: E402
+from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    correlation_id_var,
+    user_id_var,
+)
+from tests.structlog_helpers import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    inject_correlation_context,
+)
 
 scenarios("structlog_integration.feature")
 

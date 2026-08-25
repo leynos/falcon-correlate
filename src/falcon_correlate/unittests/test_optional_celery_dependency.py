@@ -53,6 +53,7 @@ if typ.TYPE_CHECKING:
     from pathlib import Path
 
 pytestmark = pytest.mark.timeout(_CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS)
+_CELERY_BLOCKED_PYTEST_RUN_GROUP = "celery-blocked-pytest-run"
 
 
 @pytest.fixture(scope="module")
@@ -109,13 +110,24 @@ def test_blocked_celery_environment_prepends_existing_pythonpath(
     """The import blocker should lead PYTHONPATH without discarding callers."""
     env = _blocked_celery_environment(
         tmp_path,
-        {"PYTHONPATH": f"/already{os.pathsep}/present", "KEEP": "1"},
+        {
+            "PYTHONPATH": f"/already{os.pathsep}/present",
+            "PYTEST_ADDOPTS": "-n auto",
+            "PYTEST_XDIST_WORKER": "gw0",
+            "KEEP": "1",
+        },
     )
 
     assert env["KEEP"] == "1", "Blocked environment should preserve unrelated keys."
     assert env["PYTHONPATH"] == (
         f"{tmp_path}{os.pathsep}/already{os.pathsep}/present"
     ), "Blocked environment should prepend the import blocker to PYTHONPATH."
+    assert "PYTEST_ADDOPTS" not in env, (
+        "Blocked environment should not inherit parent pytest options."
+    )
+    assert "PYTEST_XDIST_WORKER" not in env, (
+        "Blocked environment should not inherit parent xdist worker state."
+    )
 
 
 def test_blocked_celery_environment_sets_pythonpath_when_missing(
@@ -189,6 +201,7 @@ def test_celery_import_blocker_rejects_celery_modules(
     )
 
 
+@pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
 def test_celery_tests_emit_no_error_markers_when_celery_is_unavailable(
     celery_blocked_pytest_run: _PytestRun,
 ) -> None:
@@ -201,6 +214,7 @@ def test_celery_tests_emit_no_error_markers_when_celery_is_unavailable(
     )
 
 
+@pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
 def test_celery_tests_exit_successfully_when_celery_is_unavailable(
     celery_blocked_pytest_run: _PytestRun,
 ) -> None:
@@ -213,6 +227,7 @@ def test_celery_tests_exit_successfully_when_celery_is_unavailable(
     )
 
 
+@pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
 def test_celery_tests_report_correct_skip_count_when_celery_is_unavailable(
     celery_blocked_pytest_run: _PytestRun,
 ) -> None:

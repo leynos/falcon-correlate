@@ -3,9 +3,15 @@ NIXIE ?= nixie
 MDFORMAT_ALL ?= mdformat-all
 export PATH := $(HOME)/.local/bin:$(HOME)/.bun/bin:$(PATH)
 UV ?= $(shell command -v uv 2>/dev/null || printf '%s/.local/bin/uv' "$$HOME")
-TOOLS = $(MDFORMAT_ALL) ruff ty $(MDLINT) uv
+TOOLS = $(MDFORMAT_ALL) $(MDLINT) uv
 VENV_TOOLS = pytest
 UV_ENV = UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools
+# Cap xdist at the available cores; ``auto`` sees host CPUs and starves nested tests.
+PYTEST_WORKERS ?= 6
+RUFF_VERSION ?= 0.16.4
+TY_VERSION ?= 0.0.74
+RUFF = $(UV_ENV) $(UV) run --with ruff==$(RUFF_VERSION) ruff
+TY = $(UV_ENV) $(UV) run --with ty==$(TY_VERSION) ty
 PATHSPEC_VERSION ?= 1.1.1
 TYPOS_VERSION ?= 1.48.0
 TYPOS_CONFIG_BUILDER_COMMIT := d6da92f02240a79a945c835f69bdd08a888da1d0
@@ -14,6 +20,9 @@ TYPOS_CONFIG_BUILDER := $(UV_ENV) $(UV) tool run --python 3.14 \
 	--from "$(TYPOS_CONFIG_BUILDER_SOURCE)" typos-config-builder
 SPELLING_PY_TESTS := scripts/tests/test_typos_rollout_check.py
 PROJECT_PYTEST_EXCLUDES := $(foreach source,$(SPELLING_PY_TESTS),--ignore=$(source))
+# These tests spawn pytest subprocesses and must run outside the xdist worker pool.
+SERIAL_PY_TESTS := src/falcon_correlate/unittests/test_optional_celery_dependency.py
+SERIAL_PY_TEST_EXCLUDES := $(foreach source,$(SERIAL_PY_TESTS),--ignore=$(source))
 SPELLING_COVERAGE_ARGS := --cov=typos_rollout_check --cov-fail-under=90
 SPELLING_HELPER_PYTEST = PYTHONPATH=scripts $(UV_ENV) $(UV) run --no-project \
 	--python 3.14 --with pathspec==$(PATHSPEC_VERSION) --with pytest==9.0.2 \
@@ -21,9 +30,19 @@ SPELLING_HELPER_PYTEST = PYTHONPATH=scripts $(UV_ENV) $(UV) run --no-project \
 INTERROGATE_TARGETS ?= src/falcon_correlate scripts
 PYLINT_PYTHON ?= pypy
 PYLINT_TARGETS ?= src tests examples scripts
+PYLINT_HOME ?= .pylint_cache
 PYLINT_PYPY_SHIM_REF ?= 726d09f968b4d729ee4b29c71fc732e744854f3b
 PYLINT_PYPY_SHIM = git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)
-PYLINT = $(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy
+PYLINT = PYLINTHOME=$(PYLINT_HOME) $(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy
+DF12_PYTHON_LINTS_REF ?= v0.3.0
+DF12_PYTHON_LINTS = git+https://github.com/leynos/df12-python-lints.git@$(DF12_PYTHON_LINTS_REF)
+DF12_PYTHON ?= 3.14
+DF12_PYLINT_MESSAGES = R9101,C9102,R9103,R9104,C9105,C9106,C9107,R9108,R9109,R9110,R9111,C9112
+DF12_PYLINT = $(UV_ENV) $(UV) run --python $(DF12_PYTHON) pylint \
+	--disable=all --load-plugins=df12_python_lints \
+	--enable=$(DF12_PYLINT_MESSAGES)
+AMBRLEAKS = $(UV_ENV) $(UV) tool run --python $(DF12_PYTHON) \
+	--from '$(DF12_PYTHON_LINTS)' ambrleaks
 
 .PHONY: help all clean build build-release lint fmt check-fmt doctest \
         markdownlint nixie spelling spelling-config spelling-config-write \
@@ -45,7 +64,7 @@ build-release: ## Build artefacts (sdist & wheel)
 
 clean: ## Remove build artefacts
 	rm -rf build dist *.egg-info \
-	  .mypy_cache .pytest_cache .coverage coverage.* \
+	  .mypy_cache .pylint_cache .pytest_cache .coverage coverage.* \
 	  lcov.info htmlcov .venv .uv-cache .uv-tools
 	find . -type d -name '__pycache__' -print0 | xargs -0 -r rm -rf
 
@@ -75,23 +94,25 @@ $(VENV_TOOLS): ## Verify required CLI tools in venv
 	$(call ensure_tool_venv,$@)
 endif
 
-fmt: ruff $(MDFORMAT_ALL) ## Format sources
-	$(UV_ENV) $(UV) run ruff format
-	$(UV_ENV) $(UV) run ruff check --select I --fix
+fmt: $(MDFORMAT_ALL) ## Format sources
+	$(RUFF) format
+	$(RUFF) check --select I --fix
 	$(MDFORMAT_ALL)
 
-check-fmt: ruff ## Verify formatting
-	$(UV_ENV) $(UV) run ruff format --check
+check-fmt: ## Verify formatting
+	$(RUFF) format --check
 	# mdformat-all doesn't currently do checking
 
-lint: ruff ## Run linters
-	$(UV_ENV) $(UV) run ruff check
+lint: ## Run linters
+	$(RUFF) check
 	$(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
 	$(PYLINT) $(PYLINT_TARGETS)
+	$(DF12_PYLINT) $(PYLINT_TARGETS)
+	$(AMBRLEAKS) tests
 
-typecheck: build ty ## Run typechecking
-	ty --version
-	ty check
+typecheck: build ## Run typechecking
+	$(TY) --version
+	$(TY) check
 
 markdownlint: spelling $(MDLINT) ## Lint Markdown files and enforce spelling
 	$(MDLINT) '**/*.md' '#.uv-cache' '#.uv-tools'
@@ -115,13 +136,15 @@ spelling-helper-test: ## Validate the shared spelling-policy integration
 
 nixie: ## Validate Mermaid diagrams
 	$(call ensure_tool,nixie)
-	$(NIXIE) --no-sandbox
+	@git ls-files -z '*.md' | \
+		xargs -0 -n 1 $(NIXIE) --no-sandbox --max-concurrency 1
 
 doctest: build uv $(VENV_TOOLS) ## Run docstring examples
 	$(UV_ENV) $(UV) run pytest --doctest-modules --import-mode=importlib src/falcon_correlate --ignore=src/falcon_correlate/unittests
 
 test: build uv $(VENV_TOOLS) doctest ## Run tests
-	$(UV_ENV) $(UV) run pytest -v -n auto $(PROJECT_PYTEST_EXCLUDES)
+	$(UV_ENV) $(UV) run pytest -v $(SERIAL_PY_TESTS)
+	$(UV_ENV) $(UV) run pytest -v -n $(PYTEST_WORKERS) --dist=loadgroup $(PROJECT_PYTEST_EXCLUDES) $(SERIAL_PY_TEST_EXCLUDES)
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \

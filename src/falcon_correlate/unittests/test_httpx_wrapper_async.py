@@ -9,9 +9,13 @@ import pytest
 
 httpx = pytest.importorskip("httpx")
 
-from falcon_correlate.httpx import async_request_with_correlation_id  # noqa: E402
-from falcon_correlate.middleware import DEFAULT_HEADER_NAME  # noqa: E402
-from falcon_correlate.unittests.httpx_wrapper_helpers import (  # noqa: E402
+from falcon_correlate.httpx import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    async_request_with_correlation_id,
+)
+from falcon_correlate.middleware import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    DEFAULT_HEADER_NAME,
+)
+from falcon_correlate.unittests.httpx_wrapper_helpers import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     EXPECTED_TIMEOUT,
     run_async,
 )
@@ -73,9 +77,12 @@ class TestAsyncRequestWithCorrelationId:
             **extra_kwargs,
         )
         headers = call_kwargs["headers"]
-        assert headers[DEFAULT_HEADER_NAME] == correlation_id
+        failure_message = (
+            "expected headers[DEFAULT_HEADER_NAME] to equal correlation_id"
+        )
+        assert headers[DEFAULT_HEADER_NAME] == correlation_id, failure_message
         for key, value in expected_extra_headers.items():
-            assert headers[key] == value
+            assert headers[key] == value, "expected headers[key] to equal value"
 
     @pytest.mark.asyncio
     async def test_does_not_add_header_when_context_is_empty(
@@ -86,7 +93,10 @@ class TestAsyncRequestWithCorrelationId:
         await async_request_with_correlation_id("GET", "http://example.com")
 
         call_kwargs = mock_async_client.request.call_args.kwargs
-        assert DEFAULT_HEADER_NAME not in call_kwargs["headers"]
+        failure_message = (
+            "expected condition: DEFAULT_HEADER_NAME not in call_kwargs['h..."
+        )
+        assert DEFAULT_HEADER_NAME not in call_kwargs["headers"], failure_message
 
     @pytest.mark.asyncio
     async def test_passes_through_additional_kwargs(
@@ -102,5 +112,7 @@ class TestAsyncRequestWithCorrelationId:
         )
 
         call_kwargs = mock_async_client.request.call_args.kwargs
-        assert call_kwargs["json"] == {"key": "val"}
-        assert call_kwargs["timeout"] == EXPECTED_TIMEOUT
+        failure_message = "expected call_kwargs['json'] to equal {'key': 'val'}"
+        assert call_kwargs["json"] == {"key": "val"}, failure_message
+        failure_message = "expected call_kwargs['timeout'] to equal EXPECTED_TIMEOUT"
+        assert call_kwargs["timeout"] == EXPECTED_TIMEOUT, failure_message

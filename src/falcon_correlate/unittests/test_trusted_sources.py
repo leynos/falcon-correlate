@@ -23,66 +23,94 @@ class TestTrustedSourceChecking:
     def test_exact_ipv4_match_is_trusted(self) -> None:
         """Verify exact IPv4 match returns True."""
         middleware = CorrelationIDMiddleware(trusted_sources=["10.0.0.1"])
-        assert middleware._is_trusted_source("10.0.0.1") is True
+        failure_message = (
+            "expected middleware._is_trusted_source('10.0.0.1') to be True"
+        )
+        assert middleware._is_trusted_source("10.0.0.1") is True, failure_message
 
     def test_exact_ipv4_no_match_is_not_trusted(self) -> None:
         """Verify non-matching IPv4 returns False."""
         middleware = CorrelationIDMiddleware(trusted_sources=["10.0.0.1"])
-        assert middleware._is_trusted_source("10.0.0.2") is False
+        failure_message = (
+            "expected middleware._is_trusted_source('10.0.0.2') to be False"
+        )
+        assert middleware._is_trusted_source("10.0.0.2") is False, failure_message
 
     def test_exact_ipv6_match_is_trusted(self) -> None:
         """Verify exact IPv6 match returns True."""
         middleware = CorrelationIDMiddleware(trusted_sources=["::1"])
-        assert middleware._is_trusted_source("::1") is True
+        failure_message = "expected middleware._is_trusted_source('::1') to be True"
+        assert middleware._is_trusted_source("::1") is True, failure_message
 
     def test_exact_ipv6_no_match_is_not_trusted(self) -> None:
         """Verify non-matching IPv6 returns False."""
         middleware = CorrelationIDMiddleware(trusted_sources=["::1"])
-        assert middleware._is_trusted_source("::2") is False
+        failure_message = "expected middleware._is_trusted_source('::2') to be False"
+        assert middleware._is_trusted_source("::2") is False, failure_message
 
     # CIDR subnet matching tests
 
     def test_cidr_ipv4_subnet_match_is_trusted(self) -> None:
         """Verify IPv4 within CIDR range returns True."""
         middleware = CorrelationIDMiddleware(trusted_sources=["10.0.0.0/24"])
-        assert middleware._is_trusted_source("10.0.0.50") is True
+        failure_message = (
+            "expected middleware._is_trusted_source('10.0.0.50') to be True"
+        )
+        assert middleware._is_trusted_source("10.0.0.50") is True, failure_message
 
     def test_cidr_ipv4_subnet_no_match_is_not_trusted(self) -> None:
         """Verify IPv4 outside CIDR range returns False."""
         middleware = CorrelationIDMiddleware(trusted_sources=["10.0.0.0/24"])
-        assert middleware._is_trusted_source("10.0.1.1") is False
+        failure_message = (
+            "expected middleware._is_trusted_source('10.0.1.1') to be False"
+        )
+        assert middleware._is_trusted_source("10.0.1.1") is False, failure_message
 
     def test_cidr_ipv6_subnet_match_is_trusted(self) -> None:
         """Verify IPv6 within CIDR range returns True."""
         middleware = CorrelationIDMiddleware(trusted_sources=["2001:db8::/32"])
-        assert middleware._is_trusted_source("2001:db8::1") is True
+        failure_message = (
+            "expected middleware._is_trusted_source('2001:db8::1') to be True"
+        )
+        assert middleware._is_trusted_source("2001:db8::1") is True, failure_message
 
     def test_cidr_ipv6_subnet_no_match_is_not_trusted(self) -> None:
         """Verify IPv6 outside CIDR range returns False."""
         middleware = CorrelationIDMiddleware(trusted_sources=["2001:db8::/32"])
-        assert middleware._is_trusted_source("2001:db9::1") is False
+        failure_message = (
+            "expected condition: middleware._is_trusted_source('2001:db9::..."
+        )
+        assert middleware._is_trusted_source("2001:db9::1") is False, failure_message
 
     # Edge cases
 
     def test_none_remote_addr_is_not_trusted(self) -> None:
         """Verify None remote_addr returns False."""
         middleware = CorrelationIDMiddleware(trusted_sources=["10.0.0.1"])
-        assert middleware._is_trusted_source(None) is False
+        failure_message = "expected middleware._is_trusted_source(None) to be False"
+        assert middleware._is_trusted_source(None) is False, failure_message
 
     def test_empty_string_remote_addr_is_not_trusted(self) -> None:
         """Verify empty string remote_addr returns False."""
         middleware = CorrelationIDMiddleware(trusted_sources=["10.0.0.1"])
-        assert middleware._is_trusted_source("") is False
+        failure_message = "expected middleware._is_trusted_source('') to be False"
+        assert middleware._is_trusted_source("") is False, failure_message
 
     def test_empty_trusted_sources_never_trusts(self) -> None:
         """Verify empty trusted_sources always returns False."""
         middleware = CorrelationIDMiddleware(trusted_sources=[])
-        assert middleware._is_trusted_source("10.0.0.1") is False
+        failure_message = (
+            "expected middleware._is_trusted_source('10.0.0.1') to be False"
+        )
+        assert middleware._is_trusted_source("10.0.0.1") is False, failure_message
 
     def test_malformed_remote_addr_is_not_trusted(self) -> None:
         """Verify malformed remote_addr returns False without raising."""
         middleware = CorrelationIDMiddleware(trusted_sources=["10.0.0.1"])
-        assert middleware._is_trusted_source("not-an-ip") is False
+        failure_message = (
+            "expected middleware._is_trusted_source('not-an-ip') to be False"
+        )
+        assert middleware._is_trusted_source("not-an-ip") is False, failure_message
 
     # Multiple sources
 
@@ -91,28 +119,40 @@ class TestTrustedSourceChecking:
         middleware = CorrelationIDMiddleware(
             trusted_sources=["10.0.0.0/24", "192.168.1.0/24", "172.16.0.1"],
         )
-        assert middleware._is_trusted_source("10.0.0.50") is True
+        failure_message = (
+            "expected middleware._is_trusted_source('10.0.0.50') to be True"
+        )
+        assert middleware._is_trusted_source("10.0.0.50") is True, failure_message
 
     def test_multiple_sources_middle_match_is_trusted(self) -> None:
         """Verify matching middle of multiple sources returns True."""
         middleware = CorrelationIDMiddleware(
             trusted_sources=["10.0.0.0/24", "192.168.1.0/24", "172.16.0.1"],
         )
-        assert middleware._is_trusted_source("192.168.1.50") is True
+        failure_message = (
+            "expected condition: middleware._is_trusted_source('192.168.1...."
+        )
+        assert middleware._is_trusted_source("192.168.1.50") is True, failure_message
 
     def test_multiple_sources_last_match_is_trusted(self) -> None:
         """Verify matching last of multiple sources returns True."""
         middleware = CorrelationIDMiddleware(
             trusted_sources=["10.0.0.0/24", "192.168.1.0/24", "172.16.0.1"],
         )
-        assert middleware._is_trusted_source("172.16.0.1") is True
+        failure_message = (
+            "expected middleware._is_trusted_source('172.16.0.1') to be True"
+        )
+        assert middleware._is_trusted_source("172.16.0.1") is True, failure_message
 
     def test_multiple_sources_no_match_is_not_trusted(self) -> None:
         """Verify not matching any source returns False."""
         middleware = CorrelationIDMiddleware(
             trusted_sources=["10.0.0.0/24", "192.168.1.0/24", "172.16.0.1"],
         )
-        assert middleware._is_trusted_source("8.8.8.8") is False
+        failure_message = (
+            "expected middleware._is_trusted_source('8.8.8.8') to be False"
+        )
+        assert middleware._is_trusted_source("8.8.8.8") is False, failure_message
 
     # Mixed IPv4/IPv6 sources
 
@@ -121,28 +161,38 @@ class TestTrustedSourceChecking:
         middleware = CorrelationIDMiddleware(
             trusted_sources=["10.0.0.0/8", "192.168.1.0/24"],
         )
-        assert middleware._is_trusted_source("::1") is False
+        failure_message = "expected middleware._is_trusted_source('::1') to be False"
+        assert middleware._is_trusted_source("::1") is False, failure_message
 
     def test_mixed_sources_ipv4_addr_matches_ipv4_in_mixed_list(self) -> None:
         """Verify IPv4 address matches IPv4 source in mixed IPv4/IPv6 list."""
         middleware = CorrelationIDMiddleware(
             trusted_sources=["::1", "10.0.0.0/8"],
         )
-        assert middleware._is_trusted_source("10.0.0.1") is True
+        failure_message = (
+            "expected middleware._is_trusted_source('10.0.0.1') to be True"
+        )
+        assert middleware._is_trusted_source("10.0.0.1") is True, failure_message
 
     def test_mixed_sources_ipv6_addr_matches_ipv6_in_mixed_list(self) -> None:
         """Verify IPv6 address matches IPv6 source in mixed IPv4/IPv6 list."""
         middleware = CorrelationIDMiddleware(
             trusted_sources=["10.0.0.0/8", "2001:db8::/32"],
         )
-        assert middleware._is_trusted_source("2001:db8::1") is True
+        failure_message = (
+            "expected middleware._is_trusted_source('2001:db8::1') to be True"
+        )
+        assert middleware._is_trusted_source("2001:db8::1") is True, failure_message
 
     def test_mixed_sources_ipv4_addr_not_in_ipv6_sources(self) -> None:
         """Verify IPv4 address does not match IPv6-only trusted sources."""
         middleware = CorrelationIDMiddleware(
             trusted_sources=["::1", "2001:db8::/32"],
         )
-        assert middleware._is_trusted_source("10.0.0.1") is False
+        failure_message = (
+            "expected middleware._is_trusted_source('10.0.0.1') to be False"
+        )
+        assert middleware._is_trusted_source("10.0.0.1") is False, failure_message
 
 
 class TestTrustedSourceConfigValidation:
@@ -185,28 +235,41 @@ class TestTrustedSourceConfigValidation:
     def test_valid_ipv4_address_accepted(self) -> None:
         """Verify valid IPv4 address is accepted."""
         middleware = CorrelationIDMiddleware(trusted_sources=["192.168.1.1"])
-        assert "192.168.1.1" in middleware.trusted_sources
+        failure_message = (
+            "expected condition: '192.168.1.1' in middleware.trusted_sourc..."
+        )
+        assert "192.168.1.1" in middleware.trusted_sources, failure_message
 
     def test_valid_ipv4_cidr_accepted(self) -> None:
         """Verify valid IPv4 CIDR is accepted."""
         middleware = CorrelationIDMiddleware(trusted_sources=["192.168.1.0/24"])
-        assert "192.168.1.0/24" in middleware.trusted_sources
+        failure_message = (
+            "expected condition: '192.168.1.0/24' in middleware.trusted_so..."
+        )
+        assert "192.168.1.0/24" in middleware.trusted_sources, failure_message
 
     def test_valid_ipv6_address_accepted(self) -> None:
         """Verify valid IPv6 address is accepted."""
         middleware = CorrelationIDMiddleware(trusted_sources=["::1"])
-        assert "::1" in middleware.trusted_sources
+        failure_message = "expected '::1' to be present in middleware.trusted_sources"
+        assert "::1" in middleware.trusted_sources, failure_message
 
     def test_valid_ipv6_cidr_accepted(self) -> None:
         """Verify valid IPv6 CIDR is accepted."""
         middleware = CorrelationIDMiddleware(trusted_sources=["2001:db8::/32"])
-        assert "2001:db8::/32" in middleware.trusted_sources
+        failure_message = (
+            "expected condition: '2001:db8::/32' in middleware.trusted_sou..."
+        )
+        assert "2001:db8::/32" in middleware.trusted_sources, failure_message
 
     def test_mixed_valid_sources_accepted(self) -> None:
         """Verify mix of valid IPv4/IPv6 addresses and CIDRs accepted."""
         sources = ["10.0.0.1", "10.0.0.0/8", "::1", "2001:db8::/32"]
         middleware = CorrelationIDMiddleware(trusted_sources=sources)
-        assert middleware.trusted_sources == frozenset(sources)
+        failure_message = (
+            "expected middleware.trusted_sources to equal frozenset(sources)"
+        )
+        assert middleware.trusted_sources == frozenset(sources), failure_message
 
 
 class TestTrustedSourceIntegration:
@@ -259,7 +322,10 @@ class TestTrustedSourceIntegration:
             "/correlation",
             headers={"X-Correlation-ID": "incoming-id"},
         )
-        assert response.json["correlation_id"] == "incoming-id"
+        failure_message = (
+            "expected response.json['correlation_id'] to equal 'incoming-id'"
+        )
+        assert response.json["correlation_id"] == "incoming-id", failure_message
 
     @pytest.mark.parametrize(
         ("test_id", "trusted_sources", "headers"),
@@ -314,4 +380,7 @@ class TestTrustedSourceIntegration:
             "/correlation",
             headers={"X-Correlation-ID": "cidr-matched-id"},
         )
-        assert response.json["correlation_id"] == "cidr-matched-id"
+        failure_message = (
+            "expected condition: response.json['correlation_id'] == 'cidr-..."
+        )
+        assert response.json["correlation_id"] == "cidr-matched-id", failure_message
