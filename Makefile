@@ -6,6 +6,8 @@ UV ?= $(shell command -v uv 2>/dev/null || printf '%s/.local/bin/uv' "$$HOME")
 TOOLS = $(MDFORMAT_ALL) $(MDLINT) uv
 VENV_TOOLS = pytest
 UV_ENV = UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools
+# Cap xdist at the available cores; ``auto`` sees host CPUs and starves nested tests.
+PYTEST_WORKERS ?= 6
 RUFF_VERSION ?= 0.16.4
 TY_VERSION ?= 0.0.74
 RUFF = $(UV_ENV) $(UV) run --with ruff==$(RUFF_VERSION) ruff
@@ -18,6 +20,9 @@ TYPOS_CONFIG_BUILDER := $(UV_ENV) $(UV) tool run --python 3.14 \
 	--from "$(TYPOS_CONFIG_BUILDER_SOURCE)" typos-config-builder
 SPELLING_PY_TESTS := scripts/tests/test_typos_rollout_check.py
 PROJECT_PYTEST_EXCLUDES := $(foreach source,$(SPELLING_PY_TESTS),--ignore=$(source))
+# These tests spawn pytest subprocesses and must run outside the xdist worker pool.
+SERIAL_PY_TESTS := src/falcon_correlate/unittests/test_optional_celery_dependency.py
+SERIAL_PY_TEST_EXCLUDES := $(foreach source,$(SERIAL_PY_TESTS),--ignore=$(source))
 SPELLING_COVERAGE_ARGS := --cov=typos_rollout_check --cov-fail-under=90
 SPELLING_HELPER_PYTEST = PYTHONPATH=scripts $(UV_ENV) $(UV) run --no-project \
 	--python 3.14 --with pathspec==$(PATHSPEC_VERSION) --with pytest==9.0.2 \
@@ -138,7 +143,8 @@ doctest: build uv $(VENV_TOOLS) ## Run docstring examples
 	$(UV_ENV) $(UV) run pytest --doctest-modules --import-mode=importlib src/falcon_correlate --ignore=src/falcon_correlate/unittests
 
 test: build uv $(VENV_TOOLS) doctest ## Run tests
-	$(UV_ENV) $(UV) run pytest -v -n auto --dist=loadgroup $(PROJECT_PYTEST_EXCLUDES)
+	$(UV_ENV) $(UV) run pytest -v $(SERIAL_PY_TESTS)
+	$(UV_ENV) $(UV) run pytest -v -n $(PYTEST_WORKERS) --dist=loadgroup $(PROJECT_PYTEST_EXCLUDES) $(SERIAL_PY_TEST_EXCLUDES)
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \
