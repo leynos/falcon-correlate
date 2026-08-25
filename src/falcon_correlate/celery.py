@@ -11,11 +11,25 @@ import contextvars
 import importlib
 import logging
 import typing as typ
+import weakref
 
 from .middleware import correlation_id_var
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
+
+    class _BackendLike(typ.Protocol):
+        """Structural type for the Celery backend used by this module."""
+
+        def as_uri(self) -> str:
+            """Return the backend URI."""
+            ...
+
+    class _CeleryAppLike(typ.Protocol):
+        """Structural type for the Celery app members used by this module."""
+
+        backend: _BackendLike
+        tasks: cabc.Mapping[str, object]
 
 
 _BEFORE_TASK_PUBLISH_DISPATCH_UID = (
@@ -31,9 +45,14 @@ _CeleryContextTokens = dict[str, list[_ContextToken]]
 _celery_context_tokens: contextvars.ContextVar[_CeleryContextTokens | None] = (
     contextvars.ContextVar("celery_context_tokens", default=None)
 )
+_configured_app_backend_rpc_verdicts: weakref.WeakKeyDictionary[
+    _CeleryAppLike, bool
+] = weakref.WeakKeyDictionary()
 
 
 def propagate_correlation_id_to_celery(
+    *,
+    sender: object | None = None,
     **kwargs: object,
 ) -> None:
     """Copy the ambient correlation ID into Celery publish properties.
@@ -45,6 +64,10 @@ def propagate_correlation_id_to_celery(
 
     Parameters
     ----------
+    sender : object | None
+        Task name emitted by Celery's publish signal. When it belongs to a
+        configured application, the handler uses that application's cached
+        result-backend verdict.
     **kwargs : dict
         Celery signal keyword arguments. Must contain a ``properties`` key
         mapping to a mutable mapping (typically :class:`dict`) that holds
@@ -52,8 +75,10 @@ def propagate_correlation_id_to_celery(
 
     Notes
     -----
-    When the active Celery application uses the ``rpc://`` result backend,
-    this handler preserves the task ID in ``correlation_id`` to maintain
+    When the publishing task belongs to a configured Celery application, this
+    handler uses that application's cached result-backend verdict. Otherwise,
+    it falls back to the active Celery application. For an ``rpc://`` result
+    backend, it preserves the task ID in ``correlation_id`` to maintain
     Celery's result retrieval contract.
 
     """
@@ -68,10 +93,51 @@ def propagate_correlation_id_to_celery(
     if properties is None:
         return
 
-    if _current_result_backend_uses_rpc():
+    publishing_app = _resolve_publishing_app(sender)
+    if publishing_app is None:
+        backend_uses_rpc = _current_result_backend_uses_rpc()
+    else:
+        backend_uses_rpc = _configured_app_backend_rpc_verdicts.get(
+            publishing_app,
+        )
+        if backend_uses_rpc is None:
+            backend_uses_rpc = _cache_app_backend_rpc_verdict(publishing_app)
+
+    if backend_uses_rpc:
         return
 
     properties["correlation_id"] = correlation_id
+
+
+def _app_backend_uses_rpc(app: _CeleryAppLike) -> bool:
+    """Return whether an application's result backend URI uses RPC."""
+    backend = getattr(app, "backend", None)
+    if backend is None:
+        return False
+
+    as_uri = getattr(backend, "as_uri", None)
+    if not callable(as_uri):
+        return False
+
+    return str(as_uri()).startswith("rpc://")
+
+
+def _cache_app_backend_rpc_verdict(app: _CeleryAppLike) -> bool:
+    """Cache and return an application's RPC result-backend verdict."""
+    backend_uses_rpc = _app_backend_uses_rpc(app)
+    _configured_app_backend_rpc_verdicts[app] = backend_uses_rpc
+    return backend_uses_rpc
+
+
+def _resolve_publishing_app(sender: object | None) -> _CeleryAppLike | None:
+    """Return the configured application that owns a publishing task name."""
+    for app in _configured_app_backend_rpc_verdicts:
+        tasks = getattr(app, "tasks", None)
+        contains = getattr(tasks, "__contains__", None)
+        if callable(contains) and contains(sender):
+            return app
+
+    return None
 
 
 def _current_result_backend_uses_rpc() -> bool:
@@ -85,15 +151,7 @@ def _current_result_backend_uses_rpc() -> bool:
     if current_app is None:
         return False
 
-    backend = getattr(current_app, "backend", None)
-    if backend is None:
-        return False
-
-    as_uri = getattr(backend, "as_uri", None)
-    if not callable(as_uri):
-        return False
-
-    return str(as_uri()).startswith("rpc://")
+    return _app_backend_uses_rpc(typ.cast("_CeleryAppLike", current_app))
 
 
 def setup_correlation_id_in_worker(*, task: object | None = None, **_: object) -> None:
@@ -232,19 +290,22 @@ def _maybe_connect_celery_signals() -> None:
     _maybe_connect_celery_worker_signals()
 
 
-def configure_celery_correlation[CeleryAppT](app: CeleryAppT) -> CeleryAppT:
+def configure_celery_correlation[CeleryAppT: _CeleryAppLike](
+    app: CeleryAppT,
+) -> CeleryAppT:
     """Configure Celery correlation ID propagation for an application.
 
-    The current integration uses Celery's global signal registry, so the
-    ``app`` parameter is returned unchanged for application-factory ergonomics.
-    Stable dispatch UIDs keep repeated calls idempotent.
+    The integration uses Celery's global signal registry and caches this
+    application's ``rpc://`` result-backend verdict. Publish handling uses that
+    cached verdict when the signal sender belongs to this application's task
+    registry. Stable dispatch UIDs keep repeated calls idempotent.
 
     Parameters
     ----------
     app : CeleryAppT
-        Celery application instance being configured. The instance is used as
-        the caller's explicit setup marker; signal registration remains global
-        and requires Celery's signal objects to be importable.
+        Celery application instance whose RPC result-backend verdict is cached.
+        Signal registration remains global and requires Celery's signal objects
+        to be importable.
 
     Returns
     -------
@@ -254,6 +315,7 @@ def configure_celery_correlation[CeleryAppT](app: CeleryAppT) -> CeleryAppT:
         UIDs.
 
     """
+    _cache_app_backend_rpc_verdict(app)
     _maybe_connect_celery_signals()
     return app
 
