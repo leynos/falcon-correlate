@@ -25,11 +25,25 @@ if typ.TYPE_CHECKING:
             """Return the backend URI."""
             ...
 
+    class _TaskRegistryLike(typ.Protocol):
+        """Structural type for configured task-name membership checks."""
+
+        def __contains__(self, task_name: object) -> bool:
+            """Return whether the registry contains a task name."""
+            ...
+
     class _CeleryAppLike(typ.Protocol):
         """Structural type for the Celery app members used by this module."""
 
-        backend: _BackendLike
-        tasks: cabc.Mapping[str, object]
+        @property
+        def backend(self) -> _BackendLike:
+            """The application's result backend."""
+            ...
+
+        @property
+        def tasks(self) -> _TaskRegistryLike:
+            """The application's task registry."""
+            ...
 
 
 _BEFORE_TASK_PUBLISH_DISPATCH_UID = (
