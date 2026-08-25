@@ -35,7 +35,7 @@ def _check_tool_available(tool_name: str, args: list[str]) -> bool:
     tool_path = shutil.which(tool_name)
     if tool_path is None:
         return False
-    result = subprocess.run(  # noqa: S603 -- resolved tool path and fixed arguments.
+    result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- resolved tool path and fixed arguments.
         [tool_path, *args],
         capture_output=True,
         check=False,

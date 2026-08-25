@@ -256,7 +256,7 @@ class AsyncCorrelationIDTransport(
 def request_with_correlation_id(
     method: str,
     url: str,
-    **kwargs: typ.Any,  # noqa: ANN401 -- mirrors flexible httpx request kwargs.
+    **kwargs: typ.Any,  # ruff: ignore[any-type] -- mirrors flexible httpx request kwargs.
 ) -> httpx.Response:
     """Send an HTTP request, injecting the correlation ID header.
 
@@ -291,7 +291,7 @@ def request_with_correlation_id(
 async def async_request_with_correlation_id(
     method: str,
     url: str,
-    **kwargs: typ.Any,  # noqa: ANN401 -- mirrors flexible httpx request kwargs.
+    **kwargs: typ.Any,  # ruff: ignore[any-type] -- mirrors flexible httpx request kwargs.
 ) -> httpx.Response:
     """Send an async HTTP request, injecting the correlation ID header.
 

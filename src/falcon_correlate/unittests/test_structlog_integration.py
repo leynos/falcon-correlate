@@ -24,11 +24,11 @@ structlog = pytest.importorskip("structlog")
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
-from falcon_correlate import (  # noqa: E402 -- dependency probe first.
+from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     correlation_id_var,
     user_id_var,
 )
-from tests.structlog_helpers import (  # noqa: E402 -- dependency probe first.
+from tests.structlog_helpers import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     inject_correlation_context,
 )
 

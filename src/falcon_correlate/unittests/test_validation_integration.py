@@ -271,7 +271,7 @@ class TestValidationWithValidatorRejecting:
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class ValidationLoggingScenario:
     """Encapsulates parameters for a validation logging test scenario."""
 
@@ -310,7 +310,7 @@ def _is_validation_failure_debug_log(record: logging.LogRecord) -> bool:
 
 def build_test_client(
     create_test_client: cabc.Callable[..., falcon.testing.TestClient],
-    validator_result: bool | None,  # noqa: FBT001 - test scenario value
+    validator_result: bool | None,  # ruff: ignore[boolean-type-hint-positional-argument] - test scenario value
 ) -> falcon.testing.TestClient:
     """Build a validation logging test client for the given validator result.
 
@@ -343,7 +343,7 @@ def assert_validation_logged(
     caplog: pytest.LogCaptureFixture,
     expected_substring: str,
 ) -> None:
-    """Assert that a falcon_correlate.middleware DEBUG log contains the expected substring."""  # noqa: E501 -- descriptive BDD assertion wording.
+    """Assert that a falcon_correlate.middleware DEBUG log contains the expected substring."""  # ruff: ignore[line-too-long] -- descriptive BDD assertion wording.
     assert any(
         _is_debug_log_containing(r, expected_substring) for r in caplog.records
     ), (

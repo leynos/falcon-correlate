@@ -9,13 +9,13 @@ import pytest
 
 httpx = pytest.importorskip("httpx")
 
-from falcon_correlate.httpx import (  # noqa: E402 -- dependency probe first.
+from falcon_correlate.httpx import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     async_request_with_correlation_id,
 )
-from falcon_correlate.middleware import (  # noqa: E402 -- dependency probe first.
+from falcon_correlate.middleware import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     DEFAULT_HEADER_NAME,
 )
-from falcon_correlate.unittests.httpx_wrapper_helpers import (  # noqa: E402 -- dependency probe first.
+from falcon_correlate.unittests.httpx_wrapper_helpers import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     EXPECTED_TIMEOUT,
     run_async,
 )
