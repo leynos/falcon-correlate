@@ -110,13 +110,24 @@ def test_blocked_celery_environment_prepends_existing_pythonpath(
     """The import blocker should lead PYTHONPATH without discarding callers."""
     env = _blocked_celery_environment(
         tmp_path,
-        {"PYTHONPATH": f"/already{os.pathsep}/present", "KEEP": "1"},
+        {
+            "PYTHONPATH": f"/already{os.pathsep}/present",
+            "PYTEST_ADDOPTS": "-n auto",
+            "PYTEST_XDIST_WORKER": "gw0",
+            "KEEP": "1",
+        },
     )
 
     assert env["KEEP"] == "1", "Blocked environment should preserve unrelated keys."
     assert env["PYTHONPATH"] == (
         f"{tmp_path}{os.pathsep}/already{os.pathsep}/present"
     ), "Blocked environment should prepend the import blocker to PYTHONPATH."
+    assert "PYTEST_ADDOPTS" not in env, (
+        "Blocked environment should not inherit parent pytest options."
+    )
+    assert "PYTEST_XDIST_WORKER" not in env, (
+        "Blocked environment should not inherit parent xdist worker state."
+    )
 
 
 def test_blocked_celery_environment_sets_pythonpath_when_missing(
