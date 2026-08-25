@@ -22,15 +22,22 @@ _TYPECHECK_RECIPE_TOKENS: typ.Final = (
     ("$(UV_ENV)", "$(UV)", "run", "ty", "check"),
 )
 _PROJECT_TEST_RECIPE_TOKENS: typ.Final = (
-    "$(UV_ENV)",
-    "$(UV)",
-    "run",
-    "pytest",
-    "-v",
-    "-n",
-    "auto",
-    "$(PROJECT_PYTEST_EXCLUDES)",
+    ("$(UV_ENV)", "$(UV)", "run", "pytest", "-v", "$(SERIAL_PY_TESTS)"),
+    (
+        "$(UV_ENV)",
+        "$(UV)",
+        "run",
+        "pytest",
+        "-v",
+        "-n",
+        "$(PYTEST_WORKERS)",
+        "--dist=loadgroup",
+        "$(SERIAL_PY_TEST_EXCLUDES)",
+    ),
 )
+_SERIAL_PY_TESTS_TOKENS: typ.Final = ("$(OPTIONAL_CELERY_TEST)",)
+_SERIAL_PY_TEST_EXCLUDES_TOKENS: typ.Final = ("$(PROJECT_PYTEST_EXCLUDES)",)
+_PYTEST_WORKERS_TOKENS: typ.Final = ("6",)
 _OPTIONAL_CELERY_RECIPE_TOKENS: typ.Final = (
     ("$(UV_ENV)", "$(UV)", "run", "pytest", "-v", "$(OPTIONAL_CELERY_TEST)"),
 )
@@ -163,8 +170,18 @@ def test_typecheck_and_pytest_targets_use_project_commands() -> None:
     assert (
         _variable_tokens("PROJECT_PYTEST_EXCLUDES") == _PROJECT_PYTEST_EXCLUDE_TOKENS
     ), "project pytest exclusions must omit the optional-Celery module"
-    assert _recipe_tokens("test") == (_PROJECT_TEST_RECIPE_TOKENS,), (
-        "make test must consume the project pytest exclusion variable"
+    assert _variable_tokens("PYTEST_WORKERS") == _PYTEST_WORKERS_TOKENS, (
+        "make test must cap xdist workers at the documented local core count"
+    )
+    assert _variable_tokens("SERIAL_PY_TESTS") == _SERIAL_PY_TESTS_TOKENS, (
+        "make test must run the optional-Celery subprocess module serially"
+    )
+    assert (
+        _variable_tokens("SERIAL_PY_TEST_EXCLUDES")
+        == _SERIAL_PY_TEST_EXCLUDES_TOKENS
+    ), "parallel pytest must reuse the project optional-Celery exclusion"
+    assert _recipe_tokens("test") == _PROJECT_TEST_RECIPE_TOKENS, (
+        "make test must run nested tests serially before bounded xdist"
     )
     assert _recipe_tokens("test-optional-celery") == _OPTIONAL_CELERY_RECIPE_TOKENS, (
         "optional-Celery target must run its module serially without xdist"

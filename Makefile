@@ -24,6 +24,8 @@ CV005_CONTRACTS = $(UV_ENV) $(UV) tool run --python 3.13 \
 	cv005-contracts
 
 TYPOS_CONFIG_BUILDER_VERSION ?= v0.1.3
+# Cap xdist at the available cores; ``auto`` sees host CPUs and starves nested tests.
+PYTEST_WORKERS ?= 6
 RUFF_VERSION ?= 0.16.4
 TY_VERSION ?= 0.0.74
 RUFF = $(UV_ENV) $(UV) run --with ruff==$(RUFF_VERSION) ruff
@@ -165,8 +167,13 @@ doctest: build uv $(VENV_TOOLS) ## Run docstring examples
 makeutil: ## Verify the Makefile parser used by contract tests
 	$(call ensure_tool,$@)
 
+# These tests spawn pytest subprocesses and must run outside the xdist worker pool.
+SERIAL_PY_TESTS := $(OPTIONAL_CELERY_TEST)
+SERIAL_PY_TEST_EXCLUDES := $(PROJECT_PYTEST_EXCLUDES)
+
 test: build uv $(VENV_TOOLS) doctest makeutil ## Run tests
-	$(UV_ENV) $(UV) run pytest -v -n auto --dist=loadgroup $(PROJECT_PYTEST_EXCLUDES)
+	$(UV_ENV) $(UV) run pytest -v $(SERIAL_PY_TESTS)
+	$(UV_ENV) $(UV) run pytest -v -n $(PYTEST_WORKERS) --dist=loadgroup $(SERIAL_PY_TEST_EXCLUDES)
 
 test-mutmut-sandbox: build ## Exercise mutmut's configured sandbox on a small module
 	$(UV_ENV) $(UV) run --with mutmut==$(MUTMUT_VERSION) \
