@@ -3,7 +3,7 @@ NIXIE ?= nixie
 MDFORMAT_ALL ?= mdformat-all
 export PATH := $(HOME)/.local/bin:$(HOME)/.bun/bin:$(PATH)
 UV ?= $(shell command -v uv 2>/dev/null || printf '%s/.local/bin/uv' "$$HOME")
-TOOLS = $(MDFORMAT_ALL) ruff ty $(MDLINT) uv
+TOOLS = $(MDFORMAT_ALL) ruff $(MDLINT) uv
 VENV_TOOLS = pytest
 UV_ENV = UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools
 PATHSPEC_VERSION ?= 1.1.1
@@ -89,9 +89,9 @@ lint: ruff ## Run linters
 	$(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
 	$(PYLINT) $(PYLINT_TARGETS)
 
-typecheck: build ty ## Run typechecking
-	ty --version
-	ty check
+typecheck: build ## Run typechecking
+	$(UV_ENV) $(UV) run ty --version
+	$(UV_ENV) $(UV) run ty check
 
 markdownlint: spelling $(MDLINT) ## Lint Markdown files and enforce spelling
 	$(MDLINT) '**/*.md' '#.uv-cache' '#.uv-tools'
