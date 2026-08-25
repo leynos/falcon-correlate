@@ -29,7 +29,9 @@ jobs:
       - name: Install CLI tools
         run: |
           uv tool install interrogate==1.7.0
-          for tool in mbake ty ruff; do uv tool install ${tool}; done
+          uv tool install mbake
+          uv tool install ty==0.0.74
+          uv tool install ruff==0.16.4
           uv tool install nixie-cli==1.1.0
           npm install -g markdownlint-cli2
 

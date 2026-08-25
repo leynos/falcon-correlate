@@ -22,7 +22,7 @@ pytestmark = pytest.mark.skipif(
     reason="celery is not installed",
 )
 
-from pytest_bdd import (  # noqa: E402 -- after optional Celery test setup
+from pytest_bdd import (  # ruff: ignore[module-import-not-at-top-of-file] -- after optional Celery test setup
     given,
     parsers,
     scenarios,
@@ -30,10 +30,10 @@ from pytest_bdd import (  # noqa: E402 -- after optional Celery test setup
     when,
 )
 
-from falcon_correlate import (  # noqa: E402 -- after optional Celery test setup
+from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- after optional Celery test setup
     correlation_id_var,
 )
-from falcon_correlate.celery import (  # noqa: E402 -- after Celery skip setup
+from falcon_correlate.celery import (  # ruff: ignore[module-import-not-at-top-of-file] -- after Celery skip setup
     _BEFORE_TASK_PUBLISH_DISPATCH_UID,
     _TASK_POSTRUN_DISPATCH_UID,
     _TASK_PRERUN_DISPATCH_UID,

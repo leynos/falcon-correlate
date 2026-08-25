@@ -146,7 +146,7 @@ class TestCorrelationIDMiddlewareWithFalcon:
                 req: falcon.Request,
                 resp: falcon.Response,
                 resource: object,
-                req_succeeded: bool,  # noqa: FBT001 - Falcon WSGI middleware interface requirement
+                req_succeeded: bool,  # ruff: ignore[boolean-type-hint-positional-argument] - Falcon WSGI middleware interface requirement
             ) -> None:
                 """Record that Falcon called the response hook."""
                 call_log.append(call_name)

@@ -45,7 +45,7 @@ import pytest
 # in environments where httpx is not available.
 httpx = pytest.importorskip("httpx")
 
-from pytest_bdd import (  # noqa: E402 -- dependency probe first.
+from pytest_bdd import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     given,
     parsers,
     scenarios,
@@ -53,10 +53,10 @@ from pytest_bdd import (  # noqa: E402 -- dependency probe first.
     when,
 )
 
-from falcon_correlate import (  # noqa: E402 -- dependency probe first.
+from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     correlation_id_var,
 )
-from falcon_correlate.httpx import (  # noqa: E402 -- dependency probe first.
+from falcon_correlate.httpx import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     AsyncCorrelationIDTransport,
     CorrelationIDTransport,
 )

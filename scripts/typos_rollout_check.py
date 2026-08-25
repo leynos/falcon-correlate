@@ -19,7 +19,7 @@ import argparse
 import dataclasses
 import re
 import shutil
-import subprocess  # noqa: S404 - the checker shells out to git to list tracked files.
+import subprocess  # ruff: ignore[suspicious-subprocess-import] - the checker shells out to git to list tracked files.
 import tomllib
 import typing as typ
 from pathlib import Path
@@ -36,7 +36,7 @@ POLICY_PATHS = frozenset({
 })
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class PhraseFinding:
     """Describe one prohibited phrase in tracked text.
 
@@ -61,7 +61,7 @@ class PhraseFinding:
     correction: str
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class PhrasePolicy:
     """Hold the effective policy needed by the consumer phrase scanner.
 
@@ -174,7 +174,7 @@ def _tracked(repository: Path) -> tuple[Path, ...]:
     if git is None:
         message = "git executable not found on PATH"
         raise FileNotFoundError(message)
-    raw = subprocess.run(  # noqa: S603 - fixed git argv, no shell, no untrusted input.
+    raw = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - fixed git argv, no shell, no untrusted input.
         [git, "-C", str(repository), "ls-files", "-z"],
         check=True,
         capture_output=True,

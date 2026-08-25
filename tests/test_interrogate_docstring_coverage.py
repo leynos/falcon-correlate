@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-import subprocess  # noqa: S404 - tests intentionally validate a CLI boundary.
+import subprocess  # ruff: ignore[suspicious-subprocess-import] - tests intentionally validate a CLI boundary.
 import sys
 from pathlib import Path
 

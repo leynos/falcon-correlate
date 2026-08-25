@@ -2,7 +2,7 @@
 
 import importlib
 import shutil
-import subprocess  # noqa: S404 - fixtures shell out to git to build tracked-file trees.
+import subprocess  # ruff: ignore[suspicious-subprocess-import] - fixtures shell out to git to build tracked-file trees.
 import types
 from pathlib import Path
 
@@ -30,10 +30,10 @@ def initialize(path: Path, files: dict[str, str]) -> None:
     git = shutil.which("git")
     if git is None:
         pytest.skip("git executable not found on PATH")
-    subprocess.run(  # noqa: S603 -- resolved git path and fixed test arguments.
+    subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- resolved git path and fixed test arguments.
         [git, "init", "--quiet"], cwd=path, check=True
     )
-    subprocess.run(  # noqa: S603 -- resolved git path and fixed test arguments.
+    subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- resolved git path and fixed test arguments.
         [git, "add", "."], cwd=path, check=True
     )
 
