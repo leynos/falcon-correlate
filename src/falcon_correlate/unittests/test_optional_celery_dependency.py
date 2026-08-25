@@ -58,6 +58,7 @@ _CELERY_BLOCKED_PARENT_TIMEOUT_SECONDS = (
     2 * _CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS + _CELERY_BLOCKED_PARENT_CLEANUP_SECONDS
 )
 pytestmark = pytest.mark.timeout(_CELERY_BLOCKED_PARENT_TIMEOUT_SECONDS)
+_CELERY_BLOCKED_PYTEST_RUN_GROUP = "celery-blocked-pytest-run"
 
 
 @pytest.fixture(scope="module")
@@ -192,6 +193,7 @@ def test_celery_import_blocker_rejects_celery_modules(
     )
 
 
+@pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
 def test_celery_tests_emit_no_error_markers_when_celery_is_unavailable(
     celery_blocked_pytest_run: _PytestRun,
 ) -> None:
@@ -204,6 +206,7 @@ def test_celery_tests_emit_no_error_markers_when_celery_is_unavailable(
     )
 
 
+@pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
 def test_celery_tests_exit_successfully_when_celery_is_unavailable(
     celery_blocked_pytest_run: _PytestRun,
 ) -> None:
@@ -216,6 +219,7 @@ def test_celery_tests_exit_successfully_when_celery_is_unavailable(
     )
 
 
+@pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
 def test_celery_tests_report_correct_skip_count_when_celery_is_unavailable(
     celery_blocked_pytest_run: _PytestRun,
 ) -> None:

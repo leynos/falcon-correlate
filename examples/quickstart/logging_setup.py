@@ -68,7 +68,7 @@ def log_request(logger: logging.Logger) -> None:
     >>> log_request(logger)
     """
     logger.info("handled request")
-    return  # noqa: PLR1711 - Explicit return is intentional.
+    return  # ruff: ignore[useless-return] - Explicit return is intentional.
 
 
 # [/quickstart:logging-usage]

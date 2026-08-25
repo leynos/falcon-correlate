@@ -44,7 +44,7 @@ class TrackingMiddleware(CorrelationIDMiddleware):
     to verify middleware lifecycle behaviour.
     """
 
-    def __init__(self, **kwargs: typ.Any) -> None:  # noqa: ANN401 -- mirrors middleware options.
+    def __init__(self, **kwargs: typ.Any) -> None:  # ruff: ignore[any-type] -- mirrors middleware options.
         """Initialize tracking middleware with call flags reset."""
         super().__init__(**kwargs)
         self.process_request_called = False
@@ -60,7 +60,7 @@ class TrackingMiddleware(CorrelationIDMiddleware):
         req: falcon.Request,
         resp: falcon.Response,
         resource: object,
-        req_succeeded: bool,  # noqa: FBT001 - Falcon WSGI middleware interface requirement
+        req_succeeded: bool,  # ruff: ignore[boolean-type-hint-positional-argument] - Falcon WSGI middleware interface requirement
     ) -> None:
         """Track process_response invocation."""
         self.process_response_called = True

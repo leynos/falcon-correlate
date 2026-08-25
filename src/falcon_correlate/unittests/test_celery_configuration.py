@@ -26,7 +26,7 @@ pytestmark = pytest.mark.skipif(
     reason="celery is not installed",
 )
 
-from falcon_correlate.celery import (  # noqa: E402 -- dependency probe first.
+from falcon_correlate.celery import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     _BEFORE_TASK_PUBLISH_DISPATCH_UID,
     _TASK_POSTRUN_DISPATCH_UID,
     _TASK_PRERUN_DISPATCH_UID,
