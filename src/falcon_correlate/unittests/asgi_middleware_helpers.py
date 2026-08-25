@@ -90,7 +90,7 @@ class _HeaderFailingResponse(_Response):
 def _cast_asgi_doubles(
     req: _Request,
     resp: _Response,
-) -> "tuple[falcon.asgi.Request, falcon.asgi.Response]":  # noqa: UP037 -- falcon.asgi types are TYPE_CHECKING-only.
+) -> "tuple[falcon.asgi.Request, falcon.asgi.Response]":  # ruff: ignore[quoted-annotation] -- falcon.asgi types are TYPE_CHECKING-only.
     """Cast the ASGI test doubles to Falcon request and response types."""
     return (
         typ.cast("falcon.asgi.Request", req),

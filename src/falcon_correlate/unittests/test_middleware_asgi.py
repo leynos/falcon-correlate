@@ -209,7 +209,7 @@ class TestCorrelationIDMiddlewareASGIRequestLifecycle:
     @pytest.mark.asyncio
     async def test_process_response_honours_echo_configuration(
         self,
-        echo_header_in_response: bool,  # noqa: FBT001 - pytest parametrized value
+        echo_header_in_response: bool,  # ruff: ignore[boolean-type-hint-positional-argument] - pytest parametrized value
         expected_header: str | None,
     ) -> None:
         """Verify ASGI response processing honours header echo configuration."""

@@ -12,7 +12,7 @@ if typ.TYPE_CHECKING:
     import collections.abc as cabc
     import contextvars
 
-from pytest_bdd import (  # noqa: E402 -- dependency probe first.
+from pytest_bdd import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     given,
     parsers,
     scenarios,
@@ -20,11 +20,11 @@ from pytest_bdd import (  # noqa: E402 -- dependency probe first.
     when,
 )
 
-from falcon_correlate import (  # noqa: E402 -- dependency probe first.
+from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     correlation_id_var,
     user_id_var,
 )
-from tests.structlog_helpers import (  # noqa: E402 -- dependency probe first.
+from tests.structlog_helpers import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     inject_correlation_context,
 )
 

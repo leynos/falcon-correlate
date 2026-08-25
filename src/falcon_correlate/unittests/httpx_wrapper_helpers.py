@@ -12,10 +12,10 @@ httpx = pytest.importorskip("httpx")
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
-from falcon_correlate import (  # noqa: E402 -- dependency probe first.
+from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     correlation_id_var,
 )
-from falcon_correlate.httpx import (  # noqa: E402 -- dependency probe first.
+from falcon_correlate.httpx import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     _prepare_headers,
     async_request_with_correlation_id,
     request_with_correlation_id,
@@ -47,7 +47,7 @@ def mock_async_client() -> cabc.Generator[mock.AsyncMock, None, None]:
 def run_sync(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     correlation_id: str | None = None,
-    **kwargs: typ.Any,  # noqa: ANN401 -- mirrors flexible httpx.request kwargs.
+    **kwargs: typ.Any,  # ruff: ignore[any-type] -- mirrors flexible httpx.request kwargs.
 ) -> dict[str, typ.Any]:
     """Run ``request_with_correlation_id`` in an isolated context.
 
@@ -82,7 +82,7 @@ def run_sync(
 async def run_async(
     mock_async_client: mock.AsyncMock,
     correlation_id: str | None = None,
-    **kwargs: typ.Any,  # noqa: ANN401 -- mirrors flexible httpx request kwargs.
+    **kwargs: typ.Any,  # ruff: ignore[any-type] -- mirrors flexible httpx request kwargs.
 ) -> dict[str, typ.Any]:
     """Run ``async_request_with_correlation_id`` in a managed correlation context.
 
