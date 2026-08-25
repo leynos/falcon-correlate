@@ -57,6 +57,7 @@ _PYTEST_PROGRESS_PATTERN = re.compile(
     re.MULTILINE,
 )
 _CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS = 120
+_PYTEST_ENVIRONMENT_PREFIX = "PYTEST_"
 
 pytestmark = pytest.mark.timeout(_CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS)
 
@@ -163,9 +164,12 @@ def _blocked_celery_environment(
     sitecustomize_dir: Path,
     environ: cabc.Mapping[str, str],
 ) -> dict[str, str]:
-    """Build a child-process environment with the Celery import blocker first."""
+    """Build an isolated pytest environment with the Celery import blocker first."""
     return {
-        **environ,
+        key: value
+        for key, value in environ.items()
+        if not key.startswith(_PYTEST_ENVIRONMENT_PREFIX)
+    } | {
         "PYTHONPATH": _pythonpath_with_import_blocker(sitecustomize_dir, environ),
     }
 
