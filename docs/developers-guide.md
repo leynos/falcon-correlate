@@ -241,15 +241,18 @@ symbol, its actual kind, and a reason naming the verified caller. Use
 
 Use `make skylos-allow SYMBOL=symbol REASON="Verified runtime caller"` only
 when an entry-point rule cannot describe the boundary. The target requires both
-values and runs `skylos whitelist <symbol> --reason <reason>`, preserving the
-reason in Skylos's allow list. `SYMBOL` deliberately avoids `NAME`, because
-Windows Subsystem for Linux (WSL) injects `NAME` with the hostname. Do not add
-unexplained bulk exceptions or baselines.
+values to contain non-whitespace text, otherwise it reports the missing input
+and exits with status 2. It runs `skylos whitelist <symbol> --reason <reason>`,
+preserving the reason in Skylos's allow list. `SYMBOL` deliberately avoids
+`NAME`, because Windows Subsystem for Linux (WSL) injects `NAME` with the
+hostname. Do not add unexplained bulk exceptions or baselines.
 
 The Skylos Makefile contract is parsed by the pinned `makeutil` executable in
-`test_skylos_lint_contract.py`. `make test` verifies the parser is available
-before running the suite. The test and coverage jobs independently install the
-same parser because each runs the full pytest suite.
+`test_skylos_lint_contract.py`. Its complementary
+`test_skylos_allow_contract.py` test records the exact command arguments,
+rather than relying on Make dry-run output. `make test` verifies the parser is
+available before running the suite. The test and coverage jobs independently
+install the same parser because each runs the full pytest suite.
 
 For local full-suite runs, install the exact parser and toolchain first:
 

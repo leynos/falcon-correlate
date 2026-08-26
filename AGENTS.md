@@ -96,8 +96,9 @@
     parses source with its own runtime AST. The test and coverage CI jobs each
     install the pinned Makeutil parser before their full pytest suite. Use
     `make skylos-allow SYMBOL=symbol REASON="Verified runtime caller"` only when
-    an entry-point rule cannot model the runtime boundary. Skylos records the
-    verified caller-specific reason with the named exception.
+    an entry-point rule cannot model the runtime boundary. Both values must
+    contain non-whitespace text; otherwise the target exits with status 2.
+    Skylos records the verified caller-specific reason with the named exception.
   - **Formatting:** Adheres to formatting standards (`make check-fmt`; use
     `make fmt` to apply fixes).
   - **Typechecking:** Passes type checking (`make typecheck`).
