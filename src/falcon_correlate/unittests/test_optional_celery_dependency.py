@@ -46,7 +46,6 @@ from falcon_correlate.unittests.optional_celery_dependency_helpers import (
     _run_celery_tests_with_celery_blocked,
     _run_python_with_celery_blocked,
     _write_celery_import_blocker,
-    _write_child_sentinel_test,
 )
 
 if typ.TYPE_CHECKING:
@@ -76,11 +75,9 @@ def celery_blocked_pytest_run(
     """
     tmp_path = tmp_path_factory.mktemp("celery-blocked-suite")
     _write_celery_import_blocker(tmp_path)
-    sentinel_test = _write_child_sentinel_test(tmp_path)
     celery_test_paths = _discover_celery_test_paths(_PROJECT_ROOT)
     return _run_celery_tests_with_celery_blocked(
         tmp_path,
-        sentinel_test,
         celery_test_paths,
         _PROJECT_ROOT,
     )
@@ -211,10 +208,10 @@ def test_celery_tests_emit_no_error_markers_when_celery_is_unavailable(
 def test_celery_tests_exit_successfully_when_celery_is_unavailable(
     celery_blocked_pytest_run: _PytestRun,
 ) -> None:
-    """Celery-only tests should exit successfully when a sentinel test runs."""
+    """Celery-only tests should exit successfully when all items skip."""
     assert celery_blocked_pytest_run.result.returncode == 0, (
         "Missing-Celery pytest run should exit successfully with skipped "
-        "Celery tests and a passing sentinel.\n"
+        "Celery tests.\n"
         f"{celery_blocked_pytest_run.result.stdout}\n"
         f"{celery_blocked_pytest_run.result.stderr}"
     )

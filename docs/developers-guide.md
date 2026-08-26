@@ -584,7 +584,8 @@ boundary.
 
 For a verified named exception, run
 `make skylos-allow SYMBOL=symbol REASON="Verified runtime caller"`. Both
-values must contain non-whitespace text. `SYMBOL` is intentional: WSL sets
+values must contain non-whitespace text; missing or whitespace-only inputs
+produce a clear error and exit status 2. `SYMBOL` is intentional: WSL sets
 `NAME` to the host name. Updates are serialized with `flock` on the ignored
 repository-local `.skylos-whitelist.lock` file.
 
@@ -592,7 +593,9 @@ The Skylos Makefile contract is parsed from `makeutil parse Makefile` JSON by
 `tests/test_skylos_lint_contract.py`. `make test` checks that the pinned
 Makeutil executable is available before running the full suite. The test and
 coverage jobs independently install the same parser because each runs all
-pytest tests.
+pytest tests. `tests/test_skylos_allow_contract.py` uses a temporary executable
+recorder to verify exact whitelist argument forwarding without relying on Make
+dry-run output or changing `pyproject.toml`.
 
 For local full-suite runs, install the exact parser and toolchain first:
 
