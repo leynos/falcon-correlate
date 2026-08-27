@@ -98,7 +98,8 @@
     `make skylos-allow SYMBOL=symbol REASON="Verified runtime caller"` only when
     an entry-point rule cannot model the runtime boundary. Both values must
     contain non-whitespace text; otherwise the target exits with status 2.
-    Skylos records the verified caller-specific reason with the named exception.
+    Skylos records the verified caller-specific reason with the named exception;
+    its updates are serialized through the ignored `.skylos-whitelist.lock` file.
   - **Formatting:** Adheres to formatting standards (`make check-fmt`; use
     `make fmt` to apply fixes).
   - **Typechecking:** Passes type checking (`make typecheck`).
