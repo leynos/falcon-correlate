@@ -7,7 +7,7 @@ pull request.
 
 ## Linting architecture
 
-The Python lint target uses a three-tier linting approach:
+The Python lint target uses a four-tier linting approach:
 
 - **Tier 1: Ruff.** Ruff runs first through `uv run ruff check`. It is the
   fast linting gate and owns formatting-adjacent checks, import rules, common
@@ -20,12 +20,17 @@ The Python lint target uses a three-tier linting approach:
   `pylint-pypy-shim` wrapper. This tier focuses on rules that complement Ruff,
   especially logging format correctness, pattern matching safety, refactoring
   suggestions, resource-handling checks, and selected design limits.
+- **Tier 4: Skylos.** Skylos runs last as a blocking dead-code gate over
+  production sources. It is separately provisioned at an exact version, so it
+  does not expand the project's application dependency set.
 
-Ruff must pass before Interrogate runs, and Interrogate must pass before Pylint
-runs. This keeps the slow, deeper lint tier focused on code that has already
-passed the high-volume checks and the package docstring coverage gate.
+Ruff must pass before Interrogate runs, Interrogate must pass before Pylint
+runs, and Skylos runs after the established lint tiers. This keeps the
+dead-code analysis focused on code that has already passed the high-volume
+checks and package docstring coverage gate.
 
-The decision to use this architecture is recorded in
+The original three-tier architecture and its fourth-tier Skylos addendum are
+recorded in
 [ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md).
 
 ## Internal module architecture
@@ -187,10 +192,10 @@ as a test assertion on the SHA string.
 
 ## Roadmap notes
 
-The three-tier linting work described in
+The linting architecture described in
 [ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md)
-is complete. Keep future linting changes aligned with that ADR unless a new
-ADR supersedes it.
+is complete. Keep future linting changes aligned with its four-tier policy
+unless a new ADR supersedes it.
 
 The tested quickstart example convention is described in
 [ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md).
@@ -209,15 +214,60 @@ make lint
 $(UV_ENV) $(UV) run ruff check
 $(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
 $(PYLINT) $(PYLINT_TARGETS)
+$(SKYLOS) $(SKYLOS_PRODUCTION_TARGETS) --exclude $(SKYLOS_EXCLUDES) \\
+  --category dead_code --gate --format concise --no-upload --no-provenance \\
+  --no-grep-verify
 ```
 
-Continuous Integration installs `interrogate` as a uv tool before this target
-runs so the same 100% package docstring coverage gate is available locally and
-in CI.
+Continuous Integration runs the same `make lint` target. `$(SKYLOS_CLI)`
+provisions Skylos at the pinned `SKYLOS_VERSION` with Python 3.14. Skylos
+parses source using its own runtime Abstract Syntax Tree (AST), so this pin
+prevents phantom dead-code findings from newer project syntax. `$(SKYLOS)` adds
+scan-specific global options such as `--config-file` separately, leaving the
+standalone CLI suitable for Skylos subcommands. Continuous Integration installs
+Interrogate separately for the 100% package docstring coverage gate.
 
 The target should be run before committing changes that affect Python code,
 tests, or lint configuration. When diagnosing failures, fix Ruff findings
 first, then rerun `make lint` so the Pylint tier sees the post-Ruff state.
+
+Skylos does not upload source, collect provenance, invoke Large Language Model
+(LLM) analysis, or modify files. Treat every reported symbol as dead code until
+its runtime caller is verified. Remove genuine dead code. For framework
+callbacks, protocol implementations, or other implicit runtime callers, prefer
+a precise `[[tool.skylos.dead_code.entrypoints]]` rule with the fully qualified
+symbol, its actual kind, and a reason naming the verified caller. Use
+`type = "method"` for instance methods.
+
+Use `make skylos-allow SYMBOL=symbol REASON="Verified runtime caller"` only
+when an entry-point rule cannot describe the boundary. The target requires both
+values to contain non-whitespace text, otherwise it reports the missing input
+and exits with status 2. It runs `skylos whitelist <symbol> --reason <reason>`,
+preserving the reason in Skylos's allow list. `SYMBOL` deliberately avoids
+`NAME`, because Windows Subsystem for Linux (WSL) injects `NAME` with the
+hostname. To prevent concurrent read-modify-write updates, the helper holds an
+exclusive `flock` on the ignored `.skylos-whitelist.lock` file; set
+`SKYLOS_WHITELIST_LOCK` only when an alternate lock path is needed. Do not add
+unexplained bulk exceptions or baselines.
+
+The Skylos Makefile contract is parsed by the pinned `makeutil` executable in
+`test_skylos_lint_contract.py`. Its complementary
+`test_skylos_allow_contract.py` test records the exact command arguments,
+rather than relying on Make dry-run output. `make test` verifies the parser is
+available before running the suite. The test and coverage jobs independently
+install the same parser because each runs the full pytest suite.
+
+For local full-suite runs, install the exact parser and toolchain first:
+
+```bash
+rustup toolchain install nightly-2026-05-28 --profile minimal
+RUSTFLAGS="-Zpolonius=next" cargo +nightly-2026-05-28 install \
+  --git https://github.com/leynos/makeutil \
+  --rev 29fc5a1634ffbaa18a773eed9dff1b2838a45d9c \
+  --locked \
+  --force \
+  makeutil
+```
 
 Use the standard log pattern when capturing lint output for review:
 
@@ -259,16 +309,22 @@ Nixie 1.1.0 and Merman 0.7.0.
 
 The lint target is configured by these Makefile variables:
 
-| Variable               | Default                                                                                       | Purpose                                                        |
-| ---------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `UV`                   | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                 | Selects the `uv` launcher used by all Python tool commands.    |
-| `UV_ENV`               | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                | Keeps project-local `uv` cache and tool directories.           |
-| `PYLINT_PYTHON`        | `pypy`                                                                                        | Selects the Python runtime used for the Pylint tool execution. |
-| `PYLINT_TARGETS`       | `src tests examples scripts`                                                                  | Defines the source trees checked by the Pylint tier.           |
-| `PYLINT_PYPY_SHIM_REF` | `726d09f968b4d729ee4b29c71fc732e744854f3b`                                                    | Pins the `pylint-pypy-shim` repository revision.               |
-| `PYLINT_PYPY_SHIM`     | `git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)`                  | Identifies the shim package installed by `uv tool run`.        |
-| `PYLINT`               | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                |
-| `INTERROGATE_TARGETS`  | `src/falcon_correlate scripts`                                                                | Defines the repo-root-relative trees checked by Interrogate.   |
+| Variable                    | Default                                                                                       | Purpose                                                        |
+| --------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `UV`                        | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                 | Selects the `uv` launcher used by all Python tool commands.    |
+| `UV_ENV`                    | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                | Keeps project-local `uv` cache and tool directories.           |
+| `PYLINT_PYTHON`             | `pypy`                                                                                        | Selects the Python runtime used for the Pylint tool execution. |
+| `PYLINT_TARGETS`            | `src tests examples scripts`                                                                  | Defines the source trees checked by the Pylint tier.           |
+| `PYLINT_PYPY_SHIM_REF`      | `726d09f968b4d729ee4b29c71fc732e744854f3b`                                                    | Pins the `pylint-pypy-shim` repository revision.               |
+| `PYLINT_PYPY_SHIM`          | `git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)`                  | Identifies the shim package installed by `uv tool run`.        |
+| `PYLINT`                    | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                |
+| `INTERROGATE_TARGETS`       | `src/falcon_correlate scripts`                                                                | Defines the repo-root-relative trees checked by Interrogate.   |
+| `SKYLOS_VERSION`            | `4.33.2`                                                                                      | Pins the separately provisioned Skylos release.                |
+| `SKYLOS_CLI`                | `$(UV_ENV) $(UV) tool run --python 3.14 --from 'skylos==$(SKYLOS_VERSION)' skylos`            | Expands to the command-only Python 3.14 Skylos CLI.            |
+| `SKYLOS`                    | `$(SKYLOS_CLI) --config-file pyproject.toml`                                                  | Expands to the configured Skylos scan command.                 |
+| `SKYLOS_PRODUCTION_TARGETS` | `src/falcon_correlate`                                                                        | Defines the production source scanned for dead code.           |
+| `SKYLOS_EXCLUDES`           | `unittests`                                                                                   | Excludes test-only package infrastructure from the scan.       |
+| `SKYLOS_WHITELIST_LOCK`     | `.skylos-whitelist.lock`                                                                      | Serializes `skylos-allow` configuration updates.               |
 
 Override variables at the command line for targeted investigation. For example:
 
@@ -292,7 +348,9 @@ The policy is:
   `collections.abc as cabc`, `datetime as dt`, and `unittest.mock as mock`;
 - keep docstrings in NumPy style;
 - use a focused Pylint allow-list rather than enabling every Pylint message;
-- run Pylint under PyPy through the shim as a second tier after Ruff; and
+- run Pylint under PyPy through the shim as the third tier after Ruff and
+  Interrogate;
+- run Skylos as the strict fourth tier over production sources only; and
 - add narrow suppressions only when framework callbacks, tests, or existing
   module boundaries make a rule unsuitable for the current change.
 
@@ -356,7 +414,10 @@ that do not require optional dependencies. Network, Celery, HTTPX, and full
 Falcon integration examples should use non-executable Python code blocks and
 must be covered by ordinary tests. `make test` runs package doctests before the
 parallel pytest suite, while `test_public_exports.py` verifies documentation
-for exported callables and module-level values.
+for exported callables and module-level values. The optional-Celery
+missing-dependency contract launches a child pytest process, so run
+`make test-optional-celery` separately; keeping it out of the parallel parent
+suite prevents resource contention from invalidating its 120-second timeout.
 
 ## `pyproject.toml` lint configuration
 

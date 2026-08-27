@@ -49,7 +49,6 @@ if typ.TYPE_CHECKING:
     from .middleware_config import CorrelationIDConfigKwargs
 
 logger = logging.getLogger(__name__)
-_CORRELATION_ID_RESET_TOKEN_ATTR = CORRELATION_ID_RESET_TOKEN_ATTR
 
 
 class _CorrelationIDMiddlewareBase:
