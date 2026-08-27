@@ -34,7 +34,9 @@ _SHELL_ARGUMENT_TEXT = st.builds(
 
 def _run_skylos_allow(*arguments: str) -> subprocess.CompletedProcess[str]:
     """Run the whitelist boundary with `NAME` injected as it is under WSL."""
-    environment = {**os.environ, "NAME": "wsl-hostname"}
+    make = shutil.which("make")
+    assert make is not None, "the Skylos whitelist contract requires make on PATH"
+    environment: dict[str, str] = {**os.environ, "NAME": "wsl-hostname"}
     environment.pop("REASON", None)
     environment.pop("SYMBOL", None)
     requested_values: dict[str, str] = {}
@@ -42,8 +44,9 @@ def _run_skylos_allow(*arguments: str) -> subprocess.CompletedProcess[str]:
         name, value = argument.split("=", maxsplit=1)
         requested_values[name] = value
     environment.update(requested_values)
+    command: list[str] = [make, "skylos-allow"]
     return subprocess.run(  # noqa: S603 - fixed Make target and arguments.
-        (_MAKE_EXECUTABLE, "skylos-allow"),
+        command,
         capture_output=True,
         check=False,
         cwd=_PROJECT_ROOT,
