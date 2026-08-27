@@ -108,9 +108,9 @@ The implementer should keep these references open while working:
   helper behaviour before implementation begins.
 - Keep Celery optional. `import falcon_correlate` must continue to succeed
   when the Celery extra is not installed.
-- Preserve the current import-time auto-registration behaviour. The new helper
-  is an explicit configuration convenience, not a breaking change in startup
-  semantics.
+- Superseded on 2026-08-27 by ADR-004: import-time auto-registration is
+  removed. The helper is the required configuration seam and this is a breaking
+  startup-semantics change in version 0.2.0.
 - Implement the helper in `src/falcon_correlate/celery.py` and keep it close
   to the existing signal registration code instead of creating a second Celery
   integration module.

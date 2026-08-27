@@ -1,6 +1,6 @@
 [project]
 name = "falcon-correlate"
-version = "0.1.0"
+version = "0.2.0"
 description = "falcon-correlate package"
 readme = "README.md"
 requires-python = ">=3.12"

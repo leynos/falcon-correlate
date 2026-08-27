@@ -26,6 +26,8 @@
 - [ADR-003: docstring completeness and doctest gates](adr-003-docstring-completeness-and-doctest-gates.md)
   records the NumPy docstring convention, exported-value documentation form,
   and layered completeness checks.
+- [ADR-004: explicit Celery signal registration](adr-004-explicit-celery-signal-registration.md)
+  records the opt-in Celery integration boundary introduced in version 0.2.0.
 - [Documentation style guide](documentation-style-guide.md) defines spelling,
   Markdown, document-structure, roadmap, Architecture Decision Record (ADR),
   and Request for Comments (RFC) conventions for this repository.
