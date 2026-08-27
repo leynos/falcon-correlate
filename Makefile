@@ -115,9 +115,9 @@ skylos-allow: ## Document one named Skylos exception, not an entry point
 		exit 2;; esac
 	flock "$(SKYLOS_WHITELIST_LOCK)" env $(SKYLOS_WHITELIST) "$${SKYLOS_SYMBOL}" --reason "$${SKYLOS_REASON}"
 
-typecheck: build ty ## Run typechecking
-	ty --version
-	ty check
+typecheck: build ## Run typechecking
+	$(UV_ENV) $(UV) run ty --version
+	$(UV_ENV) $(UV) run ty check
 
 markdownlint: spelling $(MDLINT) ## Lint Markdown files and enforce spelling
 	$(MDLINT) '**/*.md' '#.uv-cache' '#.uv-tools'
