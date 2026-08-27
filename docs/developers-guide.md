@@ -245,7 +245,10 @@ values to contain non-whitespace text, otherwise it reports the missing input
 and exits with status 2. It runs `skylos whitelist <symbol> --reason <reason>`,
 preserving the reason in Skylos's allow list. `SYMBOL` deliberately avoids
 `NAME`, because Windows Subsystem for Linux (WSL) injects `NAME` with the
-hostname. Do not add unexplained bulk exceptions or baselines.
+hostname. To prevent concurrent read-modify-write updates, the helper holds an
+exclusive `flock` on the ignored `.skylos-whitelist.lock` file; set
+`SKYLOS_WHITELIST_LOCK` only when an alternate lock path is needed. Do not add
+unexplained bulk exceptions or baselines.
 
 The Skylos Makefile contract is parsed by the pinned `makeutil` executable in
 `test_skylos_lint_contract.py`. Its complementary
@@ -321,6 +324,7 @@ The lint target is configured by these Makefile variables:
 | `SKYLOS`                    | `$(SKYLOS_CLI) --config-file pyproject.toml`                                                  | Expands to the configured Skylos scan command.                 |
 | `SKYLOS_PRODUCTION_TARGETS` | `src/falcon_correlate`                                                                        | Defines the production source scanned for dead code.           |
 | `SKYLOS_EXCLUDES`           | `unittests`                                                                                   | Excludes test-only package infrastructure from the scan.       |
+| `SKYLOS_WHITELIST_LOCK`     | `.skylos-whitelist.lock`                                                                      | Serializes `skylos-allow` configuration updates.               |
 
 Override variables at the command line for targeted investigation. For example:
 

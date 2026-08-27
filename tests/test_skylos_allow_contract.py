@@ -104,6 +104,9 @@ def test_skylos_allow_forwards_generated_argument_boundaries(
             **os.environ,
             "NAME": "wsl-hostname",
             "SKYLOS_ARGUMENTS_PATH": str(recorded_arguments),
+            "SKYLOS_WHITELIST_LOCK": str(
+                Path(temporary_directory, "skylos-whitelist.lock")
+            ),
             "SYMBOL": symbol,
             "REASON": reason,
         }
