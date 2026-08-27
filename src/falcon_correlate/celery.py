@@ -1,8 +1,10 @@
 """Celery signal integration for correlation ID propagation.
 
 This module is import-safe when the optional ``celery`` dependency is not
-installed. Importing this module opportunistically registers handlers for
-Celery's publish and worker task signals when Celery is available.
+installed. Importing this module defines integration names only: it neither
+imports Celery nor connects its global signals. Call
+``configure_celery_correlation(app)`` to register the publish and worker task
+handlers.
 """
 
 from __future__ import annotations
@@ -385,9 +387,6 @@ def configure_celery_correlation[CeleryAppT: _CeleryAppLike](
     _configure_app_send_task_context(app)
     _maybe_connect_celery_signals()
     return app
-
-
-_maybe_connect_celery_signals()
 
 
 __all__ = [
