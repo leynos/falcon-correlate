@@ -576,7 +576,8 @@ For a verified named exception, run
 values must contain non-whitespace text; missing or whitespace-only inputs
 produce a clear error and exit status 2. `SYMBOL` is intentional: WSL sets
 `NAME` to the host name. Updates are serialized with `flock` on the ignored
-repository-local `.skylos-whitelist.lock` file.
+repository-local `.skylos-whitelist.lock` file. Set
+`SKYLOS_WHITELIST_LOCK` only when an alternate lock path is needed.
 
 The Skylos Makefile contract is parsed from `makeutil parse Makefile` JSON by
 `tests/test_skylos_lint_contract.py`. `make test` checks that the pinned

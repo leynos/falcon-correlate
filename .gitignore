@@ -185,6 +185,7 @@ cython_debug/
 # Ruff stuff:
 .ruff_cache/
 .skylos/
+.skylos-whitelist.lock
 
 # Local spelling-policy caches and tool directories
 .typos-oxendict-base.json
