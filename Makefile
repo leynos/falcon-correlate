@@ -90,8 +90,8 @@ lint: ruff ## Run linters
 	$(PYLINT) $(PYLINT_TARGETS)
 
 typecheck: build ty ## Run typechecking
-	ty --version
-	ty check
+	$(UV_ENV) $(UV) run ty --version
+	$(UV_ENV) $(UV) run ty check
 
 markdownlint: spelling $(MDLINT) ## Lint Markdown files and enforce spelling
 	$(MDLINT) '**/*.md' '#.uv-cache' '#.uv-tools'
