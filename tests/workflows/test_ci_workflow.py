@@ -87,6 +87,8 @@ def run_act(config: ActConfig) -> tuple[int, Path, str]:
         str(config.event_path),
         "-P",
         "ubuntu-latest=catthehacker/ubuntu:act-latest",
+        "-P",
+        "namespace-profile-default=catthehacker/ubuntu:act-latest",
         "--artifact-server-path",
         str(config.artefact_dir),
         "--json",

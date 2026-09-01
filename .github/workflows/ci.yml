@@ -8,6 +8,8 @@ on:
 jobs:
   lint:
     runs-on: namespace-profile-default
+    permissions:
+      contents: read
     env:
       MERMAN_CLI_VERSION: '0.7.0'
     steps:
