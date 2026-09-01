@@ -7,7 +7,7 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-default
     env:
       MERMAN_CLI_VERSION: '0.7.0'
     steps:
@@ -69,7 +69,7 @@ jobs:
         run: make nixie
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-default
     permissions:
       contents: read
     strategy:

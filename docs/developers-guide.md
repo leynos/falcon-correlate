@@ -417,3 +417,11 @@ policy where possible:
 `syntax-error` for the managed PyPy runtime boundary, and then enables the
 focused Pylint message set. This makes the second tier deliberate: it checks
 specific classes of problems rather than duplicating Ruff wholesale.
+
+## GitHub Actions runners
+
+Repository-owned Linux jobs use the uncached shared Namespace profile
+`namespace-profile-default` (Ubuntu 22.04, amd64, 4 vCPU, 16 GB). The profile
+has no cache volume. The reusable wheel-building workflow keeps its matrix of
+GitHub-hosted Linux, Windows, and macOS runners because it owns native
+platform and architecture selection; callers cannot replace that selection.
