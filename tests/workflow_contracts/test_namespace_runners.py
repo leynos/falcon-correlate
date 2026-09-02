@@ -58,6 +58,17 @@ def test_migrated_jobs_use_the_shared_namespace_runner() -> None:
             )
 
 
+def test_lint_job_has_read_only_repository_permissions() -> None:
+    """Keep the lint job's token scope limited to repository contents reads."""
+    jobs = _workflow_jobs("ci.yml")
+    lint_job = _as_mapping(jobs.get("lint"), "ci.yml must declare lint")
+    permissions = _as_mapping(
+        lint_job.get("permissions"),
+        "ci.yml:lint must declare explicit permissions",
+    )
+    assert permissions == {"contents": "read"}
+
+
 def test_wheel_matrix_keeps_its_caller_selected_runner() -> None:
     """Keep native wheel builds on their matrix-selected hosted platforms."""
     jobs = _workflow_jobs("build-wheels.yml")

@@ -422,6 +422,19 @@ specific classes of problems rather than duplicating Ruff wholesale.
 
 Repository-owned Linux jobs use the uncached shared Namespace profile
 `namespace-profile-default` (Ubuntu 22.04, amd64, 4 vCPU, 16 GB). The profile
-has no cache volume. The reusable wheel-building workflow keeps its matrix of
-GitHub-hosted Linux, Windows, and macOS runners because it owns native
-platform and architecture selection; callers cannot replace that selection.
+has no cache volume. The `namespace-profile-default-arm64` label is reserved
+for jobs that explicitly require ARM64 execution; it is currently declared for
+actionlint validation rather than selected by a repository-owned job.
+
+The labels are listed in `.github/actionlint.yaml`, which teaches actionlint
+about the custom self-hosted runner labels used in workflow `runs-on` values.
+Keep that list aligned with the labels available from Namespace profiles.
+
+The reusable wheel-building workflow keeps its matrix of GitHub-hosted Linux,
+Windows, and macOS runners because it owns native platform and architecture
+selection; callers cannot replace that selection.
+
+The `typecheck` target runs both `ty` commands through the configured UV
+environment: `$(UV_ENV) $(UV) run ty --version` and
+`$(UV_ENV) $(UV) run ty check`. This makes the project dependencies visible to
+the type checker in local and CI runs.
