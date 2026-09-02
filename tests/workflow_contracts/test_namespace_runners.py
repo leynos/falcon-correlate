@@ -12,18 +12,22 @@ import shutil
 import subprocess  # noqa: S404 - this test deliberately validates the Makefile CLI boundary.
 import typing as typ
 from pathlib import Path
+from types import MappingProxyType
 
 import yaml
+
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS_DIRECTORY = REPOSITORY_ROOT / ".github" / "workflows"
 NAMESPACE_RUNNER = "namespace-profile-default"
-MIGRATED_JOBS = {
+MIGRATED_JOBS: typ.Final[cabc.Mapping[str, tuple[str, ...]]] = MappingProxyType({
     "ci.yml": ("lint", "test"),
     "coverage-main.yml": ("coverage-upload",),
     "get-codescene-sha.yml": ("refresh-sha",),
     "release.yml": ("pure-wheel", "release"),
-}
+})
 
 
 def _as_mapping(value: object, message: str) -> dict[object, object]:
