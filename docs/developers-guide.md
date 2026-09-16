@@ -227,33 +227,24 @@ make lint 2>&1 | tee /tmp/lint-falcon-correlate-$(git branch --show-current).out
 
 ## Spelling policy
 
-Run `make spelling` to enforce en-GB-oxendict prose spelling with the pinned
-Typos release. Typos checks tracked Markdown, while the phrase checker scans
-eligible tracked UTF-8 text across the repository so punctuation-sensitive
-shared corrections such as `hand-written` cannot survive in comments or tests.
+Run the spelling gate with:
 
-The tracked `typos.toml` is generated from the shared estate dictionary and the
-narrow repository policy in `typos.local.toml`; never edit the generated file
-by hand. Repository exceptions belong in the local overlay as narrow exact or
-full-line patterns, not bare accepted words for machine interfaces or formal
-names.
+```bash
+make spelling
+```
 
-`make spelling-config-write` invokes the exact, commit-pinned
-`typos-config-builder` CLI with Python 3.14. It refreshes the untracked shared
-dictionary cache when its authority is newer and writes the deterministic
-configuration. Use `make spelling-config` to verify cache freshness and
-generated-config drift. The builder only parses, refreshes, merges and renders
-spelling policy. Harvesting, Typos execution, phrase enforcement and Mermaid
-validation remain consumer-owned.
+The gate runs the shared `typos-config-builder` CLI, which regenerates
+`typos.toml` on every run from the live shared dictionary and the
+repository-specific `typos.local.toml` overlay, then enforces en-GB-oxendict
+spelling across the tracked Markdown. Because the dictionary is live,
+`typos.toml` must never be drift checked in continuous integration.
 
-The standalone phrase helper supports Python 3.13 and later. Its sources under
-`scripts/` are linted, formatted and type-checked to the same standard as the
-package by the shared `make check-fmt`, `make lint` and `make typecheck` gates,
-so they carry no bespoke Ruff configuration. Run `make spelling-helper-test` to
-exercise its four grouped policy, scanning, command-line and missing-git tests
-under the pinned standalone runtime. Run `make markdownlint` for the combined
-Markdown and spelling gate, and `make nixie` to validate Mermaid diagrams with
-Nixie 1.1.0 and Merman 0.7.0.
+Never edit generated entries by hand. Add only narrow repository terminology to
+`typos.local.toml`, as exact or full-line patterns rather than bare accepted
+words for machine interfaces or formal names.
+
+Run `make markdownlint` for the combined Markdown and spelling gate, and
+`make nixie` to validate Mermaid diagrams with Nixie 1.1.0 and Merman 0.7.0.
 
 ## Makefile variables
 
@@ -264,11 +255,11 @@ The lint target is configured by these Makefile variables:
 | `UV`                   | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                 | Selects the `uv` launcher used by all Python tool commands.    |
 | `UV_ENV`               | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                | Keeps project-local `uv` cache and tool directories.           |
 | `PYLINT_PYTHON`        | `pypy`                                                                                        | Selects the Python runtime used for the Pylint tool execution. |
-| `PYLINT_TARGETS`       | `src tests examples scripts`                                                                  | Defines the source trees checked by the Pylint tier.           |
+| `PYLINT_TARGETS`       | `src tests examples`                                                                          | Defines the source trees checked by the Pylint tier.           |
 | `PYLINT_PYPY_SHIM_REF` | `726d09f968b4d729ee4b29c71fc732e744854f3b`                                                    | Pins the `pylint-pypy-shim` repository revision.               |
 | `PYLINT_PYPY_SHIM`     | `git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)`                  | Identifies the shim package installed by `uv tool run`.        |
 | `PYLINT`               | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                |
-| `INTERROGATE_TARGETS`  | `src/falcon_correlate scripts`                                                                | Defines the repo-root-relative trees checked by Interrogate.   |
+| `INTERROGATE_TARGETS`  | `src/falcon_correlate`                                                                        | Defines the repo-root-relative trees checked by Interrogate.   |
 
 Override variables at the command line for targeted investigation. For example:
 
