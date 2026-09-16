@@ -64,15 +64,11 @@ jobs:
       - name: Run typechecker
         run: make typecheck
 
-      - name: Run Markdown lint and spelling checks
-        # The upstream action rather than an installation of our own: its
-        # release carries the linter's whole dependency graph, so nothing is
-        # resolved from the registry at run time, and Dependabot manages the
-        # pin alongside the other actions. It reads .markdownlint-cli2.jsonc
-        # from the workspace, so the rules and ignores match `make markdownlint`.
-        uses: DavidAnson/markdownlint-cli2-action@4580e1612f6407034edd6c0e4e316d725920867b  # v24.2.0
-        with:
-          globs: '**/*.md'
+      - name: Check spelling
+        # `make markdownlint` carried the spelling gate as a prerequisite; the
+        # Markdown lint action above replaced that step, so spelling runs on
+        # its own here.
+        run: make spelling
 
       - name: Set up Rust for Merman
         run: rustup toolchain install 1.95.0
