@@ -122,8 +122,8 @@ Non-goals:
 ## Migration plan
 
 No runtime or public API migration is required because this decision formalizes
-the documentation validation gates introduced by this change. Contributors
-must use `make lint` and `make test` to adopt and validate the gates.
+the documentation validation gates introduced by this change. Contributors must
+use `make lint` and `make test` to adopt and validate the gates.
 
 ## Outstanding decisions
 
