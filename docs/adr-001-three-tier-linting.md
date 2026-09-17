@@ -111,7 +111,7 @@ Non-goals:
 
 - Pylint must run through `pylint-pypy-shim` under PyPy.
 - The shim package must be pinned to a known revision for reproducibility.
-- `df12-python-lints` must be pinned to `v0.1.0` and run under CPython 3.14.
+- `df12-python-lints` must be pinned to `v0.3.0` and run under CPython 3.14.
 - `ambrleaks` must scan the repository's Syrupy snapshots.
 - The lint workflow must keep Ruff first so common failures return quickly.
 - The Makefile must expose variables for the Interrogate targets, PyPy runtime,
