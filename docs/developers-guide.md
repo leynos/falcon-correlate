@@ -256,9 +256,17 @@ that arm is not registrable.
 
 ### What the contracts assert
 
-`tests/workflow_contracts/test_runner_placement.py` holds twenty-two
+`tests/workflow_contracts/test_runner_placement.py` holds twenty-five
 contracts, each proved by a mutation that it must reject and, where the rule
-could be drawn too tightly, by a correct variant it must accept. Moving a
+could be drawn too tightly, by a correct variant it must accept.
+
+Which lanes must carry the fork fallback is **derived from each workflow's
+own triggers**, not listed. A second list is the gap: a paid lane added to a
+pull-request workflow would satisfy every other rule while carrying a literal
+label no fork can obtain. The complement is asserted too, so a push-only lane
+must name its label literally and a workflow that gains a `pull_request`
+trigger moves its lanes into the fallback rule rather than out of every
+rule. Moving a
 lane to a GitHub-hosted label fails the placement contract and deliberately
 **not** the registry one; that division is the reason the two are separate.
 

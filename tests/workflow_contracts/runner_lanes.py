@@ -157,14 +157,30 @@ def _runner_declarations(job: dict[str, typ.Any]) -> list[object]:
         return []
     if not (isinstance(runs_on, str) and runs_on.strip() == MATRIX_DEFERRAL):
         return [runs_on]
-    include = job.get("strategy", {}).get("matrix", {}).get("include")
+    strategy = _as_mapping(
+        job.get("strategy"),
+        "a job deferring runs-on to matrix.os must declare a strategy mapping",
+    )
+    matrix = _as_mapping(
+        strategy.get("matrix"),
+        "a job deferring runs-on to matrix.os must declare a matrix mapping. "
+        "A matrix built at run time, such as "
+        "`matrix: ${{ fromJSON(needs.plan.outputs.legs) }}`, is valid GitHub "
+        "and parses to a string, which this reader cannot inventory",
+    )
+    include = matrix.get("include")
     if not isinstance(include, list):
         message = (
             "a job deferring runs-on to matrix.os must declare a matrix "
             f"include list; got {include!r}"
         )
         raise WorkflowReadError(message)
-    return [entry.get("os") for entry in include]
+    return [
+        _as_mapping(
+            entry, f"a matrix include entry must be a mapping; got {entry!r}"
+        ).get("os")
+        for entry in include
+    ]
 
 
 def _labels_from_declaration(value: object) -> set[str]:
@@ -242,3 +258,57 @@ def read_actionlint_registry() -> set[str]:
         "the config must declare self-hosted-runner",
     )
     return set(runner.get("labels") or [])
+
+
+def serves_pull_requests(workflow: str) -> bool:
+    """Report whether a workflow runs on pull requests.
+
+    Derived from the document rather than declared, so a lane added to a
+    pull-request workflow is covered by the fork-fallback rule without
+    anyone remembering to list it. A second declaration is the gap: the
+    lane would satisfy every other paid-lane rule while carrying a literal
+    label that a fork can never obtain.
+
+    Returns
+    -------
+    bool
+        True when the workflow declares a ``pull_request`` trigger.
+    """
+    document = _as_mapping(
+        yaml.safe_load(workflow_texts()[workflow]),
+        f"{workflow} must parse to a mapping",
+    )
+    # PyYAML resolves an unquoted `on:` key to the boolean True.
+    triggers = document.get("on", document.get(True))
+    if isinstance(triggers, str):
+        return triggers == "pull_request"
+    if isinstance(triggers, list):
+        return "pull_request" in triggers
+    return "pull_request" in _as_mapping(
+        triggers, f"{workflow} must declare an on: mapping"
+    )
+
+
+def paid_lanes_by_trigger(*, serving_pull_requests: bool) -> list[str]:
+    """Return the paid lanes whose workflow does or does not serve pull requests.
+
+    One function rather than a near-identical pair. The two questions are
+    complements of each other, and writing them separately invited the two
+    answers to drift apart, which is the very gap this derivation closes.
+
+    Parameters
+    ----------
+    serving_pull_requests : bool
+        Select the lanes whose workflow declares a ``pull_request`` trigger
+        when true, and those whose workflow does not when false.
+
+    Returns
+    -------
+    list[str]
+        Each lane as ``workflow:job``, sorted.
+    """
+    return sorted(
+        lane
+        for lane in PAID_LANES
+        if serves_pull_requests(lane.partition(":")[0]) is serving_pull_requests
+    )
