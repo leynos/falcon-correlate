@@ -22,6 +22,24 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 REPO_ROOT = Path(__file__).parent.parent.parent
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
+#: Runner labels mapped to container images for `act`.
+#:
+#: `act` knows GitHub's own labels and skips any job whose label it cannot
+#: map, printing "Skipping unsupported platform" and exiting zero. A job that
+#: is skipped rather than run makes every assertion about its output fail for
+#: a reason that has nothing to do with the job, so each label this
+#: repository uses is mapped here.
+#:
+#: `ubicloud-standard-2` is an ordinary x86-64 Ubuntu runner, so it maps to
+#: the same image as `ubuntu-latest`. This mapping is about what `act` can
+#: run locally, not about what the lane bills for in CI.
+ACT_PLATFORMS = (
+    "-P",
+    "ubuntu-latest=catthehacker/ubuntu:act-latest",
+    "-P",
+    "ubicloud-standard-2=catthehacker/ubuntu:act-latest",
+)
+
 
 def _tool_is_available(tool_name: str, args: list[str]) -> bool:
     """Check whether a tool is available by running it with given args."""
@@ -85,8 +103,7 @@ def run_act(config: ActConfig) -> tuple[int, Path, str]:
         config.job,
         "-e",
         str(config.event_path),
-        "-P",
-        "ubuntu-latest=catthehacker/ubuntu:act-latest",
+        *ACT_PLATFORMS,
         "--artifact-server-path",
         str(config.artefact_dir),
         "--json",

@@ -1,0 +1,11 @@
+# Labels actionlint does not know about on its own.
+#
+# actionlint recognises GitHub's own runner labels and rejects anything
+# else as a typo. Every label this repository bills a third party for has
+# to be registered here, and the placement contract asserts equality in
+# both directions: an unregistered label in use fails, and a registration
+# nothing uses fails too, because a stale one outlives the lane that
+# needed it and stops the check being about anything.
+self-hosted-runner:
+  labels:
+    - ubicloud-standard-2

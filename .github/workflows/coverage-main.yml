@@ -29,7 +29,14 @@ on:
 
 jobs:
   coverage-upload:
-    runs-on: ubuntu-latest
+    # A literal label, not the fork fallback. This workflow triggers only
+    # on push to main and workflow_dispatch, and neither event can carry a
+    # fork's pull request, so a fork guard here would be a condition that
+    # is always false.
+    runs-on: ubicloud-standard-2
+    # 42 s is the slowest observed run across three green runs; the queue
+    # ahead of it has reached 637 s, which is what this move addresses.
+    timeout-minutes: 10
     permissions:
       contents: read
     env:
