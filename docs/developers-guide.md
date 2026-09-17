@@ -7,7 +7,7 @@ pull request.
 
 ## Linting architecture
 
-The Python lint target uses a three-tier linting approach:
+The Python lint target uses a five-tier linting approach:
 
 - **Tier 1: Ruff.** Ruff runs first through `uv run ruff check`. It is the
   fast linting gate and owns formatting-adjacent checks, import rules, common
@@ -16,17 +16,24 @@ The Python lint target uses a three-tier linting approach:
 - **Tier 2: Interrogate.** Interrogate runs second through
   `uv run interrogate --fail-under 100`. It enforces package-level docstring
   coverage after Ruff has validated docstring style.
-- **Tier 3: Pylint through PyPy.** Pylint runs third under the `pypy@3.12`
-  interpreter, installed on demand by `uv tool run`. This tier focuses on rules
-  that complement Ruff, especially logging format correctness, pattern matching
+- **Tier 3: classic Pylint through PyPy.** Pylint runs under the pinned
+  Python 3.12 PyPy runtime without a wrapper. This tier focuses on rules that
+  complement Ruff, especially logging format correctness, pattern matching
   safety, refactoring suggestions, resource-handling checks, and selected
   design limits.
+- **Tier 4: df12 Pylint checks through CPython 3.14.** The
+  `df12-python-lints` plug-in runs separately under CPython 3.14 so its
+  syntax-tree analysis uses the requested runtime without changing the
+  PyPy-backed tier.
+- **Tier 5: snapshot leak scanning.** The `ambrleaks` command from the same
+  pinned package scans Syrupy snapshots under `tests` for values that should
+  have been redacted.
 
-Ruff must pass before Interrogate runs, and Interrogate must pass before Pylint
-runs. This keeps the slow, deeper lint tier focused on code that has already
-passed the high-volume checks and the package docstring coverage gate.
+Each stage must pass before the next one runs. This keeps the slower, deeper
+checks focused on code that has already passed the high-volume checks and the
+package docstring coverage gate.
 
-The decision to use this architecture is recorded in
+The core linting decision is recorded in
 [ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md).
 
 ## Internal module architecture
@@ -616,16 +623,22 @@ The lint target is configured by these Makefile variables:
 | ----------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | `UV`                    | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                                   | Selects the `uv` launcher used by all Python tool commands.    |
 | `UV_ENV`                | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                                  | Keeps project-local `uv` cache and tool directories.           |
-| `PYLINT_PYTHON`         | `pypy@3.12`                                                                                                     | Selects the Python runtime used for the classic Pylint pass.   |
-| `PYLINT_VERSION`        | `4.0.9`                                                                                                         | Pins the Pylint version installed by `uv tool run`.            |
-| `PYLINT_TARGETS`        | `src tests examples`                                                                                            | Defines the source trees checked by classic Pylint.           |
-| `PYLINT`                | `$(UV_ENV) $(UV) tool run --managed-python --python $(PYLINT_PYTHON) --from 'pylint==$(PYLINT_VERSION)' pylint` | Expands to the PyPy-backed classic Pylint command.             |
-| `DF12_PYTHON_LINTS_REF` | `v0.1.0`                                                                                                        | Pins the df12 plug-in and `ambrleaks` tool source.             |
-| `DF12_PYTHON`           | `3.14`                                                                                                          | Selects CPython 3.14 for the df12 Pylint and snapshot passes.   |
-| `DF12_PYLINT_MESSAGES`  | All twelve messages supplied by `v0.1.0`                                                                        | Keeps adoption of df12 checks explicit and reviewable.         |
-| `DF12_PYLINT`           | `$(UV_ENV) $(UV) run --python $(DF12_PYTHON) pylint`                                                            | Runs the isolated CPython 3.14 plug-in pass.                    |
-| `AMBRLEAKS`             | `$(UV_ENV) $(UV) tool run --python $(DF12_PYTHON) ... ambrleaks`                                                | Scans the Syrupy snapshots under CPython 3.14.                  |
-| `INTERROGATE_TARGETS`   | `src/falcon_correlate`                                                                                          | Defines the repo-root-relative trees checked by Interrogate.   |
+| `PYTEST_WORKERS`        | `6`                                                                                                            | Limits the number of parallel pytest workers.                  |
+| `RUFF_VERSION`          | `0.16.4`                                                                                                       | Pins the Ruff formatter and lint command.                      |
+| `TY_VERSION`            | `0.0.74`                                                                                                       | Pins the Ty type-checking command.                             |
+| `MBAKE_VERSION`         | `1.4.6`                                                                                                        | Pins the Makefile validator used by Continuous Integration.    |
+| `PYLINT_PYTHON`         | `pypy@3.12`                                                                                                    | Selects the Python runtime used for the classic Pylint pass.   |
+| `PYLINT_VERSION`        | `4.0.9`                                                                                                        | Pins the Pylint version installed by `uv tool run`.            |
+| `PYLINT_TARGETS`        | `src tests examples`                                                                                           | Defines the source trees checked by classic Pylint.            |
+| `PYLINT_HOME`           | `.pylint_cache`                                                                                                | Selects the Pylint cache directory.                            |
+| `PYLINT`                | `PYLINTHOME=$(PYLINT_HOME) $(UV_ENV) $(UV) tool run --managed-python --python $(PYLINT_PYTHON) --from 'pylint==$(PYLINT_VERSION)' pylint` | Runs classic Pylint directly under PyPy. |
+| `DF12_PYTHON_LINTS_REF` | `v0.3.0`                                                                                                       | Pins the df12 plug-in and `ambrleaks` tool source.             |
+| `DF12_PYTHON_LINTS`     | `git+https://github.com/leynos/df12-python-lints.git@$(DF12_PYTHON_LINTS_REF)`                                | Identifies the pinned plug-in source.                          |
+| `DF12_PYTHON`           | `3.14`                                                                                                         | Selects CPython 3.14 for the df12 Pylint and snapshot passes.   |
+| `DF12_PYLINT_MESSAGES`  | All twelve messages supplied by `v0.3.0`                                                                       | Keeps adoption of df12 checks explicit and reviewable.         |
+| `DF12_PYLINT`           | `$(UV_ENV) $(UV) run --python $(DF12_PYTHON) pylint --disable=all --load-plugins=df12_python_lints --enable=$(DF12_PYLINT_MESSAGES)` | Runs the isolated CPython 3.14 plug-in pass. |
+| `AMBRLEAKS`             | `$(UV_ENV) $(UV) tool run --python $(DF12_PYTHON) --from '$(DF12_PYTHON_LINTS)' ambrleaks`                    | Scans Syrupy snapshots under CPython 3.14.                     |
+| `INTERROGATE_TARGETS`   | `src/falcon_correlate`                                                                                         | Defines the repo-root-relative trees checked by Interrogate.   |
 
 Override variables at the command line for targeted investigation. For example:
 

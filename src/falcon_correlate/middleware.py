@@ -1,4 +1,9 @@
-"""Falcon WSGI correlation ID middleware and public middleware exports."""
+"""Falcon WSGI correlation ID middleware and public middleware exports.
+
+This module defines the WSGI middleware, delegates shared lifecycle behaviour
+to ``_CorrelationIDMiddlewareBase`` in ``middleware_base.py``, and exposes the
+ASGI middleware and shared ``CorrelationIDConfig`` configuration.
+"""
 
 from __future__ import annotations
 
