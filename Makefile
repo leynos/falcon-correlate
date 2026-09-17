@@ -28,6 +28,7 @@ TYPOS_CONFIG_BUILDER_VERSION ?= v0.1.3
 PYTEST_WORKERS ?= 6
 RUFF_VERSION ?= 0.16.4
 TY_VERSION ?= 0.0.74
+MBAKE_VERSION ?= 1.4.6
 RUFF = $(UV_ENV) $(UV) run --with ruff==$(RUFF_VERSION) ruff
 TY = $(UV_ENV) $(UV) run --with ty==$(TY_VERSION) ty
 TYPOS_CONFIG_BUILDER = $(UV_ENV) $(UV) tool run --python 3.14 --from \

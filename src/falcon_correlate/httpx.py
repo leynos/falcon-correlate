@@ -175,8 +175,7 @@ class CorrelationIDTransport(
 
     def close(self) -> None:
         """Delegate transport shutdown to the wrapped transport."""
-        result = self._wrapped_transport.close()
-        return self._cast_to_none(result)
+        return self._cast_to_none(self._wrapped_transport.close())
 
     def __enter__(self) -> CorrelationIDTransport:
         """Enter the transport context (required by httpx.Client).

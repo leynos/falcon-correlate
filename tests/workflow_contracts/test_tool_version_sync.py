@@ -10,16 +10,16 @@ import yaml
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 MAKEFILE_PATH = REPOSITORY_ROOT / "Makefile"
 WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
-TOOL_NAMES = ("ruff", "ty")
+TOOL_NAMES = ("ruff", "ty", "mbake")
 
 
 def _makefile_versions() -> dict[str, str]:
-    """Return the pinned Ruff and Ty versions from the Makefile."""
+    """Return the pinned CLI tool versions from the Makefile."""
     makefile = MAKEFILE_PATH.read_text(encoding="utf-8")
     versions = {
         name.lower(): version
         for name, version in re.findall(
-            r"^(RUFF|TY)_VERSION \?= ([^\s]+)$", makefile, flags=re.MULTILINE
+            r"^(RUFF|TY|MBAKE)_VERSION \?= ([^\s]+)$", makefile, flags=re.MULTILINE
         )
     }
     assert set(versions) == set(TOOL_NAMES), (
@@ -29,7 +29,7 @@ def _makefile_versions() -> dict[str, str]:
 
 
 def _ci_versions() -> dict[str, str]:
-    """Return the pinned Ruff and Ty versions from the CI lint job."""
+    """Return the pinned CLI tool versions from the CI lint job."""
     workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
     assert isinstance(workflow, dict), "CI workflow must parse to a mapping"
     jobs = workflow.get("jobs")
@@ -49,7 +49,7 @@ def _ci_versions() -> dict[str, str]:
     assert isinstance(install_step, dict), "CI lint job must install CLI tools"
     command = install_step.get("run")
     assert isinstance(command, str), "CI tool installation step must run a command"
-    versions = dict(re.findall(r"uv tool install (ruff|ty)==([^\s]+)", command))
+    versions = dict(re.findall(r"uv tool install (ruff|ty|mbake)==([^\s]+)", command))
     assert set(versions) == set(TOOL_NAMES), (
         f"CI must pin exactly {TOOL_NAMES}, got {versions!r}"
     )
@@ -57,7 +57,7 @@ def _ci_versions() -> dict[str, str]:
 
 
 def test_ci_tool_versions_match_makefile() -> None:
-    """CI uses the Ruff and Ty versions pinned by the Makefile."""
+    """CI uses the CLI tool versions pinned by the Makefile."""
     assert _ci_versions() == _makefile_versions(), (
-        "CI Ruff and Ty versions must match the Makefile pins"
+        "CI tool versions must match the Makefile pins"
     )

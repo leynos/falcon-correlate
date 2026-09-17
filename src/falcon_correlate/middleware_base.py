@@ -145,7 +145,7 @@ class _CorrelationIDMiddlewareBase:
         if self._config.validator is None:
             return True
         try:
-            result = self._config.validator(value)
+            return self._config.validator(value)
         except Exception:
             logger.warning(
                 "Validator raised an exception for correlation ID, treating as invalid",
@@ -153,7 +153,6 @@ class _CorrelationIDMiddlewareBase:
                 exc_info=True,
             )
             return False
-        return result
 
     def _process_request(self, req: _RequestLike) -> None:
         """Establish request-local correlation ID state."""

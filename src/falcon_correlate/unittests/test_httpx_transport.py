@@ -126,11 +126,15 @@ def test_sync_transport_delegates_same_request_object() -> None:
 
 
 def test_sync_transport_delegates_close() -> None:
-    """Sync transport should forward close calls to the wrapped transport."""
+    """Sync transport should preserve the wrapped close result."""
     transport = mock.Mock(spec=httpx.BaseTransport)
+    expected = object()
+    transport.close.return_value = expected
     wrapped_transport = CorrelationIDTransport(transport)
 
-    wrapped_transport.close()
+    assert wrapped_transport.close() is expected, (
+        "expected close to preserve the wrapped transport return value"
+    )
 
     transport.close.assert_called_once_with()
 

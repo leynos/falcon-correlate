@@ -1,6 +1,20 @@
-"""Shared recording transports and assertions for httpx transport tests."""
+"""Provide recording transports and assertions for HTTPX transport tests.
+
+Usage
+-----
+Pass a recording transport to an HTTPX client, then inspect its request with
+the assertion helpers::
+
+    transport = _RecordingTransport()
+    with httpx.Client(transport=transport) as client:
+        client.get("http://example.com")
+    _assert_header(transport, "X-Correlation-ID", None)
+
+"""
 
 from __future__ import annotations
+
+import typing as typ
 
 import pytest
 
@@ -16,6 +30,7 @@ class _RecordingTransport(httpx.BaseTransport):
         """Initialize an empty request log."""
         self.requests: list[httpx.Request] = []
 
+    @typ.override
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         """Capture the request and return a simple response."""
         self.requests.append(request)
@@ -29,6 +44,7 @@ class _RecordingAsyncTransport(httpx.AsyncBaseTransport):
         """Initialize an empty request log."""
         self.requests: list[httpx.Request] = []
 
+    @typ.override
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         """Capture the request and return a simple response."""
         self.requests.append(request)
