@@ -274,7 +274,7 @@ Run `make markdownlint` for the combined Markdown and spelling gate, and
 The lint target is configured by these Makefile variables:
 
 | Variable                | Default                                                                                                                 | Purpose                                                        |
-| ----------------------- | --------------------------------------------------------------------------------------------------------                | -------------------------------------------------------------- |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | `UV`                    | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                                           | Selects the `uv` launcher used by all Python tool commands.    |
 | `UV_ENV`                | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                                          | Keeps project-local `uv` cache and tool directories.           |
 | `PYTEST_WORKERS`        | `6`                                                                                                                     | Limits the number of parallel pytest workers.                  |
@@ -299,9 +299,9 @@ make lint PYLINT_TARGETS=src/falcon_correlate/middleware.py
 ```
 
 Do not change `PYLINT_PYPY_SHIM_REF` casually. Updating the shim changes the
-lint execution environment and should be reviewed as a tooling change.
-Update the `df12-python-lints` dependency and `DF12_PYTHON_LINTS_REF` together
-so the Pylint plug-in and `ambrleaks` keep the same rule implementation.
+lint execution environment and should be reviewed as a tooling change. Update
+the `df12-python-lints` dependency and `DF12_PYTHON_LINTS_REF` together so the
+Pylint plug-in and `ambrleaks` keep the same rule implementation.
 
 ## Episodic lint policy
 
