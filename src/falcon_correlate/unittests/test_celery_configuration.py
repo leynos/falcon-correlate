@@ -235,6 +235,42 @@ def test_configure_celery_correlation_returns_app_instance(
     assert configure_celery_correlation(celery_app) is celery_app
 
 
+def test_configure_celery_correlation_caches_app_backend_verdict(
+    celery_app: Celery,
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Configured task publishing should use the app cache, not current_app."""
+
+    @celery_app.task(name="configured-cache-publish-task")
+    def configured_cache_publish_task() -> None:
+        """Provide a task name owned by the configured application."""
+
+    configure_celery_correlation(celery_app)
+    properties = {"correlation_id": "celery-task-id"}
+
+    def _unexpected_current_app_lookup() -> bool:
+        """Fail if configured publishing reaches the compatibility fallback."""
+        pytest.fail("configured publishing consulted celery.current_app")
+
+    monkeypatch.setattr(
+        "falcon_correlate.celery._current_result_backend_uses_rpc",
+        _unexpected_current_app_lookup,
+    )
+
+    def _logic() -> None:
+        """Exercise publishing through the configured task name."""
+        correlation_id_var.set("request-correlation-id")
+        propagate_correlation_id_to_celery(
+            sender=configured_cache_publish_task.name,
+            properties=properties,
+        )
+
+    isolated_context(_logic)
+
+    assert properties["correlation_id"] == "request-correlation-id"
+
+
 def test_configure_celery_correlation_is_exported_from_package_root() -> None:
     """The public helper should be discoverable from falcon_correlate."""
     import falcon_correlate

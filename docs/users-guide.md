@@ -766,9 +766,10 @@ middleware = CorrelationIDMiddleware()
 ```
 
 The helper connects the `before_task_publish`, `task_prerun`, and
-`task_postrun` handlers in one idempotent call and returns the same app
-instance. It is safe to call repeatedly, which is useful when publisher and
-worker bootstrap code share an application factory.
+`task_postrun` handlers in one idempotent call, caches that app's `rpc://`
+result-backend verdict, and returns the same app instance. It is safe to call
+repeatedly, which is useful when publisher and worker bootstrap code share an
+application factory.
 
 Importing `falcon_correlate` also registers those handlers automatically when
 Celery is installed. If the publisher process or worker process already imports
@@ -805,9 +806,10 @@ def send_invoice_email(self, user_id: str) -> None:
 
 ### Behaviour
 
-- When `correlation_id_var` is set and the active Celery result backend is not
-  `rpc://`, the outgoing Celery message uses that value as its publish-time
-  `correlation_id`.
+- When `correlation_id_var` is set and the publishing task belongs to a
+  configured app whose result backend is not `rpc://`, the outgoing Celery
+  message uses that value as its publish-time `correlation_id`. For task names
+  not owned by a configured app, the handler falls back to Celery's active app.
 - When `correlation_id_var` is not set, `falcon-correlate` leaves Celery's
   generated publish value unchanged.
 - If the caller passes `apply_async(correlation_id=...)` while a request
@@ -815,7 +817,7 @@ def send_invoice_email(self, user_id: str) -> None:
   fills `correlation_id` by default, so overwriting the publish value is the
   only way to guarantee request-to-task propagation through
   `before_task_publish`.
-- If the active Celery result backend is `rpc://`, `falcon-correlate`
+- If the publishing app's result backend is `rpc://`, `falcon-correlate`
   preserves Celery's task-id correlation contract and does not overwrite the
   publish `correlation_id`.
 - Inside a running Celery task, `correlation_id_var.get()` returns the

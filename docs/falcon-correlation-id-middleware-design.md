@@ -1825,32 +1825,36 @@ signals.
 
 ### A.10. Celery configuration helper (Task 4.2.3)
 
-**Decision:** Add `configure_celery_correlation(app)` to
-`src/falcon_correlate/celery.py`, re-export it from `falcon_correlate`, and
-implement it as a thin wrapper over the existing Celery signal registration
-helpers.
+**Decision:** Keep `configure_celery_correlation(app)` as the explicit Celery
+setup helper, cache each configured app's `rpc://` result-backend verdict in a
+weak per-app cache, and resolve the publishing app from the
+`before_task_publish` signal sender.
 
 **Rationale:**
 
-1. **Explicit application setup without a second registration model:** Celery's
-   signals are process-global in the integration used here. The helper accepts
-   the Celery app so application factories can expose their intent clearly, but
-   it does not store app-local state or duplicate signal logic.
+1. **Load-bearing application setup without a second registration model:**
+   Celery's signals remain process-global in the integration used here. The
+   helper now caches the configured app's result-backend verdict, so calling it
+   has a concrete per-app effect without duplicating signal registration logic.
 
 2. **Backwards compatibility:** Import-time registration remains in place, so
    existing consumers that rely on `import falcon_correlate` continue to get
    publish and worker propagation automatically.
 
-3. **Idempotence through existing dispatch UIDs:** The helper delegates to a
-   shared `_maybe_connect_celery_signals()` connector, which reuses the stable
-   dispatch UIDs for `before_task_publish`, `task_prerun`, and `task_postrun`.
-   Repeated calls therefore leave exactly one integration receiver connected to
-   each supported signal.
+3. **Correct and efficient publish resolution:** `before_task_publish` carries
+   the task name as `sender`. The handler matches that name against configured
+   app task registries and reads the cached verdict, avoiding a per-publish
+   `celery.current_app` lookup and selecting the application that owns the
+   task. When no configured app owns the task, the handler retains the
+   `current_app` fallback for import-time-only and unconfigured processes.
 
-4. **Application-factory ergonomics:** The helper returns the same app
-   instance it receives. Consumers can write
-   `celery_app = configure_celery_correlation(Celery(...))` without losing the
-   concrete app object or implying that the helper creates a new application.
+4. **Idempotence and application-factory ergonomics:** The helper delegates to
+   a shared `_maybe_connect_celery_signals()` connector, which reuses stable
+   dispatch UIDs for `before_task_publish`, `task_prerun`, and `task_postrun`.
+   Repeated calls leave exactly one integration receiver connected to each
+   supported signal, and the helper returns the same app instance it receives.
+   Consumers can write `celery_app = configure_celery_correlation(Celery(...))`
+   without losing the concrete app object.
 
 5. **Testing isolates import-time side effects:** Unit and behavioural tests
    explicitly disconnect the known receivers by dispatch UID before calling the
@@ -1860,8 +1864,9 @@ helpers.
 **Files created/modified:**
 
 - `src/falcon_correlate/celery.py` — Added
-  `configure_celery_correlation(app)` and the shared
-  `_maybe_connect_celery_signals()` connector.
+  `configure_celery_correlation(app)`, the shared
+  `_maybe_connect_celery_signals()` connector, the weak per-app backend cache,
+  and sender-based publishing-app resolution.
 - `src/falcon_correlate/__init__.py` — Re-exported
   `configure_celery_correlation` from the package root.
 - `src/falcon_correlate/unittests/test_celery_configuration.py` — Added unit
