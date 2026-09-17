@@ -53,6 +53,7 @@ from tests.workflow_contracts.runner_lanes import (
     billable_labels,
     jobs_of,
     labels_of,
+    paid_lanes_by_trigger,
     read_actionlint_registry,
     workflow_texts,
 )
@@ -107,13 +108,20 @@ def test_no_lane_takes_its_label_from_a_broken_folded_scalar() -> None:
         )
 
 
-@pytest.mark.parametrize("lane", sorted({"ci.yml:lint", "ci.yml:test"}), ids=str)
+@pytest.mark.parametrize(
+    "lane", paid_lanes_by_trigger(serving_pull_requests=True), ids=str
+)
 def test_a_pull_request_lane_falls_back_for_forks(lane: str) -> None:
     """Both arms, and the right way round.
 
     Asserting only that an expression is present would accept one with no
     fallback arm, or one whose arms are swapped so every branch build lands
     on the hosted runner and every fork build on the paid one.
+
+    The lanes are derived from each workflow's own triggers rather than
+    listed here. A second list is the gap: a paid lane added to a
+    pull-request workflow would satisfy every other rule while carrying a
+    literal label no fork can obtain.
     """
     workflow, _, name = lane.partition(":")
     job = jobs_of(workflow_texts()[workflow], workflow)[name]
@@ -245,8 +253,14 @@ def test_a_reusable_workflow_caller_contributes_no_labels() -> None:
     neither is still refused.
     """
     caller = {"uses": "leynos/shared-actions/.github/workflows/thing.yml@sha"}
-    assert labels_of(caller) == set()
-    assert billable_labels(caller) == set()
+    assert labels_of(caller) == set(), (
+        "a reusable-workflow caller places no job itself and must contribute "
+        f"no label; got {sorted(labels_of(caller))}"
+    )
+    assert billable_labels(caller) == set(), (
+        f"a reusable-workflow caller must bill for nothing; got "
+        f"{sorted(billable_labels(caller))}"
+    )
     with pytest.raises(WorkflowReadError, match="cannot inventory"):
         labels_of({"steps": []})
 
@@ -273,4 +287,30 @@ def test_the_reader_resolves_each_shape_github_accepts(
     not it discriminates anything, so the shapes it must handle are built
     here instead.
     """
-    assert billable_labels({"runs-on": runs_on}) == expected
+    assert billable_labels({"runs-on": runs_on}) == expected, (
+        f"runs-on {runs_on!r} must resolve to {sorted(expected)}; got "
+        f"{sorted(billable_labels({'runs-on': runs_on}))}"
+    )
+
+
+@pytest.mark.parametrize(
+    "lane", paid_lanes_by_trigger(serving_pull_requests=False), ids=str
+)
+def test_a_lane_that_never_sees_a_pull_request_names_its_label(lane: str) -> None:
+    """The complement of the fork-fallback rule, asserted rather than assumed.
+
+    A push-only or tag-only lane cannot receive a fork's pull request, so a
+    fork guard there is a condition that is always false: it reads as
+    caution and buys nothing. Asserting the complement keeps the derivation
+    honest in both directions, so a workflow that gains a `pull_request`
+    trigger moves its lanes into the rule above rather than out of every
+    rule.
+    """
+    workflow, _, name = lane.partition(":")
+    job = jobs_of(workflow_texts()[workflow], workflow)[name]
+    runs_on = job.get("runs-on")
+    assert runs_on == UBICLOUD_LABEL, (
+        f"{lane} never serves a pull request, so it must name the paid label "
+        f"literally rather than guarding on a field that is always empty; "
+        f"got {runs_on!r}"
+    )
