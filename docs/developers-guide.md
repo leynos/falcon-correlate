@@ -190,23 +190,23 @@ as a test assertion on the SHA string.
 Five jobs run on `ubicloud-standard-2`, a per-minute runner. The rest stay on
 GitHub-hosted runners, where minutes are free for a public repository.
 
-| Lane | Runner | Ceiling |
-| --- | --- | --- |
-| `ci.yml` `lint` | fork fallback | 20 min |
-| `ci.yml` `test` | fork fallback | 10 min |
-| `coverage-main.yml` `coverage-upload` | `ubicloud-standard-2` | 10 min |
-| `release.yml` `pure-wheel` | `ubicloud-standard-2` | 15 min |
-| `release.yml` `release` | `ubicloud-standard-2` | 15 min |
+| Lane                                  | Runner                | Ceiling |
+| ------------------------------------- | --------------------- | ------- |
+| `ci.yml` `lint`                       | fork fallback         | 20 min  |
+| `ci.yml` `test`                       | fork fallback         | 10 min  |
+| `coverage-main.yml` `coverage-upload` | `ubicloud-standard-2` | 10 min  |
+| `release.yml` `pure-wheel`            | `ubicloud-standard-2` | 15 min  |
+| `release.yml` `release`               | `ubicloud-standard-2` | 15 min  |
 
 `get-codescene-sha.yml` is dispatch-only and `build-wheels.yml` is a
 `workflow_call` whose matrix is not Linux-only, so both stay hosted. The
-`mutation-testing` and `dependabot-automerge` jobs call reusable workflows
-and declare no runner at all: the called workflow places its own jobs.
+`mutation-testing` and `dependabot-automerge` jobs call reusable workflows and
+declare no runner at all: the called workflow places its own jobs.
 
 ### The fork fallback
 
-A pull request from a fork cannot obtain an Ubicloud runner, so a lane
-serving pull requests names both:
+A pull request from a fork cannot obtain an Ubicloud runner, so a lane serving
+pull requests names both:
 
 ```yaml
 runs-on: >-
@@ -214,28 +214,28 @@ runs-on: >-
   && 'ubuntu-latest' || 'ubicloud-standard-2' }}
 ```
 
-**Keep the continuation at the same indent as the first line.** A folded
-scalar whose continuation is indented more deeply keeps its line break, and
-the resulting value carries a newline inside an expression that GitHub
-evaluates anyway. A green run is not evidence the defect is absent, so a
-contract reads the parsed value and refuses a line break in it.
+**Keep the continuation at the same indent as the first line.** A folded scalar
+whose continuation is indented more deeply keeps its line break, and the
+resulting value carries a newline inside an expression that GitHub evaluates
+anyway. A green run is not evidence the defect is absent, so a contract reads
+the parsed value and refuses a line break in it.
 
-A push-only or dispatch-only lane names the paid label literally. Neither
-event can carry a fork's pull request, so a fork guard there would be a
-condition that is always false.
+A push-only or dispatch-only lane names the paid label literally. Neither event
+can carry a fork's pull request, so a fork guard there would be a condition
+that is always false.
 
 ### Ceilings
 
-An Ubicloud runner is a self-hosted just-in-time runner, so GitHub's
-six-hour limit for hosted jobs does not apply; the limit is five days. Every
-paid lane therefore declares `timeout-minutes`, and a contract requires it
-to fall between 1 and 60. The upper bound matters as much as the
-requirement: a lane declaring `timeout-minutes: 7200` has satisfied
-"declares a ceiling" without bounding anything.
+An Ubicloud runner is a self-hosted just-in-time runner, so GitHub's six-hour
+limit for hosted jobs does not apply; the limit is five days. Every paid lane
+therefore declares `timeout-minutes`, and a contract requires it to fall
+between 1 and 60. The upper bound matters as much as the requirement: a lane
+declaring `timeout-minutes: 7200` has satisfied "declares a ceiling" without
+bounding anything.
 
 The values come from measured work rather than from the label. The slowest
-`lint` run observed is 308 s, on a merge push with a cold Merman cache; a
-warm cache finishes in about 55 s. The slowest `test` leg is 27 s, and
+`lint` run observed is 308 s, on a merge push with a cold Merman cache; a warm
+cache finishes in about 55 s. The slowest `test` leg is 27 s, and
 `coverage-upload` has run between 32 s and 42 s.
 
 ### The actionlint registry
@@ -243,16 +243,15 @@ warm cache finishes in about 55 s. The slowest `test` leg is 27 s, and
 actionlint knows GitHub's own labels and rejects anything else as a typo, so
 every paid label is registered in `.github/actionlint.yaml`. The contract
 asserts **equality in both directions**. A subset assertion catches an
-unregistered label but not a stale registration left behind when a lane
-moved back, and a stale registration is what stops the check being about
-anything.
+unregistered label but not a stale registration left behind when a lane moved
+back, and a stale registration is what stops the check being about anything.
 
 "In use" is derived by subtracting a named frozen set of the labels GitHub
 hosts, not by matching a vendor prefix. A prefix reading works today and
-silently exempts a second paid provider's labels the moment one appears,
-which inverts the question the registry exists to ask. The frozen set also
-keeps the fork fallback's hosted arm out of the registry question, since
-that arm is not registrable.
+silently exempts a second paid provider's labels the moment one appears, which
+inverts the question the registry exists to ask. The frozen set also keeps the
+fork fallback's hosted arm out of the registry question, since that arm is not
+registrable.
 
 ### What the contracts assert
 
@@ -260,20 +259,20 @@ that arm is not registrable.
 contracts, each proved by a mutation that it must reject and, where the rule
 could be drawn too tightly, by a correct variant it must accept.
 
-Which lanes must carry the fork fallback is **derived from each workflow's
-own triggers**, not listed. A second list is the gap: a paid lane added to a
+Which lanes must carry the fork fallback is **derived from each workflow's own
+triggers**, not listed. A second list is the gap: a paid lane added to a
 pull-request workflow would satisfy every other rule while carrying a literal
 label no fork can obtain. The complement is asserted too, so a push-only lane
 must name its label literally and a workflow that gains a `pull_request`
-trigger moves its lanes into the fallback rule rather than out of every
-rule. Moving a
-lane to a GitHub-hosted label fails the placement contract and deliberately
-**not** the registry one; that division is the reason the two are separate.
+trigger moves its lanes into the fallback rule rather than out of every rule.
+Moving a lane to a GitHub-hosted label fails the placement contract and
+deliberately **not** the registry one; that division is the reason the two are
+separate.
 
 A lane can also be placed and switched off, so a separate contract refuses a
-job-level `if:` and `continue-on-error` at job or step scope on any paid
-lane. A guarded lane can be skipped without failing anything, which makes
-its placement a decoration.
+job-level `if:` and `continue-on-error` at job or step scope on any paid lane.
+A guarded lane can be skipped without failing anything, which makes its
+placement a decoration.
 
 ## Roadmap notes
 
