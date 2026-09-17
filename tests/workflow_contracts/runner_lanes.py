@@ -99,26 +99,81 @@ def _as_mapping(value: object, message: str) -> dict[str, typ.Any]:
     return typ.cast("dict[str, typ.Any]", value)
 
 
-def workflow_texts() -> dict[str, str]:
+def workflow_texts(directory: Path | None = None) -> dict[str, str]:
     """Return every workflow file's raw text, keyed by file name.
+
+    Reading is the one fallible step in this module, so it reports its own
+    failure rather than letting an ``OSError`` surface from what reads like
+    a query. The directory is a parameter so a caller can point the reader
+    at documents built in a test; it defaults to this repository's own
+    workflows only so the contracts next door stay readable.
 
     Both YAML extensions are read. A lane in the other one would otherwise
     escape every rule here without failing anything.
+
+    Parameters
+    ----------
+    directory : Path or None
+        Where to read from. Defaults to this repository's workflows.
 
     Returns
     -------
     dict[str, str]
         File name to file text.
+
+    Raises
+    ------
+    WorkflowReadError
+        If a file cannot be read or decoded.
     """
+    directory = WORKFLOWS_DIR if directory is None else directory
     texts: dict[str, str] = {}
-    for path in sorted(WORKFLOWS_DIR.glob("*.y*ml")):
-        texts[path.name] = path.read_text(encoding="utf-8")
+    for path in sorted(directory.glob("*.y*ml")):
+        try:
+            texts[path.name] = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as error:
+            message = f"{path.name} could not be read: {error}"
+            raise WorkflowReadError(message) from error
     return texts
 
 
+def parse_workflow(text: str, workflow: str) -> dict[str, typ.Any]:
+    """Return one workflow's parsed document.
+
+    Parameters
+    ----------
+    text : str
+        The file's text.
+    workflow : str
+        The file's name, for the message.
+
+    Returns
+    -------
+    dict[str, typ.Any]
+        The parsed document.
+
+    Raises
+    ------
+    WorkflowReadError
+        If the text is not valid YAML, or is not a mapping.
+    """
+    try:
+        document = yaml.safe_load(text)
+    except yaml.YAMLError as error:
+        message = f"{workflow} could not be parsed: {error}"
+        raise WorkflowReadError(message) from error
+    return _as_mapping(document, f"{workflow} must parse to a mapping")
+
+
 def jobs_of(text: str, workflow: str) -> dict[str, dict[str, typ.Any]]:
-    """Return one workflow's jobs, parsed."""
-    document = _as_mapping(yaml.safe_load(text), f"{workflow} must parse to a mapping")
+    """Return one workflow's jobs, parsed.
+
+    Returns
+    -------
+    dict[str, dict[str, typ.Any]]
+        Each job mapping, keyed by job name.
+    """
+    document = parse_workflow(text, workflow)
     jobs = _as_mapping(document.get("jobs"), f"{workflow} must declare a jobs mapping")
     return {
         str(name): _as_mapping(job, f"{workflow}:{name} must be a mapping")
@@ -241,18 +296,31 @@ def billable_labels(job: dict[str, typ.Any]) -> set[str]:
     return labels_of(job) - set(GITHUB_HOSTED_LABELS)
 
 
-def read_actionlint_registry() -> set[str]:
+def read_actionlint_registry(config_path: Path | None = None) -> set[str]:
     """Return the runner labels registered for actionlint.
+
+    Parameters
+    ----------
+    config_path : Path or None
+        Which configuration to read. Defaults to this repository's own.
 
     Returns
     -------
     set[str]
         Every label named under ``self-hosted-runner.labels``.
+
+    Raises
+    ------
+    WorkflowReadError
+        If the file cannot be read, is not valid YAML, or is not a mapping.
     """
-    config = _as_mapping(
-        yaml.safe_load(ACTIONLINT_CONFIG.read_text(encoding="utf-8")),
-        "the actionlint config must parse to a mapping",
-    )
+    config_path = ACTIONLINT_CONFIG if config_path is None else config_path
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        message = f"{config_path.name} could not be read: {error}"
+        raise WorkflowReadError(message) from error
+    config = parse_workflow(text, config_path.name)
     runner = _as_mapping(
         config.get("self-hosted-runner"),
         "the config must declare self-hosted-runner",
@@ -274,10 +342,7 @@ def serves_pull_requests(workflow: str) -> bool:
     bool
         True when the workflow declares a ``pull_request`` trigger.
     """
-    document = _as_mapping(
-        yaml.safe_load(workflow_texts()[workflow]),
-        f"{workflow} must parse to a mapping",
-    )
+    document = parse_workflow(workflow_texts()[workflow], workflow)
     # PyYAML resolves an unquoted `on:` key to the boolean True.
     triggers = document.get("on", document.get(True))
     if isinstance(triggers, str):
