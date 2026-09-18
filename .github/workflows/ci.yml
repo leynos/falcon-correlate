@@ -7,7 +7,14 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: >-
+      ${{ github.event.pull_request.head.repo.fork
+      && 'ubuntu-latest' || 'ubicloud-standard-2' }}
+    # 308 s is the slowest observed run, on a merge push with a cold
+    # Merman cache; a warm cache finishes in about 55 s. Four times the
+    # slowest seen, so a hang costs twenty minutes rather than the six
+    # hours a self-hosted runner would otherwise allow.
+    timeout-minutes: 20
     env:
       MERMAN_CLI_VERSION: '0.7.0'
     steps:
@@ -88,7 +95,14 @@ jobs:
         run: make nixie
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: >-
+      ${{ github.event.pull_request.head.repo.fork
+      && 'ubuntu-latest' || 'ubicloud-standard-2' }}
+    # The slowest leg observed is 27 s, the 3.13 leg on a pull request
+    # where it generates coverage instead of running pytest plainly. A
+    # matrix job cannot give one leg a different ceiling, so this bounds
+    # all three at roughly twenty times the slowest seen.
+    timeout-minutes: 10
     permissions:
       contents: read
     strategy:

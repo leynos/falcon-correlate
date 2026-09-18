@@ -18,9 +18,21 @@ from pathlib import Path
 
 import pytest
 
+from tests.workflows.act_platforms import (
+    UNSUPPORTED_PLATFORM_MESSAGE,
+    act_platform_arguments,
+)
+
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 REPO_ROOT = Path(__file__).parent.parent.parent
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+
+#: Runner labels mapped to container images for `act`, as arguments.
+#:
+#: The mapping itself lives in :mod:`tests.workflows.act_platforms`, which
+#: has no import-time side effects, so the contract that guards it can run
+#: in CI where this module cannot.
+ACT_PLATFORMS = act_platform_arguments()
 
 
 def _tool_is_available(tool_name: str, args: list[str]) -> bool:
@@ -70,6 +82,10 @@ def run_act(config: ActConfig) -> tuple[int, Path, str]:
     ------
     FileNotFoundError
         If ``act`` is not available on ``PATH``.
+    AssertionError
+        If ``act`` skipped the job because its runner label is unmapped.
+        ``act`` exits zero in that case, so every assertion the caller makes
+        would be about a job that never ran.
     """
     config.artefact_dir.mkdir(parents=True, exist_ok=True)
 
@@ -85,8 +101,7 @@ def run_act(config: ActConfig) -> tuple[int, Path, str]:
         config.job,
         "-e",
         str(config.event_path),
-        "-P",
-        "ubuntu-latest=catthehacker/ubuntu:act-latest",
+        *ACT_PLATFORMS,
         "--artifact-server-path",
         str(config.artefact_dir),
         "--json",
@@ -109,6 +124,15 @@ def run_act(config: ActConfig) -> tuple[int, Path, str]:
         check=False,
     )
     logs = completed.stdout + "\n" + completed.stderr
+    if UNSUPPORTED_PLATFORM_MESSAGE in logs:
+        message = (
+            f"act skipped {config.job} because its runner label is not "
+            f"mapped, and exited {completed.returncode}. Every assertion "
+            "below would then be about a job that never ran. Add the label "
+            "to ACT_PLATFORM_IMAGES.\n"
+            f"{logs}"
+        )
+        raise AssertionError(message)
     return completed.returncode, config.artefact_dir, logs
 
 
