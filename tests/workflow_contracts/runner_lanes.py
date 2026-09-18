@@ -1,8 +1,10 @@
-"""Readers over the workflow documents the placement contracts assert against.
+"""The lane vocabulary the placement contracts assert about.
 
-The contracts next door say what must be true. This module turns the
-workflow files into something to say it about, and it is kept separate for
-two reasons.
+Reading files and YAML lives in :mod:`tests.workflow_contracts.workflow_documents`;
+this module knows about runners, paid lanes, ceilings and the fork fallback,
+and asks that module for documents. The contracts next door say what must be
+true. This module turns the workflow files into something to say it about,
+and it is kept separate from the contracts for two reasons.
 
 The first is that a reader can be wrong while no workflow is wrong, and a
 reader exercised only over this repository's own files cannot show that:
@@ -23,13 +25,14 @@ from __future__ import annotations
 
 import re
 import typing as typ
-from pathlib import Path
 
-import yaml
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
-ACTIONLINT_CONFIG = REPO_ROOT / ".github" / "actionlint.yaml"
+from tests.workflow_contracts.workflow_documents import (
+    WorkflowReadError,
+    as_mapping,
+    jobs_of,
+    parse_workflow,
+    workflow_texts,
+)
 
 #: The paid label this repository uses.
 UBICLOUD_LABEL = "ubicloud-standard-2"
@@ -83,111 +86,100 @@ FORK_FALLBACK = re.compile(
 )
 
 
-class WorkflowReadError(RuntimeError):
-    """Raised when a workflow document has a shape this reader cannot read.
+def all_lanes(
+    texts: dict[str, str] | None = None,
+) -> list[tuple[str, str, dict[str, typ.Any]]]:
+    """Return every job in every workflow as ``(workflow, job, mapping)``.
 
-    A real exception rather than an ``assert``: the queries below are the
-    thing the contracts depend on, and an ``assert`` disappears under
-    ``python -O``, which would turn a refusal into a silent empty answer.
-    """
-
-
-def _as_mapping(value: object, message: str) -> dict[str, typ.Any]:
-    """Assert ``value`` is a mapping and narrow its static type."""
-    if not isinstance(value, dict):
-        raise WorkflowReadError(message)
-    return typ.cast("dict[str, typ.Any]", value)
-
-
-def workflow_texts(directory: Path | None = None) -> dict[str, str]:
-    """Return every workflow file's raw text, keyed by file name.
-
-    Reading is the one fallible step in this module, so it reports its own
-    failure rather than letting an ``OSError`` surface from what reads like
-    a query. The directory is a parameter so a caller can point the reader
-    at documents built in a test; it defaults to this repository's own
-    workflows only so the contracts next door stay readable.
-
-    Both YAML extensions are read. A lane in the other one would otherwise
-    escape every rule here without failing anything.
+    The source is a parameter so this query can be driven over documents
+    built in a test. Defaulting to the repository's own workflows keeps the
+    contracts next door readable, but a caller that wants a different corpus
+    does not have to reach past this function to get one.
 
     Parameters
     ----------
-    directory : Path or None
-        Where to read from. Defaults to this repository's workflows.
+    texts : dict[str, str] or None
+        File name to file text. Defaults to this repository's workflows.
 
     Returns
     -------
-    dict[str, str]
-        File name to file text.
-
-    Raises
-    ------
-    WorkflowReadError
-        If a file cannot be read or decoded.
+    list[tuple[str, str, dict[str, typ.Any]]]
+        Each job as ``(workflow, job, mapping)``.
     """
-    directory = WORKFLOWS_DIR if directory is None else directory
-    texts: dict[str, str] = {}
-    for path in sorted(directory.glob("*.y*ml")):
-        try:
-            texts[path.name] = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError) as error:
-            message = f"{path.name} could not be read: {error}"
-            raise WorkflowReadError(message) from error
-    return texts
-
-
-def parse_workflow(text: str, workflow: str) -> dict[str, typ.Any]:
-    """Return one workflow's parsed document.
-
-    Parameters
-    ----------
-    text : str
-        The file's text.
-    workflow : str
-        The file's name, for the message.
-
-    Returns
-    -------
-    dict[str, typ.Any]
-        The parsed document.
-
-    Raises
-    ------
-    WorkflowReadError
-        If the text is not valid YAML, or is not a mapping.
-    """
-    try:
-        document = yaml.safe_load(text)
-    except yaml.YAMLError as error:
-        message = f"{workflow} could not be parsed: {error}"
-        raise WorkflowReadError(message) from error
-    return _as_mapping(document, f"{workflow} must parse to a mapping")
-
-
-def jobs_of(text: str, workflow: str) -> dict[str, dict[str, typ.Any]]:
-    """Return one workflow's jobs, parsed.
-
-    Returns
-    -------
-    dict[str, dict[str, typ.Any]]
-        Each job mapping, keyed by job name.
-    """
-    document = parse_workflow(text, workflow)
-    jobs = _as_mapping(document.get("jobs"), f"{workflow} must declare a jobs mapping")
-    return {
-        str(name): _as_mapping(job, f"{workflow}:{name} must be a mapping")
-        for name, job in jobs.items()
-    }
-
-
-def all_lanes() -> list[tuple[str, str, dict[str, typ.Any]]]:
-    """Return every job in every workflow as ``(workflow, job, mapping)``."""
+    texts = workflow_texts() if texts is None else texts
     lanes: list[tuple[str, str, dict[str, typ.Any]]] = []
-    for workflow, text in workflow_texts().items():
+    for workflow, text in texts.items():
         for name, job in jobs_of(text, workflow).items():
             lanes.append((workflow, name, job))
     return lanes
+
+
+def timeout_minutes_of(job: dict[str, typ.Any]) -> int | None:
+    """Return a job's declared ceiling in minutes, or ``None`` if absent.
+
+    ``bool`` is a subclass of ``int``, so ``timeout-minutes: true`` would
+    satisfy an ``isinstance`` check and then satisfy a range check as the
+    value one. GitHub does not accept it, and a contract that does would
+    accept a lane with no ceiling at all. The type is compared exactly, and
+    a Boolean is reported as the shape it is rather than silently returned
+    as a number.
+
+    Parameters
+    ----------
+    job : dict[str, typ.Any]
+        The job mapping.
+
+    Returns
+    -------
+    int or None
+        The declared ceiling, or ``None`` when none is declared.
+
+    Raises
+    ------
+    WorkflowReadError
+        If a ceiling is declared but is not an integer.
+    """
+    declared = job.get("timeout-minutes")
+    if declared is None:
+        return None
+    if type(declared) is not int:
+        message = (
+            f"timeout-minutes must be an integer; got {declared!r}. A Boolean "
+            "satisfies an isinstance check against int and then reads as one "
+            "minute or zero, which is not a ceiling anyone reviewed"
+        )
+        raise WorkflowReadError(message)
+    return declared
+
+
+def continue_on_error_sites(job: dict[str, typ.Any]) -> list[str]:
+    """Return every place a job declares ``continue-on-error``.
+
+    The key is reported wherever it appears, whatever its value. GitHub
+    accepts an expression there, and PyYAML hands an expression back as a
+    string, so ``continue-on-error: ${{ true }}`` is not ``True`` and an
+    identity comparison against ``True`` lets it through. The lane can then
+    fail without failing the workflow while the contract passes, which is
+    the whole failure this rule exists to refuse.
+
+    Parameters
+    ----------
+    job : dict[str, typ.Any]
+        The job mapping.
+
+    Returns
+    -------
+    list[str]
+        A description of each site, empty when the key appears nowhere.
+    """
+    sites: list[str] = []
+    if "continue-on-error" in job:
+        sites.append(f"job scope ({job['continue-on-error']!r})")
+    for step in job.get("steps", []) or []:
+        if isinstance(step, dict) and "continue-on-error" in step:
+            named = step.get("name", step.get("uses", "?"))
+            sites.append(f"step {named!r} ({step['continue-on-error']!r})")
+    return sites
 
 
 def _runner_declarations(job: dict[str, typ.Any]) -> list[object]:
@@ -212,11 +204,11 @@ def _runner_declarations(job: dict[str, typ.Any]) -> list[object]:
         return []
     if not (isinstance(runs_on, str) and runs_on.strip() == MATRIX_DEFERRAL):
         return [runs_on]
-    strategy = _as_mapping(
+    strategy = as_mapping(
         job.get("strategy"),
         "a job deferring runs-on to matrix.os must declare a strategy mapping",
     )
-    matrix = _as_mapping(
+    matrix = as_mapping(
         strategy.get("matrix"),
         "a job deferring runs-on to matrix.os must declare a matrix mapping. "
         "A matrix built at run time, such as "
@@ -231,7 +223,7 @@ def _runner_declarations(job: dict[str, typ.Any]) -> list[object]:
         )
         raise WorkflowReadError(message)
     return [
-        _as_mapping(
+        as_mapping(
             entry, f"a matrix include entry must be a mapping; got {entry!r}"
         ).get("os")
         for entry in include
@@ -296,39 +288,7 @@ def billable_labels(job: dict[str, typ.Any]) -> set[str]:
     return labels_of(job) - set(GITHUB_HOSTED_LABELS)
 
 
-def read_actionlint_registry(config_path: Path | None = None) -> set[str]:
-    """Return the runner labels registered for actionlint.
-
-    Parameters
-    ----------
-    config_path : Path or None
-        Which configuration to read. Defaults to this repository's own.
-
-    Returns
-    -------
-    set[str]
-        Every label named under ``self-hosted-runner.labels``.
-
-    Raises
-    ------
-    WorkflowReadError
-        If the file cannot be read, is not valid YAML, or is not a mapping.
-    """
-    config_path = ACTIONLINT_CONFIG if config_path is None else config_path
-    try:
-        text = config_path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as error:
-        message = f"{config_path.name} could not be read: {error}"
-        raise WorkflowReadError(message) from error
-    config = parse_workflow(text, config_path.name)
-    runner = _as_mapping(
-        config.get("self-hosted-runner"),
-        "the config must declare self-hosted-runner",
-    )
-    return set(runner.get("labels") or [])
-
-
-def serves_pull_requests(workflow: str) -> bool:
+def serves_pull_requests(workflow: str, texts: dict[str, str] | None = None) -> bool:
     """Report whether a workflow runs on pull requests.
 
     Derived from the document rather than declared, so a lane added to a
@@ -337,24 +297,34 @@ def serves_pull_requests(workflow: str) -> bool:
     lane would satisfy every other paid-lane rule while carrying a literal
     label that a fork can never obtain.
 
+    Parameters
+    ----------
+    workflow : str
+        The workflow file name.
+    texts : dict[str, str] or None
+        File name to file text. Defaults to this repository's workflows.
+
     Returns
     -------
     bool
         True when the workflow declares a ``pull_request`` trigger.
     """
-    document = parse_workflow(workflow_texts()[workflow], workflow)
+    texts = workflow_texts() if texts is None else texts
+    document = parse_workflow(texts[workflow], workflow)
     # PyYAML resolves an unquoted `on:` key to the boolean True.
     triggers = document.get("on", document.get(True))
     if isinstance(triggers, str):
         return triggers == "pull_request"
     if isinstance(triggers, list):
         return "pull_request" in triggers
-    return "pull_request" in _as_mapping(
+    return "pull_request" in as_mapping(
         triggers, f"{workflow} must declare an on: mapping"
     )
 
 
-def paid_lanes_by_trigger(*, serving_pull_requests: bool) -> list[str]:
+def paid_lanes_by_trigger(
+    *, serving_pull_requests: bool, texts: dict[str, str] | None = None
+) -> list[str]:
     """Return the paid lanes whose workflow does or does not serve pull requests.
 
     One function rather than a near-identical pair. The two questions are
@@ -366,14 +336,17 @@ def paid_lanes_by_trigger(*, serving_pull_requests: bool) -> list[str]:
     serving_pull_requests : bool
         Select the lanes whose workflow declares a ``pull_request`` trigger
         when true, and those whose workflow does not when false.
+    texts : dict[str, str] or None
+        File name to file text. Defaults to this repository's workflows.
 
     Returns
     -------
     list[str]
         Each lane as ``workflow:job``, sorted.
     """
+    texts = workflow_texts() if texts is None else texts
     return sorted(
         lane
         for lane in PAID_LANES
-        if serves_pull_requests(lane.partition(":")[0]) is serving_pull_requests
+        if serves_pull_requests(lane.partition(":")[0], texts) is serving_pull_requests
     )
