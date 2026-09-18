@@ -59,164 +59,172 @@ def fixture_documents() -> dict[str, dict]:
     return {name: parse(name, text) for name, text in workflow_texts().items()}
 
 
-def test_some_workflow_serves_pull_requests(documents: dict[str, dict]) -> None:
-    """The boundary rules below are about pull-request workflows.
+class TestCodeSceneCoverageBoundary:
+    """CV-005's four rules, over this repository's own workflows."""
 
-    If none were found the rules would pass over an empty set and say
-    nothing, which is indistinguishable from compliance. Asserted separately
-    so that failure names the reader rather than the workflows.
-    """
-    serving = [
-        name for name, document in documents.items() if serves_pull_requests(document)
-    ]
+    def test_some_workflow_serves_pull_requests(
+        self, documents: dict[str, dict]
+    ) -> None:
+        """The boundary rules below are about pull-request workflows.
 
-    assert serving, (
-        "no workflow declares a pull_request trigger; the reader derives the "
-        "boundary's subject from the triggers, so an empty set means the "
-        "reader is broken rather than that the repository is compliant"
-    )
-
-
-def test_no_pull_request_workflow_reaches_codescene(documents: dict[str, dict]) -> None:
-    """CV-005's boundary, asserted over the raw text.
-
-    Read from the text rather than the parsed document because a mention can
-    sit in a `run:` script, an `env:` value or an action input, and a walk
-    reading only the shapes it expects misses whichever one is used next.
-    """
-    texts = workflow_texts()
-    for name, document in documents.items():
-        if not serves_pull_requests(document):
-            continue
-        mentions = codescene_mentions(texts[name])
-        assert not mentions, (
-            f"{name} serves pull requests and names {mentions}. A pull "
-            f"request must not reach CodeScene: the CLI is a third party in "
-            f"the path of every review, and a fork cannot obtain the token, "
-            f"so the step is a gate that some pull requests skip. Coverage is "
-            f"generated here and compared against the local ratchet; "
-            f"publication belongs to the push-to-main lane"
-        )
-
-
-def test_exactly_one_push_lane_uploads(documents: dict[str, dict]) -> None:
-    """One publisher, and it states its mode.
-
-    Two would upload the same commit twice and race on the ratchet baseline.
-    None would leave CodeScene reading nothing while every other rule here
-    passed, which is why the count is asserted in both directions.
-    """
-    uploads = [
-        (name, job, ref, inputs)
-        for name, document in documents.items()
-        if is_publisher(document)
-        for job, ref, inputs in steps_using(document, UPLOAD_ACTION)
-    ]
-
-    assert len(uploads) == 1, (
-        f"exactly one push-to-main workflow must upload coverage; "
-        f"{len(uploads)} do: {[(name, job) for name, job, _, _ in uploads]}"
-    )
-    name, job, ref, inputs = uploads[0]
-    assert inputs.get("mode") == "upload", (
-        f"{name}:{job} leaves mode at {inputs.get('mode')!r}. State it: "
-        f"`upload` is the action's default, and the default is what separates "
-        f"this lane from the `check` this repository no longer runs anywhere"
-    )
-    assert ref in MANIFEST_PINNED, (
-        f"{name}:{job} pins {UPLOAD_ACTION} at {ref[:8]}, which is not on the "
-        f"list of revisions verified to carry the CLI manifest. An older pin "
-        f"installs a floating cs-coverage, which is what broke this estate's "
-        f"lanes on 2026-09-16. Confirm the pin carries the manifest, then add "
-        f"it to MANIFEST_PINNED rather than widening the rule"
-    )
-
-
-def test_no_upload_runs_outside_the_push_lane(documents: dict[str, dict]) -> None:
-    """The publisher is the only place the upload action appears.
-
-    The boundary rule above reads pull-request workflows. A scheduled or
-    dispatch-only workflow is neither, and would carry the token past both
-    rules without this one.
-
-    `ci.yml` declares both `push` to main and `pull_request`, which is why
-    the publisher is "pushes to main and serves no pull request" rather than
-    "pushes to main": the looser reading would require `ci.yml` to upload
-    and forbid it from uploading at the same time.
-    """
-    for name, document in documents.items():
-        if is_publisher(document):
-            continue
-        assert not steps_using(document, UPLOAD_ACTION), (
-            f"{name} invokes {UPLOAD_ACTION} and is not the push-to-main "
-            f"publisher; this repository talks to CodeScene from one lane"
-        )
-
-
-def test_the_pull_request_lane_measures_without_publishing(
-    documents: dict[str, dict],
-) -> None:
-    """Ratchet on, artefact off, and the language stated.
-
-    `publish-artefact: 'false'` is the only part of this boundary observable
-    in the workflow file at all: the action archives the report under a step
-    of its own, which no scanner over these steps can see.
-    """
-    found = [
-        (name, job, ref, inputs)
-        for name, document in documents.items()
-        if serves_pull_requests(document)
-        for job, ref, inputs in steps_using(document, COVERAGE_ACTION)
-    ]
-
-    assert len(found) == 1, (
-        f"exactly one pull-request lane must generate coverage; {len(found)} do"
-    )
-    name, job, ref, inputs = found[0]
-    assert inputs.get("with-ratchet") == "true", (
-        f"{name}:{job} sets with-ratchet to {inputs.get('with-ratchet')!r}. "
-        f"The ratchet is the whole gate on this lane now that the CodeScene "
-        f"check is gone; without it the lane measures and asserts nothing"
-    )
-    assert inputs.get("publish-artefact") == "false", (
-        f"{name}:{job} sets publish-artefact to "
-        f"{inputs.get('publish-artefact')!r}. This lane does not publish, and "
-        f"the archive step is inside the action where nothing here can see it"
-    )
-    assert inputs.get("language") == "python", (
-        f"{name}:{job} leaves language at {inputs.get('language')!r}. State "
-        f"it: `auto` reads the manifests, so a repository that acquires a "
-        f"Cargo.toml would silently change what this lane measures"
-    )
-    assert ref in MANIFEST_PINNED, (
-        f"{name}:{job} pins {COVERAGE_ACTION} at {ref[:8]}, which is not on "
-        f"the list of revisions verified to carry the CLI manifest"
-    )
-
-
-def test_the_publisher_measures_what_the_ratchet_compares_against(
-    documents: dict[str, dict],
-) -> None:
-    """The baseline and the comparison must be the same measurement.
-
-    A language or format differing between the two lanes makes the ratchet
-    compare a number against one that was never comparable, and nothing
-    fails: the ratchet reports a change in coverage that is really a change
-    in what was measured.
-    """
-
-    def selection(chosen: cabc.Callable[[dict], bool]) -> dict[str, object]:
-        rows = [
-            inputs
-            for document in documents.values()
-            if chosen(document)
-            for _job, _ref, inputs in steps_using(document, COVERAGE_ACTION)
+        If none were found the rules would pass over an empty set and say
+        nothing, which is indistinguishable from compliance. Asserted separately
+        so that failure names the reader rather than the workflows.
+        """
+        serving = [
+            name
+            for name, document in documents.items()
+            if serves_pull_requests(document)
         ]
-        assert len(rows) == 1
-        return {key: rows[0].get(key) for key in ("language", "format", "with-ratchet")}
 
-    assert selection(serves_pull_requests) == selection(is_publisher), (
-        "the pull-request lane and the publisher must measure the same thing, "
-        "because the ratchet on the first compares against the baseline "
-        "written by the second"
-    )
+        assert serving, (
+            "no workflow declares a pull_request trigger; the reader derives the "
+            "boundary's subject from the triggers, so an empty set means the "
+            "reader is broken rather than that the repository is compliant"
+        )
+
+    def test_no_pull_request_workflow_reaches_codescene(
+        self, documents: dict[str, dict]
+    ) -> None:
+        """CV-005's boundary, asserted over the raw text.
+
+        Read from the text rather than the parsed document because a mention can
+        sit in a `run:` script, an `env:` value or an action input, and a walk
+        reading only the shapes it expects misses whichever one is used next.
+        """
+        texts = workflow_texts()
+        for name, document in documents.items():
+            if not serves_pull_requests(document):
+                continue
+            mentions = codescene_mentions(texts[name])
+            assert not mentions, (
+                f"{name} serves pull requests and names {mentions}. A pull "
+                f"request must not reach CodeScene: the CLI is a third party in "
+                f"the path of every review, and a fork cannot obtain the token, "
+                f"so the step is a gate that some pull requests skip. Coverage is "
+                f"generated here and compared against the local ratchet; "
+                f"publication belongs to the push-to-main lane"
+            )
+
+    def test_exactly_one_push_lane_uploads(self, documents: dict[str, dict]) -> None:
+        """One publisher, and it states its mode.
+
+        Two would upload the same commit twice and race on the ratchet baseline.
+        None would leave CodeScene reading nothing while every other rule here
+        passed, which is why the count is asserted in both directions.
+        """
+        uploads = [
+            (name, job, ref, inputs)
+            for name, document in documents.items()
+            if is_publisher(document)
+            for job, ref, inputs in steps_using(document, UPLOAD_ACTION)
+        ]
+
+        assert len(uploads) == 1, (
+            f"exactly one push-to-main workflow must upload coverage; "
+            f"{len(uploads)} do: {[(name, job) for name, job, _, _ in uploads]}"
+        )
+        name, job, ref, inputs = uploads[0]
+        assert inputs.get("mode") == "upload", (
+            f"{name}:{job} leaves mode at {inputs.get('mode')!r}. State it: "
+            f"`upload` is the action's default, and the default is what separates "
+            f"this lane from the `check` this repository no longer runs anywhere"
+        )
+        assert ref in MANIFEST_PINNED, (
+            f"{name}:{job} pins {UPLOAD_ACTION} at {ref[:8]}, which is not on the "
+            f"list of revisions verified to carry the CLI manifest. An older pin "
+            f"installs a floating cs-coverage, which is what broke this estate's "
+            f"lanes on 2026-09-16. Confirm the pin carries the manifest, then add "
+            f"it to MANIFEST_PINNED rather than widening the rule"
+        )
+
+    def test_no_upload_runs_outside_the_push_lane(
+        self, documents: dict[str, dict]
+    ) -> None:
+        """The publisher is the only place the upload action appears.
+
+        The boundary rule above reads pull-request workflows. A scheduled or
+        dispatch-only workflow is neither, and would carry the token past both
+        rules without this one.
+
+        `ci.yml` declares both `push` to main and `pull_request`, which is why
+        the publisher is "pushes to main and serves no pull request" rather than
+        "pushes to main": the looser reading would require `ci.yml` to upload
+        and forbid it from uploading at the same time.
+        """
+        for name, document in documents.items():
+            if is_publisher(document):
+                continue
+            assert not steps_using(document, UPLOAD_ACTION), (
+                f"{name} invokes {UPLOAD_ACTION} and is not the push-to-main "
+                f"publisher; this repository talks to CodeScene from one lane"
+            )
+
+    def test_the_pull_request_lane_measures_without_publishing(
+        self, documents: dict[str, dict]
+    ) -> None:
+        """Ratchet on, artefact off, and the language stated.
+
+        `publish-artefact: 'false'` is the only part of this boundary observable
+        in the workflow file at all: the action archives the report under a step
+        of its own, which no scanner over these steps can see.
+        """
+        found = [
+            (name, job, ref, inputs)
+            for name, document in documents.items()
+            if serves_pull_requests(document)
+            for job, ref, inputs in steps_using(document, COVERAGE_ACTION)
+        ]
+
+        assert len(found) == 1, (
+            f"exactly one pull-request lane must generate coverage; {len(found)} do"
+        )
+        name, job, ref, inputs = found[0]
+        assert inputs.get("with-ratchet") == "true", (
+            f"{name}:{job} sets with-ratchet to {inputs.get('with-ratchet')!r}. "
+            f"The ratchet is the whole gate on this lane now that the CodeScene "
+            f"check is gone; without it the lane measures and asserts nothing"
+        )
+        assert inputs.get("publish-artefact") == "false", (
+            f"{name}:{job} sets publish-artefact to "
+            f"{inputs.get('publish-artefact')!r}. This lane does not publish, and "
+            f"the archive step is inside the action where nothing here can see it"
+        )
+        assert inputs.get("language") == "python", (
+            f"{name}:{job} leaves language at {inputs.get('language')!r}. State "
+            f"it: `auto` reads the manifests, so a repository that acquires a "
+            f"Cargo.toml would silently change what this lane measures"
+        )
+        assert ref in MANIFEST_PINNED, (
+            f"{name}:{job} pins {COVERAGE_ACTION} at {ref[:8]}, which is not on "
+            f"the list of revisions verified to carry the CLI manifest"
+        )
+
+    def test_the_publisher_measures_what_the_ratchet_compares_against(
+        self, documents: dict[str, dict]
+    ) -> None:
+        """The baseline and the comparison must be the same measurement.
+
+        A language or format differing between the two lanes makes the ratchet
+        compare a number against one that was never comparable, and nothing
+        fails: the ratchet reports a change in coverage that is really a change
+        in what was measured.
+        """
+
+        def selection(chosen: cabc.Callable[[dict], bool]) -> dict[str, object]:
+            rows = [
+                inputs
+                for document in documents.values()
+                if chosen(document)
+                for _job, _ref, inputs in steps_using(document, COVERAGE_ACTION)
+            ]
+            assert len(rows) == 1
+            return {
+                key: rows[0].get(key) for key in ("language", "format", "with-ratchet")
+            }
+
+        assert selection(serves_pull_requests) == selection(is_publisher), (
+            "the pull-request lane and the publisher must measure the same thing, "
+            "because the ratchet on the first compares against the baseline "
+            "written by the second"
+        )

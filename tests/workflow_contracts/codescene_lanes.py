@@ -56,12 +56,46 @@ CODESCENE_MARKERS: typ.Final[tuple[str, ...]] = (
 )
 
 
-class WorkflowReadError(RuntimeError):
+class WorkflowContractError(RuntimeError):
+    """Base for every failure raised by this package's workflow readers.
+
+    A stable catch point. Callers that want to handle any reader failure
+    should name this rather than enumerating subclasses, so a reader added
+    later does not escape a handler written today.
+    """
+
+
+class WorkflowReadError(WorkflowContractError):
     """Raised when a workflow document has a shape this reader cannot read.
 
     A real exception rather than an `assert`, which disappears under
     `python -O` and would turn a refusal into a silent empty answer.
+
+    The workflow and the reason are kept as attributes as well as rendered
+    into the message, so a caller can act on which file failed and why
+    without parsing prose that exists to be read by a person.
+
+    Attributes
+    ----------
+    workflow : str or None
+        The file or directory the failure is about, when one is known.
+    reason : str
+        Why it could not be read.
     """
+
+    def __init__(self, reason: str, workflow: str | None = None) -> None:
+        """Record the reason and, when known, the workflow it concerns.
+
+        Parameters
+        ----------
+        reason : str
+            Why the document could not be read.
+        workflow : str or None
+            The file or directory concerned.
+        """
+        self.workflow = workflow
+        self.reason = reason
+        super().__init__(f"{workflow}: {reason}" if workflow else reason)
 
 
 def as_mapping(value: object, message: str) -> dict[str, typ.Any]:
@@ -113,18 +147,18 @@ def workflow_texts(directory: Path | None = None) -> dict[str, str]:
     directory = WORKFLOWS_DIR if directory is None else directory
     if not directory.is_dir():
         message = (
-            f"{directory} is not a readable workflow directory. A missing "
-            "directory would otherwise make every rule here pass over an "
-            "empty set of workflows"
+            "not a readable workflow directory. A missing directory would "
+            "otherwise make every rule here pass over an empty set of "
+            "workflows"
         )
-        raise WorkflowReadError(message)
+        raise WorkflowReadError(message, str(directory))
     texts: dict[str, str] = {}
     for path in sorted(directory.glob("*.y*ml")):
         try:
             texts[path.name] = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError) as error:
-            message = f"{path.name} could not be read: {error}"
-            raise WorkflowReadError(message) from error
+            message = f"could not be read: {error}"
+            raise WorkflowReadError(message, path.name) from error
     return texts
 
 
@@ -151,8 +185,8 @@ def parse(workflow: str, text: str) -> dict[str, typ.Any]:
     try:
         document = yaml.safe_load(text)
     except yaml.YAMLError as error:
-        message = f"{workflow} could not be parsed: {error}"
-        raise WorkflowReadError(message) from error
+        message = f"could not be parsed: {error}"
+        raise WorkflowReadError(message, workflow) from error
     return as_mapping(document, f"{workflow} must parse to a mapping")
 
 
