@@ -1,12 +1,21 @@
 name: Coverage (main)
 
-# CodeScene accepts `cs-coverage upload` only for analysed branches, so
-# main-branch coverage is uploaded here on push; pull requests generate
-# coverage (and, in a future fast-follow, run the changed-line
-# `cs-coverage check` gate) in ci.yml instead. This workflow also
-# advances the coverage ratchet baseline: caches saved on main are
-# readable by every pull-request run, so the baseline written here is
-# the one PR ratchet checks compare against.
+# The single place this repository talks to CodeScene. The service
+# accepts an upload only for an analysed branch, so main-branch coverage
+# is uploaded here on push, and no pull-request workflow carries a
+# CodeScene action, a `cs-coverage` command or the access token. Pull
+# requests generate coverage in ci.yml and compare it locally against the
+# ratchet.
+#
+# That division is the point rather than a convenience. The CodeScene CLI
+# is a third party, and on 2026-09-16 a floating version broke its
+# cobertura parser and reddened every branch in this estate whose pull
+# requests ran the check step. Confining it to one push lane means such a
+# break stops a publication and not a review.
+#
+# This workflow also advances the coverage ratchet baseline: caches saved
+# on main are readable by every pull-request run, so the baseline written
+# here is the one those ratchet checks compare against.
 #
 # workflow_dispatch lets the upload be re-run on demand: merges
 # performed by the automerge workflow's GITHUB_TOKEN do not fire
@@ -25,7 +34,6 @@ jobs:
       contents: read
     env:
       CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
-      CODESCENE_CLI_SHA256: ${{ vars.CODESCENE_CLI_SHA256 }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -40,17 +48,35 @@ jobs:
         run: uv sync --group dev --python 3.13
 
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@1014f0ce1621506ca5fa66b596ed88ec30774cce
+        uses: leynos/shared-actions/.github/actions/generate-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
+          # The same selection the pull-request lane measures, so the
+          # baseline this job writes is comparable with what the ratchet
+          # checks against.
+          language: python
           output-path: coverage.xml
           format: cobertura
           with-ratchet: 'true'
+          # `publish-artefact` is deliberately left unset, so the action
+          # keeps its default and archives the report this lane uploads.
+          # Setting it here, as the pull-request lane does, would leave
+          # CodeScene with no report to read.
 
       - name: Upload coverage data to CodeScene
         if: env.CS_ACCESS_TOKEN != ''
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@1014f0ce1621506ca5fa66b596ed88ec30774cce
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
           format: cobertura
           path: coverage.xml
+          # Stated rather than inherited. `upload` is the action's default,
+          # and the default is what separates this lane from the `check`
+          # this repository no longer runs anywhere.
+          mode: upload
           access-token: ${{ env.CS_ACCESS_TOKEN }}
-          installer-checksum: ${{ env.CODESCENE_CLI_SHA256 }}
+          # No checksum input. The pin above carries a CLI manifest that
+          # names version 1.0.101, so the installation is deterministic
+          # without one. `installer-checksum` is deprecated and rejected
+          # when non-empty at this pin, and `archive-checksum` is a digest
+          # of the manifest archive rather than of the installer script
+          # that CODESCENE_CLI_SHA256 holds, so passing that variable to it
+          # would fail every run.
