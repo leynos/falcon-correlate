@@ -89,9 +89,9 @@ easy to read and test.
 - Keep the implementation scoped to roadmap item 4.2.2. Do not implement the
   public `configure_celery_correlation(app)` helper from 4.2.3 in the same
   change unless a blocker makes it strictly necessary.
-- Preserve import-time signal registration behaviour. Importing the package in
-  a Celery worker process should remain sufficient to register the integration
-  when Celery is installed.
+- Superseded on 2026-08-27 by ADR-004: import-time signal registration is not
+  preserved. Each Celery worker must call `configure_celery_correlation(app)`
+  to register the integration.
 - Use British English in documentation.
 - Wrap Markdown paragraphs and list items at 80 columns, and keep code blocks
   within 120 columns.
