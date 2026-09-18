@@ -25,18 +25,13 @@ from pathlib import Path
 
 import yaml
 
+from tests.workflow_contracts.errors import WorkflowReadError
+
+__all__ = ["WorkflowReadError"]
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
 ACTIONLINT_CONFIG = REPO_ROOT / ".github" / "actionlint.yaml"
-
-
-class WorkflowReadError(RuntimeError):
-    """Raised when a workflow document has a shape this reader cannot read.
-
-    A real exception rather than an ``assert``: the queries below are the
-    thing the contracts depend on, and an ``assert`` disappears under
-    ``python -O``, which would turn a refusal into a silent empty answer.
-    """
 
 
 def as_mapping(value: object, message: str) -> dict[str, typ.Any]:
@@ -98,23 +93,22 @@ def workflow_texts(directory: Path | None = None) -> dict[str, str]:
     directory = WORKFLOWS_DIR if directory is None else directory
     if not directory.is_dir():
         message = (
-            f"{directory} is not a readable workflow directory. A missing "
-            "directory would otherwise make every contract here pass over an "
-            "empty set of lanes"
+            "is not a readable workflow directory. A missing directory would "
+            "otherwise make every contract here pass over an empty set of lanes"
         )
-        raise WorkflowReadError(message)
+        raise WorkflowReadError(message, str(directory))
     try:
         paths = sorted(directory.glob("*.y*ml"))
     except OSError as error:
-        message = f"{directory} could not be enumerated: {error}"
-        raise WorkflowReadError(message) from error
+        message = f"could not be enumerated: {error}"
+        raise WorkflowReadError(message, str(directory)) from error
     texts: dict[str, str] = {}
     for path in paths:
         try:
             texts[path.name] = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError) as error:
-            message = f"{path.name} could not be read: {error}"
-            raise WorkflowReadError(message) from error
+            message = f"could not be read: {error}"
+            raise WorkflowReadError(message, path.name) from error
     return texts
 
 
@@ -141,8 +135,8 @@ def parse_workflow(text: str, workflow: str) -> dict[str, typ.Any]:
     try:
         document = yaml.safe_load(text)
     except yaml.YAMLError as error:
-        message = f"{workflow} could not be parsed: {error}"
-        raise WorkflowReadError(message) from error
+        message = f"could not be parsed: {error}"
+        raise WorkflowReadError(message, workflow) from error
     return as_mapping(document, f"{workflow} must parse to a mapping")
 
 
@@ -184,8 +178,8 @@ def read_actionlint_registry(config_path: Path | None = None) -> set[str]:
     try:
         text = config_path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as error:
-        message = f"{config_path.name} could not be read: {error}"
-        raise WorkflowReadError(message) from error
+        message = f"could not be read: {error}"
+        raise WorkflowReadError(message, config_path.name) from error
     config = parse_workflow(text, config_path.name)
     runner = as_mapping(
         config.get("self-hosted-runner"),

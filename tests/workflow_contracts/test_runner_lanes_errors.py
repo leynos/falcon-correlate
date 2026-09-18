@@ -64,19 +64,27 @@ def test_a_file_that_is_not_a_directory_is_refused(tmp_path: Path) -> None:
 
 
 def test_a_file_that_is_not_utf8_is_refused_by_name(tmp_path: Path) -> None:
-    """The message names the file, because the directory holds several."""
+    """The failure names the file, because the directory holds several.
+
+    Asserted against the exception's attributes rather than its rendered
+    text: which file failed is what a caller acts on, and a message reworded
+    for a reader should not break a test that is really about the file.
+    """
     (tmp_path / "ci.yml").write_bytes(b"jobs:\n  lint:\n    runs-on: \xff\n")
-    with pytest.raises(WorkflowReadError, match=re.escape("ci.yml could not be read")):
+    with pytest.raises(WorkflowReadError) as raised:
         workflow_texts(tmp_path)
+    assert raised.value.workflow == "ci.yml"
+    assert "could not be read" in raised.value.reason
 
 
 def test_yaml_that_does_not_parse_is_refused(tmp_path: Path) -> None:
     """A parse failure is the reader's own error, not PyYAML's."""
     (tmp_path / "ci.yml").write_text("jobs: [unclosed\n", encoding="utf-8")
     texts = workflow_texts(tmp_path)
-    parse_failed = re.escape("ci.yml could not be parsed")
-    with pytest.raises(WorkflowReadError, match=parse_failed):
+    with pytest.raises(WorkflowReadError) as raised:
         all_lanes(texts)
+    assert raised.value.workflow == "ci.yml"
+    assert "could not be parsed" in raised.value.reason
 
 
 def test_a_document_that_is_not_a_mapping_is_refused(tmp_path: Path) -> None:
@@ -260,3 +268,43 @@ def test_paid_lanes_by_trigger_partitions_the_agreed_lanes() -> None:
     not_serving = set(paid_lanes_by_trigger(serving_pull_requests=False))
     assert not serving & not_serving
     assert serving | not_serving == set(PAID_LANES)
+
+
+def test_both_readers_raise_the_same_exception_class() -> None:
+    """One catch point across the package, not one per reader.
+
+    The two readers here grew on separate branches and each defined a
+    `WorkflowReadError`. Two classes of that name in one package defeat the
+    base class entirely: `except WorkflowReadError` catches whichever one the
+    caller happened to import and silently misses the other. Asserted rather
+    than assumed, because the failure is invisible until the day it matters.
+    """
+    from tests.workflow_contracts import codescene_lanes, errors, workflow_documents
+
+    assert workflow_documents.WorkflowReadError is errors.WorkflowReadError
+    assert codescene_lanes.WorkflowReadError is errors.WorkflowReadError
+    assert issubclass(errors.WorkflowReadError, errors.WorkflowContractError)
+
+
+def test_a_document_reader_failure_is_catchable_as_the_package_error() -> None:
+    """The base class is a claim this file proves rather than states."""
+    from tests.workflow_contracts.errors import WorkflowContractError
+
+    with pytest.raises(WorkflowContractError):
+        jobs_of("- not a mapping\n", "ci.yml")
+
+
+def test_a_failure_renders_the_workflow_into_its_message() -> None:
+    """The attributes are for a caller; the message is for a person.
+
+    Both are behaviour. A failure reaching a log or a test report as "could
+    not be parsed", with no file named, sends the reader to the wrong place
+    in a directory holding seven workflows. Asserted separately from the
+    attributes so that dropping either is visible.
+    """
+    from tests.workflow_contracts.errors import WorkflowReadError as Raised
+
+    assert str(Raised("could not be parsed", "ci.yml")) == (
+        "ci.yml: could not be parsed"
+    )
+    assert str(Raised("the directory is absent")) == "the directory is absent"

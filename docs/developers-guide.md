@@ -256,6 +256,60 @@ inverts the question the registry exists to ask. The frozen set also keeps the
 fork fallback's hosted arm out of the registry question, since that arm is not
 registrable.
 
+### Where coverage goes, and where CodeScene does not
+
+A pull request does not reach CodeScene. `ci.yml` generates coverage on the
+3.13 leg and compares it against the ratchet baseline; `coverage-main.yml` is
+the only lane that uploads, on a push to main.
+
+That division is the point rather than a convenience. The CodeScene CLI is a
+third party, and a floating version of it broke its cobertura parser on
+2026-09-16 and reddened every branch in this estate whose pull requests ran the
+check step, on code that had not changed. The token is also unavailable to a
+fork, so the check was a gate that some pull requests silently skipped.
+Confining the CLI to one push lane means such a break stops a publication
+rather than a review.
+
+Both lanes call `generate-coverage` at the same pin with `language: python`,
+the same format and `with-ratchet: 'true'`, so the baseline the publisher
+writes and the number the ratchet compares are the same measurement. The
+pull-request lane adds `publish-artefact: 'false'`, which is the only part of
+this boundary visible in the workflow file at all: the action archives its
+report under a step of its own that no scanner over these steps can see. The
+publisher states `mode: upload` rather than inheriting it, because the default
+is what separates that lane from the `check` this repository no longer runs.
+
+No checksum input is passed. The pinned action carries a CLI manifest naming
+`cs-coverage` 1.0.101, so the installation is deterministic without one;
+`installer-checksum` is deprecated and rejected when non-empty at that pin, and
+`archive-checksum` digests the manifest archive rather than the installer
+script, so the old `CODESCENE_CLI_SHA256` value would fail every run.
+
+`tests/workflow_contracts/test_codescene_coverage_boundary.py` asserts all of
+this, deriving the boundary's subject from each workflow's own triggers rather
+than from a list of file names. Two readings there are worth knowing before
+changing it. The publisher is "pushes to main and serves no pull request",
+because `ci.yml` declares both and the looser reading would require it to
+upload and forbid it from uploading at once. And CodeScene markers are matched
+against the raw text, because a mention can sit in a `run:` script, an `env:`
+value or an action input; comment lines are excluded so the reason can be
+written beside the rule.
+
+### Errors the readers raise
+
+`tests/workflow_contracts/errors.py` holds the hierarchy, and it holds it in
+one place deliberately. Both readers grew a `WorkflowReadError` of their own
+while they were on separate branches, and two classes of that name in one
+package defeat the base entirely: `except WorkflowReadError` catches whichever
+one the caller imported and silently misses the other.
+
+`WorkflowContractError` is the stable catch point; `WorkflowReadError` derives
+from it and carries the workflow and the reason as attributes as well as in its
+message, so a caller can act on which file failed without parsing prose written
+for a person. They are exceptions rather than `assert` statements because an
+`assert` disappears under `python -O`, and a refusal that becomes a silent
+empty answer is precisely what these contracts cannot survive.
+
 ### The reader, and why it is a separate module
 
 `tests/workflow_contracts/runner_lanes.py` turns the workflow files into
