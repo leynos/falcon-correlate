@@ -190,6 +190,9 @@ as a test assertion on the SHA string.
 Five jobs run on `ubicloud-standard-2`, a per-minute runner. The rest stay on
 GitHub-hosted runners, where minutes are free for a public repository.
 
+Table: every lane that bills for a paid runner, the runner it resolves to, and
+the ceiling it declares.
+
 | Lane                                  | Runner                | Ceiling |
 | ------------------------------------- | --------------------- | ------- |
 | `ci.yml` `lint`                       | fork fallback         | 20 min  |
@@ -253,11 +256,91 @@ inverts the question the registry exists to ask. The frozen set also keeps the
 fork fallback's hosted arm out of the registry question, since that arm is not
 registrable.
 
+### The reader, and why it is a separate module
+
+`tests/workflow_contracts/runner_lanes.py` turns the workflow files into
+something the contracts can assert about. It is separate from the contracts for
+two reasons. A reader can be wrong while no workflow is wrong, and a reader
+exercised only over this repository's seven correct documents passes whether or
+not it discriminates anything; separating it lets tests drive it over documents
+built in the test, including shapes this repository should never contain. And
+the raw text matters as much as the parsed value, because a folded scalar's
+line break survives the parse.
+
+Table: the reader's queries and what each one answers.
+
+| Query                           | Answers                                         |
+| ------------------------------- | ----------------------------------------------- |
+| `workflow_texts(directory)`     | file name to raw text, for a directory          |
+| `parse_workflow` / `jobs_of`    | one document, and its jobs                      |
+| `all_lanes(texts)`              | every job as `(workflow, job, mapping)`         |
+| `labels_of` / `billable_labels` | the labels a job resolves to, and which bill    |
+| `timeout_minutes_of(job)`       | the declared ceiling, or `None`                 |
+| `continue_on_error_sites(job)`  | every place the key appears, whatever its value |
+| `serves_pull_requests(w, t)`    | whether a workflow declares `pull_request`      |
+| `paid_lanes_by_trigger(...)`    | the agreed lanes either side of that question   |
+| `read_actionlint_registry(p)`   | the labels registered for actionlint            |
+
+Every query that reads the filesystem takes its source as a parameter and
+defaults to this repository. Injection is at the boundary rather than one level
+down, so a test can ask any of these questions about a corpus it built, and the
+answers on a different corpus are observable rather than assumed.
+
+Reading is the fallible step, so it reports its own failure as
+`WorkflowReadError` rather than letting an `OSError` or a `yaml.YAMLError`
+surface from something that reads like a query. It is a real exception and not
+an `assert`, because an `assert` disappears under `python -O` and would turn a
+refusal into a silent empty answer. The refusals are: a workflow directory that
+is absent or is not a directory; a file that cannot be read or decoded; text
+that is not valid YAML; a document or a job that is not a mapping; a runner
+declaration in a shape the reader does not support; and a registry whose
+`self-hosted-runner.labels` is not a list of strings.
+
+Two of those deserve naming, because each was a silent wrong answer before it
+was a refusal. A missing directory made `Path.glob` yield nothing, so the
+reader returned an empty mapping and every contract over "every lane" passed
+over no lanes. And a `labels:` written as a bare scalar became a set of its
+characters, so the registry contract compared nineteen letters against runner
+labels.
+
+Supported `runs-on` shapes: a literal label, a list of labels, a mapping with a
+`group` or `labels` key, and an expression. A matrix job defers to its legs, so
+each leg's image is a declaration and the job's own `runs-on` is only the
+deferral; a reusable-workflow caller declares nothing, because the called
+workflow places its own jobs.
+
+### Running the lanes locally with act
+
+`act` knows GitHub's own labels and **skips** a job whose label it cannot map,
+printing `Skipping unsupported platform` and exiting zero. Nothing fails, and
+every later assertion is then about a job that never ran. The mapping lives in
+`tests/workflows/act_platforms.py`, deliberately apart from the act tests:
+those probe for `act` and Docker at import and are excluded from CI, so a guard
+beside them could not run where it is needed.
+
+`ubicloud-standard-2` maps to the same image as `ubuntu-latest`, because it is
+an ordinary x86-64 Ubuntu runner. The mapping is about what `act` can run
+locally, not about what a lane bills for.
+
+`tests/workflow_contracts/test_act_platform_mapping.py` runs in CI and derives
+the required labels from `ci.yml`, the workflow the act harness is pointed at,
+rather than naming them. The domain is that one workflow and not the repository:
+`build-wheels.yml` matrixes over Windows and macOS, which `act` cannot host at
+any mapping. Those are different problems and the contract says which it found,
+so an unmapped Linux label reads as a mapping to add and a Windows or macOS
+lane in `ci.yml` reads as a lane act no longer covers. `run_act` also refuses
+the skip message outright, so a skipped job fails its test rather than passing
+it vacuously.
+
 ### What the contracts assert
 
-`tests/workflow_contracts/test_runner_placement.py` holds twenty-five
-contracts, each proved by a mutation that it must reject and, where the rule
-could be drawn too tightly, by a correct variant it must accept.
+`tests/workflow_contracts/` collects sixty-six cases across four modules:
+twenty-five placement contracts in `test_runner_placement.py`, five Hypothesis
+properties in `test_runner_lanes_properties.py`, twenty-six reader and
+predicate cases in `test_runner_lanes_errors.py`, and four in
+`test_act_platform_mapping.py`. Each rule is proved by a mutation that it must
+reject and, where the rule could be drawn too tightly, by a correct variant it
+must accept.
 
 Which lanes must carry the fork fallback is **derived from each workflow's own
 triggers**, not listed. A second list is the gap: a paid lane added to a
@@ -273,6 +356,19 @@ A lane can also be placed and switched off, so a separate contract refuses a
 job-level `if:` and `continue-on-error` at job or step scope on any paid lane.
 A guarded lane can be skipped without failing anything, which makes its
 placement a decoration.
+
+`continue-on-error` is refused **by presence**, whatever its value. GitHub
+accepts an expression there and PyYAML hands one back as a string, so
+`continue-on-error: ${{ true }}` is not `True` and a comparison against `True`
+accepts the one spelling hardest to notice in review. `false` is refused too: a
+key that becomes true in a one-character change is not a lane that must pass,
+and reviewing the flip is cheaper than discovering it.
+
+The ceiling is read with an exact type comparison rather than an `isinstance`
+check. `bool` subclasses `int`, so `timeout-minutes: true` would satisfy
+`isinstance(value, int)` and then satisfy the range check as the value one,
+leaving a lane with no reviewed ceiling past a contract about ceilings. GitHub
+does not accept a Boolean there at all.
 
 ## Roadmap notes
 

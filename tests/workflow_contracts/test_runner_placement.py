@@ -48,12 +48,16 @@ from tests.workflow_contracts.runner_lanes import (
     MAXIMUM_TIMEOUT_MINUTES,
     PAID_LANES,
     UBICLOUD_LABEL,
-    WorkflowReadError,
     all_lanes,
     billable_labels,
-    jobs_of,
+    continue_on_error_sites,
     labels_of,
     paid_lanes_by_trigger,
+    timeout_minutes_of,
+)
+from tests.workflow_contracts.workflow_documents import (
+    WorkflowReadError,
+    jobs_of,
     read_actionlint_registry,
     workflow_texts,
 )
@@ -151,10 +155,9 @@ def test_every_paid_lane_declares_a_bounded_ceiling(lane: str) -> None:
     """
     workflow, _, name = lane.partition(":")
     job = jobs_of(workflow_texts()[workflow], workflow)[name]
-    timeout = job.get("timeout-minutes")
-    assert isinstance(timeout, int), (
-        f"{lane} runs on a paid runner and must declare timeout-minutes; "
-        f"got {timeout!r}"
+    timeout = timeout_minutes_of(job)
+    assert timeout is not None, (
+        f"{lane} runs on a paid runner and must declare timeout-minutes"
     )
     assert 0 < timeout <= MAXIMUM_TIMEOUT_MINUTES, (
         f"{lane} declares timeout-minutes {timeout}, outside the reviewed "
@@ -170,6 +173,11 @@ def test_a_paid_lane_can_actually_run(lane: str) -> None:
     step scope, turns a placement into a decoration: the contract above
     would still see the label. Asserted separately so a failure names the
     mechanism rather than the label.
+
+    ``continue-on-error`` is refused by presence rather than by value.
+    GitHub accepts an expression there and PyYAML returns an expression as a
+    string, so ``${{ true }}`` is not ``True``: a comparison against ``True``
+    would accept the one spelling that is hardest to notice in review.
     """
     workflow, _, name = lane.partition(":")
     job = jobs_of(workflow_texts()[workflow], workflow)[name]
@@ -178,16 +186,14 @@ def test_a_paid_lane_can_actually_run(lane: str) -> None:
         "can be skipped without failing anything, so its placement asserts "
         "nothing; guard the steps inside it instead"
     )
-    assert job.get("continue-on-error") is not True, (
-        f"{lane} sets continue-on-error at job scope, so it can fail without "
-        "failing the run"
+    sites = continue_on_error_sites(job)
+    assert not sites, (
+        f"{lane} declares continue-on-error at {'; '.join(sites)}, so it can "
+        "fail without failing the run. The key is refused wherever it "
+        "appears and whatever its value, because an expression such as "
+        "${{ true }} parses as a string and would slip past a comparison "
+        "against True"
     )
-    for step in job.get("steps", []) or []:
-        assert step.get("continue-on-error") is not True, (
-            f"{lane} has a step with continue-on-error set "
-            f"({step.get('name', step.get('uses', '?'))!r}), which hides a "
-            "failure inside a lane that is otherwise required"
-        )
 
 
 def test_the_actionlint_registry_matches_the_labels_in_use() -> None:
