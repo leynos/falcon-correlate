@@ -30,16 +30,17 @@ httpx = ["httpx>=0.27,<1"]
 [dependency-groups]
 dev = [
     "celery>=5,<6",
+    "df12-python-lints @ git+https://github.com/leynos/df12-python-lints.git@v0.3.0",
     "hypothesis>=6.165.2,<7",
     "httpx>=0.27,<1",
     "pytest>=9.1.1,<10",
     "pytest-bdd>=8.1,<9",
     "pytest-asyncio>=1.4.0,<2",
     "pytest-xdist>=3.5,<4",
-    "ruff==0.15.21",
+    "ruff==0.16.4",
     "structlog>=26.1.0,<27",
     "pyright>=1.1.411,<2",
-    "ty>=0.0.69,<1",
+    "ty==0.0.74",
     "pytest-timeout>=2.3,<3",
     "pyyaml>=6.0,<7",
     "interrogate>=1.7,<2",
@@ -90,35 +91,35 @@ select = [
     "ANN",
     "C90",
     "PLR",
-    "PLE4703",
-    "PLR0202",
-    "PLR0203",
-    "PLR0914",
-    "PLR0916",
-    "PLR1702",
-    "PLR6104",
-    "PLR6201",
-    "PLR6301",
-    "PLW0108",
-    "RUF036",
-    "RUF053",
-    "RUF055",
-    "RUF064",
-    "RUF066",
+    "modified-iterating-set",
+    "no-classmethod-decorator",
+    "no-staticmethod-decorator",
+    "too-many-locals",
+    "too-many-boolean-expressions",
+    "too-many-nested-blocks",
+    "non-augmented-assignment",
+    "literal-membership",
+    "no-self-use",
+    "unnecessary-lambda",
+    "none-not-at-end-of-union",
+    "class-with-mixed-type-vars",
+    "unnecessary-regular-expression",
+    "non-octal-permissions",
+    "property-without-return",
 ]
 extend-ignore = [
-    "D203",  # Conflicts with D211; prefer no blank line before class docstring.
-    "D213",  # Conflicts with D212; keep summary on the first line.
+    "incorrect-blank-line-before-class",  # Conflicts with D211; prefer no blank line before class docstring.
+    "multi-line-summary-second-line",  # Conflicts with D212; keep summary on the first line.
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"**/test_*.py" = ["S101", "PLR0913", "PLR0917", "PLR2004", "PLR6301"]
+"**/test_*.py" = ["assert", "too-many-arguments", "too-many-positional-arguments", "magic-value-comparison", "no-self-use"]
 # Non-``test_``-prefixed BDD step-helper modules are test code registered via
 # ``pytest_plugins``; grant them the same assertion/test allowances.
-"tests/bdd/*_steps.py" = ["S101", "PLR0913", "PLR0917", "PLR2004", "PLR6301"]
-"src/falcon_correlate/unittests/**/*.py" = ["PLR0904"]
-"tests/**/*.py" = ["PLR6301"]
-"tests/workflows/*.py" = ["S404"]
+"tests/bdd/*_steps.py" = ["assert", "too-many-arguments", "too-many-positional-arguments", "magic-value-comparison", "no-self-use"]
+"src/falcon_correlate/unittests/**/*.py" = ["too-many-public-methods"]
+"tests/**/*.py" = ["no-self-use"]
+"tests/workflows/*.py" = ["suspicious-subprocess-import"]
 
 [tool.ruff.lint.pydoclint]
 ignore-one-line-docstrings = true
@@ -204,6 +205,9 @@ max-locals = 10
 recursive = true
 # Match the project file-size ceiling enforced during review.
 max-module-lines = 400
+# Baseline-gated df12 checks must honour the oldest supported Python version,
+# even though the plug-in itself runs under CPython 3.14.
+py-version = "3.12"
 
 [tool.pylint.design]
 # Keep function call surfaces small enough to understand without memorising

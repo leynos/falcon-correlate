@@ -7,7 +7,7 @@ pull request.
 
 ## Linting architecture
 
-The Python lint target uses a three-tier linting approach:
+The Python lint target uses a five-tier linting approach:
 
 - **Tier 1: Ruff.** Ruff runs first through `uv run ruff check`. It is the
   fast linting gate and owns formatting-adjacent checks, import rules, common
@@ -20,12 +20,19 @@ The Python lint target uses a three-tier linting approach:
   `pylint-pypy-shim` wrapper. This tier focuses on rules that complement Ruff,
   especially logging format correctness, pattern matching safety, refactoring
   suggestions, resource-handling checks, and selected design limits.
+- **Tier 4: df12 Pylint checks through CPython 3.14.** The
+  `df12-python-lints` plug-in runs separately under CPython 3.14 so its
+  syntax-tree analysis uses the requested runtime without changing the
+  PyPy-backed tier.
+- **Tier 5: snapshot leak scanning.** The `ambrleaks` command from the same
+  pinned package scans Syrupy snapshots under `tests` for values that should
+  have been redacted.
 
-Ruff must pass before Interrogate runs, and Interrogate must pass before Pylint
-runs. This keeps the slow, deeper lint tier focused on code that has already
-passed the high-volume checks and the package docstring coverage gate.
+Each stage must pass before the next one runs. This keeps the slower, deeper
+checks focused on code that has already passed the high-volume checks and the
+package docstring coverage gate.
 
-The decision to use this architecture is recorded in
+The core linting decision is recorded in
 [ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md).
 
 ## Internal module architecture
@@ -88,6 +95,22 @@ token. Its `_process_request` and `_process_response` async wrappers invoke
 `set_header()`, enabling failure-path tests around response-header echo and
 cleanup. This module is owned by the unit-test package and must not be imported
 by production code.
+
+## Assertion diagnostics and coverage
+
+Every test assertion must carry a useful failure message. The shared coverage
+action instruments test modules as well as production modules, so a message
+expression on its own continuation line is counted as executable code that the
+passing path does not visit. Keep a short literal on the assertion line when it
+fits. Prepare longer or dynamic diagnostics eagerly before the assertion:
+
+```python
+failure_message = f"expected {expected!r}, got {actual!r}"
+assert actual == expected, failure_message
+```
+
+This preserves the diagnostic, keeps the passing path covered, and avoids
+coverage exclusions or ratchet-baseline adjustments for test-only syntax.
 
 ## Property-based testing
 
@@ -250,16 +273,24 @@ Run `make markdownlint` for the combined Markdown and spelling gate, and
 
 The lint target is configured by these Makefile variables:
 
-| Variable               | Default                                                                                       | Purpose                                                        |
-| ---------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `UV`                   | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                 | Selects the `uv` launcher used by all Python tool commands.    |
-| `UV_ENV`               | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                | Keeps project-local `uv` cache and tool directories.           |
-| `PYLINT_PYTHON`        | `pypy`                                                                                        | Selects the Python runtime used for the Pylint tool execution. |
-| `PYLINT_TARGETS`       | `src tests examples`                                                                          | Defines the source trees checked by the Pylint tier.           |
-| `PYLINT_PYPY_SHIM_REF` | `726d09f968b4d729ee4b29c71fc732e744854f3b`                                                    | Pins the `pylint-pypy-shim` repository revision.               |
-| `PYLINT_PYPY_SHIM`     | `git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)`                  | Identifies the shim package installed by `uv tool run`.        |
-| `PYLINT`               | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                |
-| `INTERROGATE_TARGETS`  | `src/falcon_correlate`                                                                        | Defines the repo-root-relative trees checked by Interrogate.   |
+| Variable                | Default                                                                                                                 | Purpose                                                        |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `UV`                    | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                                           | Selects the `uv` launcher used by all Python tool commands.    |
+| `UV_ENV`                | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                                          | Keeps project-local `uv` cache and tool directories.           |
+| `PYTEST_WORKERS`        | `6`                                                                                                                     | Limits the number of parallel pytest workers.                  |
+| `RUFF_VERSION`          | `0.16.4`                                                                                                                | Pins the Ruff formatter and lint command.                      |
+| `TY_VERSION`            | `0.0.74`                                                                                                                | Pins the Ty type-checking command.                             |
+| `MBAKE_VERSION`         | `1.4.6`                                                                                                                 | Pins the Makefile validator used by Continuous Integration.    |
+| `PYLINT_PYTHON`         | `pypy`                                                                                                                  | Selects the Python runtime used for the Pylint tool execution. |
+| `PYLINT_TARGETS`        | `src tests examples`                                                                                                    | Defines the source trees checked by both Pylint tiers.         |
+| `PYLINT_HOME`           | `.pylint_cache`                                                                                                         | Selects the Pylint cache directory.                            |
+| `PYLINT_PYPY_SHIM_REF`  | `726d09f968b4d729ee4b29c71fc732e744854f3b`                                                                              | Pins the `pylint-pypy-shim` repository revision.               |
+| `PYLINT_PYPY_SHIM`      | `git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)`                                            | Identifies the shim package installed by `uv tool run`.        |
+| `PYLINT`                | `PYLINTHOME=$(PYLINT_HOME) $(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                |
+| `DF12_PYTHON_LINTS_REF` | `v0.3.0`                                                                                                                | Pins the df12 plug-in and `ambrleaks` tool source.             |
+| `DF12_PYTHON`           | `3.14`                                                                                                                  | Selects CPython 3.14 for the df12 Pylint and snapshot passes.  |
+| `DF12_PYLINT_MESSAGES`  | All twelve messages supplied by `v0.3.0`                                                                                | Keeps adoption of df12 checks explicit and reviewable.         |
+| `INTERROGATE_TARGETS`   | `src/falcon_correlate`                                                                                                  | Defines the repo-root-relative trees checked by Interrogate.   |
 
 Override variables at the command line for targeted investigation. For example:
 
@@ -268,7 +299,9 @@ make lint PYLINT_TARGETS=src/falcon_correlate/middleware.py
 ```
 
 Do not change `PYLINT_PYPY_SHIM_REF` casually. Updating the shim changes the
-lint execution environment and should be reviewed as a tooling change.
+lint execution environment and should be reviewed as a tooling change. Update
+the `df12-python-lints` dependency and `DF12_PYTHON_LINTS_REF` together so the
+Pylint plug-in and `ambrleaks` keep the same rule implementation.
 
 ## Episodic lint policy
 
@@ -283,7 +316,8 @@ The policy is:
   `collections.abc as cabc`, `datetime as dt`, and `unittest.mock as mock`;
 - keep docstrings in NumPy style;
 - use a focused Pylint allow-list rather than enabling every Pylint message;
-- run Pylint under PyPy through the shim as a second tier after Ruff; and
+- run built-in Pylint checks under PyPy through the shim;
+- run all `df12-python-lints` checks and `ambrleaks` under CPython 3.14; and
 - add narrow suppressions only when framework callbacks, tests, or existing
   module boundaries make a rule unsuitable for the current change.
 

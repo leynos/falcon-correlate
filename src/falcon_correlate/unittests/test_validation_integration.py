@@ -1,5 +1,5 @@
 """Unit tests for validation integration in process_request()."""
-# pylint: disable=too-many-lines
+# pylint: disable=too-many-lines  # Integration scenarios intentionally share fixtures.
 # Justification: test_validation_integration.py keeps too-many-lines
 # validation scenarios together for clarity.
 
@@ -271,7 +271,7 @@ class TestValidationWithValidatorRejecting:
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class ValidationLoggingScenario:
     """Encapsulates parameters for a validation logging test scenario."""
 
@@ -310,7 +310,7 @@ def _is_validation_failure_debug_log(record: logging.LogRecord) -> bool:
 
 def build_test_client(
     create_test_client: cabc.Callable[..., falcon.testing.TestClient],
-    validator_result: bool | None,  # noqa: FBT001 - test scenario value
+    validator_result: bool | None,  # ruff: ignore[boolean-type-hint-positional-argument] - test scenario value
 ) -> falcon.testing.TestClient:
     """Build a validation logging test client for the given validator result.
 
@@ -343,7 +343,7 @@ def assert_validation_logged(
     caplog: pytest.LogCaptureFixture,
     expected_substring: str,
 ) -> None:
-    """Assert that a falcon_correlate.middleware DEBUG log contains the expected substring."""  # noqa: E501
+    """Assert that a falcon_correlate.middleware DEBUG log contains the expected substring."""  # ruff: ignore[line-too-long] -- descriptive BDD assertion wording.
     assert any(
         _is_debug_log_containing(r, expected_substring) for r in caplog.records
     ), (
@@ -403,7 +403,8 @@ class TestValidationLogging:
             )
 
         if scenario.expect_log:
-            assert scenario.log_contains is not None
+            failure_message = "expected scenario.log_contains not to be None"
+            assert scenario.log_contains is not None, failure_message
             assert_validation_logged(caplog, scenario.log_contains)
         else:
             assert_validation_not_logged(caplog)
@@ -526,7 +527,8 @@ class TestValidatorExceptionHandling:
 
         assert response.status == "200 OK", f"Expected 200 OK, got {response.status}"
         # A correlation ID should still be present (generated, not the incoming one)
-        assert response.json["correlation_id"] is not None
+        failure_message = "expected response.json['correlation_id'] not to be None"
+        assert response.json["correlation_id"] is not None, failure_message
         assert response.json["correlation_id"] != "will-crash-validator", (
             "Expected incoming ID not used when validator raises"
         )
