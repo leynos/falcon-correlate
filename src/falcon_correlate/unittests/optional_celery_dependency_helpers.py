@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess  # noqa: S404 - tests intentionally spawn isolated Python subprocesses.
+import subprocess  # ruff: ignore[suspicious-subprocess-import] - tests intentionally spawn isolated Python subprocesses.
 import sys
 import typing as typ
 from pathlib import Path
@@ -57,6 +57,7 @@ _PYTEST_PROGRESS_PATTERN = re.compile(
     re.MULTILINE,
 )
 _CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS = 120
+_PYTEST_ENVIRONMENT_PREFIX = "PYTEST_"
 
 pytestmark = pytest.mark.timeout(_CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS)
 
@@ -163,9 +164,12 @@ def _blocked_celery_environment(
     sitecustomize_dir: Path,
     environ: cabc.Mapping[str, str],
 ) -> dict[str, str]:
-    """Build a child-process environment with the Celery import blocker first."""
+    """Build an isolated pytest environment with the Celery import blocker first."""
     return {
-        **environ,
+        key: value
+        for key, value in environ.items()
+        if not key.startswith(_PYTEST_ENVIRONMENT_PREFIX)
+    } | {
         "PYTHONPATH": _pythonpath_with_import_blocker(sitecustomize_dir, environ),
     }
 
@@ -177,7 +181,7 @@ def _run_python_with_celery_blocked(
     *args: str,
 ) -> subprocess.CompletedProcess[str]:
     """Run a Python child process where importing Celery raises ImportError."""
-    return subprocess.run(  # noqa: S603
+    return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- fixed child interpreter and arguments.
         [sys.executable, *args],
         check=False,
         cwd=cwd,
@@ -216,6 +220,7 @@ def _count_collected_test_items(
         "pytest",
         "--collect-only",
         "-q",
+        "-n=0",
         "--color=no",
         *_relative_paths(paths, project_root),
     )
@@ -239,6 +244,9 @@ def _run_celery_tests_with_celery_blocked(
         "-m",
         "pytest",
         "-q",
+        # The parent suite may use xdist.  This nested assertion suite is
+        # deliberately serial so it does not multiply the worker count.
+        "-n=0",
         "--color=no",
         str(sentinel_test),
         *_relative_paths(celery_test_paths, project_root),

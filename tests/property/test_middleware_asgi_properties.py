@@ -9,7 +9,7 @@ its own correlation ID before and after event-loop overlap, and that
 from __future__ import annotations
 
 import asyncio
-import collections.abc as cabc  # noqa: TC003 - requested runtime import.
+import collections.abc as cabc  # ruff: ignore[typing-only-standard-library-import] - requested runtime import.
 
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st

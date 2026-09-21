@@ -45,71 +45,31 @@ import pytest
 # in environments where httpx is not available.
 httpx = pytest.importorskip("httpx")
 
-from pytest_bdd import given, parsers, scenarios, then, when  # noqa: E402
+from pytest_bdd import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    given,
+    parsers,
+    scenarios,
+    then,
+    when,
+)
 
-from falcon_correlate import correlation_id_var  # noqa: E402
-from falcon_correlate.httpx import (  # noqa: E402
+from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    correlation_id_var,
+)
+from falcon_correlate.httpx import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     AsyncCorrelationIDTransport,
     CorrelationIDTransport,
+)
+from falcon_correlate.unittests.test_httpx_transport_helpers import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    _recorded_request,
+    _RecordingAsyncTransport,
+    _RecordingTransport,
 )
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
 scenarios("httpx_transport.feature")
-
-
-class _RecordingTransportBase:
-    """Provide shared request capture for test transports."""
-
-    def __init__(self) -> None:
-        """Initialize the transport with no captured request."""
-        self.request: httpx.Request | None = None
-
-    def _record_request(self, request: httpx.Request) -> httpx.Response:
-        """Capture a request and return a successful response."""
-        self.request = request
-        return httpx.Response(200, request=request)
-
-
-class RecordingTransport(_RecordingTransportBase, httpx.BaseTransport):
-    """Capture sync requests made by the configured client."""
-
-    def handle_request(self, request: httpx.Request) -> httpx.Response:
-        """Capture the request and return a success response.
-
-        Parameters
-        ----------
-        request : httpx.Request
-            Request captured for later assertions in the test.
-
-        Returns
-        -------
-        httpx.Response
-            The value produced for the test scenario.
-
-        """
-        return self._record_request(request)
-
-
-class RecordingAsyncTransport(_RecordingTransportBase, httpx.AsyncBaseTransport):
-    """Capture async requests made by the configured client."""
-
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        """Capture the request and return a success response.
-
-        Parameters
-        ----------
-        request : httpx.Request
-            Request captured for later assertions in the test.
-
-        Returns
-        -------
-        httpx.Response
-            The value produced for the test scenario.
-
-        """
-        return self._record_request(request)
 
 
 class Context(typ.TypedDict, total=False):
@@ -179,15 +139,12 @@ def when_send_request_with_transport(context: Context) -> Context:
         The value produced for the test scenario.
 
     """
-    transport = RecordingTransport()
+    transport = _RecordingTransport()
 
     with httpx.Client(transport=CorrelationIDTransport(transport)) as client:
         client.get("http://example.com")
 
-    assert transport.request is not None, (
-        "expected RecordingTransport to have captured a request"
-    )
-    context["captured_headers"] = dict(transport.request.headers)
+    context["captured_headers"] = dict(_recorded_request(transport).headers)
     return context
 
 
@@ -211,19 +168,13 @@ def when_send_async_request_with_transport(context: Context) -> Context:
     """
 
     async def _run() -> dict[str, str]:
-        transport = RecordingAsyncTransport()
+        transport = _RecordingAsyncTransport()
         async with httpx.AsyncClient(
             transport=AsyncCorrelationIDTransport(transport)
         ) as client:
             await client.get("http://example.com")
 
-        assert transport.request is not None, (
-            "expected RecordingAsyncTransport to have captured a request"
-        )
-        assert transport.request.headers is not None, (
-            "expected transport.request.headers to be present"
-        )
-        return dict(transport.request.headers)
+        return dict(_recorded_request(transport).headers)
 
     context["captured_headers"] = asyncio.run(_run())
     return context

@@ -37,7 +37,7 @@ DEFAULT_HEADER_NAME = "X-Correlation-ID"
 _NetworkType = ipaddress.IPv4Network | ipaddress.IPv6Network
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class CorrelationIDConfig:
     """Configuration for CorrelationIDMiddleware.
 
@@ -91,7 +91,7 @@ class CorrelationIDConfig:
             If ``trusted_sources`` is a string or contains non-string values, or
             if ``generator`` or ``validator`` is not callable.
 
-        """  # noqa: DOC502 - validators raise indirectly.
+        """  # ruff: ignore[docstring-extraneous-exception] - validators raise indirectly.
         if isinstance(self.trusted_sources, str):
             msg = "trusted_sources must be an iterable of strings, not a string"
             raise TypeError(msg)
@@ -223,7 +223,7 @@ class CorrelationIDConfig:
     # @CodeScene(disable:"Excess Number of Function Arguments")
     @classmethod
     # pylint: disable-next=too-many-arguments  # from_kwargs mirrors middleware constructor compatibility. FIXME: https://github.com/leynos/falcon-correlate/issues/36
-    def from_kwargs(  # noqa: PLR0913 -- from_kwargs preserves the public factory API.
+    def from_kwargs(  # ruff: ignore[too-many-arguments] -- from_kwargs preserves the public factory API.
         cls,
         *,
         header_name: str = DEFAULT_HEADER_NAME,

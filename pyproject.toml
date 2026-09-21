@@ -30,18 +30,21 @@ httpx = ["httpx>=0.27,<1"]
 [dependency-groups]
 dev = [
     "celery>=5,<6",
+    "df12-python-lints @ git+https://github.com/leynos/df12-python-lints.git@v0.3.0",
+    "astroid==4.0.4",
     "hypothesis>=6.165.2,<7",
     "httpx>=0.27,<1",
     "pytest>=9.1.1,<10",
     "pytest-bdd>=8.1,<9",
     "pytest-asyncio>=1.4.0,<2",
     "pytest-xdist>=3.5,<4",
-    "ruff==0.15.21",
+    "ruff==0.16.4",
     "structlog>=26.1.0,<27",
     "pyright>=1.1.411,<2",
-    "ty>=0.0.69,<1",
+    "ty==0.0.74",
     "pytest-timeout>=2.3,<3",
     "pyyaml>=6.0,<7",
+    "pylint==4.0.8",
     "interrogate>=1.7,<2",
     "syrupy>=5,<6",
     "pathspec==1.1.1",
@@ -90,35 +93,35 @@ select = [
     "ANN",
     "C90",
     "PLR",
-    "PLE4703",
-    "PLR0202",
-    "PLR0203",
-    "PLR0914",
-    "PLR0916",
-    "PLR1702",
-    "PLR6104",
-    "PLR6201",
-    "PLR6301",
-    "PLW0108",
-    "RUF036",
-    "RUF053",
-    "RUF055",
-    "RUF064",
-    "RUF066",
+    "modified-iterating-set",
+    "no-classmethod-decorator",
+    "no-staticmethod-decorator",
+    "too-many-locals",
+    "too-many-boolean-expressions",
+    "too-many-nested-blocks",
+    "non-augmented-assignment",
+    "literal-membership",
+    "no-self-use",
+    "unnecessary-lambda",
+    "none-not-at-end-of-union",
+    "class-with-mixed-type-vars",
+    "unnecessary-regular-expression",
+    "non-octal-permissions",
+    "property-without-return",
 ]
 extend-ignore = [
-    "D203",  # Conflicts with D211; prefer no blank line before class docstring.
-    "D213",  # Conflicts with D212; keep summary on the first line.
+    "incorrect-blank-line-before-class",  # Conflicts with D211; prefer no blank line before class docstring.
+    "multi-line-summary-second-line",  # Conflicts with D212; keep summary on the first line.
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"**/test_*.py" = ["S101", "PLR0913", "PLR0917", "PLR2004", "PLR6301"]
+"**/test_*.py" = ["assert", "too-many-arguments", "too-many-positional-arguments", "magic-value-comparison", "no-self-use"]
 # Non-``test_``-prefixed BDD step-helper modules are test code registered via
 # ``pytest_plugins``; grant them the same assertion/test allowances.
-"tests/bdd/*_steps.py" = ["S101", "PLR0913", "PLR0917", "PLR2004", "PLR6301"]
-"src/falcon_correlate/unittests/**/*.py" = ["PLR0904"]
-"tests/**/*.py" = ["PLR6301"]
-"tests/workflows/*.py" = ["S404"]
+"tests/bdd/*_steps.py" = ["assert", "too-many-arguments", "too-many-positional-arguments", "magic-value-comparison", "no-self-use"]
+"src/falcon_correlate/unittests/**/*.py" = ["too-many-public-methods"]
+"tests/**/*.py" = ["no-self-use"]
+"tests/workflows/*.py" = ["suspicious-subprocess-import"]
 
 [tool.ruff.lint.pydoclint]
 ignore-one-line-docstrings = true
@@ -204,6 +207,9 @@ max-locals = 10
 recursive = true
 # Match the project file-size ceiling enforced during review.
 max-module-lines = 400
+# Pylint checks must honour the oldest supported Python version, even though
+# the df12 plug-in itself runs under CPython 3.14.
+py-version = "3.12"
 
 [tool.pylint.design]
 # Keep function call surfaces small enough to understand without memorising
@@ -218,129 +224,6 @@ max-statements = 70
 # Keep positional call surfaces aligned with Ruff's existing argument limit.
 max-positional-arguments = 4
 
-[tool.pylint."messages control"]
-# Keep this Pylint pass focused on the explicitly selected messages.
-disable = [
-    "all",
-    # Managed PyPy is currently 3.11 while the project targets Python 3.12
-    # syntax; keep PyPy-backed Pylint useful on files it can parse.
-    "syntax-error",
-]
-enable = [
-    # Logging format safety.
-    "logging-format-interpolation",
-    "logging-format-truncated",
-    "logging-fstring-interpolation",
-    "logging-not-lazy",
-    "logging-too-few-args",
-    "logging-too-many-args",
-    "logging-unsupported-format",
-
-    # Pattern matching correctness and readability.
-    "bare-name-capture-pattern",
-    "invalid-match-args-definition",
-    "match-class-bind-self",
-    "match-class-positional-attributes",
-    "multiple-class-sub-patterns",
-    "too-many-positional-sub-patterns",
-
-    # Control-flow simplification.
-    "chained-comparison",
-    "condition-evals-to-constant",
-    "consider-merging-isinstance",
-    "consider-swap-variables",
-    "consider-using-in",
-    "consider-using-max-builtin",
-    "consider-using-min-builtin",
-    "consider-using-sys-exit",
-    "consider-using-ternary",
-    "inconsistent-return-statements",
-    "no-else-break",
-    "no-else-continue",
-    "no-else-raise",
-    "no-else-return",
-    "redefined-argument-from-local",
-    "simplifiable-condition",
-    "simplifiable-if-expression",
-    "simplifiable-if-statement",
-    "simplify-boolean-expression",
-    "stop-iteration-return",
-    "super-with-arguments",
-    "trailing-comma-tuple",
-    "unnecessary-negation",
-    "useless-return",
-
-    # Collection and iterator idioms.
-    "consider-iterating-dictionary",
-    "consider-using-dict-comprehension",
-    "consider-using-dict-items",
-    "consider-using-enumerate",
-    "consider-using-f-string",
-    "consider-using-generator",
-    "consider-using-get",
-    "consider-using-join",
-    "consider-using-set-comprehension",
-    "unnecessary-comprehension",
-    "unnecessary-dict-index-lookup",
-    "unnecessary-list-index-lookup",
-    "use-a-generator",
-    "use-dict-literal",
-    "use-implicit-booleaness-not-comparison",
-    "use-implicit-booleaness-not-comparison-to-string",
-    "use-implicit-booleaness-not-len",
-    "use-list-literal",
-    "use-maxsplit-arg",
-    "use-sequence-for-iteration",
-    "use-yield-from",
-
-    # Runtime APIs, resources, and compatibility hazards.
-    "bad-open-mode",
-    "bad-thread-instantiation",
-    "boolean-datetime",
-    "consider-using-with",
-    "deprecated-argument",
-    "deprecated-attribute",
-    "deprecated-class",
-    "deprecated-decorator",
-    "deprecated-method",
-    "forgotten-debug-statement",
-    "invalid-envvar-default",
-    "invalid-envvar-value",
-    "method-cache-max-size-none",
-    "redundant-unittest-assert",
-    "shallow-copy-environ",
-    "singledispatch-method",
-    "singledispatchmethod-function",
-    "subprocess-popen-preexec-fn",
-    "subprocess-run-check",
-    "unnecessary-dunder-call",
-    "unnecessary-ellipsis",
-    "unspecified-encoding",
-
-    # Source layout and text hygiene.
-    "missing-final-newline",
-    "mixed-line-endings",
-    "superfluous-parens",
-    "trailing-newlines",
-    "trailing-whitespace",
-    "unexpected-line-ending-format",
-
-    # Mutation during iteration.
-    "modified-iterating-dict",
-    "modified-iterating-list",
-    "modified-iterating-set",
-
-    # Structural complexity limits.
-    "too-many-arguments",
-    "too-many-boolean-expressions",
-    "too-many-branches",
-    "too-many-lines",
-    "too-many-locals",
-    "too-many-nested-blocks",
-    "too-many-positional-arguments",
-    "too-many-public-methods",
-    "too-many-statements",
-]
 
 [tool.pytest.ini_options]
 # Tests automatically killed after seconds elapsed

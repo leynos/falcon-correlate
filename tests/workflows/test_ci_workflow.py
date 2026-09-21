@@ -28,7 +28,7 @@ def _tool_is_available(tool_name: str, args: list[str]) -> bool:
     tool_path = shutil.which(tool_name)
     if tool_path is None:
         return False
-    result = subprocess.run(  # noqa: S603
+    result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- resolved tool path and fixed arguments.
         [tool_path, *args],
         capture_output=True,
         check=False,
@@ -41,7 +41,7 @@ ACT_AVAILABLE = _tool_is_available("act", ["--version"])
 DOCKER_AVAILABLE = _tool_is_available("docker", ["info"])
 
 
-@dc.dataclass(frozen=True)
+@dc.dataclass(frozen=True, slots=True)
 class ActConfig:
     """Configuration for running act."""
 
@@ -101,7 +101,7 @@ def run_act(config: ActConfig) -> tuple[int, Path, str]:
     if config.dry_run:
         cmd.append("--list")
 
-    completed = subprocess.run(  # noqa: S603
+    completed = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- resolved act path and structured arguments.
         cmd,
         text=True,
         capture_output=True,

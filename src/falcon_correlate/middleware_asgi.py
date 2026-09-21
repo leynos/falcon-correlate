@@ -1,17 +1,16 @@
 """Falcon ASGI correlation ID middleware implementation.
 
-This module exposes the async Falcon middleware hooks while reusing the WSGI
-middleware lifecycle implemented by ``_CorrelationIDMiddlewareBase`` in
-``middleware.py``. That split keeps ASGI integration focused on coroutine hook
-signatures and shares request selection, ContextVar state, response-header
-echoing, and cleanup with the WSGI variant.
+This module exposes the async Falcon middleware hooks while reusing the shared
+middleware lifecycle in ``middleware_base.py``. That split keeps ASGI
+integration focused on coroutine hook signatures and shares request selection,
+ContextVar state, response-header echoing, and cleanup with the WSGI variant.
 """
 
 from __future__ import annotations
 
 import typing as typ
 
-from .middleware import _CorrelationIDMiddlewareBase
+from .middleware_base import _CorrelationIDMiddlewareBase
 
 if typ.TYPE_CHECKING:
     import falcon.asgi
@@ -109,7 +108,7 @@ class CorrelationIDMiddlewareASGI(_CorrelationIDMiddlewareBase):
         req: falcon.asgi.Request,
         resp: falcon.asgi.Response,
         resource: object,
-        req_succeeded: bool,  # noqa: FBT001 - Falcon ASGI middleware interface requirement
+        req_succeeded: bool,  # ruff: ignore[boolean-type-hint-positional-argument] - Falcon ASGI middleware interface requirement
     ) -> None:
         """Post-process an ASGI response and clean up request-scoped context."""
         self._process_response(req, resp)

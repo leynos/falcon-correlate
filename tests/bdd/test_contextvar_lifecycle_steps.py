@@ -132,14 +132,17 @@ def when_send_concurrent_requests(
 def then_resource_observes_context_value(context: Context, expected: str) -> None:
     """Verify the in-request context variable value matches the correlation ID."""
     payload = typ.cast("dict[str, str | None]", context["response"].json)
-    assert payload["correlation_id"] == expected
-    assert payload["context_var_id"] == expected
+    failure_message = "expected payload['correlation_id'] to equal expected"
+    assert payload["correlation_id"] == expected, failure_message
+    failure_message = "expected payload['context_var_id'] to equal expected"
+    assert payload["context_var_id"] == expected, failure_message
 
 
 @then("the correlation ID context variable should be cleared")
 def then_context_variable_cleared() -> None:
     """Verify request handling left no lingering correlation ID context."""
-    assert correlation_id_var.get() is None
+    failure_message = "expected correlation_id_var.get() to be None"
+    assert correlation_id_var.get() is None, failure_message
 
 
 @then("each lifecycle response should contain its own correlation ID")
@@ -148,5 +151,7 @@ def then_each_response_contains_own_correlation_id(context: Context) -> None:
     results = context["concurrent_results"]
 
     for expected_id, payload in results.items():
-        assert payload["correlation_id"] == expected_id
-        assert payload["context_var_id"] == expected_id
+        failure_message = "expected payload['correlation_id'] to equal expected_id"
+        assert payload["correlation_id"] == expected_id, failure_message
+        failure_message = "expected payload['context_var_id'] to equal expected_id"
+        assert payload["context_var_id"] == expected_id, failure_message
