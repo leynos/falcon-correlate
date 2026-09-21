@@ -47,6 +47,7 @@ extend-ignore-re = [
 
 [default.extend-words]
 "ASO" = "ASO"
+"Astroid" = "Astroid"
 "absolutisable" = "absolutizable"
 "absolutisably" = "absolutizably"
 "absolutisation" = "absolutization"

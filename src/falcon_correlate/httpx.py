@@ -52,7 +52,7 @@ if typ.TYPE_CHECKING:
                 A protocol-level return value passed through to callers.
 
             """
-            ...
+            pass
 
     class _SupportsAsyncExit(typ.Protocol):
         """Protocol for asynchronous transport context manager exits."""
@@ -80,7 +80,7 @@ if typ.TYPE_CHECKING:
                 A protocol-level return value passed through to callers.
 
             """
-            ...
+            pass
 
     type _ExitArgs = tuple[
         type[BaseException] | None,
