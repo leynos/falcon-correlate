@@ -32,6 +32,7 @@ from tests.workflow_contracts.codescene_lanes import (
     steps_using,
     workflow_texts,
 )
+from tests.workflow_contracts.deprecated_checksum import deprecated_digest_mentions
 
 if typ.TYPE_CHECKING:
     from pathlib import Path
@@ -237,3 +238,60 @@ class TestCodeSceneMarkers:
     def test_a_clean_workflow_mentions_nothing(self) -> None:
         """Narrow as well as sufficient."""
         assert codescene_mentions("on:\n  pull_request:\njobs:\n  lint:\n") == []
+
+
+class TestRetiredChecksumNames:
+    """The retired-digest reader, driven over shapes this repository lacks.
+
+    Every workflow here is already clean, so a reader that recognised nothing
+    would pass the contracts next door over an empty set of offenders. These
+    tests drive it over documents built in the test instead.
+    """
+
+    @pytest.mark.parametrize(
+        ("line", "expected"),
+        [
+            ("          installer-checksum: ''", ["installer-checksum"]),
+            (
+                "          installer-checksum: ${{ vars.CODESCENE_CLI_SHA256 }}",
+                ["CODESCENE_CLI_SHA256", "installer-checksum"],
+            ),
+            (
+                "      CODESCENE_CLI_SHA256: ${{ vars.CODESCENE_CLI_SHA256 }}",
+                ["CODESCENE_CLI_SHA256"],
+            ),
+            (
+                '        run: echo "$CODESCENE_CLI_SHA256"',
+                ["CODESCENE_CLI_SHA256"],
+            ),
+        ],
+        ids=["input-literal", "input-from-variable", "env-value", "run-script"],
+    )
+    def test_a_retired_name_is_found_wherever_it_sits(
+        self, line: str, expected: list[str]
+    ) -> None:
+        """An input, an env value and a run script each count.
+
+        The input with an empty literal matters on its own: a contract
+        written against the variable alone would accept it, and the action
+        rejects the input rather than the value's origin.
+        """
+        text = f"jobs:\n  test:\n    steps:\n{line}\n"
+        assert deprecated_digest_mentions(text) == expected
+
+    def test_a_comment_explaining_the_retirement_is_not_a_breach(self) -> None:
+        """`coverage-main.yml` says why it passes no checksum, in a comment.
+
+        A comment invokes nothing. Refusing the word outright would delete
+        the only place that reason can be written down.
+        """
+        text = (
+            "# No checksum input: installer-checksum is rejected, and\n"
+            "# CODESCENE_CLI_SHA256 has no consumer left.\n"
+            "on:\n  push:\njobs: {}\n"
+        )
+        assert deprecated_digest_mentions(text) == []
+
+    def test_a_clean_workflow_names_neither(self) -> None:
+        """Narrow as well as sufficient."""
+        assert deprecated_digest_mentions("on:\n  push:\njobs:\n  lint:\n") == []
