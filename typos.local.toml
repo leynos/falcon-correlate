@@ -6,7 +6,8 @@ schema = 1
 stems = []
 
 [words]
-accepted = []
+# Astroid is Pylint's abstract-syntax-tree library.
+accepted = ["Astroid"]
 
 [words.corrections]
 

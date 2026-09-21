@@ -13,11 +13,12 @@ checks, and selective doctest execution for offline examples.
 ## Context and problem statement
 
 [ADR-001](adr-001-three-tier-linting.md) established Ruff, Interrogate, and
-PyPy-backed Pylint as the lint architecture. Interrogate enforces 100 percent
-docstring coverage, while Ruff's pydocstyle (`D`) rules enforce presence and
-style. Neither mechanism proves that `Parameters`, `Returns`, `Yields`, and
-`Raises` sections agree with Python signatures. They also do not validate
-module-level attribute docstrings or execute examples.
+vanilla Pylint on the verified PyPy lint runtime as the lint architecture.
+Interrogate enforces 100 percent docstring coverage, while Ruff's pydocstyle
+(`D`) rules enforce presence and style. Neither mechanism proves that
+`Parameters`, `Returns`, `Yields`, and `Raises` sections agree with Python
+signatures. They also do not validate module-level attribute docstrings or
+execute examples.
 
 The public API therefore needed a documentation convention and deterministic
 gates that detect signature drift, undocumented exported values, and stale

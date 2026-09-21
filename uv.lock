@@ -220,12 +220,14 @@ httpx = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "astroid" },
     { name = "celery" },
     { name = "df12-python-lints" },
     { name = "httpx" },
     { name = "hypothesis" },
     { name = "interrogate" },
     { name = "pathspec" },
+    { name = "pylint" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -250,12 +252,14 @@ provides-extras = ["celery", "httpx"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "astroid", specifier = "==4.0.4" },
     { name = "celery", specifier = ">=5,<6" },
     { name = "df12-python-lints", git = "https://github.com/leynos/df12-python-lints.git?rev=v0.3.0" },
     { name = "httpx", specifier = ">=0.27,<1" },
     { name = "hypothesis", specifier = ">=6.165.2,<7" },
     { name = "interrogate", specifier = ">=1.7,<2" },
     { name = "pathspec", specifier = "==1.1.1" },
+    { name = "pylint", specifier = "==4.0.8" },
     { name = "pyright", specifier = ">=1.1.411,<2" },
     { name = "pytest", specifier = ">=9.1.1,<10" },
     { name = "pytest-asyncio", specifier = ">=1.4.0,<2" },

@@ -10,6 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MERMAN_CLI_VERSION: '0.7.0'
+      PYLINT_PYPY_VERSION: '8.0.0'
+      PYLINT_PYTHON_VERSION: '3.12'
+      PYLINT_VERSION: '4.0.8'
+      ASTROID_VERSION: '4.0.4'
+      DF12_PYTHON: '3.14'
+      DF12_PYTHON_LINTS_REF: 'v0.3.0'
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -21,7 +27,17 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Set up Python
-        run: uv python install 3.13
+        run: uv python install 3.13 3.14
+
+      - name: Cache isolated lint toolchains
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .lint-tools
+            .pylint_cache
+            .uv-cache
+            .uv-tools
+          key: lint-toolchains-${{ runner.os }}-${{ runner.arch }}-${{ env.PYLINT_PYPY_VERSION }}-${{ env.PYLINT_PYTHON_VERSION }}-${{ env.PYLINT_VERSION }}-${{ env.ASTROID_VERSION }}-${{ env.DF12_PYTHON }}-${{ env.DF12_PYTHON_LINTS_REF }}-${{ hashFiles('Makefile', 'pyproject.toml', 'uv.lock') }}
 
       - name: Install yaml schema validator
         run: bun install -g pajv
@@ -60,7 +76,7 @@ jobs:
         with:
           globs: '**/*.md'
 
-      - name: Run ruff
+      - name: Run linters
         run: make lint
 
       - name: Run typechecker
