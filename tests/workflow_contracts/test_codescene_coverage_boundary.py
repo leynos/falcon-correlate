@@ -23,6 +23,11 @@ meaningless rather than failing.
 **A deterministic install.** Both lanes pin an action revision carrying the
 CLI manifest. An allowlist, because Dependabot chooses from the whole history
 and a list of known-bad pins can never be complete.
+
+**Nothing left of the old checksum.** The manifest replaced a digest of the
+installer script. No workflow may pass `installer-checksum`, read or refresh
+the `CODESCENE_CLI_SHA256` variable that fed it, or reinstate the dispatch
+that maintained that variable.
 """
 
 from __future__ import annotations
@@ -35,12 +40,19 @@ from tests.workflow_contracts.codescene_lanes import (
     COVERAGE_ACTION,
     MANIFEST_PINNED,
     UPLOAD_ACTION,
+    WORKFLOWS_DIR,
     codescene_mentions,
     is_publisher,
     parse,
     serves_pull_requests,
     steps_using,
     workflow_texts,
+)
+from tests.workflow_contracts.deprecated_checksum import (
+    DEPRECATED_CHECKSUM_INPUT,
+    DEPRECATED_DIGEST_VARIABLE,
+    DIGEST_REFRESH_WORKFLOW,
+    deprecated_digest_mentions,
 )
 
 if typ.TYPE_CHECKING:
@@ -227,4 +239,65 @@ class TestCodeSceneCoverageBoundary:
             "the pull-request lane and the publisher must measure the same thing, "
             "because the ratchet on the first compares against the baseline "
             "written by the second"
+        )
+
+
+class TestTheRetiredInstallerChecksum:
+    """Nothing may pass, read, or refresh the retired digest again."""
+
+    def test_no_workflow_passes_the_deprecated_installer_checksum(self) -> None:
+        """Refuse the input the upload action rejects outright.
+
+        At every pin in `MANIFEST_PINNED` a non-empty `installer-checksum`
+        exits the action with a hard failure. This repository already passes
+        nothing, so the rule guards a state rather than repairing one: the
+        input's name still reads as an ordinary option, and re-adding it
+        would go unremarked until a run that carried a value.
+        """
+        offending = {
+            name: mentions
+            for name, text in workflow_texts().items()
+            if (mentions := deprecated_digest_mentions(text))
+            and DEPRECATED_CHECKSUM_INPUT in mentions
+        }
+
+        assert not offending, (
+            f"{DEPRECATED_CHECKSUM_INPUT} is rejected when non-empty; the "
+            f"pinned manifest is the trust anchor and archive-checksum can "
+            f"only repeat its digest: {offending}"
+        )
+
+    def test_no_workflow_reads_or_refreshes_the_digest_variable(self) -> None:
+        """Leave no workflow maintaining a value nothing consumes.
+
+        `installer-checksum` was the variable's only consumer. A workflow
+        still reading it feeds a rejected input, which fails only when the
+        action runs; one still refreshing it maintains dead state, which
+        never fails at all and so is invisible without this rule.
+        """
+        offending = {
+            name: mentions
+            for name, text in workflow_texts().items()
+            if (mentions := deprecated_digest_mentions(text))
+            and DEPRECATED_DIGEST_VARIABLE in mentions
+        }
+
+        assert not offending, (
+            f"no workflow may read or refresh {DEPRECATED_DIGEST_VARIABLE}; "
+            f"the pinned action installs the CLI from its own manifest: "
+            f"{offending}"
+        )
+
+    def test_the_digest_refresh_workflow_is_absent(self) -> None:
+        """Keep the dispatch that wrote the dead variable out of the tree.
+
+        Asserted by path rather than through the reader, because the reader
+        answers questions about the workflows that exist and this rule is
+        about one that must not. A dispatch-only workflow never runs on its
+        own, so its return would show up in no run at all.
+        """
+        assert not (WORKFLOWS_DIR / DIGEST_REFRESH_WORKFLOW).exists(), (
+            f"{DIGEST_REFRESH_WORKFLOW} refreshed {DEPRECATED_DIGEST_VARIABLE}, "
+            f"which no workflow reads; delete it rather than leaving a "
+            f"dispatch that maintains an unused repository variable"
         )
