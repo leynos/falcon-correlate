@@ -278,6 +278,10 @@ this boundary visible in the workflow file at all: the action archives its
 report under a step of its own that no scanner over these steps can see. The
 publisher states `mode: upload` rather than inheriting it, because the default
 is what separates that lane from the `check` this repository no longer runs.
+Neither lane fetches full Git history. The ratchet compares the measured
+percentage with a stored baseline and reads no commits. The full clone the
+`test` job once requested dates from the CodeScene check step, which has left
+this lane.
 
 The suite runs once per interpreter per event. On a pull request, `ci.yml` runs
 plain pytest on 3.12 and 3.14 and generates coverage on 3.13. On a push to main,
