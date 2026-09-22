@@ -54,6 +54,10 @@ from tests.workflow_contracts.deprecated_checksum import (
     DIGEST_REFRESH_WORKFLOW,
     deprecated_digest_mentions,
 )
+from tests.workflow_contracts.pull_request_reach import (
+    inherited_secrets,
+    pull_request_closure,
+)
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -98,16 +102,18 @@ class TestCodeSceneCoverageBoundary:
     def test_no_pull_request_workflow_reaches_codescene(
         self, documents: dict[str, dict]
     ) -> None:
-        """CV-005's boundary, asserted over the raw text.
+        """CV-005's boundary, asserted over everything a pull request can run.
 
-        Read from the text rather than the parsed document because a mention can
-        sit in a `run:` script, an `env:` value or an action input, and a walk
-        reading only the shapes it expects misses whichever one is used next.
+        The subject is the closure through same-repository reusable-workflow
+        calls, not the trigger list: a `workflow_call`-only workflow a
+        pull-request job calls runs on that pull request. Read from the text
+        rather than the parsed document because a mention can sit in a `run:`
+        script, an `env:` value, an action input or a named `secrets:` entry,
+        and a walk reading only the shapes it expects misses whichever one is
+        used next.
         """
         texts = workflow_texts()
-        for name, document in documents.items():
-            if not serves_pull_requests(document):
-                continue
+        for name in sorted(pull_request_closure(documents)):
             mentions = codescene_mentions(texts[name])
             assert not mentions, (
                 f"{name} serves pull requests and names {mentions}. A pull "
@@ -117,6 +123,26 @@ class TestCodeSceneCoverageBoundary:
                 f"generated here and compared against the local ratchet; "
                 f"publication belongs to the push-to-main lane"
             )
+
+    def test_no_pull_request_workflow_forwards_every_secret(
+        self, documents: dict[str, dict]
+    ) -> None:
+        """Refuse `secrets: inherit` anywhere a pull request can run.
+
+        It names no secret, so the text markers cannot find it, and it hands
+        the token to the called workflow whether or not that workflow's text
+        is in this repository to read.
+        """
+        forwarding = {
+            name: inherited_secrets(documents[name])
+            for name in sorted(pull_request_closure(documents))
+            if inherited_secrets(documents[name])
+        }
+
+        assert not forwarding, (
+            f"these pull-request jobs forward every secret with secrets: "
+            f"inherit, which reaches CodeScene's token: {forwarding}"
+        )
 
     def test_exactly_one_push_lane_uploads(self, documents: dict[str, dict]) -> None:
         """One publisher, and it states its mode.
