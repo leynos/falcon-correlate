@@ -36,17 +36,7 @@ from tests.workflows.act_platforms import (
 
 
 def _labels_in_the_act_workflow() -> set[str]:
-    """Return every literal runner label the act workflow's lanes resolve to.
-
-    An expression is skipped rather than guessed. The fork fallback is one,
-    and act is never given a fork event, so the arm it would take is not a
-    question this contract can answer from the text.
-
-    Returns
-    -------
-    set[str]
-        Each literal label, with expressions excluded.
-    """
+    """Return every literal runner label the act workflow's lanes resolve to."""
     jobs = jobs_of(workflow_texts()[ACT_WORKFLOW], ACT_WORKFLOW)
     labels: set[str] = set()
     for job in jobs.values():

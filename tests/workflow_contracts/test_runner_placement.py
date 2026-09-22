@@ -267,7 +267,7 @@ def test_a_reusable_workflow_caller_contributes_no_labels() -> None:
         f"a reusable-workflow caller must bill for nothing; got "
         f"{sorted(billable_labels(caller))}"
     )
-    with pytest.raises(WorkflowReadError, match="cannot inventory"):
+    with pytest.raises(WorkflowReadError, match="declaring no runner"):
         labels_of({"steps": []})
 
 
@@ -320,3 +320,59 @@ def test_a_lane_that_never_sees_a_pull_request_names_its_label(lane: str) -> Non
         f"literally rather than guarding on a field that is always empty; "
         f"got {runs_on!r}"
     )
+
+
+@pytest.mark.parametrize(
+    ("runs_on", "expected"),
+    [
+        ("ubuntu-latest", {"ubuntu-latest"}),
+        (
+            ["self-hosted", "linux", "ubicloud-standard-2"],
+            {"self-hosted", "linux", "ubicloud-standard-2"},
+        ),
+        ({"group": "ubicloud-runners"}, {"ubicloud-runners"}),
+        (
+            {"group": "ubicloud-runners", "labels": "ubicloud-standard-2"},
+            {"ubicloud-runners", "ubicloud-standard-2"},
+        ),
+        (
+            {"labels": ["ubicloud-standard-2", "linux"]},
+            {"ubicloud-standard-2", "linux"},
+        ),
+    ],
+    ids=["scalar", "sequence", "group", "group-and-labels", "labels-list"],
+)
+def test_every_runs_on_form_resolves_to_its_labels(
+    runs_on: object, expected: set[str]
+) -> None:
+    """GitHub accepts three forms and a reader must model all three.
+
+    The sequence and the ``group``/``labels`` mapping are the ones a reader
+    usually misses. Missing them is not a narrow gap: a reader that returns
+    the empty set for an unmodelled shape removes that lane from the
+    placement rule, the ceiling rule and the registry rule at the same time,
+    and all three then pass. vk's reader did exactly that and hid a paid,
+    unregistered lane from all three (vk #264).
+    """
+    assert labels_of({"runs-on": runs_on}) == expected, (
+        f"{runs_on!r} must resolve to {sorted(expected)}; got "
+        f"{sorted(labels_of({'runs-on': runs_on}))}"
+    )
+
+
+@pytest.mark.parametrize(
+    "runs_on",
+    [42, {"cpu": 4}, [1, 2], None],
+    ids=["number", "mapping-without-group-or-labels", "sequence-of-numbers", "absent"],
+)
+def test_an_unmodelled_runs_on_is_refused_rather_than_ignored(
+    runs_on: object,
+) -> None:
+    """Fail closed. An unreadable shape must stop one rule, not silence three.
+
+    Returning the empty set here would be the silent failure this whole
+    module exists to refuse, because "this lane bills for nothing" and "this
+    lane could not be read" would become the same answer.
+    """
+    with pytest.raises(WorkflowReadError):
+        labels_of({"runs-on": runs_on} if runs_on is not None else {"steps": []})

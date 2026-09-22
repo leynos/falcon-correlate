@@ -24,8 +24,13 @@ import typing as typ
 from pathlib import Path
 
 import yaml
+import yaml.constructor
+import yaml.resolver
 
 from tests.workflow_contracts.errors import WorkflowReadError
+
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
 
 __all__ = ["WorkflowReadError"]
 
@@ -34,12 +39,20 @@ WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
 ACTIONLINT_CONFIG = REPO_ROOT / ".github" / "actionlint.yaml"
 
 
-def as_mapping(value: object, message: str) -> dict[str, typ.Any]:
+def as_mapping(
+    value: object, message: str, workflow: str | None = None
+) -> dict[str, typ.Any]:
     """Return ``value`` as a mapping, refusing anything else.
 
     Public because the lane queries next door need the same refusal for the
     trigger mapping, and a second copy of it would be a second thing to keep
     in step with this one.
+
+    The source is a parameter so a structural refusal carries the same
+    machine-readable ``workflow`` attribute an I/O refusal does. Without it a
+    caller handling `WorkflowReadError` can act on which file failed to read
+    but not on which file was malformed, which is the arbitrary half of a
+    distinction the exception exists to erase.
 
     Parameters
     ----------
@@ -47,6 +60,8 @@ def as_mapping(value: object, message: str) -> dict[str, typ.Any]:
         The parsed value.
     message : str
         What to say when it is not a mapping.
+    workflow : str or None
+        The file the value came from, when one is known.
 
     Returns
     -------
@@ -59,7 +74,7 @@ def as_mapping(value: object, message: str) -> dict[str, typ.Any]:
         If the value is not a mapping.
     """
     if not isinstance(value, dict):
-        raise WorkflowReadError(message)
+        raise WorkflowReadError(message, workflow)
     return typ.cast("dict[str, typ.Any]", value)
 
 
@@ -91,13 +106,19 @@ def workflow_texts(directory: Path | None = None) -> dict[str, str]:
         If a file cannot be read or decoded.
     """
     directory = WORKFLOWS_DIR if directory is None else directory
-    if not directory.is_dir():
-        message = (
-            "is not a readable workflow directory. A missing directory would "
-            "otherwise make every contract here pass over an empty set of lanes"
-        )
-        raise WorkflowReadError(message, str(directory))
+    # `is_dir()` is inside the handler rather than before it. On Python before
+    # 3.14 it propagates permission and metadata errors instead of returning
+    # False, so probing outside the handler lets an `OSError` escape the very
+    # function whose contract is that reading failures arrive as
+    # `WorkflowReadError`.
     try:
+        if not directory.is_dir():
+            message = (
+                "is not a readable workflow directory. A missing directory "
+                "would otherwise make every contract here pass over an empty "
+                "set of lanes"
+            )
+            raise WorkflowReadError(message, str(directory))
         paths = sorted(directory.glob("*.y*ml"))
     except OSError as error:
         message = f"could not be enumerated: {error}"
@@ -110,6 +131,68 @@ def workflow_texts(directory: Path | None = None) -> dict[str, str]:
             message = f"could not be read: {error}"
             raise WorkflowReadError(message, path.name) from error
     return texts
+
+
+class _StrictLoader(yaml.SafeLoader):
+    """A ``SafeLoader`` that refuses a mapping repeating a key.
+
+    PyYAML keeps the last value for a repeated key and says nothing. A
+    workflow declaring ``runs-on`` twice, or ``jobs`` twice, therefore parses
+    into a document that silently discards the earlier value, and every
+    contract here then asserts against data the file does not contain: a lane
+    could carry a paid label in the discarded half and read as hosted.
+
+    GitHub Actions and actionlint both reject duplicate mapping keys, so a
+    document this refuses is one that would never have run anyway. Refusing it
+    here means the contracts fail loudly rather than passing on a half of the
+    file nobody chose.
+    """
+
+
+def _no_duplicate_keys(
+    loader: _StrictLoader, node: yaml.MappingNode, *, deep: bool = False
+) -> dict[typ.Any, typ.Any]:
+    """Construct a mapping, refusing a key that appears more than once.
+
+    Parameters
+    ----------
+    loader : _StrictLoader
+        The loader constructing the node.
+    node : yaml.MappingNode
+        The mapping being constructed.
+    deep : bool
+        Whether to construct child objects eagerly.
+
+    Returns
+    -------
+    dict[typ.Any, typ.Any]
+        The constructed mapping.
+
+    Raises
+    ------
+    yaml.constructor.ConstructorError
+        If a key appears more than once, with the key and its line.
+    """
+    mapping: dict[typ.Any, typ.Any] = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in mapping:
+            message = (
+                f"duplicate mapping key {key!r} at line "
+                f"{key_node.start_mark.line + 1}; PyYAML would keep only the "
+                "last value and every rule here would then read a document "
+                "the file does not contain"
+            )
+            raise yaml.constructor.ConstructorError(
+                None, None, message, key_node.start_mark
+            )
+        mapping[key] = loader.construct_object(value_node, deep=deep)
+    return mapping
+
+
+_StrictLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _no_duplicate_keys
+)
 
 
 def parse_workflow(text: str, workflow: str) -> dict[str, typ.Any]:
@@ -130,14 +213,15 @@ def parse_workflow(text: str, workflow: str) -> dict[str, typ.Any]:
     Raises
     ------
     WorkflowReadError
-        If the text is not valid YAML, or is not a mapping.
+        If the text is not valid YAML, repeats a mapping key, or is not a
+        mapping.
     """
     try:
-        document = yaml.safe_load(text)
+        document = yaml.load(text, Loader=_StrictLoader)  # noqa: S506 - strict SafeLoader subclass
     except yaml.YAMLError as error:
         message = f"could not be parsed: {error}"
         raise WorkflowReadError(message, workflow) from error
-    return as_mapping(document, f"{workflow} must parse to a mapping")
+    return as_mapping(document, "must parse to a mapping", workflow)
 
 
 def jobs_of(text: str, workflow: str) -> dict[str, dict[str, typ.Any]]:
@@ -149,9 +233,9 @@ def jobs_of(text: str, workflow: str) -> dict[str, dict[str, typ.Any]]:
         Each job mapping, keyed by job name.
     """
     document = parse_workflow(text, workflow)
-    jobs = as_mapping(document.get("jobs"), f"{workflow} must declare a jobs mapping")
+    jobs = as_mapping(document.get("jobs"), "must declare a jobs mapping", workflow)
     return {
-        str(name): as_mapping(job, f"{workflow}:{name} must be a mapping")
+        str(name): as_mapping(job, f"job {name} must be a mapping", workflow)
         for name, job in jobs.items()
     }
 
@@ -183,7 +267,8 @@ def read_actionlint_registry(config_path: Path | None = None) -> set[str]:
     config = parse_workflow(text, config_path.name)
     runner = as_mapping(
         config.get("self-hosted-runner"),
-        "the config must declare self-hosted-runner",
+        "must declare self-hosted-runner",
+        config_path.name,
     )
     labels = runner.get("labels")
     if labels is None:
@@ -199,3 +284,45 @@ def read_actionlint_registry(config_path: Path | None = None) -> set[str]:
         )
         raise WorkflowReadError(message)
     return set(labels)
+
+
+def text_of(texts: cabc.Mapping[str, str], workflow: str) -> str:
+    """Return one workflow's text, refusing an absent name.
+
+    A bare ``texts[workflow]`` raises ``KeyError`` with nothing but the name,
+    and it raises it during pytest's parameter generation when the missing
+    workflow is one a module-level constant enumerates, which reports as a
+    collection error rather than as a contract failure.
+
+    This is not hypothetical. ``get-codescene-sha.yml`` was deleted from this
+    repository on 2026-09-22 while ``HOSTED_LANES`` still named it, and the
+    result was a `KeyError` with no indication of which list was stale or what
+    the repository actually contains.
+
+    Parameters
+    ----------
+    texts : cabc.Mapping[str, str]
+        File name to file text.
+    workflow : str
+        The file name to read.
+
+    Returns
+    -------
+    str
+        The file's text.
+
+    Raises
+    ------
+    WorkflowReadError
+        If the corpus has no such workflow.
+    """
+    try:
+        return texts[workflow]
+    except KeyError as error:
+        message = (
+            "is named by a contract but is not among the workflows read "
+            f"({', '.join(sorted(texts)) or 'none'}). Either the workflow was "
+            "deleted and the list naming it is stale, or the reader was "
+            "pointed at the wrong directory"
+        )
+        raise WorkflowReadError(message, workflow) from error
