@@ -24,10 +24,9 @@ import typing as typ
 from pathlib import Path
 
 import yaml
-import yaml.constructor
-import yaml.resolver
 
 from tests.workflow_contracts.errors import WorkflowReadError
+from tests.workflow_contracts.strict_yaml import StrictLoader
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -133,68 +132,6 @@ def workflow_texts(directory: Path | None = None) -> dict[str, str]:
     return texts
 
 
-class _StrictLoader(yaml.SafeLoader):
-    """A ``SafeLoader`` that refuses a mapping repeating a key.
-
-    PyYAML keeps the last value for a repeated key and says nothing. A
-    workflow declaring ``runs-on`` twice, or ``jobs`` twice, therefore parses
-    into a document that silently discards the earlier value, and every
-    contract here then asserts against data the file does not contain: a lane
-    could carry a paid label in the discarded half and read as hosted.
-
-    GitHub Actions and actionlint both reject duplicate mapping keys, so a
-    document this refuses is one that would never have run anyway. Refusing it
-    here means the contracts fail loudly rather than passing on a half of the
-    file nobody chose.
-    """
-
-
-def _no_duplicate_keys(
-    loader: _StrictLoader, node: yaml.MappingNode, *, deep: bool = False
-) -> dict[typ.Any, typ.Any]:
-    """Construct a mapping, refusing a key that appears more than once.
-
-    Parameters
-    ----------
-    loader : _StrictLoader
-        The loader constructing the node.
-    node : yaml.MappingNode
-        The mapping being constructed.
-    deep : bool
-        Whether to construct child objects eagerly.
-
-    Returns
-    -------
-    dict[typ.Any, typ.Any]
-        The constructed mapping.
-
-    Raises
-    ------
-    yaml.constructor.ConstructorError
-        If a key appears more than once, with the key and its line.
-    """
-    mapping: dict[typ.Any, typ.Any] = {}
-    for key_node, value_node in node.value:
-        key = loader.construct_object(key_node, deep=deep)
-        if key in mapping:
-            message = (
-                f"duplicate mapping key {key!r} at line "
-                f"{key_node.start_mark.line + 1}; PyYAML would keep only the "
-                "last value and every rule here would then read a document "
-                "the file does not contain"
-            )
-            raise yaml.constructor.ConstructorError(
-                None, None, message, key_node.start_mark
-            )
-        mapping[key] = loader.construct_object(value_node, deep=deep)
-    return mapping
-
-
-_StrictLoader.add_constructor(
-    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _no_duplicate_keys
-)
-
-
 def parse_workflow(text: str, workflow: str) -> dict[str, typ.Any]:
     """Return one workflow's parsed document.
 
@@ -217,7 +154,7 @@ def parse_workflow(text: str, workflow: str) -> dict[str, typ.Any]:
         mapping.
     """
     try:
-        document = yaml.load(text, Loader=_StrictLoader)  # noqa: S506 - strict SafeLoader subclass
+        document = yaml.load(text, Loader=StrictLoader)  # noqa: S506 - strict SafeLoader subclass
     except yaml.YAMLError as error:
         message = f"could not be parsed: {error}"
         raise WorkflowReadError(message, workflow) from error
