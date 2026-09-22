@@ -250,6 +250,29 @@ def test_a_repeated_mapping_key_is_refused(text: str, key: str) -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "text",
+    ["? [a, b]\n: value\n", "? {a: 1}\n: value\n"],
+    ids=["list-key", "mapping-key"],
+)
+def test_an_unhashable_mapping_key_is_refused_as_malformed_yaml(text: str) -> None:
+    """A complex key is malformed YAML for a workflow, not a crash.
+
+    The duplicate-key check tests membership, which raises `TypeError` for a
+    key that constructs as a list or a mapping. No reader catches that, so
+    before this refusal it escaped the `WorkflowReadError` boundary as a raw
+    exception naming no file.
+    """
+    with pytest.raises(WorkflowReadError) as raised:
+        parse_workflow(text, "ci.yml")
+    assert raised.value.workflow == "ci.yml", (
+        f"the refusal must name the file; got {raised.value.workflow!r}"
+    )
+    assert "unhashable" in raised.value.reason, (
+        f"the reason must say what was wrong with the key; got {raised.value.reason!r}"
+    )
+
+
 def test_an_unreadable_directory_arrives_as_the_reader_s_own_error(
     tmp_path: Path,
 ) -> None:

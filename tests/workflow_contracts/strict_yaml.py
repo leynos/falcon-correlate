@@ -61,11 +61,25 @@ def _no_duplicate_keys(
     Raises
     ------
     yaml.constructor.ConstructorError
-        If a key appears more than once, with the key and its line.
+        If a key appears more than once, or cannot be a key at all because it
+        constructs as a list or mapping, with the key and its line.
     """
     mapping: dict[typ.Any, typ.Any] = {}
     for key_node, value_node in node.value:
         key = loader.construct_object(key_node, deep=deep)
+        try:
+            hash(key)
+        except TypeError as error:
+            # A complex key such as `? [a, b]` constructs as a list. The
+            # membership test below would raise `TypeError`, which no reader
+            # catches, so it is reported as the malformed YAML it is.
+            message = (
+                f"unhashable mapping key {key!r} at line "
+                f"{key_node.start_mark.line + 1}; a mapping key must be a scalar"
+            )
+            raise yaml.constructor.ConstructorError(
+                None, None, message, key_node.start_mark
+            ) from error
         if key in mapping:
             message = (
                 f"duplicate mapping key {key!r} at line "

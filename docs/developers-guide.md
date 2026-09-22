@@ -335,6 +335,27 @@ Table: the reader's queries and what each one answers.
 | `paid_lanes_by_trigger(...)`    | the agreed lanes either side of that question   |
 | `read_actionlint_registry(p)`   | the labels registered for actionlint            |
 
+The reader is five modules, each answering one question, with one error
+boundary between them and the contracts:
+
+- `workflow_documents.py` reads files and YAML: the corpus, one document, its
+  jobs, and `text_of`, which refuses a workflow name the corpus does not hold
+  instead of raising a bare `KeyError`. It knows nothing about runners.
+- `strict_yaml.py` holds `StrictLoader`, the `SafeLoader` every workflow is
+  parsed with. It refuses a mapping that repeats a key, because PyYAML keeps
+  the last value in silence and a lane could then carry a paid label in the
+  discarded half, and it refuses a key that constructs as a list or a mapping,
+  which would otherwise escape as a raw `TypeError`. Both arrive as
+  `yaml.constructor.ConstructorError`, which `parse_workflow` reports as
+  `WorkflowReadError` naming the file.
+- `runs_on.py` resolves a job's `runs-on` in all three forms GitHub accepts to
+  the labels it can bill for, and refuses any other shape.
+- `runner_lanes.py` is the lane vocabulary built on those: which lanes are
+  paid, their ceilings, and the actionlint registry.
+- `errors.py` holds `WorkflowContractError` and `WorkflowReadError`, once, so
+  every reader raises the same class and `except WorkflowReadError` catches all
+  of them.
+
 Every query that reads the filesystem takes its source as a parameter and
 defaults to this repository. Injection is at the boundary rather than one level
 down, so a test can ask any of these questions about a corpus it built, and the
@@ -384,17 +405,22 @@ any mapping. Those are different problems and the contract says which it found,
 so an unmapped Linux label reads as a mapping to add and a Windows or macOS
 lane in `ci.yml` reads as a lane act no longer covers. `run_act` also refuses
 the skip message outright, so a skipped job fails its test rather than passing
-it vacuously.
+it vacuously. It lives in `tests/workflows/act_runner.py`, apart from the
+integration tests for the same import-time reason, and takes an optional
+`act_executable`, so `tests/workflow_contracts/test_act_runner.py` proves the
+refusal in CI with a stand-in `act` that prints the skip message and exits
+zero, alongside a job that ran and failed, which it must return untouched.
 
 ### What the contracts assert
 
-`tests/workflow_contracts/` collects sixty-six cases across four modules:
-twenty-five placement contracts in `test_runner_placement.py`, five Hypothesis
-properties in `test_runner_lanes_properties.py`, twenty-six reader and
-predicate cases in `test_runner_lanes_errors.py`, and four in
-`test_act_platform_mapping.py`. Each rule is proved by a mutation that it must
-reject and, where the rule could be drawn too tightly, by a correct variant it
-must accept.
+The placement contracts live in `test_runner_placement.py`, the Hypothesis
+properties of the lane reader in `test_runner_lanes_properties.py`, and the
+reader's refusals and predicates in `test_runner_lanes_errors.py` and
+`test_reader_refusals.py`. `test_act_platform_mapping.py` holds the act label
+mapping and `test_act_runner.py` the refusal of a skipped job. The counts are
+deliberately not stated here, because a count in prose is stale the next time a
+case is added. Each rule is proved by a mutation that it must reject and, where
+the rule could be drawn too tightly, by a correct variant it must accept.
 
 Which lanes must carry the fork fallback is **derived from each workflow's own
 triggers**, not listed. A second list is the gap: a paid lane added to a
