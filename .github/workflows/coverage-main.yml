@@ -27,6 +27,14 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Queue trunk generations; never cancel one. Each writes the ratchet baseline
+# and uploads the report, so a cancelled run abandons both, and two running
+# at once let the older commit finish last and leave its baseline as the one
+# every pull request is measured against.
+concurrency:
+  group: coverage-main-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   coverage-upload:
     # A literal label, not the fork fallback. This workflow triggers only
@@ -70,7 +78,11 @@ jobs:
           # CodeScene with no report to read.
 
       - name: Upload coverage data to CodeScene
-        if: env.CS_ACCESS_TOKEN != ''
+        # The ref guard is load-bearing. `workflow_dispatch` can select any
+        # branch or tag, and the push trigger's `branches: [main]` says
+        # nothing about a dispatch, so without it a dispatch from a feature
+        # branch would publish that branch's coverage as the trunk's.
+        if: github.ref == 'refs/heads/main' && env.CS_ACCESS_TOKEN != ''
         uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
           format: cobertura

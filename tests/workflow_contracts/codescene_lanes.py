@@ -21,6 +21,11 @@ from pathlib import Path
 import yaml
 
 from tests.workflow_contracts.errors import WorkflowContractError, WorkflowReadError
+from tests.workflow_contracts.pull_request_reach import (
+    PULL_REQUEST_EVENTS,
+    trigger_names,
+)
+from tests.workflow_contracts.strict_yaml import StrictLoader
 
 __all__ = ["WorkflowContractError", "WorkflowReadError"]
 
@@ -142,10 +147,13 @@ def parse(workflow: str, text: str) -> dict[str, typ.Any]:
     Raises
     ------
     WorkflowReadError
-        If the text is not valid YAML, or is not a mapping.
+        If the text is not valid YAML, repeats a mapping key, uses a list or
+        mapping as a key, or is not a mapping. PyYAML alone keeps the last of
+        two equal keys in silence, so a credential declared in the discarded
+        half would read here as absent.
     """
     try:
-        document = yaml.safe_load(text)
+        document = yaml.load(text, Loader=StrictLoader)  # noqa: S506 - strict SafeLoader subclass
     except yaml.YAMLError as error:
         message = f"could not be parsed: {error}"
         raise WorkflowReadError(message, workflow) from error
@@ -173,29 +181,32 @@ def triggers_of(document: dict[str, typ.Any]) -> object:
     return document.get("on", document.get(True))
 
 
-def serves_pull_requests(document: dict[str, typ.Any]) -> bool:
-    """Report whether a workflow runs on pull requests.
+def serves_pull_requests(
+    document: dict[str, typ.Any], workflow: str = "workflow"
+) -> bool:
+    """Report whether a pull request can start a workflow directly.
 
     Derived from the document rather than listed, so a workflow that gains a
     `pull_request` trigger tomorrow comes under the boundary without anyone
-    remembering to add it.
+    remembering to add it. `pull_request_target` counts: it runs with the
+    base repository's secrets. A workflow a pull-request workflow calls is
+    reached too, which is the closure's question, not this one's.
 
     Parameters
     ----------
     document : dict[str, typ.Any]
         A parsed workflow document.
+    workflow : str
+        The file's name, for a refusal's message.
 
     Returns
     -------
     bool
-        True when the workflow declares a `pull_request` trigger.
+        True when the workflow declares a pull-request event, in any of the
+        forms :func:`~tests.workflow_contracts.pull_request_reach.trigger_names`
+        reads; an unreadable trigger block is refused there.
     """
-    triggers = triggers_of(document)
-    if isinstance(triggers, str):
-        return triggers == "pull_request"
-    if isinstance(triggers, list):
-        return "pull_request" in triggers
-    return "pull_request" in as_mapping(triggers, "a workflow must declare on:")
+    return bool(PULL_REQUEST_EVENTS & trigger_names(document, workflow))
 
 
 def pushes_to_main(document: dict[str, typ.Any]) -> bool:
