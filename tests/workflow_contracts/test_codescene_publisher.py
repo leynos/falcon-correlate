@@ -17,10 +17,15 @@ from tests.workflow_contracts.codescene_lanes import (
     steps_of,
     workflow_texts,
 )
-from tests.workflow_contracts.guard_conditions import conjuncts
+from tests.workflow_contracts.guard_conditions import admits, conjuncts
 
 MAIN_REF = "github.ref == 'refs/heads/main'"
 SKIP_WITHOUT_CREDENTIAL = "env.CS_ACCESS_TOKEN != ''"
+
+
+def _start(event: str, ref: str, token: str) -> dict[str, str]:
+    """Return the context a workflow started by *event* on *ref* evaluates in."""
+    return {"github.event_name": event, "github.ref": ref, "env.CS_ACCESS_TOKEN": token}
 
 
 @pytest.fixture(name="publisher")
@@ -70,18 +75,58 @@ class TestTheUploadGuard:
             f"{name}'s upload must skip when the token is absent; it has {found}"
         )
 
+    @pytest.mark.parametrize(
+        ("context", "expected"),
+        [
+            (_start("push", "refs/heads/main", "set"), True),
+            (_start("workflow_dispatch", "refs/heads/main", "set"), True),
+            (_start("workflow_dispatch", "refs/heads/feature", "set"), False),
+            (_start("workflow_dispatch", "refs/tags/v1.0.0", "set"), False),
+            (_start("push", "refs/heads/main", ""), False),
+        ],
+        ids=[
+            "push to main",
+            "dispatch on main",
+            "dispatch on a branch",
+            "dispatch on a tag",
+            "no token",
+        ],
+    )
+    def test_the_upload_runs_only_for_the_trunk(
+        self, publisher: tuple[str, dict], context: dict[str, str], expected: object
+    ) -> None:
+        """Evaluate the guard for each way the workflow can be started.
+
+        The behavioural question a workflow runner would answer, asked of the
+        guard as GitHub evaluates it.
+        """
+        name, document = publisher
+        guard = next(
+            str(step.get("if", ""))
+            for _job, step in steps_of(document)
+            if str(step.get("uses", "")).partition("@")[0] == UPLOAD_ACTION
+        )
+
+        assert admits(guard, context, name) is expected, (
+            f"{name}'s upload must {'run' if expected else 'not run'} in {context}"
+        )
+
 
 class TestTrunkGenerations:
-    """Trunk generations queue; none is cancelled."""
+    """Trunk runs never overlap, and a running one is never cancelled."""
 
-    def test_the_publisher_queues_and_never_cancels(
+    def test_the_publisher_never_overlaps_or_cancels_a_running_generation(
         self, publisher: tuple[str, dict]
     ) -> None:
-        """A cancelled trunk run abandons its upload and its baseline write.
+        """A cancelled running generation abandons its upload and baseline.
 
-        Two running at once let the older commit finish last and leave its
-        baseline as the newest. A group per ref with cancellation off queues
-        them instead.
+        Two running at once would let the older commit finish last and leave
+        its baseline as the newest. A group per ref with cancellation off
+        prevents both. It is not a durable queue: GitHub keeps one pending
+        run per group, so a newer push replaces an older pending one. That
+        skips an intermediate commit's publication, which is the right
+        outcome, because the newest commit's baseline is the one pull
+        requests should read.
         """
         name, document = publisher
         declared = document.get("concurrency")

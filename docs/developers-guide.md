@@ -291,10 +291,14 @@ push trigger's `branches: [main]` says nothing about a dispatch, so without the
 guard a dispatch from a feature branch would publish that branch's coverage as
 the trunk's. The contract reads the guard as a conjunction and refuses `||`,
 because a substring check passes a guard with
-`|| github.event_name == 'workflow_dispatch'` appended. The workflow also
-queues its runs in a concurrency group keyed on the ref and never cancels one:
-a cancelled trunk run abandons its upload and its baseline write, and two
-overlapping runs let the older commit's baseline land last.
+`|| github.event_name == 'workflow_dispatch'` appended, and it evaluates the
+guard for a push to main, dispatches from main, a branch and a tag, and a
+missing token. The workflow also runs in a concurrency group keyed on the ref
+that never cancels a running generation: a cancelled trunk run abandons its
+upload and its baseline write, and two overlapping runs let the older commit's
+baseline land last. It is not a durable queue. GitHub keeps one pending run per
+group, so a newer push replaces an older pending one, which skips an
+intermediate commit that no pull request should be measured against anyway.
 
 `tests/workflow_contracts/test_codescene_coverage_boundary.py` asserts all of
 this, deriving the boundary's subject from each workflow's own triggers rather
@@ -303,17 +307,18 @@ than from a list of file names. The subject is a closure, not a trigger list:
 `pull_request` or `pull_request_target` event starts, reading the trigger block
 in any form GitHub accepts, and follows each job-level call into this
 repository's workflow directory, recognized by where the reference resolves
-rather than by a list of prefixes. A `workflow_call`-only workflow a
-pull-request job calls runs on that pull request, and with `secrets: inherit`
-it holds every secret the caller does, so the closure is scanned and
-`secrets: inherit` is refused anywhere in it. Workflows are parsed with
-`StrictLoader`, so a credential cannot hide in the discarded half of a repeated
-key. Two readings there are worth knowing before changing it. The publisher is
-"pushes to main and serves no pull request", because `ci.yml` declares both and
-the looser reading would require it to upload and forbid it from uploading at
-once. And CodeScene markers are matched against the raw text, because a mention
-can sit in a `run:` script, an `env:` value or an action input; comment lines
-are excluded so the reason can be written beside the rule.
+rather than by a list of prefixes, GitHub's recommended `$/` self-repository
+spelling included. A `workflow_call`-only workflow a pull-request job calls
+runs on that pull request, and with `secrets: inherit` it holds every secret
+the caller does, so the closure is scanned and `secrets: inherit` is refused
+anywhere in it. Workflows are parsed with `StrictLoader`, so a credential
+cannot hide in the discarded half of a repeated key. Two readings there are
+worth knowing before changing it. The publisher is "pushes to main and serves
+no pull request", because `ci.yml` declares both and the looser reading would
+require it to upload and forbid it from uploading at once. And CodeScene
+markers are matched against the raw text, because a mention can sit in a `run:`
+script, an `env:` value or an action input; comment lines are excluded so the
+reason can be written beside the rule.
 
 ### Errors the readers raise
 

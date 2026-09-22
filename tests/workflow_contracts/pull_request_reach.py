@@ -78,25 +78,7 @@ def trigger_names(
 
 
 def _event_names(declared: object, workflow: str) -> frozenset[str]:
-    """Read the scalar, list and mapping trigger forms.
-
-    Parameters
-    ----------
-    declared : object
-        The value under the trigger key.
-    workflow : str
-        The file's name, for the message.
-
-    Returns
-    -------
-    frozenset[str]
-        The declared event names.
-
-    Raises
-    ------
-    WorkflowReadError
-        If the value is none of a string, a list of strings, or a mapping.
-    """
+    """Read the scalar, list and mapping trigger forms, refusing any other."""
     if isinstance(declared, str):
         return frozenset({declared})
     names = list(declared) if isinstance(declared, (list, dict)) else []
@@ -107,73 +89,35 @@ def _event_names(declared: object, workflow: str) -> frozenset[str]:
 
 
 def _local_workflow(reference: str) -> str | None:
-    """Return the workflow file a same-repository call names, if it is one.
+    """Return the workflow a same-repository call names, matched by shape."""
+    # GitHub's recommended `$/` self-repository prefix is stripped when no
+    # `@ref` follows it, as is this repository's own `owner/repo/` and any
+    # `@ref`; normalizing the path removes a leading `./`.
+    path, separator, _ref = reference.partition("@")
+    if path.startswith("$/"):
+        return None if separator else _in_workflow_directory(path.removeprefix("$/"))
+    return _in_workflow_directory(path.removeprefix(f"{REPOSITORY}/"))
 
-    Matched by shape rather than by an enumerated prefix list: strip this
-    repository's own ``owner/repo/`` and any ``@ref``, normalize the path,
-    which also removes a leading ``./``, and ask whether what remains is a
-    file directly under the workflow directory.
 
-    Parameters
-    ----------
-    reference : str
-        A job-level ``uses`` value.
-
-    Returns
-    -------
-    str | None
-        The file name, or ``None`` when the reference is not a local call.
-    """
-    path = reference.split("@", 1)[0].removeprefix(f"{REPOSITORY}/")
+def _in_workflow_directory(path: str) -> str | None:
+    """Return the file name when a path resolves directly under the directory."""
     directory, name = posixpath.split(posixpath.normpath(path))
     return name if directory == WORKFLOW_DIRECTORY and name else None
 
 
 def _is_remote(reference: str) -> bool:
-    """Report whether a job-level ``uses`` is an ``owner/repo/path@ref`` call.
-
-    Parameters
-    ----------
-    reference : str
-        A job-level ``uses`` value.
-
-    Returns
-    -------
-    bool
-        True for a reference into another repository.
-    """
+    """Report whether a job-level ``uses`` is an ``owner/repo/path@ref`` call."""
     path, separator, ref = reference.partition("@")
     return (
         bool(separator and ref)
+        and not path.startswith("$/")
         and path.count("/") >= _REMOTE_SEPARATORS
         and ".." not in path
     )
 
 
 def _called(reference: str, present: cabc.Collection[str], workflow: str) -> str | None:
-    """Return the local workflow one job-level ``uses`` calls, if any.
-
-    Parameters
-    ----------
-    reference : str
-        The job's ``uses`` value.
-    present : cabc.Collection[str]
-        File names in the workflow directory.
-    workflow : str
-        The calling file's name, for the message.
-
-    Returns
-    -------
-    str | None
-        The called file name, or ``None`` for a remote reusable workflow.
-
-    Raises
-    ------
-    WorkflowReadError
-        If the reference has neither known shape, which would otherwise drop
-        the callee from the closure in silence, or names a local file that
-        does not exist.
-    """
+    """Return the local workflow a call names, refusing one it cannot place."""
     name = _local_workflow(reference)
     if name is None and not _is_remote(reference):
         message = f"calls {reference!r}, which is neither local nor owner/repo/path@ref"
@@ -185,21 +129,7 @@ def _called(reference: str, present: cabc.Collection[str], workflow: str) -> str
 
 
 def _jobs(document: cabc.Mapping[typ.Any, typ.Any]) -> dict[typ.Any, dict]:
-    """Return a document's job mappings, skipping anything that is not one.
-
-    The CodeScene reader refuses a malformed job in its own traversal; this
-    reader answers only which calls and forwards a well-formed job makes.
-
-    Parameters
-    ----------
-    document : cabc.Mapping[typ.Any, typ.Any]
-        A parsed workflow document.
-
-    Returns
-    -------
-    dict[typ.Any, dict]
-        Job name to job mapping.
-    """
+    """Return a document's job mappings; the CodeScene reader refuses bad ones."""
     jobs = document.get("jobs")
     if not isinstance(jobs, dict):
         return {}

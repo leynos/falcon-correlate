@@ -12,7 +12,7 @@ import pytest
 
 from tests.workflow_contracts.codescene_lanes import codescene_mentions, parse
 from tests.workflow_contracts.errors import WorkflowReadError
-from tests.workflow_contracts.guard_conditions import conjuncts
+from tests.workflow_contracts.guard_conditions import admits, conjuncts
 from tests.workflow_contracts.pull_request_reach import (
     inherited_secrets,
     local_calls,
@@ -67,6 +67,7 @@ class TestLocalCalls:
     @pytest.mark.parametrize(
         "reference",
         [
+            "$/.github/workflows/called.yml",
             "./.github/workflows/called.yml",
             "./.github/workflows/../workflows/called.yml",
             "leynos/falcon-correlate/.github/workflows/called.yml@main",
@@ -99,11 +100,11 @@ class TestLocalCalls:
     @pytest.mark.parametrize(
         "reference",
         [
-            "$/.github/workflows/called.yml",
+            "$/.github/workflows/called.yml@main",
             "called.yml",
             "./.github/workflows/absent.yml",
         ],
-        ids=["unknown prefix", "bare name", "missing file"],
+        ids=["self reference with a ref", "bare name", "missing file"],
     )
     def test_an_unplaceable_call_is_refused(self, reference: str) -> None:
         """Skipping it would drop the callee from the closure in silence."""
@@ -229,8 +230,15 @@ class TestGuardConjuncts:
             "github.ref == 'refs/heads/main' && (env.T != '')",
             "!cancelled()",
             "github.ref == 'refs/heads/main' && ",
+            "github.ref == 'refs/heads/main' && env.T != '' && )",
         ],
-        ids=["disjunction", "group", "negation", "empty conjunct"],
+        ids=[
+            "disjunction",
+            "group",
+            "negation",
+            "empty conjunct",
+            "stray parenthesis",
+        ],
     )
     def test_a_form_that_is_not_a_conjunction_is_refused(self, condition: str) -> None:
         """Refuse rather than approximate; the disjunction is the case."""
@@ -242,3 +250,58 @@ class TestGuardConjuncts:
         assert conjuncts("env.A == '||(!)'", "x") == ["env.A == '||(!)'"], (
             "operators inside a quoted literal must not be read"
         )
+
+
+class TestGuardEvaluation:
+    """A guard is evaluated as GitHub would, or refused."""
+
+    @pytest.mark.parametrize(
+        ("context", "expected"),
+        [
+            ({"github.ref": "refs/heads/main", "env.T": "set"}, True),
+            ({"github.ref": "refs/heads/feature", "env.T": "set"}, False),
+            ({"github.ref": "refs/heads/main", "env.T": ""}, False),
+        ],
+        ids=["main with a value", "another ref", "no value"],
+    )
+    def test_a_conjunction_holds_only_when_every_conjunct_does(
+        self, context: dict[str, str], expected: object
+    ) -> None:
+        """Admit only when all conjuncts hold."""
+        guard = "github.ref == 'refs/heads/main' && env.T != ''"
+
+        assert admits(guard, context, "x") is expected, (
+            f"{guard!r} must evaluate to {expected} in {context}"
+        )
+
+    def test_string_comparison_ignores_case(self) -> None:
+        """Compare strings the way GitHub's expression language does."""
+        assert admits("runner.os == 'windows'", {"runner.os": "Windows"}, "x"), (
+            "string comparison must ignore case"
+        )
+
+    @pytest.mark.parametrize(
+        ("value", "expected"), [("true", True), ("", False), ("false", False)]
+    )
+    def test_a_bare_reference_reads_as_truthiness(
+        self, value: str, expected: object
+    ) -> None:
+        """Read a bare value as GitHub reads it."""
+        assert admits("matrix.tools", {"matrix.tools": value}, "x") is expected, (
+            f"a bare reference holding {value!r} must read as {expected}"
+        )
+
+    def test_status_functions_and_an_empty_guard_admit(self) -> None:
+        """Treat `always()` and a missing guard as running the step."""
+        assert admits("${{ always() }}", {}, "x"), "always() must admit"
+        assert admits("", {}, "x"), "a step with no guard must run"
+
+    @pytest.mark.parametrize(
+        "condition",
+        ["github.ref == 'refs/heads/main'", "github.ref >= 'refs/heads/main'"],
+        ids=["unnamed reference", "unsupported operator"],
+    )
+    def test_what_cannot_be_evaluated_is_refused(self, condition: str) -> None:
+        """Refuse an unnamed reference or an unsupported form, never default."""
+        with pytest.raises(WorkflowReadError):
+            admits(condition, {"github.ref": "x"} if ">=" in condition else {}, "x")

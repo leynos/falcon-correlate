@@ -27,10 +27,13 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Queue trunk generations; never cancel one. Each writes the ratchet baseline
-# and uploads the report, so a cancelled run abandons both, and two running
-# at once let the older commit finish last and leave its baseline as the one
-# every pull request is measured against.
+# Never overlap trunk generations, and never cancel a running one. Each writes
+# the ratchet baseline and uploads the report, so a cancelled run abandons
+# both, and two running at once let the older commit finish last and leave
+# its baseline as the one every pull request is measured against. GitHub
+# keeps one pending run per group, so a newer push replaces an older pending
+# one; skipping that intermediate commit is the right outcome, because the
+# newest commit's baseline is the one pull requests should read.
 concurrency:
   group: coverage-main-${{ github.ref }}
   cancel-in-progress: false
