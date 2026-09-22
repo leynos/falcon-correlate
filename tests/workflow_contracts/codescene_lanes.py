@@ -20,6 +20,10 @@ from pathlib import Path
 
 import yaml
 
+from tests.workflow_contracts.errors import WorkflowContractError, WorkflowReadError
+
+__all__ = ["WorkflowContractError", "WorkflowReadError"]
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
 
@@ -54,48 +58,6 @@ CODESCENE_MARKERS: typ.Final[tuple[str, ...]] = (
     "upload-codescene-coverage",
     "codescene.io",
 )
-
-
-class WorkflowContractError(RuntimeError):
-    """Base for every failure raised by this package's workflow readers.
-
-    A stable catch point. Callers that want to handle any reader failure
-    should name this rather than enumerating subclasses, so a reader added
-    later does not escape a handler written today.
-    """
-
-
-class WorkflowReadError(WorkflowContractError):
-    """Raised when a workflow document has a shape this reader cannot read.
-
-    A real exception rather than an `assert`, which disappears under
-    `python -O` and would turn a refusal into a silent empty answer.
-
-    The workflow and the reason are kept as attributes as well as rendered
-    into the message, so a caller can act on which file failed and why
-    without parsing prose that exists to be read by a person.
-
-    Attributes
-    ----------
-    workflow : str or None
-        The file or directory the failure is about, when one is known.
-    reason : str
-        Why it could not be read.
-    """
-
-    def __init__(self, reason: str, workflow: str | None = None) -> None:
-        """Record the reason and, when known, the workflow it concerns.
-
-        Parameters
-        ----------
-        reason : str
-            Why the document could not be read.
-        workflow : str or None
-            The file or directory concerned.
-        """
-        self.workflow = workflow
-        self.reason = reason
-        super().__init__(f"{workflow}: {reason}" if workflow else reason)
 
 
 def as_mapping(value: object, message: str) -> dict[str, typ.Any]:

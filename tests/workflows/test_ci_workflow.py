@@ -9,7 +9,6 @@ Run with: pytest tests/workflows/ -v
 
 from __future__ import annotations
 
-import dataclasses as dc
 import json
 import shutil
 import subprocess
@@ -18,9 +17,9 @@ from pathlib import Path
 
 import pytest
 
+from tests.workflows.act_runner import WORKFLOW_PATH, ActConfig, run_act
+
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
-REPO_ROOT = Path(__file__).parent.parent.parent
-WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
 
 def _tool_is_available(tool_name: str, args: list[str]) -> bool:
@@ -39,77 +38,6 @@ def _tool_is_available(tool_name: str, args: list[str]) -> bool:
 # Check if act and Docker are available at module load time
 ACT_AVAILABLE = _tool_is_available("act", ["--version"])
 DOCKER_AVAILABLE = _tool_is_available("docker", ["info"])
-
-
-@dc.dataclass(frozen=True)
-class ActConfig:
-    """Configuration for running act."""
-
-    event: str
-    job: str
-    event_path: Path
-    artefact_dir: Path
-    matrix: dict[str, str] = dc.field(default_factory=dict)
-    dry_run: bool = False
-
-
-def run_act(config: ActConfig) -> tuple[int, Path, str]:
-    """Run act with the specified configuration.
-
-    Parameters
-    ----------
-    config : ActConfig
-        Configuration for the event, job, matrix values, and artefact directory.
-
-    Returns
-    -------
-    tuple[int, Path, str]
-        The exit code, artefact directory, and combined stdout/stderr logs.
-
-    Raises
-    ------
-    FileNotFoundError
-        If ``act`` is not available on ``PATH``.
-    """
-    config.artefact_dir.mkdir(parents=True, exist_ok=True)
-
-    act_path = shutil.which("act")
-    if act_path is None:
-        msg = "act executable not found in PATH"
-        raise FileNotFoundError(msg)
-
-    cmd = [
-        act_path,
-        config.event,
-        "-j",
-        config.job,
-        "-e",
-        str(config.event_path),
-        "-P",
-        "ubuntu-latest=catthehacker/ubuntu:act-latest",
-        "--artifact-server-path",
-        str(config.artefact_dir),
-        "--json",
-        "-b",
-        "-W",
-        str(WORKFLOW_PATH),
-    ]
-
-    for key, value in config.matrix.items():
-        cmd.extend(["--matrix", f"{key}:{value}"])
-
-    if config.dry_run:
-        cmd.append("--list")
-
-    completed = subprocess.run(  # noqa: S603
-        cmd,
-        text=True,
-        capture_output=True,
-        cwd=str(REPO_ROOT),
-        check=False,
-    )
-    logs = completed.stdout + "\n" + completed.stderr
-    return completed.returncode, config.artefact_dir, logs
 
 
 def parse_json_logs(logs: str) -> list[dict[str, typ.Any]]:
