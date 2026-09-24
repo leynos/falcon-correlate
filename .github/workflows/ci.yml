@@ -109,6 +109,13 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.12', '3.13', '3.14']
+        # coverage-main.yml runs the whole suite under coverage on 3.13 for
+        # every push to main, so a 3.13 leg here would run the same tests a
+        # second time on the same commit. On a pull request the leg stays: it
+        # is the one that generates coverage. Held by
+        # tests/workflow_contracts/test_suite_runs_once.py.
+        exclude:
+          - python-version: ${{ github.event_name == 'push' && '3.13' || '' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -125,7 +132,7 @@ jobs:
         run: uv sync --group dev --python ${{ matrix.python-version }}
 
       - name: Run tests
-        if: matrix.python-version != '3.13' || github.event_name != 'pull_request'
+        if: matrix.python-version != '3.13'
         run: uv run pytest -v -n auto --ignore=tests/workflows
 
       # Coverage runs on pull requests only, and on a single matrix leg

@@ -279,6 +279,17 @@ report under a step of its own that no scanner over these steps can see. The
 publisher states `mode: upload` rather than inheriting it, because the default
 is what separates that lane from the `check` this repository no longer runs.
 
+The suite runs once per interpreter per event. On a pull request, `ci.yml` runs
+plain pytest on 3.12 and 3.14 and generates coverage on 3.13. On a push to main,
+`coverage-main.yml` runs the whole suite under coverage on 3.13, so the `test`
+matrix excludes its 3.13 leg on push rather than running the same tests on the
+same commit a second time. The exclusion is an expression on the event, because
+a job-level `if:` cannot read the matrix and a skipped step still starts and
+bills a runner. `tests/workflow_contracts/test_suite_runs_once.py` counts, for
+each event, which interpreter the suite runs on and how often: every
+interpreter exactly once. It fails on a duplicate as well as on an interpreter
+that stops being tested.
+
 No checksum input is passed. The pinned action carries a CLI manifest naming
 `cs-coverage` 1.0.101, so the installation is deterministic without one;
 `installer-checksum` is deprecated and rejected when non-empty at that pin, and
