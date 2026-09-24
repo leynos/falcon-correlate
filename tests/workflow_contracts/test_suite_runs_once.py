@@ -65,6 +65,31 @@ def _excluded(entry: object, event: str, where: str) -> str:
     raise WorkflowReadError(message)
 
 
+def _versions(matrix: dict[str, typ.Any], where: str) -> list[str]:
+    """Return a matrix's interpreter versions, refusing any that are not strings.
+
+    An expression would be walked as characters, and an unquoted ``3.10``
+    reads as the float ``3.1``, which no string exclusion can ever match.
+
+    Returns
+    -------
+    list[str]
+        The versions, in matrix order.
+
+    Raises
+    ------
+    WorkflowReadError
+        If the value is missing, not a list, or holds a non-string.
+    """
+    versions = matrix.get(MATRIX_KEY)
+    if not isinstance(versions, list) or not all(
+        isinstance(version, str) for version in versions
+    ):
+        message = f"{where}: {MATRIX_KEY} must be a list of quoted versions"
+        raise WorkflowReadError(message)
+    return typ.cast("list[str]", versions)
+
+
 def _legs(job: dict[str, typ.Any], event: str, where: str) -> list[str | None]:
     """Return the interpreters a job's matrix starts for *event*.
 
@@ -92,8 +117,9 @@ def _legs(job: dict[str, typ.Any], event: str, where: str) -> list[str | None]:
     if set(matrix) - {MATRIX_KEY, "exclude"}:
         message = f"{where}: cannot read the matrix keys {sorted(matrix)!r}"
         raise WorkflowReadError(message)
+    versions = _versions(matrix, where)
     dropped = {_excluded(entry, event, where) for entry in matrix.get("exclude", [])}
-    return [str(version) for version in matrix[MATRIX_KEY] if version not in dropped]
+    return [version for version in versions if version not in dropped]
 
 
 def _installed_interpreter(job: dict[str, typ.Any], where: str) -> str:
@@ -285,4 +311,31 @@ jobs:
       - run: uv run pytest -v -n auto --ignore=tests/workflows
 """
     with pytest.raises(WorkflowReadError, match="cannot evaluate the exclusion"):
+        suite_runs({"ci.yml": text}, "push")
+
+
+@pytest.mark.parametrize(
+    "versions",
+    [
+        "${{ fromJSON(needs.setup.outputs.versions) }}",
+        "[3.12, 3.13]",
+    ],
+    ids=["expression", "unquoted-numbers"],
+)
+def test_an_unreadable_version_list_is_refused(versions: str) -> None:
+    """Refuse versions that are not a list of quoted strings."""
+    text = f"""
+on:
+  push:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: {versions}
+    steps:
+      - run: uv run pytest -v -n auto --ignore=tests/workflows
+"""
+    with pytest.raises(WorkflowReadError, match="must be a list of quoted versions"):
         suite_runs({"ci.yml": text}, "push")
