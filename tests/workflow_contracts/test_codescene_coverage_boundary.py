@@ -45,6 +45,7 @@ from tests.workflow_contracts.codescene_lanes import (
     is_publisher,
     parse,
     serves_pull_requests,
+    steps_of,
     steps_using,
     workflow_texts,
 )
@@ -61,6 +62,9 @@ from tests.workflow_contracts.pull_request_reach import (
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
+
+
+CHECKOUT_ACTION = "actions/checkout"
 
 
 @pytest.fixture(name="documents")
@@ -237,6 +241,38 @@ class TestCodeSceneCoverageBoundary:
             f"{name}:{job} pins {COVERAGE_ACTION} at {ref[:8]}, which is not on "
             f"the list of revisions verified to carry the CLI manifest"
         )
+
+    def test_the_pull_request_coverage_lane_fetches_no_history(
+        self, documents: dict[str, dict]
+    ) -> None:
+        """Keep the coverage lane's checkout shallow.
+
+        `generate-coverage` compares the measured percentage with a stored
+        baseline and never runs git, so full history buys nothing. It was
+        requested for the CodeScene check step, which has left this lane, and a
+        comment claiming the ratchet needs the merge base outlived it elsewhere
+        in the estate.
+        """
+        lanes = [
+            (name, job)
+            for name, document in documents.items()
+            if serves_pull_requests(document)
+            for job, _ref, _inputs in steps_using(document, COVERAGE_ACTION)
+        ]
+
+        assert lanes, "a pull-request lane must generate coverage"
+        for name, job in lanes:
+            depths = [
+                (step.get("with") or {}).get("fetch-depth")
+                for step_job, step in steps_of(documents[name])
+                if step_job == job
+                and str(step.get("uses", "")).partition("@")[0] == CHECKOUT_ACTION
+            ]
+            assert depths, f"{name}:{job} must check the repository out"
+            assert all(str(depth) != "0" for depth in depths), (
+                f"{name}:{job} fetches full history (fetch-depth {depths}); the "
+                f"ratchet reads no commits, so the default shallow clone serves it"
+            )
 
     def test_the_publisher_measures_what_the_ratchet_compares_against(
         self, documents: dict[str, dict]

@@ -232,6 +232,42 @@ class TestTheCredential:
             f"command; it declares {sorted(checks[0])}"
         )
 
+    def test_the_credential_check_runs_before_the_upload_in_its_job(
+        self, publisher: tuple[str, dict]
+    ) -> None:
+        """Place the check in the upload's job, ahead of it.
+
+        A step output is visible only to later steps of the same job. A check
+        moved to another job, or after the upload, leaves the upload's guard
+        reading an output nobody has written, so the upload skips forever.
+        """
+        name, document = publisher
+        placed = list(enumerate(steps_of(document)))
+        checks = [
+            (position, job)
+            for position, (job, step) in placed
+            if step.get("id") == CREDENTIAL_CHECK_ID
+        ]
+        uploads = [
+            (position, job)
+            for position, (job, step) in placed
+            if str(step.get("uses", "")).partition("@")[0] == UPLOAD_ACTION
+        ]
+
+        assert len(checks) == 1, f"{name} must declare one credential check"
+        assert len(uploads) == 1, f"{name} must upload exactly once"
+        (check_position, check_job), (upload_position, upload_job) = (
+            checks[0],
+            uploads[0],
+        )
+        assert check_job == upload_job, (
+            f"{name}'s credential check runs in {check_job!r} and the upload in "
+            f"{upload_job!r}; a step output does not cross jobs"
+        )
+        assert check_position < upload_position, (
+            f"{name}'s credential check must run before the upload reads it"
+        )
+
     def test_the_upload_takes_the_secret_as_its_input(
         self, publisher: tuple[str, dict]
     ) -> None:
