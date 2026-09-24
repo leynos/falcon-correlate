@@ -315,6 +315,25 @@ baseline land last. It is not a durable queue. GitHub keeps one pending run per
 group, so a newer push replaces an older pending one, which skips an
 intermediate commit that no pull request should be measured against anyway.
 
+The token is bound in no `env`. The uploader is a composite action that binds
+the token itself from its `access-token` input and hands a step's `env` to its
+nested `upload-artifact` and cache steps. A check step with the id
+`codescene-token` runs one command,
+`echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"`,
+whose expression GitHub evaluates before the shell starts, so the secret
+reaches no process. The upload runs only when that output is `'true'` and the
+ref is main, and passes `${{ secrets.CS_ACCESS_TOKEN }}` straight to
+`access-token`. `tests/workflow_contracts/test_codescene_publisher.py` asserts
+the exact command with no `if:` or `env`, the output conjunct, the direct
+input, and no `env` anywhere in the publisher carrying the token under any
+name. A guard on `env.CS_ACCESS_TOKEN != ''` would not do: with the binding
+deleted it is simply false, and the upload skips forever without failing
+anything.
+
+One known exception: a Dependabot pull request merged by the automerge workflow
+uses `GITHUB_TOKEN`, whose merges fire no push event, so that commit publishes
+no coverage until the next push or a dispatch on main.
+
 `tests/workflow_contracts/test_codescene_coverage_boundary.py` asserts all of
 this, deriving the boundary's subject from each workflow's own triggers rather
 than from a list of file names. The subject is a closure, not a trigger list:
