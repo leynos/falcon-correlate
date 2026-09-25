@@ -48,6 +48,10 @@ jobs:
     # 42 s is the slowest observed run across three green runs; the queue
     # ahead of it has reached 637 s, which is what this move addresses.
     timeout-minutes: 10
+    # The CodeScene token lives in this environment, whose deployment policy
+    # admits `main` alone; tests/workflow_contracts/codescene_environment.py
+    # holds it to this job.
+    environment: codescene
     permissions:
       contents: read
     steps:
