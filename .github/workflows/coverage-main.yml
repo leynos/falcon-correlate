@@ -50,8 +50,6 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-    env:
-      CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -80,12 +78,22 @@ jobs:
           # Setting it here, as the pull-request lane does, would leave
           # CodeScene with no report to read.
 
+      # The expression is evaluated before the shell starts, so this step
+      # binds no secret and holds no shell conditional. With no
+      # CS_ACCESS_TOKEN secret, as on a fork, the upload below skips.
+      - name: Check for the CodeScene token
+        id: codescene-token
+        run: echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
       - name: Upload coverage data to CodeScene
         # The ref guard is load-bearing. `workflow_dispatch` can select any
         # branch or tag, and the push trigger's `branches: [main]` says
         # nothing about a dispatch, so without it a dispatch from a feature
-        # branch would publish that branch's coverage as the trunk's.
-        if: github.ref == 'refs/heads/main' && env.CS_ACCESS_TOKEN != ''
+        # branch would publish that branch's coverage as the trunk's. The
+        # token goes straight to the input rather than through `env`: the
+        # uploader is a composite action and hands a step's `env` to its
+        # nested upload-artifact and cache steps, which have no use for it.
+        if: steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main'
         uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
           format: cobertura
@@ -94,7 +102,7 @@ jobs:
           # and the default is what separates this lane from the `check`
           # this repository no longer runs anywhere.
           mode: upload
-          access-token: ${{ env.CS_ACCESS_TOKEN }}
+          access-token: ${{ secrets.CS_ACCESS_TOKEN }}
           # No checksum input. The pin above carries a CLI manifest that
           # names version 1.0.101, so the installation is deterministic
           # without one. `installer-checksum` is deprecated and rejected

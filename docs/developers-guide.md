@@ -278,6 +278,11 @@ this boundary visible in the workflow file at all: the action archives its
 report under a step of its own that no scanner over these steps can see. The
 publisher states `mode: upload` rather than inheriting it, because the default
 is what separates that lane from the `check` this repository no longer runs.
+Neither lane fetches full Git history. The ratchet compares the measured
+percentage with a stored baseline and reads no commits. The full clone the
+`test` job once requested dates from the CodeScene check step, which has left
+this lane, and `test_the_pull_request_coverage_lane_fetches_no_history` keeps
+it from returning.
 
 The suite runs once per interpreter per event. On a pull request, `ci.yml` runs
 plain pytest on 3.12 and 3.14 and generates coverage on 3.13. On a push to main,
@@ -310,6 +315,25 @@ upload and its baseline write, and two overlapping runs let the older commit's
 baseline land last. It is not a durable queue. GitHub keeps one pending run per
 group, so a newer push replaces an older pending one, which skips an
 intermediate commit that no pull request should be measured against anyway.
+
+The token is bound in no `env`. The uploader is a composite action that binds
+the token itself from its `access-token` input and hands a step's `env` to its
+nested `upload-artifact` and cache steps. A check step with the id
+`codescene-token` runs one command,
+`echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"`,
+whose expression GitHub evaluates before the shell starts, so the secret
+reaches no process. The upload runs only when that output is `'true'` and the
+ref is main, and passes `${{ secrets.CS_ACCESS_TOKEN }}` straight to
+`access-token`. `tests/workflow_contracts/test_codescene_publisher.py` asserts
+the exact command with no `if:` or `env`, the output conjunct, the direct
+input, and no `env` anywhere in the publisher carrying the token under any
+name. A guard on `env.CS_ACCESS_TOKEN != ''` would not do: with the binding
+deleted it is simply false, and the upload skips forever without failing
+anything.
+
+One known exception: a Dependabot pull request merged by the automerge workflow
+uses `GITHUB_TOKEN`, whose merges fire no push event, so that commit publishes
+no coverage until the next push or a dispatch on main.
 
 `tests/workflow_contracts/test_codescene_coverage_boundary.py` asserts all of
 this, deriving the boundary's subject from each workflow's own triggers rather

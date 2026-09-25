@@ -2,11 +2,13 @@
 
 The boundary contracts clear everything a pull request can run. These hold
 the publisher itself: the conditions its upload runs under, and whether two
-trunk generations can overlap or be cancelled. Each is a way CV-005 fails
-while every pull-request lane stays clean.
+trunk generations can overlap or be cancelled, and where the token is bound.
+Each is a way CV-005 fails while every pull-request lane stays clean.
 """
 
 from __future__ import annotations
+
+import typing as typ
 
 import pytest
 
@@ -19,13 +21,61 @@ from tests.workflow_contracts.codescene_lanes import (
 )
 from tests.workflow_contracts.guard_conditions import admits, conjuncts
 
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
+
 MAIN_REF = "github.ref == 'refs/heads/main'"
-SKIP_WITHOUT_CREDENTIAL = "env.CS_ACCESS_TOKEN != ''"
+
+#: The publisher's credential check. It binds nothing and runs one command whose
+#: expression GitHub evaluates before the shell starts, so the secret reaches no
+#: process and no `env`; the upload consumes the output it writes.
+CREDENTIAL_CHECK_ID = "codescene-token"
+CREDENTIAL_CHECK_COMMAND = (
+    'echo "available=${{ secrets.CS_ACCESS_TOKEN != \'\' }}" >> "$GITHUB_OUTPUT"'
+)
+CREDENTIAL_OUTPUT = f"steps.{CREDENTIAL_CHECK_ID}.outputs.available"
+SKIP_WITHOUT_CREDENTIAL = f"{CREDENTIAL_OUTPUT} == 'true'"
+CREDENTIAL_NAME = "CS_ACCESS_TOKEN"
+CREDENTIAL_INPUT = "${{ secrets.CS_ACCESS_TOKEN }}"
 
 
-def _start(event: str, ref: str, token: str) -> dict[str, str]:
-    """Return the context a workflow started by *event* on *ref* evaluates in."""
-    return {"github.event_name": event, "github.ref": ref, "env.CS_ACCESS_TOKEN": token}
+def _start(event: str, ref: str, available: str) -> dict[str, str]:
+    """Return the context a workflow started by *event* on *ref* evaluates in.
+
+    Returns
+    -------
+    dict[str, str]
+        The references the upload's guard reads. *available* is what the
+        credential check wrote: ``'true'`` when the repository holds the
+        secret, ``'false'`` when it does not.
+    """
+    return {"github.event_name": event, "github.ref": ref, CREDENTIAL_OUTPUT: available}
+
+
+def _upload(document: dict) -> dict[str, typ.Any]:
+    """Return the publisher's one upload step, failing if there is not one."""
+    uploads = [
+        step
+        for _job, step in steps_of(document)
+        if str(step.get("uses", "")).partition("@")[0] == UPLOAD_ACTION
+    ]
+    assert len(uploads) == 1, f"the publisher must upload exactly once; {uploads}"
+    return uploads[0]
+
+
+def _env_texts(value: object, *, under_env: bool = False) -> cabc.Iterator[str]:
+    """Yield every key and scalar that sits beneath an ``env`` mapping."""
+    match value:
+        case dict():
+            for key, entry in value.items():
+                if under_env:
+                    yield str(key)
+                yield from _env_texts(entry, under_env=under_env or key == "env")
+        case list():
+            for entry in value:
+                yield from _env_texts(entry, under_env=under_env)
+        case _ if under_env:
+            yield str(value)
 
 
 @pytest.fixture(name="publisher")
@@ -78,11 +128,11 @@ class TestTheUploadGuard:
     @pytest.mark.parametrize(
         ("context", "expected"),
         [
-            (_start("push", "refs/heads/main", "set"), True),
-            (_start("workflow_dispatch", "refs/heads/main", "set"), True),
-            (_start("workflow_dispatch", "refs/heads/feature", "set"), False),
-            (_start("workflow_dispatch", "refs/tags/v1.0.0", "set"), False),
-            (_start("push", "refs/heads/main", ""), False),
+            (_start("push", "refs/heads/main", "true"), True),
+            (_start("workflow_dispatch", "refs/heads/main", "true"), True),
+            (_start("workflow_dispatch", "refs/heads/feature", "true"), False),
+            (_start("workflow_dispatch", "refs/tags/v1.0.0", "true"), False),
+            (_start("push", "refs/heads/main", "false"), False),
         ],
         ids=[
             "push to main",
@@ -141,4 +191,104 @@ class TestTrunkGenerations:
         assert "github.ref" in str(declared.get("group")), (
             f"{name}'s group must be keyed on the ref, so pushes to main queue "
             f"behind one another; it declares {declared.get('group')!r}"
+        )
+
+
+class TestTheCredential:
+    """The token is bound in no `env`, and the upload still cannot skip silently.
+
+    The uploader is composite: it binds the token from its `access-token` input
+    and hands a step's `env` to its nested upload-artifact and cache steps. A
+    guard on `env.CS_ACCESS_TOKEN != ''` is simply false once the binding is
+    deleted, and the upload then skips forever with nothing failing, so the
+    check and the input are asserted positively.
+    """
+
+    def test_the_credential_check_is_one_exact_command(
+        self, publisher: tuple[str, dict]
+    ) -> None:
+        """Require the check step with its command alone, no `if:` and no `env`.
+
+        `false && X` contains X, so an `if:` could carry the command without
+        running it, and an `env` would bind the secret this step exists not to.
+        """
+        name, document = publisher
+        checks = [
+            step
+            for _job, step in steps_of(document)
+            if step.get("id") == CREDENTIAL_CHECK_ID
+        ]
+
+        assert len(checks) == 1, (
+            f"{name} must declare one step with id {CREDENTIAL_CHECK_ID!r}; "
+            f"found {len(checks)}"
+        )
+        assert checks[0].get("run") == CREDENTIAL_CHECK_COMMAND, (
+            f"{name}'s credential check must run exactly "
+            f"{CREDENTIAL_CHECK_COMMAND!r}; it runs {checks[0].get('run')!r}"
+        )
+        assert set(checks[0]) <= {"name", "id", "run"}, (
+            f"{name}'s credential check may carry only a name, its id and its "
+            f"command; it declares {sorted(checks[0])}"
+        )
+
+    def test_the_credential_check_runs_before_the_upload_in_its_job(
+        self, publisher: tuple[str, dict]
+    ) -> None:
+        """Place the check in the upload's job, ahead of it.
+
+        A step output is visible only to later steps of the same job. A check
+        moved to another job, or after the upload, leaves the upload's guard
+        reading an output nobody has written, so the upload skips forever.
+        """
+        name, document = publisher
+        placed = list(enumerate(steps_of(document)))
+        checks = [
+            (position, job)
+            for position, (job, step) in placed
+            if step.get("id") == CREDENTIAL_CHECK_ID
+        ]
+        uploads = [
+            (position, job)
+            for position, (job, step) in placed
+            if str(step.get("uses", "")).partition("@")[0] == UPLOAD_ACTION
+        ]
+
+        assert len(checks) == 1, f"{name} must declare one credential check"
+        assert len(uploads) == 1, f"{name} must upload exactly once"
+        (check_position, check_job), (upload_position, upload_job) = (
+            checks[0],
+            uploads[0],
+        )
+        assert check_job == upload_job, (
+            f"{name}'s credential check runs in {check_job!r} and the upload in "
+            f"{upload_job!r}; a step output does not cross jobs"
+        )
+        assert check_position < upload_position, (
+            f"{name}'s credential check must run before the upload reads it"
+        )
+
+    def test_the_upload_takes_the_secret_as_its_input(
+        self, publisher: tuple[str, dict]
+    ) -> None:
+        """Pass the secret straight to `access-token`, not through `env`."""
+        name, document = publisher
+        inputs = _upload(document).get("with")
+
+        assert isinstance(inputs, dict), f"{name}'s upload must declare inputs"
+        assert inputs.get("access-token") == CREDENTIAL_INPUT, (
+            f"{name}'s upload must pass {CREDENTIAL_INPUT!r} to access-token; "
+            f"it passes {inputs.get('access-token')!r}"
+        )
+
+    def test_no_env_in_the_publisher_carries_the_token(
+        self, publisher: tuple[str, dict]
+    ) -> None:
+        """Refuse the token in a workflow, job or step `env`, under any name."""
+        name, document = publisher
+        offending = [text for text in _env_texts(document) if CREDENTIAL_NAME in text]
+
+        assert not offending, (
+            f"{name} must bind {CREDENTIAL_NAME} in no env; the composite uploader "
+            f"hands a step's env to its nested steps: {offending}"
         )
