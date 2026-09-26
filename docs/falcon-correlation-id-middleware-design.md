@@ -1718,16 +1718,17 @@ before delegation.
 
 **Decision:** Add a dedicated optional-integration module at
 `src/falcon_correlate/celery.py` that defines
-`propagate_correlation_id_to_celery` and connects it to Celery's
-`before_task_publish` signal at import time.
+`propagate_correlation_id_to_celery`. Calling
+`configure_celery_correlation(app)` connects it to Celery's
+`before_task_publish` signal.
 
 **Rationale:**
 
 1. **Feature isolation and import safety:** Keeping the implementation in its
    own module mirrors the existing `httpx` integration and preserves
-   `import falcon_correlate` when Celery is not installed. The module loads the
-   signal dynamically and becomes a no-op when the optional dependency is
-   absent.
+   `import falcon_correlate` when Celery is not installed. Importing the
+   package or module neither loads Celery nor mutates its global signal
+   registry; configuration dynamically loads signals only when a caller opts in.
 
 2. **Idempotent signal registration:** The signal connection uses a stable
    `dispatch_uid` (
@@ -1748,9 +1749,9 @@ before delegation.
    `properties` mapping. If `properties` is `None`, the handler returns without
    rebinding local variables that Celery would not observe.
 
-5. **Public package export:** The handler is re-exported from
-   `falcon_correlate.__init__` so consumers can discover the integration from
-   the package root while still getting automatic registration on import.
+5. **Public package export:** The handler and configuration helper are
+   re-exported from `falcon_correlate.__init__` so consumers can discover the
+   integration from the package root without triggering it.
 
 **Files created/modified:**
 
@@ -1767,15 +1768,15 @@ before delegation.
   scenarios.
 - `tests/bdd/test_celery_publish_signal_steps.py` — Added BDD steps that patch
   the Kombu publish boundary and assert the final broker correlation ID.
-- `docs/users-guide.md` — Documented installation, automatic registration, and
+- `docs/users-guide.md` — Documented installation, explicit registration, and
   the publish-path overwrite policy.
 
 ### A.9. Celery worker signal handlers (Task 4.2.2)
 
 **Decision:** Extend `src/falcon_correlate/celery.py` with
 `setup_correlation_id_in_worker` and `clear_correlation_id_in_worker`, and
-register them at import time with Celery's `task_prerun` and `task_postrun`
-signals.
+register them through `configure_celery_correlation(app)` with Celery's
+`task_prerun` and `task_postrun` signals.
 
 **Rationale:**
 
@@ -1792,8 +1793,8 @@ signals.
    context.
 
 3. **Registration stays idempotent:** Stable dispatch UIDs are used for both
-   worker signals so repeated imports or reloads do not create duplicate
-   receivers.
+   worker signals so repeated explicit configuration calls do not create
+   duplicate receivers.
 
 4. **Behavioural testing uses explicit task signal dispatch:** Celery eager
    execution fires `task_prerun` and `task_postrun`, but on Celery 5.6.3 it
@@ -1810,8 +1811,7 @@ signals.
 **Files created/modified:**
 
 - `src/falcon_correlate/celery.py` — Added worker setup and cleanup handlers,
-  the internal token store, worker signal registration, and import-time
-  connection.
+  the internal token store, and worker signal registration.
 - `src/falcon_correlate/__init__.py` — Re-exported
   `setup_correlation_id_in_worker` and `clear_correlation_id_in_worker`.
 - `src/falcon_correlate/unittests/test_celery_worker_signal.py` — Added unit
@@ -1827,8 +1827,7 @@ signals.
 
 **Decision:** Add `configure_celery_correlation(app)` to
 `src/falcon_correlate/celery.py`, re-export it from `falcon_correlate`, and
-implement it as a thin wrapper over the existing Celery signal registration
-helpers.
+make it the sole entry point for Celery signal registration.
 
 **Rationale:**
 
@@ -1837,9 +1836,9 @@ helpers.
    the Celery app so application factories can expose their intent clearly, but
    it does not store app-local state or duplicate signal logic.
 
-2. **Backwards compatibility:** Import-time registration remains in place, so
-   existing consumers that rely on `import falcon_correlate` continue to get
-   publish and worker propagation automatically.
+2. **Explicit opt-in:** Import-time registration is removed in version 0.2.0.
+   This breaking change avoids Celery's import cost and implicit mutation of
+   its process-global signal registry in processes that never use Celery.
 
 3. **Idempotence through existing dispatch UIDs:** The helper delegates to a
    shared `_maybe_connect_celery_signals()` connector, which reuses the stable
@@ -1852,10 +1851,9 @@ helpers.
    `celery_app = configure_celery_correlation(Celery(...))` without losing the
    concrete app object or implying that the helper creates a new application.
 
-5. **Testing isolates import-time side effects:** Unit and behavioural tests
-   explicitly disconnect the known receivers by dispatch UID before calling the
-   helper. This prevents the existing import-time registration from hiding a
-   broken public configuration path.
+5. **Testing proves the import boundary:** A clean-process regression test
+   proves package import does not load Celery or register a receiver, then
+   verifies that the helper registers all three handlers.
 
 **Files created/modified:**
 
@@ -1869,11 +1867,10 @@ helpers.
   export.
 - `tests/bdd/celery_configuration.feature` — Added behavioural scenarios for
   explicit configuration of publish and worker propagation.
-- `tests/bdd/test_celery_configuration_steps.py` — Added BDD steps that
-  disconnect import-time receivers and prove the public helper reconnects the
-  publish and worker paths.
+- `tests/bdd/test_celery_configuration_steps.py` — Added BDD steps that prove
+  the public helper enables the publish and worker paths.
 - `docs/users-guide.md` — Documented the explicit helper, return contract,
-  idempotence, and relationship to import-time auto-registration.
+  idempotence, and explicit-registration requirement.
 - `docs/roadmap.md` — Marked roadmap item 4.2.3 complete.
 
 ### A.11. Optional Celery integration validation (Task 4.2.4)
