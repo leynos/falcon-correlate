@@ -68,7 +68,7 @@ jobs:
         run: uv sync --group dev --python 3.13
 
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
+        uses: leynos/shared-actions/.github/actions/generate-coverage@22c1a57865e42ba7e2ca4f88ae49fa6f81f58013
         with:
           # The same selection the pull-request lane measures, so the
           # baseline this job writes is comparable with what the ratchet
