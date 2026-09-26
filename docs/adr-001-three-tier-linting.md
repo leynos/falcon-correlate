@@ -2,9 +2,12 @@
 
 ## Status
 
-Accepted on 2026-05-15 and amended on 2026-06-21. The project uses Ruff as the
-first lint tier, Interrogate as the second lint tier, and a focused Pylint
-pass, executed through `pylint-pypy-shim` on PyPy, as the third lint tier.
+Accepted on 2026-05-15 and amended on 2026-06-21 and on 2026-09-25. The project
+uses Ruff as the first lint tier, Interrogate as the second lint tier, and a
+focused Pylint pass, executed directly under a pinned PyPy interpreter, as the
+third lint tier. See
+[Amendment (2026-09-25): plain Pylint on PyPy 3.12](#amendment-2026-09-25-plain-pylint-on-pypy-312)
+for the current execution mechanism.
 
 ## Date
 
@@ -116,8 +119,10 @@ Non-goals:
 ## Decision Outcome / Proposed Direction
 
 Choose option D. `make lint` runs `uv run ruff check` first, then runs
-Interrogate with `--fail-under 100`, then runs Pylint through the pinned
-`pylint-pypy-shim` package with `PYLINT_TARGETS` defaulting to `src tests`.
+Interrogate with `--fail-under 100`, then runs Pylint under the pinned
+`pypy@3.12` interpreter with `PYLINT_TARGETS` defaulting to `src tests`. See the
+[2026-09-25 amendment](#amendment-2026-09-25-plain-pylint-on-pypy-312) for the
+current execution mechanism.
 
 Ruff owns the broad lint policy, import policy, docstring style, type-checking
 import rules, security checks, and most complexity checks. Interrogate owns the
@@ -127,9 +132,10 @@ selected design limits.
 
 ## Known Risks and Limitations
 
-- PyPy may lag the project's target Python syntax. The Pylint configuration
-  disables `syntax-error` so the second tier remains useful when this runtime
-  boundary appears.
+- PyPy may lag the project's target Python syntax. This was the original
+  rationale for disabling `syntax-error` in the Pylint configuration; the
+  [2026-09-25 amendment](#amendment-2026-09-25-plain-pylint-on-pypy-312)
+  records why that disable was removed.
 - The Pylint tier may be slower than Ruff. Running Ruff first keeps most
   high-volume feedback fast.
 - Interrogate reports paths relative to its invocation directory. The Makefile
@@ -143,10 +149,31 @@ selected design limits.
 
 The three-tier approach separates fast feedback, docstring coverage, and deeper
 static analysis. It keeps the normal contributor workflow simple through
-`make lint`, while the Makefile variables make the Interrogate target, runtime,
-shim revision, and lint targets explicit for maintenance.
+`make lint`, while the Makefile variables make the Interrogate target, Pylint
+runtime, Pylint version, and lint targets explicit for maintenance.
 
 The project treats lint configuration as architecture because it shapes public
 API design, import boundaries, logging correctness, and module size pressure.
 Recording the decision makes future changes to the lint stack reviewable rather
 than incidental.
+
+## Amendment (2026-09-25): plain Pylint on PyPy 3.12
+
+The Makefile no longer installs Pylint through the `pylint-pypy-shim` wrapper.
+It instead runs Pylint directly under the `pypy@3.12` interpreter, pinned via
+`PYLINT_PYTHON ?= pypy@3.12`, and a pinned Pylint version,
+`PYLINT_VERSION ?= 4.0.9`, both installed on demand by
+`uv tool run --managed-python --python $(PYLINT_PYTHON)` with
+`--from 'pylint==$(PYLINT_VERSION)' pylint`. The `PYLINT_PYPY_SHIM_REF` and
+`PYLINT_PYPY_SHIM` variables are gone.
+
+PyPy 8 implements Python 3.12, and uv 0.12.19 (2026-09-25) ships it as a
+managed interpreter, so Pylint runs on it without the shim's object-build
+patch. The interpreter is pinned to `pypy@3.12` rather than bare `pypy` so a
+new PyPy release cannot change the parsed grammar without a commit.
+
+The Pylint configuration no longer disables `syntax-error`. While that message
+was disabled, any module the PyPy runtime could not parse produced no messages
+at all, so the lint passed without linting it. In this repository four modules
+were skipped that way under PyPy 3.11; PyPy 3.12 parses all of them, and they
+lint clean. A parse failure now fails the lint.

@@ -16,10 +16,11 @@ The Python lint target uses a three-tier linting approach:
 - **Tier 2: Interrogate.** Interrogate runs second through
   `uv run interrogate --fail-under 100`. It enforces package-level docstring
   coverage after Ruff has validated docstring style.
-- **Tier 3: Pylint through PyPy.** Pylint runs third through the
-  `pylint-pypy-shim` wrapper. This tier focuses on rules that complement Ruff,
-  especially logging format correctness, pattern matching safety, refactoring
-  suggestions, resource-handling checks, and selected design limits.
+- **Tier 3: Pylint through PyPy.** Pylint runs third under the `pypy@3.12`
+  interpreter, installed on demand by `uv tool run`. This tier focuses on rules
+  that complement Ruff, especially logging format correctness, pattern matching
+  safety, refactoring suggestions, resource-handling checks, and selected
+  design limits.
 
 Ruff must pass before Interrogate runs, and Interrogate must pass before Pylint
 runs. This keeps the slow, deeper lint tier focused on code that has already
@@ -575,16 +576,15 @@ Run `make markdownlint` for the combined Markdown and spelling gate, and
 
 The lint target is configured by these Makefile variables:
 
-| Variable               | Default                                                                                       | Purpose                                                        |
-| ---------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `UV`                   | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                 | Selects the `uv` launcher used by all Python tool commands.    |
-| `UV_ENV`               | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                | Keeps project-local `uv` cache and tool directories.           |
-| `PYLINT_PYTHON`        | `pypy`                                                                                        | Selects the Python runtime used for the Pylint tool execution. |
-| `PYLINT_TARGETS`       | `src tests examples`                                                                          | Defines the source trees checked by the Pylint tier.           |
-| `PYLINT_PYPY_SHIM_REF` | `726d09f968b4d729ee4b29c71fc732e744854f3b`                                                    | Pins the `pylint-pypy-shim` repository revision.               |
-| `PYLINT_PYPY_SHIM`     | `git+https://github.com/leynos/pylint-pypy-shim.git@$(PYLINT_PYPY_SHIM_REF)`                  | Identifies the shim package installed by `uv tool run`.        |
-| `PYLINT`               | `$(UV_ENV) $(UV) tool run --python $(PYLINT_PYTHON) --from '$(PYLINT_PYPY_SHIM)' pylint-pypy` | Expands to the full PyPy-backed Pylint command.                |
-| `INTERROGATE_TARGETS`  | `src/falcon_correlate`                                                                        | Defines the repo-root-relative trees checked by Interrogate.   |
+| Variable              | Default                                                                                                         | Purpose                                                        |
+| --------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `UV`                  | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                                   | Selects the `uv` launcher used by all Python tool commands.    |
+| `UV_ENV`              | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                                  | Keeps project-local `uv` cache and tool directories.           |
+| `PYLINT_PYTHON`       | `pypy@3.12`                                                                                                     | Selects the Python runtime used for the Pylint tool execution. |
+| `PYLINT_VERSION`      | `4.0.9`                                                                                                         | Pins the Pylint version installed by `uv tool run`.            |
+| `PYLINT_TARGETS`      | `src tests examples`                                                                                            | Defines the source trees checked by the Pylint tier.           |
+| `PYLINT`              | `$(UV_ENV) $(UV) tool run --managed-python --python $(PYLINT_PYTHON) --from 'pylint==$(PYLINT_VERSION)' pylint` | Expands to the full PyPy-backed Pylint command.                |
+| `INTERROGATE_TARGETS` | `src/falcon_correlate`                                                                                          | Defines the repo-root-relative trees checked by Interrogate.   |
 
 Override variables at the command line for targeted investigation. For example:
 
@@ -592,8 +592,10 @@ Override variables at the command line for targeted investigation. For example:
 make lint PYLINT_TARGETS=src/falcon_correlate/middleware.py
 ```
 
-Do not change `PYLINT_PYPY_SHIM_REF` casually. Updating the shim changes the
-lint execution environment and should be reviewed as a tooling change.
+`PYLINT_PYTHON` pins the interpreter to `pypy@3.12`, not bare `pypy`, so a new
+PyPy release cannot change the parsed grammar without a commit. Do not change
+`PYLINT_PYTHON` or `PYLINT_VERSION` casually; either one changes the lint
+execution environment and should be reviewed as a tooling change.
 
 ## Episodic lint policy
 
@@ -608,7 +610,8 @@ The policy is:
   `collections.abc as cabc`, `datetime as dt`, and `unittest.mock as mock`;
 - keep docstrings in NumPy style;
 - use a focused Pylint allow-list rather than enabling every Pylint message;
-- run Pylint under PyPy through the shim as a second tier after Ruff; and
+- run Pylint directly under a pinned PyPy interpreter as a second tier after
+  Ruff; and
 - add narrow suppressions only when framework callbacks, tests, or existing
   module boundaries make a rule unsuitable for the current change.
 
@@ -729,7 +732,8 @@ policy where possible:
 - `max-statements = 70`; and
 - `max-positional-arguments = 4`.
 
-`[tool.pylint."messages control"]` disables all messages by default, disables
-`syntax-error` for the managed PyPy runtime boundary, and then enables the
-focused Pylint message set. This makes the second tier deliberate: it checks
-specific classes of problems rather than duplicating Ruff wholesale.
+`[tool.pylint."messages control"]` disables all messages by default and then
+enables the focused Pylint message set. This makes the second tier deliberate:
+it checks specific classes of problems rather than duplicating Ruff wholesale.
+`syntax-error` is not disabled, so a module PyPy cannot parse fails the lint
+rather than passing unchecked.
