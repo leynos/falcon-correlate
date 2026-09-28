@@ -148,7 +148,7 @@ jobs:
       # wrote.
       - name: Generate coverage
         if: matrix.python-version == '3.13' && github.event_name == 'pull_request'
-        uses: leynos/shared-actions/.github/actions/generate-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
+        uses: leynos/shared-actions/.github/actions/generate-coverage@a06e1b8f83ce7f9da5bb26625ef2b7021adbf958
         with:
           # Stated rather than detected. `auto` reads the manifests, and a
           # repository that acquires a Cargo.toml would silently change
