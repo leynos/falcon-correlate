@@ -306,7 +306,7 @@ def test_a_longer_make_target_is_not_the_suite() -> None:
 
 
 def test_a_bare_make_test_is_still_refused_as_unreadable() -> None:
-    """The narrow side: the target really named `test` still has to be the plain suite."""
+    """The narrow side: a target really named `test` must still be the plain suite."""
     with pytest.raises(WorkflowReadError, match="cannot tell whether"):
         _runs_suite({"run": "make test"}, "ci.yml:test")
 
