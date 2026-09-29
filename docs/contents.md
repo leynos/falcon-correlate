@@ -18,9 +18,9 @@
 - [Falcon correlation ID middleware design](falcon-correlation-id-middleware-design.md)
   explains the middleware architecture, request lifecycle, configuration model,
   and correlation ID propagation rules.
-- [ADR-001: three-tier linting](adr-001-three-tier-linting.md) records the
-  accepted linting architecture that combines Ruff, Interrogate, and
-  PyPy-backed Pylint.
+- [ADR-001: Python linting architecture](adr-001-three-tier-linting.md)
+  records the accepted four-tier linting architecture: Ruff, Interrogate,
+  PyPy-backed Pylint, and Skylos production dead-code detection.
 - [ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md)
   records the convention for runnable examples and AST-guarded guide snippets.
 - [ADR-003: docstring completeness and doctest gates](adr-003-docstring-completeness-and-doctest-gates.md)
