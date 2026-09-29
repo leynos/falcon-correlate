@@ -147,7 +147,12 @@ jobs:
 
       - name: Run tests
         if: matrix.python-version != '3.13'
-        run: uv run pytest -v -n auto --ignore=tests/workflows
+        run: >-
+          uv run pytest -v -n auto --ignore=tests/workflows
+          --ignore=src/falcon_correlate/unittests/test_optional_celery_dependency.py
+
+      - name: Run optional-Celery tests serially
+        run: make test-optional-celery
 
       # Coverage runs on pull requests only, and on a single matrix leg
       # (3.13). Pushes to main upload their own coverage (and advance the

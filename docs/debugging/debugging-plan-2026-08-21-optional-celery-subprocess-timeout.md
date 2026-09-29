@@ -1,12 +1,9 @@
-# Debugging Plan: optional-Celery subprocess timeout
+# Debugging plan: optional-Celery subprocess timeout
 
-**Generated**: 2026-08-21 20:43 CEST
-**Issue ID**: full test gate
-**Severity**: High
-**Falsification sub-agent**: alchemist
-**Planning agent boundary**: This document was prepared by the planning agent.
-Falsification must be executed by the named sub-agent, not by the planning
-agent.
+**Generated**: 2026-08-21 20:43 CEST **Issue ID**: full test gate **Severity**:
+High **Falsification sub-agent**: alchemist **Planning agent boundary**: This
+document was prepared by the planning agent. Falsification must be executed by
+the named sub-agent, not by the planning agent.
 
 ## Problem statement
 
@@ -19,12 +16,12 @@ environment.
 
 ## Context summary
 
-| Aspect              | Details                                                       |
-| ------------------- | ------------------------------------------------------------- |
-| First observed      | 2026-08-21 full gate run                                      |
-| Reproduction rate   | 2/3: xdist and serial target runs                             |
-| Affected components | Optional-Celery child-pytest fixture                          |
-| Recent changes      | Skylos work; no Celery helper or test changes                 |
+| Aspect              | Details                                       |
+| ------------------- | --------------------------------------------- |
+| First observed      | 2026-08-21 full gate run                      |
+| Reproduction rate   | 2/3: xdist and serial target runs             |
+| Affected components | Optional-Celery child-pytest fixture          |
+| Recent changes      | Skylos work; no Celery helper or test changes |
 
 ### Error artefacts
 
@@ -60,9 +57,9 @@ when run directly without xdist.
 
 #### H1 falsification result
 
-| Step | Action                                                               | Observed result                                        |
-| ---- | -------------------------------------------------------------------- | ------------------------------------------------------ |
-| 1    | Run `make test-optional-celery`.                                     | Timed out in 120.76 seconds (three fixture errors).    |
+| Step | Action                           | Observed result                                     |
+| ---- | -------------------------------- | --------------------------------------------------- |
+| 1    | Run `make test-optional-celery`. | Timed out in 120.76 seconds (three fixture errors). |
 
 **Tooling**: The existing project virtual environment, pytest, and Make target.
 
@@ -80,14 +77,14 @@ Celery environment.
 **Plausibility**: Falsified — on 2026-08-21 the isolated helper returned 36
 collected items in 2.766 seconds, well below its 120-second timeout.
 
-**Prediction**: Directly invoking the collection helper will exceed 120
-seconds or raise `subprocess.TimeoutExpired`.
+**Prediction**: Directly invoking the collection helper will exceed 120 seconds
+or raise `subprocess.TimeoutExpired`.
 
 #### H2 falsification result
 
-| Step | Action | Observed result |
-| ---- | ------ | --------------- |
-| 1 | Run a temporary-directory Python snippet that creates the import blocker, discovers Celery paths, and calls `_count_collected_test_items`. | Returned 36 items in 2.766 seconds. |
+| Step | Action                                                                                                                                     | Observed result                     |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
+| 1    | Run a temporary-directory Python snippet that creates the import blocker, discovers Celery paths, and calls `_count_collected_test_items`. | Returned 36 items in 2.766 seconds. |
 
 **Tooling**: `uv run python`, the existing helper functions, and a temporary
 directory only.
@@ -111,9 +108,9 @@ operation will exceed 120 seconds or raise `subprocess.TimeoutExpired`.
 
 #### H3 falsification result
 
-| Step | Action | Observed result |
-| ---- | ------ | --------------- |
-| 1 | Run a temporary-directory Python snippet that creates the import blocker and sentinel, discovers Celery paths, and calls `_run_celery_tests_with_celery_blocked`. | Completed in about 28.3 seconds. |
+| Step | Action                                                                                                                                                            | Observed result                  |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| 1    | Run a temporary-directory Python snippet that creates the import blocker and sentinel, discovers Celery paths, and calls `_run_celery_tests_with_celery_blocked`. | Completed in about 28.3 seconds. |
 
 **Tooling**: `uv run python`, the existing helper functions, and a temporary
 directory only.
