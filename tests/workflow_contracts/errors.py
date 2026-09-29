@@ -2,7 +2,7 @@
 
 One module so there is one catch point. Two readers live here,
 :mod:`workflow_documents` for the files and their YAML and
-:mod:`codescene_lanes` for the CodeScene boundary, and each grew its own
+:mod:`lane_reading` for the lanes, and each grew its own
 `WorkflowReadError` while the other was on a different branch. Two classes of
 that name in one package defeat the reason the base exists: a caller writing
 `except WorkflowReadError` catches whichever one it happened to import and

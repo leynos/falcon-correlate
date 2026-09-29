@@ -159,13 +159,13 @@ def test_both_readers_raise_the_same_exception_class() -> None:
     caller happened to import and silently misses the other. Asserted rather
     than assumed, because the failure is invisible until the day it matters.
     """
-    from tests.workflow_contracts import codescene_lanes, errors, workflow_documents
+    from tests.workflow_contracts import errors, lane_reading, workflow_documents
 
     assert workflow_documents.WorkflowReadError is errors.WorkflowReadError, (
         "the document reader must raise the package's error, not one of its own"
     )
-    assert codescene_lanes.WorkflowReadError is errors.WorkflowReadError, (
-        "the CodeScene reader must raise the same class as the document reader"
+    assert lane_reading.WorkflowReadError is errors.WorkflowReadError, (
+        "the lane reader must raise the same class as the document reader"
     )
     assert issubclass(errors.WorkflowReadError, errors.WorkflowContractError), (
         "the read error must derive from the package's stable catch point"

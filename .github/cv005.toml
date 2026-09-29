@@ -1,0 +1,10 @@
+repository = "leynos/falcon-correlate"
+
+# The coverage step of the pull-request lane runs on one leg of the Python
+# matrix (3.13, the version the publisher measures under), so its condition is
+# the pull-request guard plus that leg.
+[[pairing]]
+lane = "ci.yml:test:Generate coverage"
+publisher = "coverage-main.yml:coverage-upload:Generate coverage"
+differs = []
+guards = ["matrix.python-version == '3.13'"]

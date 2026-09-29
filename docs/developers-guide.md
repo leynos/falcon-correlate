@@ -325,45 +325,56 @@ nested `upload-artifact` and cache steps. A check step with the id
 whose expression GitHub evaluates before the shell starts, so the secret
 reaches no process. The upload runs only when that output is `'true'` and the
 ref is main, and passes `${{ secrets.CS_ACCESS_TOKEN }}` straight to
-`access-token`. `tests/workflow_contracts/test_codescene_publisher.py` asserts
-the exact command with no `if:` or `env`, the output conjunct, the direct
-input, and no `env` anywhere in the publisher carrying the token under any
-name. A guard on `env.CS_ACCESS_TOKEN != ''` would not do: with the binding
-deleted it is simply false, and the upload skips forever without failing
-anything.
+`access-token`. The shared contract library asserts the exact command with no
+`if:` or `env`, the output conjunct, the direct input, and no `env` anywhere in
+the publisher carrying the token under any name. A guard on
+`env.CS_ACCESS_TOKEN != ''` would not do: with the binding deleted it is simply
+false, and the upload skips forever without failing anything.
 
 The publisher job declares `environment: codescene`. That environment admits
 deployments from `main` alone and is where the CodeScene token lives, so only
-the trunk publisher can read it.
-`tests/workflow_contracts/codescene_environment.py` holds the placement: every
+the trunk publisher can read it. The library holds the placement: every
 uploading job declares the environment, as a string or as `{name: codescene}`;
 no other job declares it; and no workflow a pull request can start declares it
-in any job. `tests/workflow_contracts/test_codescene_environment.py` proves
-each clause over changed copies of the parsed workflows.
+in any job.
 
 One known exception: a Dependabot pull request merged by the automerge workflow
 uses `GITHUB_TOKEN`, whose merges fire no push event, so that commit publishes
 no coverage until the next push or a dispatch on main.
 
-`tests/workflow_contracts/test_codescene_coverage_boundary.py` asserts all of
-this, deriving the boundary's subject from each workflow's own triggers rather
-than from a list of file names. The subject is a closure, not a trigger list:
-`tests/workflow_contracts/pull_request_reach.py` starts from every workflow a
-`pull_request` or `pull_request_target` event starts, reading the trigger block
-in any form GitHub accepts, and follows each job-level call into this
-repository's workflow directory, recognized by where the reference resolves
-rather than by a list of prefixes, GitHub's recommended `$/` self-repository
-spelling included. A `workflow_call`-only workflow a pull-request job calls
-runs on that pull request, and with `secrets: inherit` it holds every secret
-the caller does, so the closure is scanned and `secrets: inherit` is refused
-anywhere in it. Workflows are parsed with `StrictLoader`, so a credential
-cannot hide in the discarded half of a repeated key. Two readings there are
-worth knowing before changing it. The publisher is "pushes to main and serves
-no pull request", because `ci.yml` declares both and the looser reading would
-require it to upload and forbid it from uploading at once. And CodeScene
-markers are matched against the raw text, because a mention can sit in a `run:`
-script, an `env:` value or an action input; comment lines are excluded so the
-reason can be written beside the rule.
+`make test-workflow-contracts` asserts all of this by running
+`cv005-contracts check`, the shared contract library in `leynos/shared-actions`
+(`packages/cv005-contracts`), from a full commit named by `CV005_CONTRACTS_REF`
+in the Makefile; CI runs it in a "Check the CV-005 contracts" step of the lint
+job. A fix to the rules is therefore a pin bump. The target needs `uv`, which
+fetches the Python 3.13 the library runs under. The repository's parameters are
+in `.github/cv005.toml`: its `repository` name and one `[[pairing]]` for the
+pull-request coverage step, which runs on the 3.13 leg of the test matrix alone
+(the version the publisher measures under), so its condition is the
+pull-request guard plus `matrix.python-version == '3.13'`. The library's own
+suite proves each rule refuses the shape it exists to refuse, so this
+repository keeps no copy of the readers or the refusal cases.
+
+The library derives the boundary's subject from each workflow's own triggers
+rather than from a list of file names. The subject is a closure, not a trigger
+list: it starts from every workflow a `pull_request` or `pull_request_target`
+event starts, reading the trigger block in any form GitHub accepts, and follows
+each job-level call into this repository's workflow directory, recognized by
+where the reference resolves rather than by a list of prefixes, GitHub's
+recommended `$/` self-repository spelling included. A `workflow_call`-only
+workflow a pull-request job calls runs on that pull request, and with
+`secrets: inherit` it holds every secret the caller does, so the closure is
+scanned and `secrets: inherit` is refused anywhere in it. Workflows are read
+strictly, so a credential cannot hide in the discarded half of a repeated key.
+Two readings there are worth knowing before changing it. The publisher is
+"pushes to main and serves no pull request", because `ci.yml` declares both and
+the looser reading would require it to upload and forbid it from uploading at
+once. And CodeScene markers are matched against the raw text, because a mention
+can sit in a `run:` script, an `env:` value or an action input.
+
+What stays under `tests/workflow_contracts/` is the runner-placement contract
+and the suite-runs-once contract, which read the workflows through
+`lane_reading.py`, `triggers.py` and `runner_lanes.py`.
 
 ### Errors the readers raise
 

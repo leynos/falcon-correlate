@@ -71,6 +71,9 @@ jobs:
       - name: Run typechecker
         run: make typecheck
 
+      - name: Check the CV-005 contracts
+        run: make test-workflow-contracts
+
       - name: Check spelling
         # `make markdownlint` carried the spelling gate as a prerequisite; the
         # Markdown lint action above replaced that step, so spelling runs on

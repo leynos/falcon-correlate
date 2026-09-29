@@ -22,15 +22,15 @@ import typing as typ
 
 import pytest
 
-from tests.workflow_contracts.codescene_lanes import (
+from tests.workflow_contracts.errors import WorkflowReadError
+from tests.workflow_contracts.guard_conditions import admits
+from tests.workflow_contracts.lane_reading import (
     as_mapping,
     parse,
     pushes_to_main,
     serves_pull_requests,
     workflow_texts,
 )
-from tests.workflow_contracts.errors import WorkflowReadError
-from tests.workflow_contracts.guard_conditions import admits
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -47,7 +47,9 @@ EVENT_EXCLUSION = re.compile(
 )
 INSTALL_INTERPRETER = re.compile(r"^uv python install (?P<version>\S+)$")
 #: Commands that run the suite, or might; each must be the plain command.
-SUITE_HINT = re.compile(r"\bpytest\b|\bmake\s+test\b")
+#: A hyphen ends a word for `\b`, so `make test-workflow-contracts` would read as
+#: `make test`; the lookahead keeps a longer target from counting as the suite.
+SUITE_HINT = re.compile(r"\bpytest\b|\bmake\s+test(?![\w-])")
 
 
 def _excluded(entry: object, event: str, where: str) -> str:
@@ -291,6 +293,22 @@ jobs:
 """
     with pytest.raises(WorkflowReadError, match="cannot tell whether"):
         suite_runs({"ci.yml": text}, "push")
+
+
+def test_a_longer_make_target_is_not_the_suite() -> None:
+    """`make test-workflow-contracts` is a contract check, not a second suite run.
+
+    A word-boundary match read the hyphen as the end of `test`, so the target
+    that runs the shared contract library counted as a suite step and the
+    lint job was refused as unreadable.
+    """
+    assert not _runs_suite({"run": "make test-workflow-contracts"}, "ci.yml:lint")
+
+
+def test_a_bare_make_test_is_still_refused_as_unreadable() -> None:
+    """The narrow side: the target really named `test` still has to be the plain suite."""
+    with pytest.raises(WorkflowReadError, match="cannot tell whether"):
+        _runs_suite({"run": "make test"}, "ci.yml:test")
 
 
 def test_an_unreadable_exclusion_is_refused() -> None:
