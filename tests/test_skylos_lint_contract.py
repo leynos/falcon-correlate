@@ -56,6 +56,9 @@ _SKYLOS_CLI_TOKENS: typ.Final = (
 )
 _SKYLOS_SCAN_TOKENS: typ.Final = (
     "$(SKYLOS_CLI)",
+    "$(SKYLOS_SCAN_OPTIONS)",
+)
+_SKYLOS_SCAN_OPTION_TOKENS: typ.Final = (
     "--config-file",
     "pyproject.toml",
 )
@@ -74,6 +77,7 @@ _SKYLOS_LINT_TOKENS: typ.Final = (
     "--no-grep-verify",
 )
 _SKYLOS_WHITELIST_LOCK_TOKENS: typ.Final = (".skylos-whitelist.lock",)
+_FLOCK_RECIPE_PREFIX_TOKENS: typ.Final = ("flock",)
 _SKYLOS_WHITELIST_TOKENS: typ.Final = (
     "flock",
     "$(SKYLOS_WHITELIST_LOCK)",
@@ -84,6 +88,7 @@ _SKYLOS_WHITELIST_TOKENS: typ.Final = (
     "--reason",
     "$${SKYLOS_REASON}",
 )
+_SKYLOS_RECIPE_PREFIX_TOKENS: typ.Final = ("$(SKYLOS)",)
 _DOCUMENTED_WHITELIST_NAMES: typ.Final = frozenset()
 _METHOD_ENTRY_POINTS: typ.Final = frozenset({
     "falcon_correlate.middleware_config.CorrelationIDConfig.__post_init__",
@@ -271,108 +276,115 @@ def _assert_makeutil_installation(command: object, *, contract: str) -> None:
     ), f"{contract} must pin the Makeutil installation command"
 
 
-def test_lint_recipe_runs_the_production_dead_code_gate() -> None:
-    """`make lint` must scan production code with Skylos's strict gate."""
-    assert _variable_tokens("SKYLOS_VERSION") == _SKYLOS_VERSION_TOKENS, (
-        "Skylos version contract must pin 4.33.2"
-    )
-    assert (
-        _variable_tokens("SKYLOS_PRODUCTION_TARGETS")
-        == _SKYLOS_PRODUCTION_TARGET_TOKENS
-    ), "Skylos production-target contract must scan only production modules"
-    assert _variable_tokens("SKYLOS_EXCLUDES") == _SKYLOS_EXCLUDE_TOKENS, (
-        "Skylos exclusion contract must omit in-package tests"
-    )
-    commands = [
-        command for command in _recipe_tokens("lint") if command[:1] == ("$(SKYLOS)",)
-    ]
-    assert commands == [_SKYLOS_LINT_TOKENS], (
-        "Skylos lint command must be a strict production dead-code gate"
-    )
+class TestSkylosLintContract:
+    """Keep related static-analysis gate contracts together."""
 
-
-def test_whitelist_target_uses_skylos_subcommand_contract() -> None:
-    """`skylos whitelist` must precede its named exception and reason."""
-    assert _variable_tokens("SKYLOS_CLI") == _SKYLOS_CLI_TOKENS, (
-        "Skylos CLI contract must pin Python 3.14 and its tool release"
-    )
-    assert _variable_tokens("SKYLOS") == _SKYLOS_SCAN_TOKENS, (
-        "Skylos scan command must add only scan-specific global options"
-    )
-    assert _variable_tokens("SKYLOS_WHITELIST_LOCK") == _SKYLOS_WHITELIST_LOCK_TOKENS, (
-        "Skylos whitelist lock must default to the ignored repository-local path"
-    )
-    commands = [
-        command
-        for command in _recipe_tokens("skylos-allow")
-        if command[:1] == ("flock",)
-    ]
-    assert commands == [_SKYLOS_WHITELIST_TOKENS], (
-        "Skylos whitelist command must serialize updates and dispatch before "
-        "its reason option"
-    )
-
-
-def test_skylos_configuration_models_implicit_runtime_callers() -> None:
-    """Each known false positive must be a typed, explained entry point."""
-    with (_PROJECT_ROOT / "pyproject.toml").open("rb") as configuration_file:
-        configuration = tomllib.load(configuration_file)
-
-    tool = _mapping(configuration.get("tool"), subject="tool configuration")
-    skylos = _mapping(tool.get("skylos"), subject="Skylos configuration")
-    gate = _mapping(skylos.get("gate"), subject="Skylos gate configuration")
-    assert gate.get("strict") is True, (
-        "Skylos gate configuration must enable strict mode"
-    )
-    documented_names, documented_reasons = _documented_whitelist(skylos)
-    assert documented_names == _DOCUMENTED_WHITELIST_NAMES, (
-        "Skylos documented whitelist names must remain the reviewed set"
-    )
-    assert frozenset(documented_reasons) == _DOCUMENTED_WHITELIST_NAMES, (
-        "Skylos documented whitelist reasons must cover exactly the reviewed set"
-    )
-    assert all(
-        isinstance(reason, str) and reason.strip()
-        for reason in documented_reasons.values()
-    ), "Skylos documented whitelist reasons must contain explanatory text"
-    assert _entry_points_by_type(skylos) == {
-        "method": _METHOD_ENTRY_POINTS,
-        "parameter": _PARAMETER_ENTRY_POINTS,
-    }, "Skylos entry-point contract must preserve typed runtime exceptions"
-
-
-def test_ci_runs_lint_and_installs_makeutil_for_full_suites() -> None:
-    """CI must share lint and Makeutil contracts with local contributor gates."""
-    lint_step = _sole_workflow_step("lint", "Run lint gates")
-    assert lint_step.get("run") == "make lint", (
-        "CI lint-step contract must invoke the shared make lint target"
-    )
-    test_rule = _sole_recipe_rule("test")
-    prerequisites = _text_sequence(
-        test_rule.get("prerequisites"), subject="test prerequisites"
-    )
-    assert "makeutil" in prerequisites, (
-        "make test must require Makeutil before its Skylos contract tests run"
-    )
-
-    for workflow_path, job_name in (
-        (".github/workflows/ci.yml", "test"),
-        (".github/workflows/coverage-main.yml", "coverage-upload"),
-    ):
-        job = _workflow_job(workflow_path, job_name)
-        environment = _mapping(
-            job.get("env"), subject=f"{workflow_path} Makeutil environment"
+    def test_lint_recipe_runs_the_production_dead_code_gate(self) -> None:
+        """`make lint` must scan production code with Skylos's strict gate."""
+        assert _variable_tokens("SKYLOS_VERSION") == _SKYLOS_VERSION_TOKENS, (
+            "Skylos version contract must pin 4.33.2"
         )
-        assert environment.get("MAKEUTIL_REVISION") == _MAKEUTIL_REVISION, (
-            f"{workflow_path} Makeutil revision contract must stay pinned"
+        assert (
+            _variable_tokens("SKYLOS_PRODUCTION_TARGETS")
+            == _SKYLOS_PRODUCTION_TARGET_TOKENS
+        ), "Skylos production-target contract must scan only production modules"
+        assert _variable_tokens("SKYLOS_EXCLUDES") == _SKYLOS_EXCLUDE_TOKENS, (
+            "Skylos exclusion contract must omit in-package tests"
         )
-        assert environment.get("MAKEUTIL_TOOLCHAIN") == _MAKEUTIL_TOOLCHAIN, (
-            f"{workflow_path} Makeutil toolchain contract must stay pinned"
+        commands = [
+            command
+            for command in _recipe_tokens("lint")
+            if command[: len(_SKYLOS_RECIPE_PREFIX_TOKENS)]
+            == _SKYLOS_RECIPE_PREFIX_TOKENS
+        ]
+        assert commands == [_SKYLOS_LINT_TOKENS], (
+            "Skylos lint command must be a strict production dead-code gate"
         )
-        parser_step = _sole_workflow_step(
-            job_name, "Install Makefile parser", workflow_path=workflow_path
+
+    def test_whitelist_target_uses_skylos_subcommand_contract(self) -> None:
+        """`skylos whitelist` must precede its named exception and reason."""
+        assert _variable_tokens("SKYLOS_CLI") == _SKYLOS_CLI_TOKENS, (
+            "Skylos CLI contract must pin Python 3.14 and its tool release"
         )
-        _assert_makeutil_installation(
-            parser_step.get("run"),
-            contract=f"{workflow_path} Makeutil-install contract",
+        assert _variable_tokens("SKYLOS") == _SKYLOS_SCAN_TOKENS, (
+            "Skylos scan command must add only scan-specific global options"
         )
+        assert _variable_tokens("SKYLOS_SCAN_OPTIONS") == _SKYLOS_SCAN_OPTION_TOKENS, (
+            "Skylos scan-only global options must be separate from its CLI macro"
+        )
+        assert (
+            _variable_tokens("SKYLOS_WHITELIST_LOCK") == _SKYLOS_WHITELIST_LOCK_TOKENS
+        ), "Skylos whitelist lock must default to the ignored repository-local path"
+        commands = [
+            command
+            for command in _recipe_tokens("skylos-allow")
+            if command[: len(_FLOCK_RECIPE_PREFIX_TOKENS)]
+            == _FLOCK_RECIPE_PREFIX_TOKENS
+        ]
+        assert commands == [_SKYLOS_WHITELIST_TOKENS], (
+            "Skylos whitelist command must serialize updates and dispatch before "
+            "its reason option"
+        )
+
+    def test_skylos_configuration_models_implicit_runtime_callers(self) -> None:
+        """Each known false positive must be a typed, explained entry point."""
+        with (_PROJECT_ROOT / "pyproject.toml").open("rb") as configuration_file:
+            configuration = tomllib.load(configuration_file)
+
+        tool = _mapping(configuration.get("tool"), subject="tool configuration")
+        skylos = _mapping(tool.get("skylos"), subject="Skylos configuration")
+        gate = _mapping(skylos.get("gate"), subject="Skylos gate configuration")
+        assert gate.get("strict") is True, (
+            "Skylos gate configuration must enable strict mode"
+        )
+        documented_names, documented_reasons = _documented_whitelist(skylos)
+        assert documented_names == _DOCUMENTED_WHITELIST_NAMES, (
+            "Skylos documented whitelist names must remain the reviewed set"
+        )
+        assert frozenset(documented_reasons) == _DOCUMENTED_WHITELIST_NAMES, (
+            "Skylos documented whitelist reasons must cover exactly the reviewed set"
+        )
+        assert all(
+            isinstance(reason, str) and reason.strip()
+            for reason in documented_reasons.values()
+        ), "Skylos documented whitelist reasons must contain explanatory text"
+        assert _entry_points_by_type(skylos) == {
+            "method": _METHOD_ENTRY_POINTS,
+            "parameter": _PARAMETER_ENTRY_POINTS,
+        }, "Skylos entry-point contract must preserve typed runtime exceptions"
+
+    def test_ci_runs_lint_and_installs_makeutil_for_full_suites(self) -> None:
+        """CI must share lint and Makeutil contracts with local contributor gates."""
+        lint_step = _sole_workflow_step("lint", "Run lint gates")
+        assert lint_step.get("run") == "make lint", (
+            "CI lint-step contract must invoke the shared make lint target"
+        )
+        test_rule = _sole_recipe_rule("test")
+        prerequisites = _text_sequence(
+            test_rule.get("prerequisites"), subject="test prerequisites"
+        )
+        assert "makeutil" in prerequisites, (
+            "make test must require Makeutil before its Skylos contract tests run"
+        )
+
+        for workflow_path, job_name in (
+            (".github/workflows/ci.yml", "test"),
+            (".github/workflows/coverage-main.yml", "coverage-upload"),
+        ):
+            job = _workflow_job(workflow_path, job_name)
+            environment = _mapping(
+                job.get("env"), subject=f"{workflow_path} Makeutil environment"
+            )
+            assert environment.get("MAKEUTIL_REVISION") == _MAKEUTIL_REVISION, (
+                f"{workflow_path} Makeutil revision contract must stay pinned"
+            )
+            assert environment.get("MAKEUTIL_TOOLCHAIN") == _MAKEUTIL_TOOLCHAIN, (
+                f"{workflow_path} Makeutil toolchain contract must stay pinned"
+            )
+            parser_step = _sole_workflow_step(
+                job_name, "Install Makefile parser", workflow_path=workflow_path
+            )
+            _assert_makeutil_installation(
+                parser_step.get("run"),
+                contract=f"{workflow_path} Makeutil-install contract",
+            )

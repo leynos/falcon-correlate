@@ -31,7 +31,6 @@ SKYLOS_CLI = $(UV_ENV) $(UV) tool run --python 3.14 \
 	--from 'skylos==$(SKYLOS_VERSION)' skylos
 SKYLOS_SCAN_OPTIONS = --config-file pyproject.toml
 SKYLOS = $(SKYLOS_CLI) $(SKYLOS_SCAN_OPTIONS)
-SKYLOS_WHITELIST = $(SKYLOS_CLI) whitelist
 SKYLOS_PRODUCTION_TARGETS ?= src/falcon_correlate
 SKYLOS_EXCLUDES ?= unittests
 SKYLOS_WHITELIST_LOCK ?= .skylos-whitelist.lock
@@ -113,7 +112,7 @@ skylos-allow: ## Document one named Skylos exception, not an entry point
 	@case "$${SKYLOS_REASON}" in *[![:space:]]*) ;; *) \
 		printf "Error: REASON is required for a named whitelist exception\\n" >&2; \
 		exit 2;; esac
-	flock "$(SKYLOS_WHITELIST_LOCK)" env $(SKYLOS_WHITELIST) "$${SKYLOS_SYMBOL}" --reason "$${SKYLOS_REASON}"
+	flock "$(SKYLOS_WHITELIST_LOCK)" env $(SKYLOS_CLI) whitelist "$${SKYLOS_SYMBOL}" --reason "$${SKYLOS_REASON}"
 
 typecheck: build ## Run typechecking
 	$(UV_ENV) $(UV) run ty --version

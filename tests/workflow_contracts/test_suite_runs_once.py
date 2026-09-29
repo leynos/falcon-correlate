@@ -37,6 +37,10 @@ if typ.TYPE_CHECKING:
 
 INTERPRETERS = ("3.12", "3.13", "3.14")
 PLAIN_SUITE = "uv run pytest -v -n auto --ignore=tests/workflows"
+PLAIN_SUITE_WITH_OPTIONAL_CELERY_EXCLUDED = (
+    f"{PLAIN_SUITE} "
+    "--ignore=src/falcon_correlate/unittests/test_optional_celery_dependency.py"
+)
 COVERAGE_ACTION = "leynos/shared-actions/.github/actions/generate-coverage@"
 MATRIX_KEY = "python-version"
 #: The one computed exclusion this reader evaluates: a version dropped on one
@@ -47,7 +51,7 @@ EVENT_EXCLUSION = re.compile(
 )
 INSTALL_INTERPRETER = re.compile(r"^uv python install (?P<version>\S+)$")
 #: Commands that run the suite, or might; each must be the plain command.
-SUITE_HINT = re.compile(r"\bpytest\b|\bmake\s+test\b")
+SUITE_HINT = re.compile(r"\bpytest\b|\bmake\s+test(?:\s|$)")
 
 
 def _excluded(entry: object, event: str, where: str) -> str:
@@ -142,7 +146,7 @@ def _runs_suite(step: dict[str, typ.Any], where: str) -> bool:
     command = str(step.get("run", "")).strip()
     if not SUITE_HINT.search(command):
         return False
-    if command == PLAIN_SUITE:
+    if command in {PLAIN_SUITE, PLAIN_SUITE_WITH_OPTIONAL_CELERY_EXCLUDED}:
         return True
     message = f"{where}: cannot tell whether {command!r} runs the suite"
     raise WorkflowReadError(message)

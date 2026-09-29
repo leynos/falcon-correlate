@@ -566,18 +566,17 @@ Skylos parses source with the Python runtime's own abstract syntax tree (AST),
 so the CLI is pinned to Python 3.14 to avoid phantom findings on newer Python
 syntax. The production scan excludes unit-test modules and uses strict gate
 mode. Investigate every finding: remove genuine dead code, and record only
-verified false positives. Prefer typed
-`[[tool.skylos.dead_code.entrypoints]]` rules for implicit runtime callers.
-Use the `skylos-allow` helper only when an entry-point rule cannot model the
-boundary.
+verified false positives. Prefer typed `[[tool.skylos.dead_code.entrypoints]]`
+rules for implicit runtime callers. Use the `skylos-allow` helper only when an
+entry-point rule cannot model the boundary.
 
 For a verified named exception, run
-`make skylos-allow SYMBOL=symbol REASON="Verified runtime caller"`. Both
-values must contain non-whitespace text; missing or whitespace-only inputs
-produce a clear error and exit status 2. `SYMBOL` is intentional: WSL sets
-`NAME` to the host name. Updates are serialized with `flock` on the ignored
-repository-local `.skylos-whitelist.lock` file. Set
-`SKYLOS_WHITELIST_LOCK` only when an alternate lock path is needed.
+`make skylos-allow SYMBOL=symbol REASON="Verified runtime caller"`. Both values
+must contain non-whitespace text; missing or whitespace-only inputs produce a
+clear error and exit status 2. `SYMBOL` is intentional: WSL sets `NAME` to the
+host name. Updates are serialized with `flock` on the ignored repository-local
+`.skylos-whitelist.lock` file. Set `SKYLOS_WHITELIST_LOCK` only when an
+alternate lock path is needed.
 
 The Skylos Makefile contract is parsed from `makeutil parse Makefile` JSON by
 `tests/test_skylos_lint_contract.py`. `make test` checks that the pinned
@@ -630,21 +629,21 @@ Run `make markdownlint` for the combined Markdown and spelling gate, and
 
 The lint target is configured by these Makefile variables:
 
-| Variable              | Default                                                                                                         | Purpose                                                        |
-| --------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `UV`                  | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                                   | Selects the `uv` launcher used by all Python tool commands.    |
-| `UV_ENV`              | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                                  | Keeps project-local `uv` cache and tool directories.           |
-| `PYLINT_PYTHON`       | `pypy@3.12`                                                                                                     | Selects the Python runtime used for the Pylint tool execution. |
-| `PYLINT_VERSION`      | `4.0.9`                                                                                                         | Pins the Pylint version installed by `uv tool run`.            |
-| `PYLINT_TARGETS`      | `src tests examples`                                                                                            | Defines the source trees checked by the Pylint tier.           |
-| `PYLINT`              | `$(UV_ENV) $(UV) tool run --managed-python --python $(PYLINT_PYTHON) --from 'pylint==$(PYLINT_VERSION)' pylint` | Expands to the full PyPy-backed Pylint command.                |
-| `INTERROGATE_TARGETS` | `src/falcon_correlate`                                                                                          | Defines the repo-root-relative trees checked by Interrogate.   |
-| `SKYLOS_VERSION`      | `4.33.2`                                                                                                       | Pins the separately provisioned Skylos release.                |
-| `SKYLOS_CLI`          | `uv tool run --python 3.14 --from 'skylos==$(SKYLOS_VERSION)' skylos`                                         | Expands to the pinned Skylos CLI command.                       |
-| `SKYLOS_SCAN_OPTIONS` | `--config-file pyproject.toml`                                                                                  | Holds scan-only global options.                                 |
-| `SKYLOS_PRODUCTION_TARGETS` | `src/falcon_correlate`                                                                                    | Defines the production source scanned for dead code.           |
-| `SKYLOS_EXCLUDES`     | `unittests`                                                                                                    | Excludes test-only package infrastructure from the scan.       |
-| `SKYLOS_WHITELIST_LOCK` | `.skylos-whitelist.lock`                                                                                    | Serializes whitelist read-modify-write updates.                |
+| Variable                    | Default                                                                                                         | Purpose                                                        |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `UV`                        | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                                   | Selects the `uv` launcher used by all Python tool commands.    |
+| `UV_ENV`                    | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                                  | Keeps project-local `uv` cache and tool directories.           |
+| `PYLINT_PYTHON`             | `pypy@3.12`                                                                                                     | Selects the Python runtime used for the Pylint tool execution. |
+| `PYLINT_VERSION`            | `4.0.9`                                                                                                         | Pins the Pylint version installed by `uv tool run`.            |
+| `PYLINT_TARGETS`            | `src tests examples`                                                                                            | Defines the source trees checked by the Pylint tier.           |
+| `PYLINT`                    | `$(UV_ENV) $(UV) tool run --managed-python --python $(PYLINT_PYTHON) --from 'pylint==$(PYLINT_VERSION)' pylint` | Expands to the full PyPy-backed Pylint command.                |
+| `INTERROGATE_TARGETS`       | `src/falcon_correlate`                                                                                          | Defines the repo-root-relative trees checked by Interrogate.   |
+| `SKYLOS_VERSION`            | `4.33.2`                                                                                                        | Pins the separately provisioned Skylos release.                |
+| `SKYLOS_CLI`                | `uv tool run --python 3.14 --from 'skylos==$(SKYLOS_VERSION)' skylos`                                           | Expands to the pinned Skylos CLI command.                      |
+| `SKYLOS_SCAN_OPTIONS`       | `--config-file pyproject.toml`                                                                                  | Holds scan-only global options.                                |
+| `SKYLOS_PRODUCTION_TARGETS` | `src/falcon_correlate`                                                                                          | Defines the production source scanned for dead code.           |
+| `SKYLOS_EXCLUDES`           | `unittests`                                                                                                     | Excludes test-only package infrastructure from the scan.       |
+| `SKYLOS_WHITELIST_LOCK`     | `.skylos-whitelist.lock`                                                                                        | Serializes whitelist read-modify-write updates.                |
 
 Override variables at the command line for targeted investigation. For example:
 
