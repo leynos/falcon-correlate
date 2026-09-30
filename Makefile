@@ -29,9 +29,11 @@ TY_VERSION ?= 0.0.74
 MBAKE_VERSION ?= 1.4.6
 RUFF = $(UV_ENV) $(UV) run --with ruff==$(RUFF_VERSION) ruff
 TY = $(UV_ENV) $(UV) run --with ty==$(TY_VERSION) ty
-TYPOS_CONFIG_BUILDER_VERSION ?= v0.1.1
+# Pin Git-sourced tools to immutable commits so uv can reuse cached sources
+# without refreshing movable release tags on every invocation.
+TYPOS_CONFIG_BUILDER_REF ?= b2bc36bee84fbe9b958ab64bd4581377ddd60c72
 TYPOS_CONFIG_BUILDER = $(UV_ENV) $(UV) tool run --python 3.14 --from \
-	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_VERSION)" \
+	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_REF)" \
 	typos-config-builder
 INTERROGATE_TARGETS ?= src/falcon_correlate
 # These tests spawn pytest subprocesses and must run outside the xdist worker pool.
@@ -55,7 +57,7 @@ PYLINT_ANALYSIS_MESSAGES = syntax-error,astroid-error,parse-error,config-parse-e
 PYLINT_CLASSIC_MESSAGES = logging-format-interpolation,logging-format-truncated,logging-fstring-interpolation,logging-not-lazy,logging-too-few-args,logging-too-many-args,logging-unsupported-format,bare-name-capture-pattern,invalid-match-args-definition,match-class-bind-self,match-class-positional-attributes,multiple-class-sub-patterns,too-many-positional-sub-patterns,chained-comparison,condition-evals-to-constant,consider-merging-isinstance,consider-swap-variables,consider-using-in,consider-using-max-builtin,consider-using-min-builtin,consider-using-sys-exit,consider-using-ternary,inconsistent-return-statements,no-else-break,no-else-continue,no-else-raise,no-else-return,redefined-argument-from-local,simplifiable-condition,simplifiable-if-expression,simplifiable-if-statement,simplify-boolean-expression,stop-iteration-return,super-with-arguments,trailing-comma-tuple,unnecessary-negation,useless-return,consider-iterating-dictionary,consider-using-dict-comprehension,consider-using-dict-items,consider-using-enumerate,consider-using-f-string,consider-using-generator,consider-using-get,consider-using-join,consider-using-set-comprehension,unnecessary-comprehension,unnecessary-dict-index-lookup,unnecessary-list-index-lookup,use-a-generator,use-dict-literal,use-implicit-booleaness-not-comparison,use-implicit-booleaness-not-comparison-to-string,use-implicit-booleaness-not-len,use-list-literal,use-maxsplit-arg,use-sequence-for-iteration,use-yield-from,bad-open-mode,bad-thread-instantiation,boolean-datetime,consider-using-with,deprecated-argument,deprecated-attribute,deprecated-class,deprecated-decorator,deprecated-method,forgotten-debug-statement,invalid-envvar-default,invalid-envvar-value,method-cache-max-size-none,redundant-unittest-assert,shallow-copy-environ,singledispatch-method,singledispatchmethod-function,subprocess-popen-preexec-fn,subprocess-run-check,unnecessary-dunder-call,unnecessary-ellipsis,unspecified-encoding,missing-final-newline,mixed-line-endings,superfluous-parens,trailing-newlines,trailing-whitespace,unexpected-line-ending-format,modified-iterating-dict,modified-iterating-list,modified-iterating-set,too-many-arguments,too-many-boolean-expressions,too-many-branches,too-many-lines,too-many-locals,too-many-nested-blocks,too-many-positional-arguments,too-many-public-methods,too-many-statements
 PYLINT = PYLINTHOME=$(PYLINT_HOME) $(PYLINT_TOOL) pylint --jobs=1 --disable=all \
 	--enable=$(PYLINT_CLASSIC_MESSAGES),$(PYLINT_ANALYSIS_MESSAGES)
-DF12_PYTHON_LINTS_REF ?= v0.3.0
+DF12_PYTHON_LINTS_REF ?= 4cf41736cce2f7ba2778882a5c629c044568a0e5
 DF12_PYTHON_LINTS = git+https://github.com/leynos/df12-python-lints.git@$(DF12_PYTHON_LINTS_REF)
 DF12_PYTHON ?= 3.14
 DF12_PYLINT_VERSION ?= $(PYLINT_VERSION)

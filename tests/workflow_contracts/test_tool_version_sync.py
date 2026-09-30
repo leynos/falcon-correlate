@@ -131,6 +131,15 @@ def test_pylint_toolchain_pins_match_ci_and_dependencies() -> None:
     assert _ci_lint_toolchain() == makefile, (
         "CI Pylint toolchain pins must match the Makefile"
     )
+    pyproject = tomllib.loads(PYPROJECT_PATH.read_text(encoding="utf-8"))
+    development_dependencies = pyproject["dependency-groups"]["dev"]
+    expected_df12_dependency = (
+        "df12-python-lints @ git+https://github.com/leynos/df12-python-lints.git@"
+        + makefile["DF12_PYTHON_LINTS_REF"]
+    )
+    assert expected_df12_dependency in development_dependencies, (
+        "The development dependency must use the Makefile's DF12 source pin"
+    )
     assert _development_pylint_versions() == {
         name: makefile[name] for name in ("PYLINT_VERSION", "ASTROID_VERSION")
     }, "Development dependencies must match the Makefile Pylint and Astroid pins"

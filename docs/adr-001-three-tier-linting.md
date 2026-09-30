@@ -114,7 +114,8 @@ Non-goals:
 - Classic Pylint must run without a monkey-patch under the verified PyPy 3.12
   runtime.
 - The PyPy archive, Pylint, and Astroid must be pinned for reproducibility.
-- `df12-python-lints` must be pinned to `v0.3.0` and run under CPython 3.14.
+- Pin the `df12-python-lints` v0.3.0 release to commit
+  `4cf41736cce2f7ba2778882a5c629c044568a0e5` and run it under CPython 3.14.
 - `ambrleaks` must scan the repository's Syrupy snapshots.
 - The lint workflow must keep Ruff first so common failures return quickly.
 - The Makefile must expose variables for the Interrogate targets, PyPy runtime,
@@ -214,6 +215,10 @@ Regression contracts exercise interpreter identity, PEP 695 AST nodes, actual
 PyPy live-object inspection, invalid syntax, lint failure propagation, plugin
 isolation, and preservation of `.venv`. `make lint` and the CI lint lane remain
 the complete entry points.
+
+The DF12 v0.3.0 source is pinned by full commit ID in the Makefile, CI, and
+development dependency group. Immutable refs prevent a release tag from moving
+and allow uv to reuse a cached source without refreshing that tag.
 
 The classic source set remains `src tests examples`. This checkout has no
 separately versioned `scripts/` tree; if newer-language tooling is added, it
