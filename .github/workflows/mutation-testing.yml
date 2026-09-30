@@ -18,4 +18,4 @@ jobs:
     permissions:
       contents: read
       id-token: write # OIDC workflow-source resolution
-    uses: leynos/shared-actions/.github/workflows/mutation-mutmut.yml@8a83824b29dfe8f861714b544dc85fb925ed010c
+    uses: leynos/shared-actions/.github/workflows/mutation-mutmut.yml@8250c914bd32aeacfdf8d9e87b804ec0024ee83e
