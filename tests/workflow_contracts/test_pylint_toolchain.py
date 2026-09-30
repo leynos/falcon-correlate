@@ -90,6 +90,32 @@ def _tool_command(*, python: str, source: str) -> tuple[str, ...]:
     )
 
 
+def _toolchain_identity(command: tuple[str, ...]) -> dict[str, object]:
+    """Return the interpreter and package identity for one Pylint toolchain."""
+    identity = textwrap.dedent(
+        """
+        import astroid
+        import importlib.util
+        import json
+        import pylint
+        import sys
+
+        pypy_version = getattr(sys, "pypy_version_info", None)
+        print(json.dumps({
+            "implementation": sys.implementation.name,
+            "python": sys.version_info[:2],
+            "pypy": pypy_version[:3] if pypy_version is not None else None,
+            "pylint": pylint.__version__,
+            "astroid": astroid.__version__,
+            "df12": importlib.util.find_spec("df12_python_lints") is not None,
+        }))
+        """
+    )
+    result = _run((*command, "python", "-c", identity))
+    _require_success(result)
+    return json.loads(result.stdout)
+
+
 @pytest.fixture(scope="module")
 def toolchains() -> _Toolchains:
     """Provision the pinned PyPy binary and return both lint tool commands."""
@@ -116,32 +142,16 @@ def test_classic_pylint_toolchain_has_the_pinned_pypy_identity(
     toolchains: _Toolchains,
 ) -> None:
     """Classic Pylint must run on the pinned PyPy 3.12 binary."""
-    identity = textwrap.dedent(
-        """
-        import astroid
-        import json
-        import pylint
-        import sys
-
-        print(json.dumps({
-            "implementation": sys.implementation.name,
-            "python": sys.version_info[:2],
-            "pypy": sys.pypy_version_info[:3],
-            "pylint": pylint.__version__,
-            "astroid": astroid.__version__,
-        }))
-        """
-    )
-    result = _run([*toolchains.classic, "python", "-c", identity])
-    _require_success(result)
+    identity = _toolchain_identity(toolchains.classic)
     expected = {
         "implementation": "pypy",
         "python": [3, 12],
         "pypy": [8, 0, 0],
         "pylint": _makefile_pin("PYLINT_VERSION"),
         "astroid": _makefile_pin("ASTROID_VERSION"),
+        "df12": False,
     }
-    assert json.loads(result.stdout) == expected, (
+    assert identity == expected, (
         "Classic Pylint must run with the Makefile's pinned PyPy toolchain"
     )
 
@@ -150,33 +160,16 @@ def test_df12_pylint_toolchain_has_the_pinned_cpython_identity(
     toolchains: _Toolchains,
 ) -> None:
     """DF12 Pylint must run separately under CPython 3.14."""
-    identity = textwrap.dedent(
-        """
-        import astroid
-        import importlib.util
-        import json
-        import pylint
-        import sys
-
-        print(json.dumps({
-            "implementation": sys.implementation.name,
-            "python": sys.version_info[:2],
-            "pylint": pylint.__version__,
-            "astroid": astroid.__version__,
-            "df12": importlib.util.find_spec("df12_python_lints") is not None,
-        }))
-        """
-    )
-    result = _run([*toolchains.df12, "python", "-c", identity])
-    _require_success(result)
+    identity = _toolchain_identity(toolchains.df12)
     expected = {
         "implementation": "cpython",
         "python": [3, 14],
+        "pypy": None,
         "pylint": _makefile_pin("DF12_PYLINT_VERSION"),
         "astroid": _makefile_pin("DF12_ASTROID_VERSION"),
         "df12": True,
     }
-    assert json.loads(result.stdout) == expected, (
+    assert identity == expected, (
         "DF12 Pylint must run with its separately pinned CPython toolchain"
     )
 
