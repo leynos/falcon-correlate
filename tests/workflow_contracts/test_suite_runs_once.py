@@ -22,15 +22,15 @@ import typing as typ
 
 import pytest
 
-from tests.workflow_contracts.codescene_lanes import (
+from tests.workflow_contracts.errors import WorkflowReadError
+from tests.workflow_contracts.guard_conditions import admits
+from tests.workflow_contracts.lane_reading import (
     as_mapping,
     parse,
     pushes_to_main,
     serves_pull_requests,
     workflow_texts,
 )
-from tests.workflow_contracts.errors import WorkflowReadError
-from tests.workflow_contracts.guard_conditions import admits
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -47,7 +47,11 @@ EVENT_EXCLUSION = re.compile(
 )
 INSTALL_INTERPRETER = re.compile(r"^uv python install (?P<version>\S+)$")
 #: Commands that run the suite, or might; each must be the plain command.
-SUITE_HINT = re.compile(r"\bpytest\b|\bmake\s+test\b")
+#: Any goal of a `make` command that is exactly `test`, wherever it sits among
+#: the goals: `make test-workflow-contracts test` runs the suite too. A hyphen
+#: ends a word for `\b`, so the lookahead keeps a longer target such as
+#: `make test-workflow-contracts` from counting as the suite.
+SUITE_HINT = re.compile(r"\bpytest\b|\bmake\b(?:\s+\S+)*?\s+test(?![\w-])")
 
 
 def _excluded(entry: object, event: str, where: str) -> str:
@@ -291,6 +295,43 @@ jobs:
 """
     with pytest.raises(WorkflowReadError, match="cannot tell whether"):
         suite_runs({"ci.yml": text}, "push")
+
+
+def test_a_longer_make_target_is_not_the_suite() -> None:
+    """`make test-workflow-contracts` is a contract check, not a second suite run.
+
+    A word-boundary match read the hyphen as the end of `test`, so the target
+    that runs the shared contract library counted as a suite step and the
+    lint job was refused as unreadable.
+    """
+    assert not _runs_suite({"run": "make test-workflow-contracts"}, "ci.yml:lint")
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "make test-workflow-contracts test",
+        "make test test-workflow-contracts",
+        "make -j2 test-workflow-contracts test",
+    ],
+)
+def test_a_make_command_listing_the_suite_among_its_goals_is_refused(
+    command: str,
+) -> None:
+    """Make runs every goal, so a `test` goal anywhere still runs the suite.
+
+    A pattern anchored on the first goal read `make test-workflow-contracts
+    test` as neither, and a job already running the suite could add the
+    contract step and run it twice unseen.
+    """
+    with pytest.raises(WorkflowReadError, match="cannot tell whether"):
+        _runs_suite({"run": command}, "ci.yml:test")
+
+
+def test_a_bare_make_test_is_still_refused_as_unreadable() -> None:
+    """The narrow side: a target really named `test` must still be the plain suite."""
+    with pytest.raises(WorkflowReadError, match="cannot tell whether"):
+        _runs_suite({"run": "make test"}, "ci.yml:test")
 
 
 def test_an_unreadable_exclusion_is_refused() -> None:

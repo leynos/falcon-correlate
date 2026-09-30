@@ -1,16 +1,12 @@
-"""Readers over the workflow documents the CodeScene boundary asserts against.
+"""Readers over the workflow documents the runner and suite contracts assert against.
 
 Kept apart from the contracts next door for the reason every reader in this
-directory is: a reader exercised only over this repository's own seven correct
+directory is: a reader exercised only over this repository's own correct
 documents passes whether or not it discriminates anything, and separating it
 lets a contract drive it with documents built in the test.
 
-The boundary itself is CV-005. A pull request must not reach CodeScene. The CLI
-is a third party in the path of every review, and on 2026-09-16 a floating
-version broke its cobertura parser and reddened every branch in this estate
-whose pull requests ran the check step, on code that had not changed. One
-push-to-main lane publishes; pull requests measure coverage and compare it
-against a local ratchet baseline.
+The CodeScene boundary (CV-005) is not read here: `make test-workflow-contracts`
+runs it from the shared contract library.
 """
 
 from __future__ import annotations
@@ -21,48 +17,13 @@ from pathlib import Path
 import yaml
 
 from tests.workflow_contracts.errors import WorkflowContractError, WorkflowReadError
-from tests.workflow_contracts.pull_request_reach import (
-    PULL_REQUEST_EVENTS,
-    trigger_names,
-)
 from tests.workflow_contracts.strict_yaml import StrictLoader
+from tests.workflow_contracts.triggers import PULL_REQUEST_EVENTS, trigger_names
 
 __all__ = ["WorkflowContractError", "WorkflowReadError"]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
-
-#: The action that generates a coverage report.
-COVERAGE_ACTION: typ.Final[str] = (
-    "leynos/shared-actions/.github/actions/generate-coverage"
-)
-
-#: The action that talks to CodeScene.
-UPLOAD_ACTION: typ.Final[str] = (
-    "leynos/shared-actions/.github/actions/upload-codescene-coverage"
-)
-
-#: Pins verified to carry the CLI manifest that pins cs-coverage 1.0.101,
-#: which is what makes an installation deterministic without a checksum
-#: input. An allowlist rather than a list of known-bad pins: Dependabot
-#: chooses from the whole history, so a list of bad pins can never be
-#: complete, and an older pin reintroduces the floating install that broke
-#: this repository's lanes. Refusing an unknown pin costs one verification;
-#: accepting one fails open and silently.
-MANIFEST_PINNED: typ.Final[frozenset[str]] = frozenset({
-    "a5765019912a8ab6882b12db049c7cde635f3a85",
-})
-
-#: Anything naming CodeScene in a workflow's text. Matched against the raw
-#: text rather than the parsed document, because a mention can sit in a
-#: `run:` script, an `env:` value or an action input, and a walk that reads
-#: only the shapes it expects would miss whichever one is used next.
-CODESCENE_MARKERS: typ.Final[tuple[str, ...]] = (
-    "cs-coverage",
-    "CS_ACCESS_TOKEN",
-    "upload-codescene-coverage",
-    "codescene.io",
-)
 
 
 def as_mapping(value: object, message: str) -> dict[str, typ.Any]:
@@ -203,7 +164,7 @@ def serves_pull_requests(
     -------
     bool
         True when the workflow declares a pull-request event, in any of the
-        forms :func:`~tests.workflow_contracts.pull_request_reach.trigger_names`
+        forms :func:`~tests.workflow_contracts.triggers.trigger_names`
         reads; an unreadable trigger block is refused there.
     """
     return bool(PULL_REQUEST_EVENTS & trigger_names(document, workflow))
@@ -230,107 +191,3 @@ def pushes_to_main(document: dict[str, typ.Any]) -> bool:
         return False
     branches = push.get("branches")
     return isinstance(branches, list) and "main" in branches
-
-
-def steps_of(document: dict[str, typ.Any]) -> list[tuple[str, dict[str, typ.Any]]]:
-    """Return every step in every job, paired with its job name.
-
-    Parameters
-    ----------
-    document : dict[str, typ.Any]
-        A parsed workflow document.
-
-    Returns
-    -------
-    list[tuple[str, dict[str, typ.Any]]]
-        Each step as `(job, mapping)`.
-    """
-    found: list[tuple[str, dict[str, typ.Any]]] = []
-    for name, job in as_mapping(document.get("jobs"), "a workflow needs jobs").items():
-        job_map = as_mapping(job, f"job {name} must be a mapping")
-        found.extend(
-            (str(name), as_mapping(step, f"a step in {name} must map"))
-            for step in job_map.get("steps") or []
-        )
-    return found
-
-
-def steps_using(
-    document: dict[str, typ.Any], action: str
-) -> list[tuple[str, str, dict[str, typ.Any]]]:
-    """Return every step invoking `action`, with its job name and ref.
-
-    The action path is compared against the part of `uses` before the `@`,
-    not searched for as a substring: a search also selects any action whose
-    path extends this one.
-
-    Parameters
-    ----------
-    document : dict[str, typ.Any]
-        A parsed workflow document.
-    action : str
-        The action path, without a ref.
-
-    Returns
-    -------
-    list[tuple[str, str, dict[str, typ.Any]]]
-        Each match as `(job, ref, inputs)`.
-    """
-    found: list[tuple[str, str, dict[str, typ.Any]]] = []
-    for job, step in steps_of(document):
-        uses = str(step.get("uses", ""))
-        path, _, ref = uses.partition("@")
-        if path != action:
-            continue
-        found.append((job, ref, as_mapping(step.get("with") or {}, "with must map")))
-    return found
-
-
-def codescene_mentions(text: str) -> list[str]:
-    """Return every CodeScene marker appearing in a workflow's raw text.
-
-    Read from the text rather than the parsed document because a mention can
-    sit in a `run:` script, an `env:` value or an action input, and a walk
-    reading only the shapes it expects misses whichever one is used next.
-
-    Comment lines are excluded, so a file may explain the boundary without
-    breaching it. A comment cannot invoke anything, and a rule that refused
-    the word would forbid the only place the reason can be written down.
-
-    Parameters
-    ----------
-    text : str
-        The file's text.
-
-    Returns
-    -------
-    list[str]
-        Each marker found, sorted and without repeats.
-    """
-    code = "\n".join(
-        line for line in text.splitlines() if not line.lstrip().startswith("#")
-    )
-    return sorted({marker for marker in CODESCENE_MARKERS if marker in code})
-
-
-def is_publisher(document: dict[str, typ.Any]) -> bool:
-    """Report whether a workflow is the push-to-main publisher.
-
-    A push trigger naming main is not enough on its own. `ci.yml` declares
-    both `push` to main and `pull_request`, so a predicate reading only the
-    push arm would call it a publisher while the boundary rules also call it
-    a pull-request workflow, and the same file would be required to upload
-    and forbidden from uploading. A workflow that serves pull requests is a
-    pull-request workflow, and the publisher is the one that does not.
-
-    Parameters
-    ----------
-    document : dict[str, typ.Any]
-        A parsed workflow document.
-
-    Returns
-    -------
-    bool
-        True when the workflow pushes to main and serves no pull request.
-    """
-    return pushes_to_main(document) and not serves_pull_requests(document)
