@@ -154,7 +154,7 @@ def parse_workflow(text: str, workflow: str) -> dict[str, typ.Any]:
         mapping.
     """
     try:
-        document = yaml.load(text, Loader=StrictLoader)  # noqa: S506 - strict SafeLoader subclass
+        document = yaml.load(text, Loader=StrictLoader)  # ruff: ignore[unsafe-yaml-load] - strict SafeLoader subclass
     except yaml.YAMLError as error:
         message = f"could not be parsed: {error}"
         raise WorkflowReadError(message, workflow) from error

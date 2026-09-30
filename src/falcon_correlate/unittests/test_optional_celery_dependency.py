@@ -70,14 +70,17 @@ def celery_blocked_pytest_run(
     """
     tmp_path = tmp_path_factory.mktemp("celery-blocked-suite")
     _write_celery_import_blocker(tmp_path)
-    sentinel_test = _write_child_sentinel_test(tmp_path)
     celery_test_paths = _discover_celery_test_paths(_PROJECT_ROOT)
-    return _run_celery_tests_with_celery_blocked(
-        tmp_path,
-        sentinel_test,
-        celery_test_paths,
-        _PROJECT_ROOT,
-    )
+    sentinel_test = _write_child_sentinel_test(_PROJECT_ROOT)
+    try:
+        return _run_celery_tests_with_celery_blocked(
+            tmp_path,
+            sentinel_test,
+            celery_test_paths,
+            _PROJECT_ROOT,
+        )
+    finally:
+        sentinel_test.unlink()
 
 
 @pytest.fixture(scope="module")
