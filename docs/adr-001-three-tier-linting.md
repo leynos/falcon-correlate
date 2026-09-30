@@ -17,10 +17,10 @@ for the current toolchain.
 
 `falcon-correlate` already used Ruff for linting and formatting checks. The
 project needed to import the stricter lint policy from `leynos/episodic`,
-including a focused Pylint tier, and an explicit docstring coverage gate so
-new public and internal package code cannot reduce coverage while still
-satisfying style-only docstring checks. The original PyPy workaround has since
-been removed; the current execution model is recorded in the latest amendment.
+including a focused Pylint tier, and an explicit docstring coverage gate so new
+public and internal package code cannot reduce coverage while still satisfying
+style-only docstring checks. The original PyPy workaround has since been
+removed; the current execution model is recorded in the latest amendment.
 
 The decision needed to preserve a fast default lint path, keep lint behaviour
 reproducible across local and CI environments, and avoid enabling an unbounded
@@ -69,11 +69,11 @@ Interrogate complements Ruff because Ruff validates docstring style and
 presence rule-by-rule, while Interrogate reports package-level coverage and
 fails the lint target below the configured threshold.
 
-| Topic              | Ruff only           | Unrestricted Pylint     | Focused PyPy-backed Pylint          | Ruff + Interrogate + focused Pylint |
-| ------------------ | ------------------- | ----------------------- | ----------------------------------- | ----------------------------------- |
-| Speed              | Fastest             | Slowest                 | Fast first tier, deeper second tier | Fast style tier, explicit coverage  |
-| Signal             | Good but incomplete | Noisy                   | Focused                             | Focused plus coverage threshold     |
-| Episodic alignment | Partial             | Partial                 | Full                                | Full plus package coverage          |
+| Topic              | Ruff only           | Unrestricted Pylint     | Focused PyPy-backed Pylint                 | Ruff + Interrogate + focused Pylint   |
+| ------------------ | ------------------- | ----------------------- | ------------------------------------------ | ------------------------------------- |
+| Speed              | Fastest             | Slowest                 | Fast first tier, deeper second tier        | Fast style tier, explicit coverage    |
+| Signal             | Good but incomplete | Noisy                   | Focused                                    | Focused plus coverage threshold       |
+| Episodic alignment | Partial             | Partial                 | Full                                       | Full plus package coverage            |
 | Reproducibility    | Good                | Depends on local Pylint | Pinned interpreter and `uv` tool execution | Pinned interpreter and `uv` execution |
 
 _Table 1: Comparison of linting options._
@@ -126,7 +126,8 @@ Choose option D. `make lint` runs Ruff, Interrogate, one-worker classic Pylint
 on checksum-verified PyPy 8.0.0/Python 3.12, the separate df12 Pylint pass on
 CPython 3.14, and `ambrleaks`. The classic and df12 passes cover
 `src tests examples`; their isolated environments and fatal diagnostics are
-described in the [2026-09-30 amendment](#amendment-2026-09-30-verified-pylint-on-pypy-312).
+described in the
+[2026-09-30 amendment](#amendment-2026-09-30-verified-pylint-on-pypy-312).
 
 Ruff owns the broad lint policy, import policy, docstring style, type-checking
 import rules, security checks, and most complexity checks. Interrogate owns the
@@ -216,13 +217,15 @@ installed Pylint/Astroid versions before analysis. Caller overrides pass
 through the same identity checks. This leaves the project's `.venv` and
 supported Python baseline unchanged.
 
-Pylint 4.1.1 declares Astroid `>=4.3.2,<=4.4`; the released 4.3.3 build is a
-supported pair. The separate DF12 pass uses the same explicit Pylint/Astroid
-pins in its own isolated environment on CPython 3.14, loads only
-`df12_python_lints`, and has a distinct `PYLINTHOME`. `ambrleaks` remains a
-separate CPython 3.14 invocation. The GitHub repository for `df12-python-lints`
-is owned by the df12 Productions organization, which also owns
-`falcon-correlate`; the dependency is pinned to release `v0.3.0`.
+Pylint 4.1.1 declares Astroid `>=4.3.2,<=4.4`, so Astroid 4.3.3 falls within
+its supported range. See the [Pylint 4.1.1 metadata](https://pypi.org/project/pylint/4.1.1/)
+and [Astroid 4.3.3 release](https://pypi.org/project/astroid/4.3.3/). The
+separate DF12 pass uses the same explicit Pylint/Astroid pins in its own
+isolated environment on CPython 3.14, loads only `df12_python_lints`, and has a
+distinct `PYLINTHOME`. `ambrleaks` remains a separate CPython 3.14 invocation.
+The GitHub repository for `df12-python-lints` is owned by the df12 Productions
+organization, which also owns `falcon-correlate`; the dependency is pinned to
+release `v0.3.0`.
 
 Both Pylint passes set the source `py-version` to 3.12; the host interpreter
 does not redefine the library baseline. Each invocation uses one worker and
@@ -230,6 +233,7 @@ enables syntax and fatal analysis diagnostics after `--disable=all`. Regression
 contracts exercise interpreter identity, PEP 695 AST nodes, actual PyPy live-
 object inspection, invalid syntax, lint failure propagation, plugin isolation,
 and preservation of `.venv`.
+`make lint` and the CI lint lane remain the complete entry points.
 
 The effective `make lint` order is:
 
@@ -246,5 +250,7 @@ must receive equivalent built-in Pylint coverage in an explicit
 host-appropriate pass rather than relying only on DF12 checks. The CI lint lane
 and `make lint` remain the complete entry points.
 
-The pinned artifact is listed on the [official PyPy downloads page](https://downloads.python.org/pypy/)
-and its digest is published in the [PyPy checksums](https://www.pypy.org/checksums.html).
+The pinned artefact is listed on the
+[official PyPy downloads page](https://downloads.python.org/pypy/) and its
+digest is published in the
+[PyPy checksums](https://www.pypy.org/checksums.html).

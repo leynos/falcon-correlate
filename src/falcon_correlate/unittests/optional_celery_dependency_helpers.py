@@ -36,6 +36,7 @@ import os
 import re
 import subprocess  # ruff: ignore[suspicious-subprocess-import] - tests intentionally spawn isolated Python subprocesses.
 import sys
+import tempfile
 import typing as typ
 from pathlib import Path
 
@@ -125,6 +126,20 @@ sys.meta_path.insert(0, _BlockCeleryFinder())
         encoding="utf-8",
     )
     return sitecustomize
+
+
+def _write_child_sentinel_test(project_root: Path) -> Path:
+    """Write a passing sentinel inside the child pytest root."""
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        prefix="test_non_celery_sentinel_",
+        suffix=".py",
+        dir=project_root,
+        delete=False,
+    ) as sentinel:
+        sentinel.write("def test_non_celery_suite_still_runs():\n    assert True\n")
+        return Path(sentinel.name)
 
 
 def _discover_celery_test_paths(project_root: Path) -> tuple[Path, ...]:
@@ -219,6 +234,7 @@ def _count_collected_test_items(
 
 def _run_celery_tests_with_celery_blocked(
     sitecustomize_dir: Path,
+    sentinel_test: Path,
     celery_test_paths: tuple[Path, ...],
     project_root: Path,
 ) -> _PytestRun:
@@ -237,20 +253,24 @@ def _run_celery_tests_with_celery_blocked(
         # deliberately serial so it does not multiply the worker count.
         "-n=0",
         "--color=no",
+        *_relative_paths((sentinel_test,), project_root),
         *_relative_paths(celery_test_paths, project_root),
     )
     # Build the expected snapshot from the child's own collection rather than a
     # bare literal. Each Celery module imports cleanly but marks itself
     # ``pytest.mark.skipif`` when Celery is absent, so every collected item
-    # skips at setup and emits one ``s`` marker. The progress markers and skip
-    # count are both the number of collected Celery items.
+    # skips at setup and emits one ``s`` marker. The passing sentinel emits the
+    # leading ``.``; the remaining markers and skip count are the number of
+    # collected Celery items.
     skipped_count = _count_collected_test_items(
         sitecustomize_dir,
         celery_test_paths,
         project_root,
     )
-    progress = "s" * skipped_count
-    expected_stdout = f"{progress} [100%]\n{skipped_count} skipped in <duration>"
+    progress = "." + "s" * skipped_count
+    expected_stdout = (
+        f"{progress} [100%]\n1 passed, {skipped_count} skipped in <duration>"
+    )
     return _PytestRun(
         result=result,
         normalized_stdout=_normalize_pytest_output(result.stdout),

@@ -694,8 +694,8 @@ Run `make markdownlint` for the combined Markdown and spelling gate, and
 
 ## Makefile variables
 
-The lint target is configured by these Makefile variables. The CI workflow
-sets matching version pins and runs the same `make lint` entry point.
+The lint target is configured by these Makefile variables. The CI workflow sets
+matching version pins and runs the same `make lint` entry point.
 
 | Variable                 | Default                                                                                                         | Purpose                                                      |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
@@ -742,12 +742,12 @@ make lint PYLINT_TARGETS=src/falcon_correlate/middleware.py
 ```
 
 The installer downloads the official `pypy3.12-v8.0.0-linux64.tar.gz` archive
-only on Linux x86_64 and verifies its published digest before extraction.
-PyPy labels its Python 3.12 build beta quality. Before analysis, Make checks
-the selected executable's full runtime identity and the installed Pylint and
-Astroid versions, including when a caller overrides Make variables. Classic
-and df12 tools use isolated `uv tool run` environments and distinct
-`PYLINTHOME` directories; neither replaces or changes the project's `.venv`.
+only on Linux x86_64 and verifies its published digest before extraction. PyPy
+labels its Python 3.12 build beta quality. Before analysis, Make checks the
+selected executable's full runtime identity and the installed Pylint and
+Astroid versions, including when a caller overrides Make variables. Classic and
+df12 tools use isolated `uv tool run` environments and distinct `PYLINTHOME`
+directories; neither replaces or changes the project's `.venv`.
 
 Pylint's `py-version` remains `3.12` for both passes. It describes the source
 baseline, not the interpreter running the tool: DF12 runs on CPython 3.14 but

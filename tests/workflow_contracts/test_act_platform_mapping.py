@@ -96,7 +96,9 @@ class TestActPlatformMapping:
         would leave the label unmapped at the point it matters.
         """
         arguments = act_platform_arguments()
-        assert len(arguments) == 2 * len(ACT_PLATFORM_IMAGES)
+        assert len(arguments) == 2 * len(ACT_PLATFORM_IMAGES), (
+            "each image mapping needs a -P option pair"
+        )
         pairs = {
             arguments[index + 1]
             for index in range(0, len(arguments), 2)
@@ -104,4 +106,4 @@ class TestActPlatformMapping:
         }
         assert pairs == {
             f"{label}={image}" for label, image in ACT_PLATFORM_IMAGES.items()
-        }
+        }, "every mapped runner label must retain its assigned act image"

@@ -31,7 +31,7 @@ WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 ACT_PLATFORMS = act_platform_arguments()
 
 
-@dc.dataclass(frozen=True)
+@dc.dataclass(frozen=True, slots=True)
 class ActConfig:
     """Configuration for running act."""
 
@@ -98,7 +98,7 @@ def run_act(config: ActConfig) -> tuple[int, Path, str]:
     if config.dry_run:
         cmd.append("--list")
 
-    completed = subprocess.run(  # noqa: S603 -- resolved act path and structured arguments.
+    completed = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- resolved act path and structured arguments.
         cmd,
         text=True,
         capture_output=True,

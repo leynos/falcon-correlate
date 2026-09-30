@@ -205,13 +205,15 @@ def serves_pull_requests(workflow: str, texts: dict[str, str] | None = None) -> 
     document = parse_workflow(text_of(texts, workflow), workflow)
     # PyYAML resolves an unquoted `on:` key to the boolean True.
     triggers = document.get("on", document.get(True))
-    if isinstance(triggers, str):
-        return triggers == "pull_request"
-    if isinstance(triggers, list):
-        return "pull_request" in triggers
-    return "pull_request" in as_mapping(
-        triggers, "must declare an on: mapping", workflow
-    )
+    match triggers:
+        case str() as trigger_name:
+            return trigger_name == "pull_request"
+        case list() as trigger_names:
+            return "pull_request" in trigger_names
+        case _:
+            return "pull_request" in as_mapping(
+                triggers, "must declare an on: mapping", workflow
+            )
 
 
 def paid_lanes_by_trigger(
