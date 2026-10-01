@@ -174,7 +174,15 @@ class CorrelationIDTransport(
         return self._wrapped_transport.handle_request(request)
 
     def close(self) -> None:
-        """Delegate transport shutdown to the wrapped transport."""
+        """Delegate shutdown to the wrapped transport.
+
+        Returns
+        -------
+        None
+            The declared HTTPX contract is ``None``. At runtime, the wrapped
+            transport's result is forwarded unchanged.
+
+        """
         return self._cast_to_none(self._wrapped_transport.close())
 
     def __enter__(self) -> CorrelationIDTransport:

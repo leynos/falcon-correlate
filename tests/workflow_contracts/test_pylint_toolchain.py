@@ -120,8 +120,14 @@ def _toolchain_identity(command: tuple[str, ...]) -> dict[str, object]:
 def toolchains() -> _Toolchains:
     """Provision the pinned PyPy binary and return both lint tool commands."""
     _require_success(_run(["make", "--no-print-directory", "prepare-pylint-python"]))
-    lint_runtime = REPOSITORY_ROOT / ".lint-tools" / "pypy3.12-v8.0.0-linux64"
-    classic_python = lint_runtime / "bin" / "pypy3.12"
+    python_version = _makefile_pin("PYLINT_PYTHON_VERSION")
+    pypy_version = _makefile_pin("PYLINT_PYPY_VERSION")
+    lint_runtime = (
+        REPOSITORY_ROOT
+        / ".lint-tools"
+        / f"pypy{python_version}-v{pypy_version}-linux64"
+    )
+    classic_python = lint_runtime / "bin" / f"pypy{python_version}"
     assert classic_python.is_file(), "The pinned PyPy executable must be provisioned"
     return _Toolchains(
         classic=_tool_command(
