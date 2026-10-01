@@ -64,7 +64,8 @@ import falcon
 import falcon.testing
 import pytest
 
-from falcon_correlate import ContextualLogFilter
+from falcon_correlate import ContextualLogFilter, CorrelationIDMiddleware
+from tests.conftest import CorrelationEchoResource
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -182,3 +183,63 @@ def logger_with_capture() -> cabc.Generator[
         hdlr.close()
         lgr.propagate = orig_propagate
         lgr.setLevel(orig_level)
+
+
+class _MiddlewareKwargs(typ.TypedDict, total=False):
+    """Type definition for CorrelationIDMiddleware keyword arguments."""
+
+    generator: cabc.Callable[[], str]
+    trusted_sources: cabc.Iterable[str]
+    validator: cabc.Callable[[str], bool]
+
+
+@pytest.fixture
+def correlation_echo_resource() -> CorrelationEchoResource:
+    """Provide a CorrelationEchoResource instance for testing.
+
+    Returns
+    -------
+    CorrelationEchoResource
+        A new ``CorrelationEchoResource`` instance.
+
+    """
+    return CorrelationEchoResource()
+
+
+@pytest.fixture
+def create_test_client(
+    correlation_echo_resource: CorrelationEchoResource,
+) -> cabc.Callable[..., falcon.testing.TestClient]:
+    """Build test clients with configurable middleware.
+
+    Parameters
+    ----------
+    correlation_echo_resource : CorrelationEchoResource
+        The resource fixture added to the built app.
+
+    Returns
+    -------
+        A factory function that creates TestClient instances.
+
+    """
+
+    def _create(
+        generator: cabc.Callable[[], str] | None = None,
+        trusted_sources: cabc.Iterable[str] | None = None,
+        validator: cabc.Callable[[str], bool] | None = None,
+    ) -> falcon.testing.TestClient:
+        """Build a Falcon TestClient with optional middleware configuration."""
+        kwargs: _MiddlewareKwargs = {}
+        if generator is not None:
+            kwargs["generator"] = generator
+        if trusted_sources is not None:
+            kwargs["trusted_sources"] = trusted_sources
+        if validator is not None:
+            kwargs["validator"] = validator
+
+        middleware = CorrelationIDMiddleware(**kwargs)
+        app = falcon.App(middleware=[middleware])
+        app.add_route("/test", correlation_echo_resource)
+        return falcon.testing.TestClient(app)
+
+    return _create

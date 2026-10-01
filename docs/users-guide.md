@@ -699,6 +699,10 @@ with httpx.Client(transport=CorrelationIDTransport(base_transport)) as client:
     response = client.get("https://api.example.com/data")
 ```
 
+Calling `CorrelationIDTransport.close()` delegates shutdown to the wrapped
+transport and forwards its runtime return value. Its declared return type
+remains `None` to match the HTTPX transport interface.
+
 Use `AsyncCorrelationIDTransport` for a reusable async client:
 
 ```python

@@ -3,11 +3,11 @@
 ## Status
 
 Accepted on 2026-05-15 and amended on 2026-06-21, 2026-07-31, 2026-09-25, and
-2026-09-30. The classic Pylint pass now runs vanilla Pylint on the
-checksum-verified PyPy 8.0.0 Python 3.12 binary. The separate
-`df12-python-lints` pass runs under CPython 3.14, followed by `ambrleaks`. See
-the [2026-09-30 amendment](#amendment-2026-09-30-verified-pylint-on-pypy-312)
-for the current toolchain.
+2026-09-30. `make lint` now runs five ordered checks: Ruff, Interrogate,
+classic Pylint on the checksum-verified PyPy 8.0.0 Python 3.12 binary, DF12
+Pylint under CPython 3.14, and `ambrleaks`. See the
+[2026-09-30 amendment](#amendment-2026-09-30-verified-pylint-on-pypy-312) for
+the current toolchain.
 
 ## Date
 
@@ -114,8 +114,7 @@ Non-goals:
 - Classic Pylint must run without a monkey-patch under the verified PyPy 3.12
   runtime.
 - The PyPy archive, Pylint, and Astroid must be pinned for reproducibility.
-- Pin the `df12-python-lints` v0.3.0 release to commit
-  `4cf41736cce2f7ba2778882a5c629c044568a0e5` and run it under CPython 3.14.
+- Pin the `df12-python-lints` v0.3.0 release tag and run it under CPython 3.14.
 - `ambrleaks` must scan the repository's Syrupy snapshots.
 - The lint workflow must keep Ruff first so common failures return quickly.
 - The Makefile must expose variables for the Interrogate targets, PyPy runtime,
@@ -132,11 +131,10 @@ described in the
 
 Ruff owns the broad lint policy, import policy, docstring style, type-checking
 import rules, security checks, and most complexity checks. Interrogate owns the
-package docstring coverage threshold. Pylint owns the focused third tier for
-logging, pattern matching, refactoring suggestions, resource handling, and
-selected design limits. The df12 plug-in owns house-style structural checks,
-suppression explanations, and snapshot-assertion guidance. `ambrleaks` owns
-snapshot redaction checks.
+package docstring coverage threshold. Classic Pylint owns focused logging,
+pattern-matching, refactoring, resource-handling, and design checks. The df12
+plug-in owns house-style structural checks, suppression explanations, and
+snapshot-assertion guidance. `ambrleaks` owns snapshot redaction checks.
 
 ## Known Risks and Limitations
 
@@ -157,10 +155,11 @@ snapshot redaction checks.
 
 ## Architectural Rationale
 
-The three-tier approach separates fast feedback, docstring coverage, and deeper
-static analysis. It keeps the normal contributor workflow simple through
-`make lint`, while the Makefile variables make both runtimes, package versions,
-isolated Pylint caches, and source targets explicit for maintenance.
+The five-tier approach separates fast feedback, docstring coverage, two focused
+Pylint passes, and snapshot redaction checks. It keeps the normal contributor
+workflow simple through `make lint`, while the Makefile variables make both
+runtimes, package versions, isolated Pylint caches, and source targets explicit
+for maintenance.
 
 The project treats lint configuration as architecture because it shapes public
 API design, import boundaries, logging correctness, and module size pressure.
@@ -216,9 +215,11 @@ PyPy live-object inspection, invalid syntax, lint failure propagation, plugin
 isolation, and preservation of `.venv`. `make lint` and the CI lint lane remain
 the complete entry points.
 
-The DF12 v0.3.0 source is pinned by full commit ID in the Makefile, CI, and
-development dependency group. Immutable refs prevent a release tag from moving
-and allow uv to reuse a cached source without refreshing that tag.
+The Makefile, CI, and development dependency group pin the DF12 source to the
+`v0.3.0` release tag. Keeping the same version tag in each place ensures the
+Pylint plug-in and `ambrleaks` use the same published rule set. The
+`df12-python-lints` repository is owned by the df12 Productions organization,
+which also owns `falcon-correlate`.
 
 The classic source set remains `src tests examples`. This checkout has no
 separately versioned `scripts/` tree; if newer-language tooling is added, it

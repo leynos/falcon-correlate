@@ -9,13 +9,14 @@ pull request.
 
 The Python lint target uses a five-tier linting approach:
 
-- **Tier 1: Ruff.** Ruff runs first through `uv run ruff check`. It is the
-  fast linting gate and owns formatting-adjacent checks, import rules, common
-  correctness rules, docstring rules, security checks, complexity thresholds,
-  and Ruff's Pylint-compatible rule families.
+- **Tier 1: Ruff.** Ruff runs first through the pinned `$(RUFF) check` wrapper.
+  It is the fast linting gate and owns formatting-adjacent checks, import
+  rules, common correctness rules, docstring rules, security checks, complexity
+  thresholds, and Ruff's Pylint-compatible rule families.
 - **Tier 2: Interrogate.** Interrogate runs second through
-  `uv run interrogate --fail-under 100`. It enforces package-level docstring
-  coverage after Ruff has validated docstring style.
+  `$(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)`. It
+  enforces package-level docstring coverage after Ruff has validated docstring
+  style.
 - **Tier 3: classic Pylint through PyPy.** Vanilla Pylint 4.1.1 with Astroid
   4.3.3 runs under the checksum-verified PyPy 8.0.0 Python 3.12 binary, without
   a wrapper or monkey-patch. The beta-quality runtime is provisioned for Linux
@@ -34,8 +35,9 @@ Each stage must pass before the next one runs. This keeps the slower, deeper
 checks focused on code that has already passed the high-volume checks and the
 package docstring coverage gate.
 
-The core linting decision is recorded in
-[ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md).
+The original linting decision is recorded in
+[ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md);
+its later amendment records the current five-tier pipeline.
 
 ## Internal module architecture
 
@@ -138,8 +140,8 @@ Follow the existing pattern in `tests/property/test_header_injection.py`:
 ## Tested documentation examples
 
 Runnable documentation examples live under `examples/`. They are source files,
-not Markdown-only snippets. The Pylint tier includes `examples` in
-`PYLINT_TARGETS` so runnable documentation examples are covered by that tier.
+not Markdown-only snippets. Both Pylint passes include `examples` in
+`PYLINT_TARGETS`, so runnable documentation examples are covered by both.
 
 The quickstart guide embeds snippets from `examples/quickstart/`. Each source
 region is delimited with sentinel comments:
@@ -557,7 +559,7 @@ does not accept a Boolean there at all.
 
 ## Roadmap notes
 
-The three-tier linting work described in
+The five-tier linting work described in
 [ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md)
 is complete. Keep future linting changes aligned with that ADR unless a new
 ADR supersedes it.
@@ -576,9 +578,11 @@ make lint
 `make lint` executes these commands in order:
 
 ```bash
-$(UV_ENV) $(UV) run ruff check
+$(RUFF) check
 $(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
-$(PYLINT) $(PYLINT_TARGETS)
+classic-pylint
+df12-pylint
+$(AMBRLEAKS) tests
 ```
 
 Continuous Integration installs `interrogate` as a uv tool before this target
@@ -587,7 +591,13 @@ in CI.
 
 The target should be run before committing changes that affect Python code,
 tests, or lint configuration. When diagnosing failures, fix Ruff findings
-first, then rerun `make lint` so the Pylint tier sees the post-Ruff state.
+first, then rerun `make lint` so both Pylint passes see the post-Ruff state.
+
+`make test` first runs
+`src/falcon_correlate/unittests/test_optional_celery_dependency.py` serially.
+That test starts a nested pytest process, so it is excluded from the following
+xdist run. The remaining tests run with `-n $(PYTEST_WORKERS)`; the default
+worker limit is six.
 
 Use the standard log pattern when capturing lint output for review:
 
@@ -644,11 +654,11 @@ CI workflow sets matching lint pins and runs the same `make lint` entry point.
 | `PYLINT_TARGETS`           | `src tests examples`                                                                  | Defines the source trees checked by both Pylint passes.     |
 | `PYLINT_HOME`              | `.pylint_cache/pypy-3.12-8.0.0-pylint-4.1.1-astroid-4.3.3`                            | Separates classic Pylint state.                             |
 | `PYLINT`                   | Isolated `uv tool run`, one worker, focused built-in messages plus fatal diagnostics. | Runs classic Pylint directly under PyPy.                    |
-| `DF12_PYTHON_LINTS_REF`    | `4cf41736cce2f7ba2778882a5c629c044568a0e5`                                            | Pins release v0.3.0 and `ambrleaks` to an immutable commit. |
+| `DF12_PYTHON_LINTS_REF`    | `v0.3.0`                                                                              | Pins the versioned DF12 release for Pylint and `ambrleaks`. |
 | `DF12_PYTHON`              | `3.14`                                                                                | Selects CPython for the df12 and snapshot passes.           |
 | `DF12_PYLINT_VERSION`      | `$(PYLINT_VERSION)`                                                                   | Keeps the isolated df12 Pylint version aligned.             |
 | `DF12_ASTROID_VERSION`     | `$(ASTROID_VERSION)`                                                                  | Keeps the isolated df12 Astroid version aligned.            |
-| `DF12_PYLINT_HOME`         | `.pylint_cache/cpython-3.14-df12-<full source ref>-pylint-4.1.1-astroid-4.3.3`        | Separates state by DF12 source and package pins.            |
+| `DF12_PYLINT_HOME`         | `.pylint_cache/cpython-3.14-df12-v0.3.0-pylint-4.1.1-astroid-4.3.3`                   | Separates state by DF12 source and package pins.            |
 | `DF12_PYLINT_MESSAGES`     | All twelve messages supplied by `v0.3.0`                                              | Keeps the df12 checks explicit and reviewable.              |
 | `DF12_PYLINT`              | Isolated `uv tool run`, one worker, df12 plug-in plus fatal diagnostics.              | Runs only the df12 pass under CPython 3.14.                 |
 | `AMBRLEAKS`                | Isolated `uv tool run` under `$(DF12_PYTHON)`                                         | Scans Syrupy snapshots under CPython 3.14.                  |
@@ -678,7 +688,8 @@ the focused built-in Pylint checks in a separate host-appropriate pass.
 Do not change the runtime, Pylint, or Astroid pins casually; review them as a
 tooling change. Update the `df12-python-lints` dependency and
 `DF12_PYTHON_LINTS_REF` together so the plug-in and `ambrleaks` keep the same
-rule implementation.
+rule implementation. The `v0.3.0` tag pins the shared tool version so both
+commands use the same released rule set.
 
 ## Episodic lint policy
 
