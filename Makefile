@@ -13,13 +13,15 @@ UV ?= $(shell command -v uv 2>/dev/null || printf '%s/.local/bin/uv' "$$HOME")
 TOOLS = $(MDLINT) uv
 VENV_TOOLS = pytest
 UV_ENV = UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools
+# Ignore Lody's injected Git URL rewrites when resolving public Git sources.
+GIT_SOURCE_ENV = GIT_CONFIG_COUNT=0 PATH=/usr/bin:/bin:$(PATH)
 MUTMUT_VERSION ?= 3.6.0
 
 # The CV-005 CodeScene contracts live in shared-actions and run from a full
 # commit, so a fix is a pin bump. `.github/cv005.toml` holds this repository's
 # only parameters.
 CV005_CONTRACTS_REF ?= 88977798a5c3bae1549afb99642529488c665276
-CV005_CONTRACTS = $(UV_ENV) $(UV) tool run --python 3.13 \
+CV005_CONTRACTS = $(GIT_SOURCE_ENV) $(UV_ENV) $(UV) tool run --python 3.13 \
 	--from 'git+https://github.com/leynos/shared-actions@$(CV005_CONTRACTS_REF)\#subdirectory=packages/cv005-contracts' \
 	cv005-contracts
 
@@ -31,7 +33,7 @@ TY_VERSION ?= 0.0.74
 MBAKE_VERSION ?= 1.4.6
 RUFF = $(UV_ENV) $(UV) run --with ruff==$(RUFF_VERSION) ruff
 TY = $(UV_ENV) $(UV) run --with ty==$(TY_VERSION) ty
-TYPOS_CONFIG_BUILDER = $(UV_ENV) $(UV) tool run --python 3.14 --from \
+TYPOS_CONFIG_BUILDER = $(GIT_SOURCE_ENV) $(UV_ENV) $(UV) tool run --python 3.14 --from \
 	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_VERSION)" \
 	typos-config-builder
 INTERROGATE_TARGETS ?= src/falcon_correlate
@@ -72,14 +74,13 @@ DF12_PYLINT_VERSION ?= $(PYLINT_VERSION)
 DF12_ASTROID_VERSION ?= $(ASTROID_VERSION)
 DF12_PYLINT_HOME ?= .pylint_cache/cpython-$(DF12_PYTHON)-df12-$(DF12_PYTHON_LINTS_REF)-pylint-$(DF12_PYLINT_VERSION)-astroid-$(DF12_ASTROID_VERSION)
 DF12_PYLINT_MESSAGES = R9101,C9102,R9103,R9104,C9105,C9106,C9107,R9108,R9109,R9110,R9111,C9112
-DF12_PYLINT_TOOL = $(UV_ENV) $(UV) tool run --isolated --python $(DF12_PYTHON) \
+DF12_PYLINT_TOOL = $(GIT_SOURCE_ENV) $(UV_ENV) $(UV) tool run --isolated --python $(DF12_PYTHON) \
 	--from '$(DF12_PYTHON_LINTS)' --with 'pylint==$(DF12_PYLINT_VERSION)' \
 	--with 'astroid==$(DF12_ASTROID_VERSION)'
 DF12_PYLINT = PYLINTHOME=$(DF12_PYLINT_HOME) $(DF12_PYLINT_TOOL) pylint --jobs=1 \
 	--disable=all --load-plugins=df12_python_lints \
 	--enable=$(DF12_PYLINT_MESSAGES),$(PYLINT_ANALYSIS_MESSAGES)
-AMBRLEAKS = $(UV_ENV) $(UV) tool run --isolated --python $(DF12_PYTHON) \
-	--from '$(DF12_PYTHON_LINTS)' ambrleaks
+AMBRLEAKS = $(DF12_PYLINT_TOOL) ambrleaks
 
 .PHONY: help all clean build build-release lint classic-pylint df12-pylint \
         prepare-pylint-python verify-classic-pylint verify-df12-pylint \
