@@ -304,7 +304,9 @@ def test_a_longer_make_target_is_not_the_suite() -> None:
     that runs the shared contract library counted as a suite step and the
     lint job was refused as unreadable.
     """
-    assert not _runs_suite({"run": "make test-workflow-contracts"}, "ci.yml:lint")
+    assert not _runs_suite({"run": "make test-workflow-contracts"}, "ci.yml:lint"), (
+        "the contract-only Make target must not be treated as the test suite"
+    )
 
 
 @pytest.mark.parametrize(

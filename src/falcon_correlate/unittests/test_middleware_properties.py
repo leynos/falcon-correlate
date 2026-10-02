@@ -69,7 +69,10 @@ class _PropertyResponse:
             The recorded value, or ``None`` if the header is absent.
 
         """
-        return self.headers.get(name)
+        try:
+            return self.headers[name]
+        except KeyError:
+            return None
 
 
 def _expected_correlation_id(
@@ -116,7 +119,7 @@ class _RequestSelectionScenario(typ.NamedTuple):
 
 @st.composite
 def _request_selection_scenarios(
-    draw: "st.DrawFn",  # noqa: UP037 -- st.DrawFn is not runtime-stable.
+    draw: "st.DrawFn",  # ruff: ignore[quoted-annotation] -- st.DrawFn is not runtime-stable.
 ) -> _RequestSelectionScenario:
     """Composite Hypothesis strategy for request-selection property scenarios."""
     return _RequestSelectionScenario(
@@ -169,7 +172,7 @@ def test_process_request_selection_property(
         req,
         resp,
         None,
-        True,  # noqa: FBT003 - Falcon middleware hook receives positional bool
+        True,  # ruff: ignore[boolean-positional-value-in-call] - Falcon middleware hook receives positional bool
     )
     assert context.run(correlation_id_var.get) is None, (
         "expected correlation_id_var.get() to be None after response but got "
@@ -184,7 +187,7 @@ def test_process_request_selection_property(
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_process_response_cleanup_property(
     request_response_factory: cabc.Callable[..., tuple[typ.Any, typ.Any]],
-    should_fail: bool,  # noqa: FBT001 - generated property input
+    should_fail: bool,  # ruff: ignore[boolean-type-hint-positional-argument] - generated property input
     correlation_id: str,
 ) -> None:
     """Verify response cleanup runs whether header echo succeeds or raises."""
@@ -206,14 +209,14 @@ def test_process_response_cleanup_property(
                     req,
                     response,
                     None,
-                    True,  # noqa: FBT003 - Falcon middleware hook receives positional bool
+                    True,  # ruff: ignore[boolean-positional-value-in-call] - Falcon middleware hook receives positional bool
                 )
         else:
             middleware.process_response(
                 req,
                 response,
                 None,
-                True,  # noqa: FBT003 - Falcon middleware hook receives positional bool
+                True,  # ruff: ignore[boolean-positional-value-in-call] - Falcon middleware hook receives positional bool
             )
             assert resp.get_header("X-Correlation-ID") == expected_id, (
                 "expected response header to equal selected correlation ID "
@@ -258,7 +261,7 @@ def test_concurrent_context_isolation_property(
                 req,
                 resp,
                 None,
-                True,  # noqa: FBT003 - Falcon middleware hook receives positional bool
+                True,  # ruff: ignore[boolean-positional-value-in-call] - Falcon middleware hook receives positional bool
             )
             return before, during, correlation_id_var.get()
 

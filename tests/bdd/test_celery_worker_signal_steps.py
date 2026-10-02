@@ -21,10 +21,18 @@ pytestmark = pytest.mark.skipif(
     reason="celery is not installed",
 )
 
-from pytest_bdd import given, parsers, scenarios, then, when  # noqa: E402
+from pytest_bdd import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    given,
+    parsers,
+    scenarios,
+    then,
+    when,
+)
 
-from falcon_correlate import correlation_id_var  # noqa: E402
-from falcon_correlate.celery import (  # noqa: E402
+from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    correlation_id_var,
+)
+from falcon_correlate.celery import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     _celery_context_tokens,
     _maybe_connect_celery_worker_signals,
 )
