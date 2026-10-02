@@ -751,9 +751,8 @@ test environments where the optional dependency is absent.
 
 ### Enabling the publish and worker signal handlers
 
-The clearest activation path is to call
-`configure_celery_correlation(celery_app)` during Celery application setup in
-each publisher and worker process:
+Call `configure_celery_correlation(celery_app)` during Celery application setup
+in each publisher and worker process:
 
 ```python
 from celery import Celery
@@ -770,11 +769,10 @@ The helper connects the `before_task_publish`, `task_prerun`, and
 instance. It is safe to call repeatedly, which is useful when publisher and
 worker bootstrap code share an application factory.
 
-Importing `falcon_correlate` also registers those handlers automatically when
-Celery is installed. If the publisher process or worker process already imports
-anything from the package root, no extra registration call is needed. The
-explicit helper remains the preferred form for new application setup because it
-makes Celery integration visible at the point where the Celery app is created.
+Calling the helper is required to activate Celery propagation. Importing
+`falcon_correlate` or `falcon_correlate.celery` does not import Celery or
+connect the handlers, so library consumers can safely read the ambient context
+variable without mutating Celery's process-global signal registry.
 
 Once the handlers are registered in the publisher process, normal task
 publishing APIs such as `delay()` and `apply_async()` propagate the request
