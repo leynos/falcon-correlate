@@ -615,6 +615,18 @@ Use the standard log pattern when capturing lint output for review:
 make lint 2>&1 | tee /tmp/lint-falcon-correlate-$(git branch --show-current).out
 ```
 
+## Test and typecheck workflow
+
+`make test` requires the pinned `makeutil` parser on `PATH`, runs the full
+pytest suite with xdist and excludes
+`src/falcon_correlate/unittests/test_optional_celery_dependency.py`, whose
+nested subprocess checks need to run serially. Run those checks with
+`make test-optional-celery`. CI applies the same split: it excludes the module
+from its xdist run and invokes the serial target separately.
+
+`make typecheck` runs `ty` through the project `uv` environment. This ensures
+the type checker can resolve project dependencies such as `pathspec`.
+
 ## Spelling policy
 
 Run the spelling gate with:

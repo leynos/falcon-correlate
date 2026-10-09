@@ -8,10 +8,12 @@ mutation of the committed Skylos allow list.
 from __future__ import annotations
 
 import json
+import operator
 import os
 import shutil
 import string
 import subprocess  # noqa: S404 - contracts invoke a fixed local executable.
+from contextlib import ExitStack
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -137,3 +139,104 @@ def test_skylos_allow_forwards_generated_argument_boundaries(
     assert configuration_path.read_bytes() == configuration_before, (
         "Skylos whitelist forwarding must not mutate pyproject.toml"
     )
+
+
+@hyp.settings(max_examples=8, deadline=None)
+@hyp.example(
+    updates=[
+        ("handler$(one)", 'reason "one"', 65),
+        ("handler;two", "reason | two", 20),
+        ("handler three", "reason `three`", 45),
+    ]
+)
+@hyp.given(
+    updates=st.lists(
+        st.tuples(
+            _SHELL_ARGUMENT_TEXT,
+            _SHELL_ARGUMENT_TEXT,
+            st.integers(min_value=20, max_value=80),
+        ),
+        min_size=2,
+        max_size=5,
+        unique_by=operator.itemgetter(0),
+    )
+)
+def test_skylos_allow_serializes_concurrent_whitelist_updates(
+    updates: list[tuple[str, str, int]],
+) -> None:
+    """Concurrent whitelist updates retain each generated symbol-reason pair."""
+    with TemporaryDirectory() as temporary_directory:
+        temporary_root = Path(temporary_directory)
+        whitelist_path = temporary_root / "whitelist.json"
+        lock_path = temporary_root / "skylos-whitelist.lock"
+        recorder = temporary_root / "skylos-recorder"
+        recorder.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json\n"
+            "import os\n"
+            "import sys\n"
+            "import time\n"
+            "from pathlib import Path\n\n"
+            "if (len(sys.argv) != 5 or sys.argv[1] != 'whitelist'\n"
+            "        or sys.argv[3] != '--reason'):\n"
+            "    raise SystemExit('unexpected Skylos whitelist arguments')\n"
+            "whitelist = Path(os.environ['SKYLOS_WHITELIST_PATH'])\n"
+            "entries = (json.loads(whitelist.read_text(encoding='utf-8'))\n"
+            "           if whitelist.exists() else {})\n"
+            "time.sleep(float(os.environ['SKYLOS_DELAY_SECONDS']))\n"
+            "entries[sys.argv[2]] = sys.argv[4]\n"
+            "whitelist.write_text(json.dumps(entries), encoding='utf-8')\n",
+            encoding="utf-8",
+        )
+        recorder.chmod(0o755)
+
+        processes: list[subprocess.Popen[str]] = []
+        with ExitStack() as process_context:
+            try:
+                for symbol, reason, delay_milliseconds in updates:
+                    environment = {
+                        **os.environ,
+                        "NAME": "wsl-hostname",
+                        "SYMBOL": symbol,
+                        "REASON": reason,
+                        "SKYLOS_DELAY_SECONDS": str(delay_milliseconds / 1000),
+                        "SKYLOS_WHITELIST_PATH": str(whitelist_path),
+                    }
+                    command = [
+                        _MAKE_EXECUTABLE,
+                        "--no-print-directory",
+                        "-f",
+                        str(_PROJECT_ROOT / "Makefile"),
+                        f"SKYLOS_CLI={recorder}",
+                        f"SKYLOS_WHITELIST_LOCK={lock_path}",
+                        "skylos-allow",
+                    ]
+                    processes.append(
+                        process_context.enter_context(
+                            subprocess.Popen(  # noqa: S603 - fixed Make target and recorder.
+                                command,
+                                cwd=temporary_root,
+                                env=environment,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                text=True,
+                            )
+                        )
+                    )
+
+                for process, update in zip(processes, updates, strict=True):
+                    _, stderr = process.communicate(timeout=30)
+                    assert process.returncode == 0, (
+                        "concurrent Skylos whitelist update must succeed for "
+                        f"{update[0]!r}: {stderr}"
+                    )
+            finally:
+                for process in processes:
+                    if process.poll() is None:
+                        process.kill()
+                for process in processes:
+                    process.communicate()
+
+        assert json.loads(whitelist_path.read_text(encoding="utf-8")) == {
+            symbol: reason for symbol, reason, _ in updates
+        }, "serialized Skylos updates must preserve every symbol and its reason"

@@ -504,9 +504,9 @@ Acceptance for this milestone:
 - [x] 2026-05-19: Committed the implementation as `2631c8c` with message
   `Implement Falcon ASGI correlation middleware`.
 - [x] 2026-05-19: Pushed branch
-  `5-1-1-implement-async-middleware-methods` to origin and updated draft PR
-  #32 with implementation summary, validation evidence, this ExecPlan link,
-  and the Lody session reference.
+  `5-1-1-implement-async-middleware-methods` to origin and updated draft PR #32
+  with implementation summary, validation evidence, this ExecPlan link, and the
+  Lody session reference.
 - [x] 2026-05-19: Addressed review warnings that remained valid after checking
   the current code. Documentation gaps were fixed by the scribe agent in commit
   `153dc11`. The remaining code/test fixes add warning logging when
