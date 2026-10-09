@@ -13,6 +13,7 @@ UV ?= $(shell command -v uv 2>/dev/null || printf '%s/.local/bin/uv' "$$HOME")
 TOOLS = ruff ty $(MDLINT) uv
 VENV_TOOLS = pytest
 UV_ENV = UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools
+MUTMUT_VERSION ?= 3.6.0
 
 # The CV-005 CodeScene contracts live in shared-actions and run from a full
 # commit, so a fix is a pin bump. `.github/cv005.toml` holds this repository's
@@ -47,7 +48,8 @@ SKYLOS_WHITELIST_LOCK ?= .skylos-whitelist.lock
 .PHONY: help all clean build build-release lint fmt check-fmt doctest \
         markdownlint nixie spelling makeutil skylos-allow test \
         test-optional-celery typecheck \
-        $(TOOLS) $(VENV_TOOLS) test-workflow-contracts
+        $(TOOLS) $(VENV_TOOLS) test-workflow-contracts \
+        test-mutmut-sandbox
 
 .DEFAULT_GOAL := all
 
@@ -148,6 +150,10 @@ makeutil: ## Verify the Makefile parser used by contract tests
 
 test: build uv $(VENV_TOOLS) doctest makeutil ## Run tests
 	$(UV_ENV) $(UV) run pytest -v -n auto $(PROJECT_PYTEST_EXCLUDES)
+
+test-mutmut-sandbox: build ## Exercise mutmut's configured sandbox on a small module
+	$(UV_ENV) $(UV) run --with mutmut==$(MUTMUT_VERSION) \
+		mutmut run falcon_correlate.pure.*
 
 test-optional-celery: build uv $(VENV_TOOLS) ## Validate missing-Celery support
 	$(UV_ENV) $(UV) run pytest -v $(OPTIONAL_CELERY_TEST)

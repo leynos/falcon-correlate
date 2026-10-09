@@ -116,6 +116,22 @@ Follow the existing pattern in `tests/property/test_header_injection.py`:
 - assert on the external behaviour of the property rather than the generated
   example itself.
 
+## Mutation testing
+
+`[tool.mutmut]` in `pyproject.toml` defines the source paths to mutate and the
+test paths copied into mutmut's `mutants/` sandbox. Every repository package
+imported by those tests must also be present there, either through
+`source_paths`, the selected test tree, or `also_copy`. The quickstart BDD
+tests import runnable modules from `examples/`, so that package is copied
+unmutated with `also_copy = ["examples/"]`.
+
+`tests/workflow_contracts/test_mutmut_config.py` parses imports throughout the
+selected tests and their local support modules. It fails when a repository
+package is not covered by the configured sandbox paths or a selected Python
+file is missing. Pull-request CI also runs `make test-mutmut-sandbox` on Python
+3.13; this checks the real sandbox baseline and a focused set of mutants before
+the scheduled workflow runs the broader mutation suite.
+
 ## Tested documentation examples
 
 Runnable documentation examples live under `examples/`. They are source files,
