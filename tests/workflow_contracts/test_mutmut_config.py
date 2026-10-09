@@ -16,15 +16,18 @@ baseline.
 from __future__ import annotations
 
 import ast
+import re
 import tomllib
 import typing as typ
 from collections import deque
 from pathlib import Path
 
 import pytest
+import yaml
 
 PYPROJECT_PATH = Path(__file__).resolve().parents[2] / "pyproject.toml"
 REPOSITORY_ROOT = PYPROJECT_PATH.parent
+CI_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
 
 
 def _mutmut_config() -> dict[str, typ.Any]:
@@ -102,16 +105,22 @@ def _imported_modules(source: str) -> set[str]:
     }
 
 
-def _selected_python_files(config: dict[str, typ.Any]) -> set[Path]:
+def _selected_python_files(
+    config: dict[str, typ.Any], repository_root: Path
+) -> set[Path]:
     """Return every Python file selected by mutmut's pytest configuration."""
     selected_files: set[Path] = set()
     for configured_path in _configured_paths(
         config, "pytest_add_cli_args_test_selection"
     ):
-        path = REPOSITORY_ROOT / configured_path
+        path = repository_root / configured_path
+        assert path.is_dir() or (path.is_file() and path.suffix == ".py"), (
+            f"pytest_add_cli_args_test_selection entry {configured_path!r} "
+            "must name an existing directory or Python file"
+        )
         if path.is_dir():
             selected_files.update(path.rglob("*.py"))
-        elif path.suffix == ".py":
+        else:
             selected_files.add(path)
     return selected_files
 
@@ -131,14 +140,18 @@ def _repository_module_path(module_name: str) -> Path | None:
 
 def _selected_and_support_files(config: dict[str, typ.Any]) -> set[Path]:
     """Return selected tests and repository support modules they import."""
-    selected_files = _selected_python_files(config)
+    selected_files = _selected_python_files(config, REPOSITORY_ROOT)
     source_roots = {
         _import_root(path) for path in _configured_paths(config, "source_paths")
     }
-    support_roots = {
+    selected_roots = {
         _import_root(path)
         for path in _configured_paths(config, "pytest_add_cli_args_test_selection")
-    } - source_roots
+    }
+    copied_roots = {
+        _import_root(path) for path in _configured_paths(config, "also_copy")
+    }
+    support_roots = (selected_roots | copied_roots) - source_roots
 
     files = set(selected_files)
     pending = deque(selected_files)
@@ -175,71 +188,118 @@ def _repository_import_roots() -> set[str]:
     return roots
 
 
-def test_also_copy_mirrors_the_quickstart_examples_package() -> None:
-    """``also_copy`` must mirror ``examples/`` into mutmut's sandbox.
+class TestMutmutConfig:
+    """Keep mutmut's configured sandbox paths valid and complete."""
 
-    ``tests/bdd/`` is part of ``pytest_add_cli_args_test_selection``, and
-    its quickstart steps import ``examples.quickstart.*``; the sandbox
-    must contain that package or the baseline fails before mutants run.
-    """
-    also_copy = _mutmut_config().get("also_copy", [])
-    assert isinstance(also_copy, list), "also_copy must be a list of paths"
-    assert "examples/" in also_copy, (
-        "also_copy must include 'examples/' so mutmut's mutants/ sandbox "
-        "can resolve the quickstart example import "
-        "(examples.quickstart.*) that tests/bdd/test_quickstart_steps.py "
-        "depends on; without it the mutation baseline fails with "
-        "ModuleNotFoundError before any mutant is generated (issue #100)"
-    )
+    def test_also_copy_mirrors_the_quickstart_examples_package(self) -> None:
+        """``also_copy`` must mirror ``examples/`` into mutmut's sandbox.
 
-
-@pytest.mark.parametrize(
-    ("source", "expected_root"),
-    [
-        ("import fixtures.widget", "fixtures"),
-        ("from fixtures import widget", "fixtures"),
-        ('import_module("fixtures.widget")', "fixtures"),
-        ('importlib.import_module(f"fixtures.{name}")', "fixtures"),
-    ],
-    ids=("import", "from-import", "dynamic", "dynamic-f-string"),
-)
-def test_import_scanner_detects_repository_package_imports(
-    source: str, expected_root: str
-) -> None:
-    """The scanner detects static and dynamic package imports."""
-    imported_roots = {
-        module_name.partition(".")[0] for module_name in _imported_modules(source)
-    }
-    assert imported_roots == {expected_root}
-
-
-def test_selected_tests_are_covered_by_mutmut_sandbox_paths() -> None:
-    """Every repository package selected tests import from must be mirrored.
-
-    Guards against future imports of other out-of-tree packages by
-    parsing all selected tests and their repository-local support modules,
-    then asserting each imported repository package is a source path,
-    selected test tree, or explicitly copied.
-    """
-    config = _mutmut_config()
-    mirrored_roots = {
-        _import_root(path)
-        for key in (
-            "source_paths",
-            "also_copy",
-            "pytest_add_cli_args_test_selection",
+        ``tests/bdd/`` is part of ``pytest_add_cli_args_test_selection``, and
+        its quickstart steps import ``examples.quickstart.*``; the sandbox
+        must contain that package or the baseline fails before mutants run.
+        """
+        also_copy = _mutmut_config().get("also_copy", [])
+        assert isinstance(also_copy, list), "also_copy must be a list of paths"
+        assert "examples/" in also_copy, (
+            "also_copy must include 'examples/' so mutmut's mutants/ sandbox "
+            "can resolve the quickstart example import "
+            "(examples.quickstart.*) that tests/bdd/test_quickstart_steps.py "
+            "depends on; without it the mutation baseline fails with "
+            "ModuleNotFoundError before any mutant is generated (issue #100)"
         )
-        for path in _configured_paths(config, key)
-    }
-    repository_roots = _repository_import_roots()
-    imported_roots = {
-        module_name.partition(".")[0]
-        for py_file in _selected_and_support_files(config)
-        for module_name in _imported_modules(py_file.read_text(encoding="utf-8"))
-    } & repository_roots
 
-    assert imported_roots <= mirrored_roots, (
-        f"selected tests import packages {imported_roots - mirrored_roots} "
-        "that are not covered by [tool.mutmut] source_paths or also_copy; "
-        "add them to also_copy or the mutation baseline will fail"
+    def test_source_and_copy_paths_exist(self) -> None:
+        """Configured source and copied sandbox paths must still exist."""
+        config = _mutmut_config()
+        for key in ("source_paths", "also_copy"):
+            for configured_path in _configured_paths(config, key):
+                assert (REPOSITORY_ROOT / configured_path).exists(), (
+                    f"[tool.mutmut] {key} entry {configured_path!r} "
+                    "must name an existing path"
+                )
+
+    @pytest.mark.parametrize(
+        ("source", "expected_root"),
+        [
+            ("import fixtures.widget", "fixtures"),
+            ("from fixtures import widget", "fixtures"),
+            ('import_module("fixtures.widget")', "fixtures"),
+            ('importlib.import_module(f"fixtures.{name}")', "fixtures"),
+        ],
+        ids=("import", "from-import", "dynamic", "dynamic-f-string"),
     )
+    def test_import_scanner_detects_repository_package_imports(
+        self, source: str, expected_root: str
+    ) -> None:
+        """The scanner detects static and dynamic package imports."""
+        imported_roots = {
+            module_name.partition(".")[0] for module_name in _imported_modules(source)
+        }
+        assert imported_roots == {expected_root}, (
+            f"expected the scanner to detect repository root {expected_root!r}, "
+            f"found {imported_roots!r}"
+        )
+
+    def test_missing_selected_file_has_a_clear_configuration_error(
+        self, tmp_path: Path
+    ) -> None:
+        """Missing selected files fail at the config entry, not during reading."""
+        config = {"pytest_add_cli_args_test_selection": ["tests/missing.py"]}
+        error_message = (
+            "pytest_add_cli_args_test_selection entry 'tests/missing.py' "
+            "must name an existing directory or Python file"
+        )
+        with pytest.raises(
+            AssertionError,
+            match=re.escape(error_message),
+        ):
+            _selected_python_files(config, tmp_path)
+
+    def test_selected_tests_are_covered_by_mutmut_sandbox_paths(self) -> None:
+        """Every repository package selected tests import from must be mirrored.
+
+        Guards against future imports of other out-of-tree packages by
+        parsing all selected tests and their repository-local support modules,
+        then asserting each imported repository package is a source path,
+        selected test tree, or explicitly copied.
+        """
+        config = _mutmut_config()
+        mirrored_roots = {
+            _import_root(path)
+            for key in (
+                "source_paths",
+                "also_copy",
+                "pytest_add_cli_args_test_selection",
+            )
+            for path in _configured_paths(config, key)
+        }
+        repository_roots = _repository_import_roots()
+        imported_roots = {
+            module_name.partition(".")[0]
+            for py_file in _selected_and_support_files(config)
+            for module_name in _imported_modules(py_file.read_text(encoding="utf-8"))
+        } & repository_roots
+
+        assert imported_roots <= mirrored_roots, (
+            f"selected tests import packages {imported_roots - mirrored_roots} "
+            "that are not covered by [tool.mutmut] source_paths or also_copy; "
+            "add them to also_copy or the mutation baseline will fail"
+        )
+
+    def test_pull_request_ci_checks_the_mutmut_sandbox(self) -> None:
+        """The required Python 3.13 pull-request lane runs the real sandbox."""
+        workflow = yaml.safe_load(CI_WORKFLOW_PATH.read_text(encoding="utf-8"))
+        check_steps = [
+            step
+            for step in workflow["jobs"]["test"]["steps"]
+            if step.get("name") == "Check mutmut sandbox"
+        ]
+
+        assert check_steps == [
+            {
+                "name": "Check mutmut sandbox",
+                "if": "matrix.python-version == '3.13' "
+                "&& github.event_name == 'pull_request'",
+                "run": "make test-mutmut-sandbox",
+            }
+        ]

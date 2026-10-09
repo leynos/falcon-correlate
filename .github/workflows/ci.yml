@@ -192,3 +192,10 @@ jobs:
           # this boundary is observable here. `coverage-main.yml` keeps the
           # action's default and uploads what it archives.
           publish-artefact: 'false'
+
+      # Run the mutmut sandbox once on pull requests. Its configured test
+      # selection includes the quickstart BDD tests, so this exercises the
+      # examples/ copy before the scheduled full mutation workflow runs.
+      - name: Check mutmut sandbox
+        if: matrix.python-version == '3.13' && github.event_name == 'pull_request'
+        run: make test-mutmut-sandbox
