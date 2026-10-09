@@ -651,6 +651,10 @@ Run the spelling gate with:
 make spelling
 ```
 
+`TYPOS_CONFIG_BUILDER_VERSION` in the `Makefile` pins the
+`typos-config-builder` release the gate runs (currently `v0.1.3`). Raise it
+together with the regenerated `typos.toml`, never on its own.
+
 The gate runs the shared `typos-config-builder` CLI, which regenerates
 `typos.toml` on every run from the live shared dictionary and the
 repository-specific `typos.local.toml` overlay, then enforces en-GB-oxendict
