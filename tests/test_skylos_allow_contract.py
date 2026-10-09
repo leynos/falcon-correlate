@@ -141,6 +141,29 @@ def test_skylos_allow_forwards_generated_argument_boundaries(
     )
 
 
+def _write_concurrent_whitelist_recorder(recorder: Path) -> None:
+    """Write a delayed fake Skylos CLI for concurrent whitelist updates."""
+    recorder.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json\n"
+        "import os\n"
+        "import sys\n"
+        "import time\n"
+        "from pathlib import Path\n\n"
+        "if (len(sys.argv) != 5 or sys.argv[1] != 'whitelist'\n"
+        "        or sys.argv[3] != '--reason'):\n"
+        "    raise SystemExit('unexpected Skylos whitelist arguments')\n"
+        "whitelist = Path(os.environ['SKYLOS_WHITELIST_PATH'])\n"
+        "entries = (json.loads(whitelist.read_text(encoding='utf-8'))\n"
+        "           if whitelist.exists() else {})\n"
+        "time.sleep(float(os.environ['SKYLOS_DELAY_SECONDS']))\n"
+        "entries[sys.argv[2]] = sys.argv[4]\n"
+        "whitelist.write_text(json.dumps(entries), encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    recorder.chmod(0o755)
+
+
 @hyp.settings(max_examples=8, deadline=None)
 @hyp.example(
     updates=[
@@ -170,25 +193,7 @@ def test_skylos_allow_serializes_concurrent_whitelist_updates(
         whitelist_path = temporary_root / "whitelist.json"
         lock_path = temporary_root / "skylos-whitelist.lock"
         recorder = temporary_root / "skylos-recorder"
-        recorder.write_text(
-            "#!/usr/bin/env python3\n"
-            "import json\n"
-            "import os\n"
-            "import sys\n"
-            "import time\n"
-            "from pathlib import Path\n\n"
-            "if (len(sys.argv) != 5 or sys.argv[1] != 'whitelist'\n"
-            "        or sys.argv[3] != '--reason'):\n"
-            "    raise SystemExit('unexpected Skylos whitelist arguments')\n"
-            "whitelist = Path(os.environ['SKYLOS_WHITELIST_PATH'])\n"
-            "entries = (json.loads(whitelist.read_text(encoding='utf-8'))\n"
-            "           if whitelist.exists() else {})\n"
-            "time.sleep(float(os.environ['SKYLOS_DELAY_SECONDS']))\n"
-            "entries[sys.argv[2]] = sys.argv[4]\n"
-            "whitelist.write_text(json.dumps(entries), encoding='utf-8')\n",
-            encoding="utf-8",
-        )
-        recorder.chmod(0o755)
+        _write_concurrent_whitelist_recorder(recorder)
 
         processes: list[subprocess.Popen[str]] = []
         with ExitStack() as process_context:
