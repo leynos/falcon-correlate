@@ -126,16 +126,6 @@ sys.meta_path.insert(0, _BlockCeleryFinder())
     return sitecustomize
 
 
-def _write_child_sentinel_test(tmp_path: Path) -> Path:
-    """Write a passing test so pytest exits successfully when Celery tests skip."""
-    sentinel = tmp_path / "test_non_celery_sentinel.py"
-    sentinel.write_text(
-        "def test_non_celery_suite_still_runs():\n    assert True\n",
-        encoding="utf-8",
-    )
-    return sentinel
-
-
 def _discover_celery_test_paths(project_root: Path) -> tuple[Path, ...]:
     """Return current Celery-dependent unit and BDD step modules."""
     paths = {
@@ -224,7 +214,6 @@ def _count_collected_test_items(
 
 def _run_celery_tests_with_celery_blocked(
     sitecustomize_dir: Path,
-    sentinel_test: Path,
     celery_test_paths: tuple[Path, ...],
     project_root: Path,
 ) -> _PytestRun:
@@ -240,24 +229,20 @@ def _run_celery_tests_with_celery_blocked(
         "pytest",
         "-q",
         "--color=no",
-        str(sentinel_test),
         *_relative_paths(celery_test_paths, project_root),
     )
     # Build the expected snapshot from the child's own collection rather than a
     # bare literal. Each Celery module imports cleanly but marks itself
     # ``pytest.mark.skipif`` when Celery is absent, so every collected item
-    # skips at setup and emits one ``s`` marker. The sentinel is the only
-    # passing item and prints the leading ``.``; the remaining markers and the
-    # skip count are both the number of collected Celery items.
+    # skips at setup and emits one ``s`` marker. The progress markers and skip
+    # count are both the number of collected Celery items.
     skipped_count = _count_collected_test_items(
         sitecustomize_dir,
         celery_test_paths,
         project_root,
     )
-    progress = "." + "s" * skipped_count
-    expected_stdout = (
-        f"{progress} [100%]\n1 passed, {skipped_count} skipped in <duration>"
-    )
+    progress = "s" * skipped_count
+    expected_stdout = f"{progress} [100%]\n{skipped_count} skipped in <duration>"
     return _PytestRun(
         result=result,
         normalized_stdout=_normalize_pytest_output(result.stdout),

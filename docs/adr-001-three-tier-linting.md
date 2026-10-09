@@ -177,3 +177,25 @@ was disabled, any module the PyPy runtime could not parse produced no messages
 at all, so the lint passed without linting it. In this repository four modules
 were skipped that way under PyPy 3.11; PyPy 3.12 parses all of them, and they
 lint clean. A parse failure now fails the lint.
+
+## Addendum (2026-09-29): Skylos production dead-code tier
+
+The original three-tier decision remains the foundation for Ruff, Interrogate,
+and PyPy-backed Pylint. The effective Python lint order is now:
+
+1. Ruff — fast, broad lint rules and docstring style.
+2. Interrogate — 100 per cent package docstring coverage.
+3. PyPy-backed Pylint — focused selected messages.
+4. Skylos — strict production dead-code detection.
+
+Skylos is a blocking fourth tier in `make lint`. It scans
+`src/falcon_correlate`, excludes the in-package `unittests` directory, and uses
+the strict gate configuration in `pyproject.toml`. The standalone command is
+pinned to Python 3.14 because Skylos parses source with its own runtime
+Abstract Syntax Tree (AST); the pin prevents phantom findings when the project
+uses newer supported Python syntax.
+
+Framework lifecycle callbacks and required protocol parameters use precise,
+typed entry-point rules with verified reasons. A named Skylos allow-list entry
+is permitted only when an entry-point rule cannot model the runtime boundary,
+and it must include the verified caller-specific reason.

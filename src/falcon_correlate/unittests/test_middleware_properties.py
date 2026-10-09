@@ -18,7 +18,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from falcon_correlate import CorrelationIDMiddleware, correlation_id_var
-from falcon_correlate.middleware import _CORRELATION_ID_RESET_TOKEN_ATTR
+from falcon_correlate.middleware_utils import CORRELATION_ID_RESET_TOKEN_ATTR
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -225,9 +225,9 @@ def test_process_response_cleanup_property(
             "expected correlation_id_var.get() to be None after response but got "
             f"{correlation_id_var.get()!r}"
         )
-        assert getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None) is None, (
+        assert getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None) is None, (
             "expected reset token attribute to be None after response but got "
-            f"{getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)!r}"
+            f"{getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)!r}"
         )
 
     contextvars.copy_context().run(_inner)
