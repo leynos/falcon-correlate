@@ -138,9 +138,8 @@ def _repository_module_path(module_name: str) -> Path | None:
     return None
 
 
-def _selected_and_support_files(config: dict[str, typ.Any]) -> set[Path]:
-    """Return selected tests and repository support modules they import."""
-    selected_files = _selected_python_files(config, REPOSITORY_ROOT)
+def _configured_support_roots(config: dict[str, typ.Any]) -> set[str]:
+    """Return copied roots available to selected tests outside source paths."""
     source_roots = {
         _import_root(path) for path in _configured_paths(config, "source_paths")
     }
@@ -151,8 +150,13 @@ def _selected_and_support_files(config: dict[str, typ.Any]) -> set[Path]:
     copied_roots = {
         _import_root(path) for path in _configured_paths(config, "also_copy")
     }
-    support_roots = (selected_roots | copied_roots) - source_roots
+    return (selected_roots | copied_roots) - source_roots
 
+
+def _repository_support_files(
+    selected_files: set[Path], support_roots: set[str]
+) -> set[Path]:
+    """Return local support modules imported from copied sandbox roots."""
     files = set(selected_files)
     pending = deque(selected_files)
     while pending:
@@ -166,6 +170,13 @@ def _selected_and_support_files(config: dict[str, typ.Any]) -> set[Path]:
             files.add(support_file)
             pending.append(support_file)
     return files
+
+
+def _selected_and_support_files(config: dict[str, typ.Any]) -> set[Path]:
+    """Return selected tests and repository support modules they import."""
+    selected_files = _selected_python_files(config, REPOSITORY_ROOT)
+    support_roots = _configured_support_roots(config)
+    return _repository_support_files(selected_files, support_roots)
 
 
 def _repository_import_roots() -> set[str]:
