@@ -34,8 +34,9 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess  # noqa: S404 - tests intentionally spawn isolated Python subprocesses.
+import subprocess  # ruff: ignore[suspicious-subprocess-import] - tests intentionally spawn isolated Python subprocesses.
 import sys
+import tempfile
 import typing as typ
 from pathlib import Path
 
@@ -57,6 +58,7 @@ _PYTEST_PROGRESS_PATTERN = re.compile(
     re.MULTILINE,
 )
 _CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS = 120
+_PYTEST_ENVIRONMENT_PREFIX = "PYTEST_"
 
 pytestmark = pytest.mark.timeout(_CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS)
 
@@ -126,6 +128,20 @@ sys.meta_path.insert(0, _BlockCeleryFinder())
     return sitecustomize
 
 
+def _write_child_sentinel_test(project_root: Path) -> Path:
+    """Write a passing sentinel inside the child pytest root."""
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        prefix="test_non_celery_sentinel_",
+        suffix=".py",
+        dir=project_root,
+        delete=False,
+    ) as sentinel:
+        sentinel.write("def test_non_celery_suite_still_runs():\n    assert True\n")
+        return Path(sentinel.name)
+
+
 def _discover_celery_test_paths(project_root: Path) -> tuple[Path, ...]:
     """Return current Celery-dependent unit and BDD step modules."""
     paths = {
@@ -153,9 +169,12 @@ def _blocked_celery_environment(
     sitecustomize_dir: Path,
     environ: cabc.Mapping[str, str],
 ) -> dict[str, str]:
-    """Build a child-process environment with the Celery import blocker first."""
+    """Build an isolated pytest environment with the Celery import blocker first."""
     return {
-        **environ,
+        key: value
+        for key, value in environ.items()
+        if not key.startswith(_PYTEST_ENVIRONMENT_PREFIX)
+    } | {
         "PYTHONPATH": _pythonpath_with_import_blocker(sitecustomize_dir, environ),
     }
 
@@ -167,7 +186,7 @@ def _run_python_with_celery_blocked(
     *args: str,
 ) -> subprocess.CompletedProcess[str]:
     """Run a Python child process where importing Celery raises ImportError."""
-    return subprocess.run(  # noqa: S603
+    return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- fixed child interpreter and arguments.
         [sys.executable, *args],
         check=False,
         cwd=cwd,
@@ -206,6 +225,7 @@ def _count_collected_test_items(
         "pytest",
         "--collect-only",
         "-q",
+        "-n=0",
         "--color=no",
         *_relative_paths(paths, project_root),
     )
@@ -214,6 +234,7 @@ def _count_collected_test_items(
 
 def _run_celery_tests_with_celery_blocked(
     sitecustomize_dir: Path,
+    sentinel_test: Path,
     celery_test_paths: tuple[Path, ...],
     project_root: Path,
 ) -> _PytestRun:
@@ -228,21 +249,28 @@ def _run_celery_tests_with_celery_blocked(
         "-m",
         "pytest",
         "-q",
+        # The parent suite may use xdist.  This nested assertion suite is
+        # deliberately serial so it does not multiply the worker count.
+        "-n=0",
         "--color=no",
+        *_relative_paths((sentinel_test,), project_root),
         *_relative_paths(celery_test_paths, project_root),
     )
     # Build the expected snapshot from the child's own collection rather than a
     # bare literal. Each Celery module imports cleanly but marks itself
     # ``pytest.mark.skipif`` when Celery is absent, so every collected item
-    # skips at setup and emits one ``s`` marker. The progress markers and skip
-    # count are both the number of collected Celery items.
+    # skips at setup and emits one ``s`` marker. The passing sentinel emits the
+    # leading ``.``; the remaining markers and skip count are the number of
+    # collected Celery items.
     skipped_count = _count_collected_test_items(
         sitecustomize_dir,
         celery_test_paths,
         project_root,
     )
-    progress = "s" * skipped_count
-    expected_stdout = f"{progress} [100%]\n{skipped_count} skipped in <duration>"
+    progress = "." + "s" * skipped_count
+    expected_stdout = (
+        f"{progress} [100%]\n1 passed, {skipped_count} skipped in <duration>"
+    )
     return _PytestRun(
         result=result,
         normalized_stdout=_normalize_pytest_output(result.stdout),

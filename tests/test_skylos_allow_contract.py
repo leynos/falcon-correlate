@@ -12,7 +12,7 @@ import operator
 import os
 import shutil
 import string
-import subprocess  # noqa: S404 - contracts invoke a fixed local executable.
+import subprocess  # ruff: ignore[suspicious-subprocess-import] - contracts invoke a fixed local executable.
 from contextlib import ExitStack
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -47,7 +47,7 @@ def _run_skylos_allow(*arguments: str) -> subprocess.CompletedProcess[str]:
         requested_values[name] = value
     environment.update(requested_values)
     command: list[str] = [make, "skylos-allow"]
-    return subprocess.run(  # noqa: S603 - fixed Make target and arguments.
+    return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - fixed Make target and arguments.
         command,
         capture_output=True,
         check=False,
@@ -112,7 +112,7 @@ def test_skylos_allow_forwards_generated_argument_boundaries(
             "SYMBOL": symbol,
             "REASON": reason,
         }
-        completed = subprocess.run(  # noqa: S603 - fixed Make target and recorder.
+        completed = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - fixed Make target and recorder.
             (
                 _MAKE_EXECUTABLE,
                 "--no-print-directory",
@@ -218,7 +218,7 @@ def test_skylos_allow_serializes_concurrent_whitelist_updates(
                     ]
                     processes.append(
                         process_context.enter_context(
-                            subprocess.Popen(  # noqa: S603 - fixed Make target and recorder.
+                            subprocess.Popen(  # ruff: ignore[subprocess-without-shell-equals-true] - fixed Make target and recorder.
                                 command,
                                 cwd=temporary_root,
                                 env=environment,

@@ -42,8 +42,10 @@ class TestCorrelationIDHeaderRetrieval:
             headers={"X-Correlation-ID": "cid-123"},
         )
 
-        assert response.json["has_correlation_id"] is True
-        assert response.json["correlation_id"] == "cid-123"
+        failure_message = "expected response.json['has_correlation_id'] to be True"
+        assert response.json["has_correlation_id"] is True, failure_message
+        failure_message = "expected response.json['correlation_id'] to equal 'cid-123'"
+        assert response.json["correlation_id"] == "cid-123", failure_message
 
     def test_missing_header_triggers_generation(self) -> None:
         """Verify missing header triggers ID generation."""
@@ -87,5 +89,7 @@ class TestCorrelationIDHeaderRetrieval:
             headers={"X-Correlation-ID": "  cid-123  "},
         )
 
-        assert response.json["has_correlation_id"] is True
-        assert response.json["correlation_id"] == "cid-123"
+        failure_message = "expected response.json['has_correlation_id'] to be True"
+        assert response.json["has_correlation_id"] is True, failure_message
+        failure_message = "expected response.json['correlation_id'] to equal 'cid-123'"
+        assert response.json["correlation_id"] == "cid-123", failure_message

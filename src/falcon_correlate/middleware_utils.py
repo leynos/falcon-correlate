@@ -28,7 +28,7 @@ user_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 )
 """Request-local user ID storage for applications that attach user context."""
 
-CORRELATION_ID_RESET_TOKEN_ATTR = "_correlation_id_reset_token"  # noqa: S105 - attribute-name string is not a secret
+CORRELATION_ID_RESET_TOKEN_ATTR = "_correlation_id_reset_token"  # ruff: ignore[hardcoded-password-string] - attribute-name string is not a secret
 MISSING_CONTEXT_PLACEHOLDER: str = "-"
 
 RECOMMENDED_LOG_FORMAT: str = (
@@ -126,7 +126,7 @@ class ContextualLogFilter(logging.Filter):
 
     """
 
-    def filter(  # noqa: PLR6301 - logging.Filter requires an instance method.
+    def filter(  # ruff: ignore[no-self-use] - logging.Filter requires an instance method.
         self, record: logging.LogRecord
     ) -> bool:
         """Enrich *record* with correlation ID and user ID attributes.

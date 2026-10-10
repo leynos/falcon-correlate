@@ -186,22 +186,24 @@ def _labels_from_declaration(value: object) -> set[str]:
     WorkflowReadError
         If the declaration is a shape this reader cannot inventory.
     """
-    if isinstance(value, list):
-        return _labels_from_sequence(value)
-    if isinstance(value, dict):
-        return _labels_from_group_mapping(value)
-    if not isinstance(value, str):
-        message = (
-            "runs-on must be a label, a conditional, the matrix deferral, a "
-            "sequence of labels, or a group/labels mapping. Anything else is "
-            "refused rather than read as declaring no runner, because a "
-            f"silent miss hides a paid lane from every rule at once; got {value!r}"
-        )
-        raise WorkflowReadError(message)
-    fallback = FORK_FALLBACK.match(value.strip())
-    if fallback:
-        return {fallback["when_fork"], fallback["when_branch"]}
-    return {value.strip()}
+    match value:
+        case list() as sequence:
+            return _labels_from_sequence(sequence)
+        case dict() as mapping:
+            return _labels_from_group_mapping(mapping)
+        case str() as label:
+            fallback = FORK_FALLBACK.match(label.strip())
+            if fallback:
+                return {fallback["when_fork"], fallback["when_branch"]}
+            return {label.strip()}
+        case _:
+            message = (
+                "runs-on must be a label, a conditional, the matrix deferral, a "
+                "sequence of labels, or a group/labels mapping. Anything else is "
+                "refused rather than read as declaring no runner, because a "
+                f"silent miss hides a paid lane from every rule at once; got {value!r}"
+            )
+            raise WorkflowReadError(message)
 
 
 def labels_of(job: dict[str, typ.Any]) -> set[str]:

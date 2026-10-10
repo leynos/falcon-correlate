@@ -7,32 +7,38 @@ pull request.
 
 ## Linting architecture
 
-The Python lint target uses a four-tier linting approach:
+The Python lint target runs six checks in this order:
 
-- **Tier 1: Ruff.** Ruff runs first through `uv run ruff check`. It is the
-  fast linting gate and owns formatting-adjacent checks, import rules, common
-  correctness rules, docstring rules, security checks, complexity thresholds,
-  and Ruff's Pylint-compatible rule families.
-- **Tier 2: Interrogate.** Interrogate runs second through
+- **Check 1: Ruff.** Ruff runs first through the pinned `$(RUFF)` wrapper. It
+  owns formatting-adjacent checks, imports, common correctness, docstring and
+  security rules, complexity thresholds, and Ruff's Pylint-compatible rules.
+- **Check 2: Interrogate.** Interrogate runs second through
   `uv run interrogate --fail-under 100`. It enforces package-level docstring
   coverage after Ruff has validated docstring style.
-- **Tier 3: Pylint through PyPy.** Pylint runs third under the `pypy@3.12`
-  interpreter, installed on demand by `uv tool run`. This tier focuses on rules
-  that complement Ruff, especially logging format correctness, pattern matching
-  safety, refactoring suggestions, resource-handling checks, and selected
-  design limits.
-- **Tier 4: Skylos.** Skylos runs last as a blocking dead-code gate over
-  production sources. It is separately provisioned at an exact version, so it
-  does not expand the project's application dependency set.
+- **Check 3: Classic Pylint through PyPy.** Vanilla Pylint 4.1.1 with
+  Astroid 4.3.3 runs directly under the checksum-verified PyPy 8.0.0/Python
+  3.12 binary on Linux x86_64. This pass focuses on rules that complement Ruff,
+  including logging format correctness, pattern-matching safety, refactoring
+  suggestions, resource handling, and selected design limits.
+- **Check 4: DF12 Pylint.** The `df12-python-lints` plug-in runs through
+  `$(DF12_PYLINT)` on CPython 3.14 with its explicit message list and the same
+  Pylint/Astroid pins. Its GitHub repository is owned by the df12 Productions
+  organization, which also owns `falcon-correlate`; the source is pinned to
+  release `v0.3.0` by `DF12_PYTHON_LINTS_REF`.
+- **Check 5: Ambrleaks.** `$(AMBRLEAKS) tests` checks the Syrupy snapshots for
+  leaked test state under CPython 3.14.
+- **Check 6: Skylos.** Skylos runs as a blocking dead-code gate over production
+  sources. It is separately provisioned at an exact version, so it does not
+  expand the project's application dependency set.
 
-Ruff must pass before Interrogate runs, Interrogate must pass before Pylint
-runs, and Skylos runs after the established lint tiers. This keeps the
-dead-code analysis focused on code that has already passed the high-volume
-checks and package docstring coverage gate.
+Each check runs only after the preceding check passes. This keeps dead-code
+analysis focused on code that has already passed the style, package docstring,
+classic and DF12 lint, and snapshot checks.
 
-The initial three-tier architecture is recorded in
+The original linting decision is recorded in
 [ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md).
-Skylos extends that established gate with production dead-code detection.
+DF12 Pylint, Ambrleaks, and Skylos extend that original architecture with
+separate plugin, snapshot, and production dead-code checks.
 
 ## Internal module architecture
 
@@ -95,6 +101,22 @@ token. Its `_process_request` and `_process_response` async wrappers invoke
 cleanup. This module is owned by the unit-test package and must not be imported
 by production code.
 
+## Assertion diagnostics and coverage
+
+Every test assertion must carry a useful failure message. The shared coverage
+action instruments test modules as well as production modules, so a message
+expression on its own continuation line is counted as executable code that the
+passing path does not visit. Keep a short literal on the assertion line when it
+fits. Prepare longer or dynamic diagnostics eagerly before the assertion:
+
+```python
+failure_message = f"expected {expected!r}, got {actual!r}"
+assert actual == expected, failure_message
+```
+
+This preserves the diagnostic, keeps the passing path covered, and avoids
+coverage exclusions or ratchet-baseline adjustments for test-only syntax.
+
 ## Property-based testing
 
 Property-based tests live under `tests/property/` and use Hypothesis for input
@@ -135,8 +157,9 @@ the scheduled workflow runs the broader mutation suite.
 ## Tested documentation examples
 
 Runnable documentation examples live under `examples/`. They are source files,
-not Markdown-only snippets. The Pylint tier includes `examples` in
-`PYLINT_TARGETS` so runnable documentation examples are covered by that tier.
+not Markdown-only snippets. The classic and DF12 Pylint checks include
+`examples` in `PYLINT_TARGETS` so runnable documentation examples are covered
+by both passes.
 
 The quickstart guide embeds snippets from `examples/quickstart/`. Each source
 region is delimited with sentinel comments:
@@ -556,8 +579,8 @@ does not accept a Boolean there at all.
 
 The linting architecture described in
 [ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md)
-is complete. Keep future changes aligned with its four-tier policy unless a
-new ADR supersedes it.
+is complete. The current six-check pipeline above records the subsequent
+additions; keep future changes aligned with it unless a new ADR supersedes it.
 
 The tested quickstart example convention is described in
 [ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md).
@@ -573,10 +596,12 @@ make lint
 `make lint` executes these commands in order:
 
 ```bash
-$(UV_ENV) $(UV) run ruff check
+$(RUFF) check
 $(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
-$(PYLINT) $(PYLINT_TARGETS)
-$(SKYLOS_CLI) $(SKYLOS_SCAN_OPTIONS) $(SKYLOS_PRODUCTION_TARGETS) \
+$(MAKE) --no-print-directory classic-pylint
+$(MAKE) --no-print-directory df12-pylint
+$(AMBRLEAKS) tests
+$(SKYLOS) $(SKYLOS_PRODUCTION_TARGETS) \
   --exclude $(SKYLOS_EXCLUDES) --category dead_code --gate --format concise \
   --no-upload --no-provenance --no-grep-verify
 ```
@@ -587,7 +612,7 @@ Interrogate separately for the 100% package docstring coverage gate.
 
 The target should be run before committing changes that affect Python code,
 tests, or lint configuration. When diagnosing failures, fix Ruff findings
-first, then rerun `make lint` so the later tiers see the post-Ruff state.
+first, then rerun `make lint` so later checks see the post-Ruff state.
 
 Skylos parses source with the Python runtime's own abstract syntax tree (AST),
 so the CLI is pinned to Python 3.14 to avoid phantom findings on newer Python
@@ -633,12 +658,12 @@ make lint 2>&1 | tee /tmp/lint-falcon-correlate-$(git branch --show-current).out
 
 ## Test and typecheck workflow
 
-`make test` requires the pinned `makeutil` parser on `PATH`, runs the full
-pytest suite with xdist and excludes
-`src/falcon_correlate/unittests/test_optional_celery_dependency.py`, whose
-nested subprocess checks need to run serially. Run those checks with
-`make test-optional-celery`. CI applies the same split: it excludes the module
-from its xdist run and invokes the serial target separately.
+`make test` requires the pinned `makeutil` parser on `PATH`. It first runs
+`src/falcon_correlate/unittests/test_optional_celery_dependency.py` serially
+because its checks spawn nested pytest processes, then runs the remaining suite
+with xdist using `PYTEST_WORKERS` (six workers by default). The serial module
+is excluded from the xdist run. CI applies the same split; use
+`make test-optional-celery` to run the serial checks by themselves.
 
 `make typecheck` runs `ty` through the project `uv` environment. This ensures
 the type checker can resolve project dependencies such as `pathspec`.
@@ -670,23 +695,46 @@ Run `make markdownlint` for the combined Markdown and spelling gate, and
 
 ## Makefile variables
 
-The lint target is configured by these Makefile variables:
+The lint target is configured by these Makefile variables. The CI workflow sets
+matching version pins and runs the same `make lint` entry point.
 
-| Variable                    | Default                                                                                                         | Purpose                                                        |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `UV`                        | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                                                   | Selects the `uv` launcher used by all Python tool commands.    |
-| `UV_ENV`                    | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                                                  | Keeps project-local `uv` cache and tool directories.           |
-| `PYLINT_PYTHON`             | `pypy@3.12`                                                                                                     | Selects the Python runtime used for the Pylint tool execution. |
-| `PYLINT_VERSION`            | `4.0.9`                                                                                                         | Pins the Pylint version installed by `uv tool run`.            |
-| `PYLINT_TARGETS`            | `src tests examples`                                                                                            | Defines the source trees checked by the Pylint tier.           |
-| `PYLINT`                    | `$(UV_ENV) $(UV) tool run --managed-python --python $(PYLINT_PYTHON) --from 'pylint==$(PYLINT_VERSION)' pylint` | Expands to the full PyPy-backed Pylint command.                |
-| `INTERROGATE_TARGETS`       | `src/falcon_correlate`                                                                                          | Defines the repo-root-relative trees checked by Interrogate.   |
-| `SKYLOS_VERSION`            | `4.33.2`                                                                                                        | Pins the separately provisioned Skylos release.                |
-| `SKYLOS_CLI`                | `uv tool run --python 3.14 --from 'skylos==$(SKYLOS_VERSION)' skylos`                                           | Expands to the pinned Skylos CLI command.                      |
-| `SKYLOS_SCAN_OPTIONS`       | `--config-file pyproject.toml`                                                                                  | Holds scan-only global options.                                |
-| `SKYLOS_PRODUCTION_TARGETS` | `src/falcon_correlate`                                                                                          | Defines the production source scanned for dead code.           |
-| `SKYLOS_EXCLUDES`           | `unittests`                                                                                                     | Excludes test-only package infrastructure from the scan.       |
-| `SKYLOS_WHITELIST_LOCK`     | `.skylos-whitelist.lock`                                                                                        | Serializes whitelist read-modify-write updates.                |
+| Variable                       | Default                                                                              | Purpose                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| `UV`                           | First `uv` on `PATH`, falling back to `$(HOME)/.local/bin/uv`                        | Selects the `uv` launcher used by Python tool commands.      |
+| `UV_ENV`                       | `UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools`                                       | Keeps project-local `uv` cache and tool directories.         |
+| `RUFF_VERSION`                 | `0.16.4`                                                                             | Pins the Ruff formatter and lint command.                    |
+| `RUFF`                         | `$(UV_ENV) $(UV) run --with ruff==$(RUFF_VERSION) ruff`                              | Provides the pinned Ruff command.                            |
+| `TY_VERSION`                   | `0.0.74`                                                                             | Pins the Ty type-checking command.                           |
+| `TY`                           | `$(UV_ENV) $(UV) run --with ty==$(TY_VERSION) ty`                                    | Provides the pinned Ty command.                              |
+| `PYTEST_WORKERS`               | `6`                                                                                  | Bounds the parallel pytest worker count.                     |
+| `PYLINT_PYPY_VERSION`          | `8.0.0`                                                                              | Selects the official PyPy release for classic Pylint.        |
+| `PYLINT_PYTHON_VERSION`        | `3.12`                                                                               | Sets the classic source/runtime Python baseline.             |
+| `PYLINT_PYPY_SHA256`           | `a1b4851459c2b3dffccab71cb08989534fab0839deddd34f0e6bf18add256fd7`                   | Verifies the downloaded PyPy archive.                        |
+| `PYLINT_TOOLCHAIN_DIR`         | `.lint-tools`                                                                        | Keeps the PyPy binary outside the project `.venv`.           |
+| `PYLINT_PYTHON`                | `$(PYLINT_PYPY_ROOT)/bin/pypy3.12`                                                   | Selects the executable checked before linting.               |
+| `PYLINT_VERSION`               | `4.1.1`                                                                              | Pins vanilla Pylint for the classic pass.                    |
+| `ASTROID_VERSION`              | `4.3.3`                                                                              | Pins the compatible Astroid release.                         |
+| `PYLINT_TARGETS`               | `src tests examples`                                                                 | Defines the source trees checked by both Pylint passes.      |
+| `PYLINT_HOME`                  | `.pylint_cache/pypy-3.12-8.0.0-pylint-4.1.1-astroid-4.3.3`                           | Separates classic Pylint state.                              |
+| `PYLINT`                       | Isolated `uv tool run`, one worker, focused built-in messages and fatal diagnostics. | Runs classic Pylint directly under PyPy.                     |
+| `DF12_PYTHON_LINTS_REF`        | `v0.3.0`                                                                             | Pins the df12 plug-in and `ambrleaks` source.                |
+| `DF12_PYTHON`                  | `3.14`                                                                               | Selects CPython for DF12 and snapshot passes.                |
+| `DF12_PYLINT_VERSION`          | `$(PYLINT_VERSION)`                                                                  | Keeps the DF12 Pylint version aligned with the classic pin.  |
+| `DF12_ASTROID_VERSION`         | `$(ASTROID_VERSION)`                                                                 | Keeps the DF12 Astroid version aligned with the classic pin. |
+| `DF12_PYLINT_HOME`             | `.pylint_cache/cpython-3.14-df12-v0.3.0-pylint-4.1.1-astroid-4.3.3`                  | Separates CPython DF12 Pylint state.                         |
+| `DF12_PYLINT_MESSAGES`         | Twelve messages supplied by `v0.3.0`                                                 | Keeps DF12 checks explicit and reviewable.                   |
+| `DF12_PYLINT`                  | Isolated `uv tool run`, one worker, DF12 plug-in plus fatal diagnostics.             | Runs only the DF12 pass under CPython 3.14.                  |
+| `AMBRLEAKS`                    | Isolated `uv tool run` under `$(DF12_PYTHON)`                                        | Scans Syrupy snapshots under CPython 3.14.                   |
+| `INTERROGATE_TARGETS`          | `src/falcon_correlate`                                                               | Defines repo-root-relative Interrogate targets.              |
+| `SKYLOS_VERSION`               | `4.33.2`                                                                             | Pins the separately provisioned Skylos release.              |
+| `SKYLOS_CLI`                   | `$(UV_ENV) $(UV) tool run --python 3.14 --from 'skylos==$(SKYLOS_VERSION)' skylos`   | Provides Skylos using its Python 3.14 AST runtime.           |
+| `SKYLOS_SCAN_OPTIONS`          | `--config-file pyproject.toml`                                                       | Holds scan-wide options for Skylos.                          |
+| `SKYLOS_PRODUCTION_TARGETS`    | `src/falcon_correlate`                                                               | Defines the production source scanned for dead code.         |
+| `SKYLOS_EXCLUDES`              | `unittests`                                                                          | Excludes test-only package infrastructure from the scan.     |
+| `SKYLOS_WHITELIST_LOCK`        | `.skylos-whitelist.lock`                                                             | Serializes whitelist read-modify-write updates.              |
+| `MUTMUT_VERSION`               | `3.6.0`                                                                              | Pins the focused mutation sandbox command.                   |
+| `MBAKE_VERSION`                | `1.4.6`                                                                              | Pins the Makefile parser used by the workflow contract gate. |
+| `TYPOS_CONFIG_BUILDER_VERSION` | `v0.1.3`                                                                             | Pins the spelling policy generator.                          |
 
 Override variables at the command line for targeted investigation. For example:
 
@@ -694,10 +742,25 @@ Override variables at the command line for targeted investigation. For example:
 make lint PYLINT_TARGETS=src/falcon_correlate/middleware.py
 ```
 
-`PYLINT_PYTHON` pins the interpreter to `pypy@3.12`, not bare `pypy`, so a new
-PyPy release cannot change the parsed grammar without a commit. Do not change
-`PYLINT_PYTHON` or `PYLINT_VERSION` casually; either one changes the lint
-execution environment and should be reviewed as a tooling change.
+The installer downloads the official `pypy3.12-v8.0.0-linux64.tar.gz` archive
+only on Linux x86_64 and verifies its published digest before extraction. PyPy
+labels its Python 3.12 build beta quality. Before analysis, Make checks the
+selected executable's full runtime identity and the installed Pylint and
+Astroid versions, including when a caller overrides Make variables. Classic and
+df12 tools use isolated `uv tool run` environments and distinct `PYLINTHOME`
+directories; neither replaces or changes the project's `.venv`.
+
+Pylint's `py-version` remains `3.12` for both passes. It describes the source
+baseline, not the interpreter running the tool: DF12 runs on CPython 3.14 but
+does not move baseline code to Python 3.14. Classic Pylint and DF12 both check
+`src tests examples`; this checkout has no separately versioned `scripts/`
+tree. Any future tooling that requires newer Python syntax must also receive
+the focused built-in Pylint checks in a separate host-appropriate pass.
+
+Do not change the runtime, Pylint, or Astroid pins casually; review them as a
+tooling change. Update the `df12-python-lints` dependency and
+`DF12_PYTHON_LINTS_REF` together so the plug-in and `ambrleaks` keep the same
+rule implementation.
 
 ## Episodic lint policy
 
@@ -712,8 +775,8 @@ The policy is:
   `collections.abc as cabc`, `datetime as dt`, and `unittest.mock as mock`;
 - keep docstrings in NumPy style;
 - use a focused Pylint allow-list rather than enabling every Pylint message;
-- run Pylint directly under a pinned PyPy interpreter as a second tier after
-  Ruff; and
+- run built-in Pylint checks directly under a pinned PyPy interpreter;
+- run all `df12-python-lints` checks and `ambrleaks` under CPython 3.14; and
 - add narrow suppressions only when framework callbacks, tests, or existing
   module boundaries make a rule unsuitable for the current change.
 
@@ -834,8 +897,10 @@ policy where possible:
 - `max-statements = 70`; and
 - `max-positional-arguments = 4`.
 
-`[tool.pylint."messages control"]` disables all messages by default and then
-enables the focused Pylint message set. This makes the second tier deliberate:
-it checks specific classes of problems rather than duplicating Ruff wholesale.
-`syntax-error` is not disabled, so a module PyPy cannot parse fails the lint
-rather than passing unchecked.
+The Makefile commands disable Pylint messages by default and explicitly enable
+the focused rule sets plus `syntax-error` and fatal analysis diagnostics. This
+keeps the checks deliberate without allowing parse or checker failures to pass
+unnoticed, including when the command uses `--disable=all`. Pylint's
+`py-version` remains `3.12` for both passes because it describes the source
+baseline; the CPython 3.14 DF12 host does not move application code to Python
+3.14.
