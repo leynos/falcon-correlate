@@ -2,12 +2,13 @@
 
 ## Status
 
-Accepted on 2026-05-15 and amended on 2026-06-21, 2026-07-31, 2026-09-25,
-and 2026-09-30. The current six-check `make lint` pipeline runs pinned Ruff,
+Accepted on 2026-05-15 and amended on 2026-06-21, 2026-07-31, 2026-09-25, and
+2026-09-30. The current six-check `make lint` pipeline runs pinned Ruff,
 Interrogate, classic Pylint on checksum-verified PyPy 8.0.0/Python 3.12, DF12
 Pylint on CPython 3.14, Ambrleaks, and Skylos production dead-code detection.
-See the [2026-09-30 amendment](#amendment-2026-09-30-verified-pylint-on-pypy-312)
-for the current toolchain.
+See the
+[2026-09-30 amendment](#amendment-2026-09-30-verified-pylint-on-pypy-312) for
+the current toolchain.
 
 ## Date
 
@@ -157,11 +158,11 @@ snapshot redaction checks.
 ## Architectural Rationale
 
 The original three-tier decision separated fast feedback, docstring coverage,
-and deeper static analysis. Later amendments extended that decision; the
-current `make lint` pipeline has six checks, documented in the 2026-09-30
-amendment. The single Makefile entry point keeps the contributor workflow
-simple while making runtimes, package versions, isolated Pylint caches, and
-source targets explicit for maintenance.
+and deeper static analysis. Later amendments extended that decision; the current
+`make lint` pipeline has six checks, documented in the 2026-09-30 amendment.
+The single Makefile entry point keeps the contributor workflow simple while
+making runtimes, package versions, isolated Pylint caches, and source targets
+explicit for maintenance.
 
 The project treats lint configuration as architecture because it shapes public
 API design, import boundaries, logging correctness, and module size pressure.
@@ -197,9 +198,9 @@ At that point, the original Ruff, Interrogate, and PyPy-backed Pylint decision
 had been extended with a blocking Skylos scan. Skylos scanned
 `src/falcon_correlate`, excluded the in-package `unittests` directory, and used
 the strict gate configuration in `pyproject.toml`. The standalone command was
-pinned to Python 3.14 because Skylos parses source with its own runtime Abstract
-Syntax Tree (AST); the pin prevents phantom findings when the project uses
-newer supported Python syntax.
+pinned to Python 3.14 because Skylos parses source with its own runtime
+Abstract Syntax Tree (AST); the pin prevents phantom findings when the project
+uses newer supported Python syntax.
 
 Framework lifecycle callbacks and required protocol parameters use precise,
 typed entry-point rules with verified reasons. A named Skylos allow-list entry
@@ -218,12 +219,13 @@ through the same identity checks. This leaves the project's `.venv` and
 supported Python baseline unchanged.
 
 Pylint 4.1.1 declares Astroid `>=4.3.2,<=4.4`, so Astroid 4.3.3 falls within
-its supported range. See the [Pylint 4.1.1 metadata](https://pypi.org/project/pylint/4.1.1/)
-and [Astroid 4.3.3 release](https://pypi.org/project/astroid/4.3.3/). The
-separate DF12 pass uses the same explicit Pylint/Astroid pins in its own
-isolated environment on CPython 3.14, loads only `df12_python_lints`, and has a
-distinct `PYLINTHOME`. `ambrleaks` remains a separate CPython 3.14 invocation.
-The GitHub repository for `df12-python-lints` is owned by the df12 Productions
+its supported range. See the
+[Pylint 4.1.1 metadata](https://pypi.org/project/pylint/4.1.1/) and
+[Astroid 4.3.3 release](https://pypi.org/project/astroid/4.3.3/). The separate
+DF12 pass uses the same explicit Pylint/Astroid pins in its own isolated
+environment on CPython 3.14, loads only `df12_python_lints`, and has a distinct
+`PYLINTHOME`. `ambrleaks` remains a separate CPython 3.14 invocation. The
+GitHub repository for `df12-python-lints` is owned by the df12 Productions
 organization, which also owns `falcon-correlate`; the dependency is pinned to
 release `v0.3.0`.
 
@@ -232,8 +234,8 @@ does not redefine the library baseline. Each invocation uses one worker and
 enables syntax and fatal analysis diagnostics after `--disable=all`. Regression
 contracts exercise interpreter identity, PEP 695 AST nodes, actual PyPy live-
 object inspection, invalid syntax, lint failure propagation, plugin isolation,
-and preservation of `.venv`.
-`make lint` and the CI lint lane remain the complete entry points.
+and preservation of `.venv`. `make lint` and the CI lint lane remain the
+complete entry points.
 
 The effective `make lint` order is:
 

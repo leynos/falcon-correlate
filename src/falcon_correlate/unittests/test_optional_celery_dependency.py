@@ -46,6 +46,7 @@ from falcon_correlate.unittests.optional_celery_dependency_helpers import (
     _run_celery_tests_with_celery_blocked,
     _run_python_with_celery_blocked,
     _write_celery_import_blocker,
+    _write_child_sentinel_test,
 )
 
 if typ.TYPE_CHECKING:

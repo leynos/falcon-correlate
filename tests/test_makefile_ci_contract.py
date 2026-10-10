@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import shlex
-import subprocess  # noqa: S404 - fixed local parser command.
+import subprocess  # ruff: ignore[suspicious-subprocess-import] - fixed local parser command.
 import typing as typ
 from pathlib import Path
 
@@ -18,8 +18,16 @@ _OPTIONAL_CELERY_TEST_TOKENS: typ.Final = (
 _PROJECT_PYTEST_EXCLUDE_TOKENS: typ.Final = ("--ignore=$(OPTIONAL_CELERY_TEST)",)
 _TYPECHECK_PREREQUISITES: typ.Final = ("build",)
 _TYPECHECK_RECIPE_TOKENS: typ.Final = (
-    ("$(UV_ENV)", "$(UV)", "run", "ty", "--version"),
-    ("$(UV_ENV)", "$(UV)", "run", "ty", "check"),
+    ("$(TY)", "--version"),
+    ("$(TY)", "check"),
+)
+_TY_WRAPPER_TOKENS: typ.Final = (
+    "$(UV_ENV)",
+    "$(UV)",
+    "run",
+    "--with",
+    "ty==$(TY_VERSION)",
+    "ty",
 )
 _PROJECT_TEST_RECIPE_TOKENS: typ.Final = (
     ("$(UV_ENV)", "$(UV)", "run", "pytest", "-v", "$(SERIAL_PY_TESTS)"),
@@ -50,7 +58,7 @@ _CI_SERIAL_OPTIONAL_CELERY_COMMAND: typ.Final = "make test-optional-celery"
 
 def _makefile_report() -> dict[str, object]:
     """Return a fresh successful Makeutil parse of the repository Makefile."""
-    completed = subprocess.run(  # noqa: S603 - fixed parser command.
+    completed = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - fixed parser command.
         _MAKEUTIL_COMMAND,
         capture_output=True,
         check=True,
@@ -164,6 +172,9 @@ def test_typecheck_and_pytest_targets_use_project_commands() -> None:
     assert _recipe_tokens("typecheck") == _TYPECHECK_RECIPE_TOKENS, (
         "typecheck must run both ty commands through the project uv environment"
     )
+    assert _variable_tokens("TY") == _TY_WRAPPER_TOKENS, (
+        "typecheck must use the pinned project uv wrapper for ty"
+    )
     assert _variable_tokens("OPTIONAL_CELERY_TEST") == _OPTIONAL_CELERY_TEST_TOKENS, (
         "optional-Celery exclusion must name the isolated unit-test module"
     )
@@ -177,8 +188,7 @@ def test_typecheck_and_pytest_targets_use_project_commands() -> None:
         "make test must run the optional-Celery subprocess module serially"
     )
     assert (
-        _variable_tokens("SERIAL_PY_TEST_EXCLUDES")
-        == _SERIAL_PY_TEST_EXCLUDES_TOKENS
+        _variable_tokens("SERIAL_PY_TEST_EXCLUDES") == _SERIAL_PY_TEST_EXCLUDES_TOKENS
     ), "parallel pytest must reuse the project optional-Celery exclusion"
     assert _recipe_tokens("test") == _PROJECT_TEST_RECIPE_TOKENS, (
         "make test must run nested tests serially before bounded xdist"

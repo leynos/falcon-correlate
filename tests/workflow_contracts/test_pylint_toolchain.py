@@ -120,11 +120,12 @@ def _toolchain_identity(command: tuple[str, ...]) -> dict[str, object]:
 def toolchains() -> _Toolchains:
     """Provision the pinned PyPy binary and return both lint tool commands."""
     _require_success(_run(["make", "--no-print-directory", "prepare-pylint-python"]))
+    toolchain_dir = _makefile_pin("PYLINT_TOOLCHAIN_DIR")
     python_version = _makefile_pin("PYLINT_PYTHON_VERSION")
     pypy_version = _makefile_pin("PYLINT_PYPY_VERSION")
     lint_runtime = (
         REPOSITORY_ROOT
-        / ".lint-tools"
+        / toolchain_dir
         / f"pypy{python_version}-v{pypy_version}-linux64"
     )
     classic_python = lint_runtime / "bin" / f"pypy{python_version}"
@@ -373,7 +374,7 @@ def test_ci_runs_make_lint_without_making_failure_optional() -> None:
     workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
     lint_job = workflow["jobs"]["lint"]
     lint_step = next(
-        step for step in lint_job["steps"] if step.get("name") == "Run linters"
+        step for step in lint_job["steps"] if step.get("name") == "Run lint gates"
     )
     assert lint_step["run"] == "make lint", (
         "The CI lint step must run the complete Makefile lint target"

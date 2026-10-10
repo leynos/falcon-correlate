@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import shlex
-import subprocess  # noqa: S404 - contracts invoke a fixed local executable.
+import subprocess  # ruff: ignore[suspicious-subprocess-import] - contracts invoke a fixed local executable.
 import tomllib
 import typing as typ
 from pathlib import Path
@@ -116,7 +116,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 def _makefile_report() -> dict[str, object]:
     """Return Makeutil's complete, successfully parsed Makefile report."""
-    completed = subprocess.run(  # noqa: S603 - fixed parser command.
+    completed = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - fixed parser command.
         _MAKEUTIL_COMMAND,
         capture_output=True,
         check=True,

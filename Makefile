@@ -13,8 +13,8 @@ UV ?= $(shell command -v uv 2>/dev/null || printf '%s/.local/bin/uv' "$$HOME")
 TOOLS = $(MDLINT) uv
 VENV_TOOLS = pytest
 UV_ENV = UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools
-# Ignore Lody's injected Git URL rewrites when resolving public Git sources.
-GIT_SOURCE_ENV = GIT_CONFIG_COUNT=0 PATH=/usr/bin:/bin:$(PATH)
+# Ignore session Git rewrites and transport helpers for public Git sources.
+GIT_SOURCE_ENV = GIT_CONFIG_COUNT=0 GIT_EXEC_PATH= PATH=/usr/bin:/bin:$(PATH)
 MUTMUT_VERSION ?= 3.6.0
 
 # The CV-005 CodeScene contracts live in shared-actions and run from a full
