@@ -48,19 +48,20 @@ class _CorrelationIDMiddlewareBase:
 
         """
         self._correlation_id_var = correlation_id_context_var
+        if config is not None and kwargs:
+            msg = "Cannot specify both 'config' and individual parameters"
+            raise ValueError(msg)
         if config is not None:
-            if kwargs:
-                msg = "Cannot specify both 'config' and individual parameters"
-                raise ValueError(msg)
             self._config = config
-        else:
-            unknown_keys = set(kwargs.keys()) - VALID_CONFIG_KWARGS
-            if unknown_keys:
-                msg = f"Unknown keyword arguments: {', '.join(sorted(unknown_keys))}"
-                raise TypeError(msg)
-            # Cast to TypedDict after validating keys - runtime will verify values
-            typed_kwargs = typ.cast("CorrelationIDConfigKwargs", kwargs)
-            self._config = CorrelationIDConfig.from_kwargs(**typed_kwargs)
+            return
+
+        unknown_keys = set(kwargs.keys()) - VALID_CONFIG_KWARGS
+        if unknown_keys:
+            msg = f"Unknown keyword arguments: {', '.join(sorted(unknown_keys))}"
+            raise TypeError(msg)
+        # Cast to TypedDict after validating keys - runtime will verify values
+        typed_kwargs = typ.cast("CorrelationIDConfigKwargs", kwargs)
+        self._config = CorrelationIDConfig.from_kwargs(**typed_kwargs)
 
     # @CodeScene(disable:"Bumpy Road Ahead")
     @property
