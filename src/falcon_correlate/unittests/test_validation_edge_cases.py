@@ -1,4 +1,10 @@
-"""Integration tests for validation logging and edge cases."""
+"""Test validator edge cases and the middleware's validation logs.
+
+These Falcon client tests cover accepted, rejected, and missing validation
+results, including warning diagnostics when a user-supplied validator raises.
+They also verify that validation logs keep their correlation ID and header
+context.
+"""
 
 from __future__ import annotations
 
@@ -236,21 +242,32 @@ class TestValidatorExceptionHandling:
             )
 
         warning_record = next(
-            record
-            for record in caplog.records
-            if record.name == "falcon_correlate.middleware"
-            and record.levelno == logging.WARNING
-            and record.getMessage()
-            == "Validator raised an exception for correlation ID, treating as invalid"
+            (
+                record
+                for record in caplog.records
+                if record.name == "falcon_correlate.middleware"
+                and record.levelno == logging.WARNING
+                and record.getMessage()
+                == (
+                    "Validator raised an exception for correlation ID, "
+                    "treating as invalid"
+                )
+            ),
+            None,
         )
-        warning_log = typ.cast("typ.Any", warning_record)
-        assert warning_log.correlation_id == "crash-value", (
-            "expected validator warning correlation_id to be 'crash-value' but got "
-            f"{warning_log.correlation_id!r}"
+        captured_messages = [record.getMessage() for record in caplog.records]
+        assert warning_record is not None, (
+            "expected validator warning record; captured log messages: "
+            f"{captured_messages!r}"
         )
-        assert warning_log.header_name == "X-Correlation-ID", (
-            "expected validator warning header_name to be 'X-Correlation-ID' but got "
-            f"{warning_log.header_name!r}"
+
+        correlation_id = getattr(warning_record, "correlation_id", None)
+        header_name = getattr(warning_record, "header_name", None)
+        assert correlation_id == "crash-value", (
+            f"expected correlation_id 'crash-value', got {correlation_id!r}"
+        )
+        assert header_name == "X-Correlation-ID", (
+            f"expected header_name 'X-Correlation-ID', got {header_name!r}"
         )
 
     def test_request_succeeds_despite_validator_exception(

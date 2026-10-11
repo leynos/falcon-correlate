@@ -2,26 +2,25 @@
 
 ## Status
 
-Accepted on 2026-05-15 and amended on 2026-06-21, 2026-07-31, 2026-09-25, and
-2026-09-30. The current six-check `make lint` pipeline runs pinned Ruff,
-Interrogate, classic Pylint on checksum-verified PyPy 8.0.0/Python 3.12, DF12
-Pylint on CPython 3.14, Ambrleaks, and Skylos production dead-code detection.
-See the
-[2026-09-30 amendment](#amendment-2026-09-30-verified-pylint-on-pypy-312) for
-the current toolchain.
+Accepted on 2026-05-15 and amended on 2026-06-21 and on 2026-09-25. The project
+uses Ruff as the first lint tier, Interrogate as the second lint tier, and a
+focused Pylint pass, executed directly under a pinned PyPy interpreter, as the
+third lint tier. See
+[Amendment (2026-09-25): plain Pylint on PyPy 3.12](#amendment-2026-09-25-plain-pylint-on-pypy-312)
+for the current execution mechanism.
 
 ## Date
 
-2026-07-31.
+2026-06-21.
 
 ## Context and Problem Statement
 
 `falcon-correlate` already used Ruff for linting and formatting checks. The
 project needed to import the stricter lint policy from `leynos/episodic`,
-including a focused Pylint tier, and an explicit docstring coverage gate so new
-public and internal package code cannot reduce coverage while still satisfying
-style-only docstring checks. The original PyPy workaround has since been
-removed; the current execution model is recorded in the latest amendment.
+including the practice of running Pylint as a later lint tier through the
+`pylint-pypy-shim` repository. The project also needs an explicit docstring
+coverage gate so new public and internal package code cannot reduce docstring
+coverage while still satisfying style-only docstring checks.
 
 The decision needed to preserve a fast default lint path, keep lint behaviour
 reproducible across local and CI environments, and avoid enabling an unbounded
@@ -34,10 +33,9 @@ the lint integration.
 - Run fast, broad lint checks before slower or deeper checks.
 - Reuse the lint policy already established in `leynos/episodic`.
 - Enforce 100 percent docstring coverage for the package.
-- Pin the classic Pylint runtime and package versions so the PyPy-backed
-  execution path is reproducible.
+- Pin the shim revision so the PyPy-backed Pylint execution path is
+  reproducible.
 - Keep Pylint focused on rules that add value beyond Ruff.
-- Run the tagged df12 Pylint plug-in and snapshot scanner under CPython 3.14.
 - Allow narrow suppressions for framework callback signatures, tests, and
   legacy module boundaries.
 
@@ -58,9 +56,9 @@ goals.
 ### Option C: Ruff followed by focused PyPy-backed Pylint
 
 This preserves Ruff as the fast first tier and adds a deliberate Pylint
-allow-list as the second tier. The initial implementation used a wrapper to
-work around a PyPy/Astroid inspection failure; the 2026-09-30 amendment records
-the tested vanilla-Pylint replacement.
+allow-list as the second tier. `uv tool run --python pypy` installs and runs
+the pinned `pylint-pypy-shim`, keeping the execution model aligned with
+episodic.
 
 ### Option D: Ruff followed by Interrogate and focused PyPy-backed Pylint
 
@@ -70,12 +68,12 @@ Interrogate complements Ruff because Ruff validates docstring style and
 presence rule-by-rule, while Interrogate reports package-level coverage and
 fails the lint target below the configured threshold.
 
-| Topic              | Ruff only           | Unrestricted Pylint     | Focused PyPy-backed Pylint                 | Ruff + Interrogate + focused Pylint   |
-| ------------------ | ------------------- | ----------------------- | ------------------------------------------ | ------------------------------------- |
-| Speed              | Fastest             | Slowest                 | Fast first tier, deeper second tier        | Fast style tier, explicit coverage    |
-| Signal             | Good but incomplete | Noisy                   | Focused                                    | Focused plus coverage threshold       |
-| Episodic alignment | Partial             | Partial                 | Full                                       | Full plus package coverage            |
-| Reproducibility    | Good                | Depends on local Pylint | Pinned interpreter and `uv` tool execution | Pinned interpreter and `uv` execution |
+| Topic              | Ruff only           | Unrestricted Pylint     | Focused PyPy-backed Pylint          | Ruff + Interrogate + focused Pylint |
+| ------------------ | ------------------- | ----------------------- | ----------------------------------- | ----------------------------------- |
+| Speed              | Fastest             | Slowest                 | Fast first tier, deeper second tier | Fast style tier, explicit coverage  |
+| Signal             | Good but incomplete | Noisy                   | Focused                             | Focused plus coverage threshold     |
+| Episodic alignment | Partial             | Partial                 | Full                                | Full plus package coverage          |
+| Reproducibility    | Good                | Depends on local Pylint | Pinned shim and `uv` tool execution | Pinned shim and `uv` execution      |
 
 _Table 1: Comparison of linting options._
 
@@ -112,42 +110,34 @@ Non-goals:
 
 ### Technical requirements
 
-- Classic Pylint must run without a monkey-patch under the verified PyPy 3.12
-  runtime.
-- The PyPy archive, Pylint, and Astroid must be pinned for reproducibility.
-- `df12-python-lints` must be pinned to `v0.3.0` and run under CPython 3.14.
-- `ambrleaks` must scan the repository's Syrupy snapshots.
+- Pylint must run through `pylint-pypy-shim` under PyPy.
+- The shim package must be pinned to a known revision for reproducibility.
 - The lint workflow must keep Ruff first so common failures return quickly.
 - The Makefile must expose variables for the Interrogate targets, PyPy runtime,
-  Pylint toolchain, and Pylint targets.
+  shim reference, and Pylint targets.
 
 ## Decision Outcome / Proposed Direction
 
-Choose option D. `make lint` runs Ruff, Interrogate, one-worker classic Pylint
-on checksum-verified PyPy 8.0.0/Python 3.12, the separate df12 Pylint pass on
-CPython 3.14, and `ambrleaks`. The classic and df12 passes cover
-`src tests examples`; their isolated environments and fatal diagnostics are
-described in the
-[2026-09-30 amendment](#amendment-2026-09-30-verified-pylint-on-pypy-312).
+Choose option D. `make lint` runs `uv run ruff check` first, then runs
+Interrogate with `--fail-under 100`, then runs Pylint under the pinned
+`pypy@3.12` interpreter with `PYLINT_TARGETS` defaulting to `src tests`. See the
+[2026-09-25 amendment](#amendment-2026-09-25-plain-pylint-on-pypy-312) for the
+current execution mechanism.
 
 Ruff owns the broad lint policy, import policy, docstring style, type-checking
 import rules, security checks, and most complexity checks. Interrogate owns the
 package docstring coverage threshold. Pylint owns the focused third tier for
 logging, pattern matching, refactoring suggestions, resource handling, and
-selected design limits. The df12 plug-in owns house-style structural checks,
-suppression explanations, and snapshot-assertion guidance. `ambrleaks` owns
-snapshot redaction checks.
+selected design limits.
 
 ## Known Risks and Limitations
 
-- PyPy 8.0.0's Python 3.12 build is beta quality and this lint binary is
-  currently provisioned only for Linux x86_64. The classic pass explicitly
-  enables syntax and fatal analysis diagnostics so parse failures cannot pass
-  unnoticed.
+- PyPy may lag the project's target Python syntax. This was the original
+  rationale for disabling `syntax-error` in the Pylint configuration; the
+  [2026-09-25 amendment](#amendment-2026-09-25-plain-pylint-on-pypy-312)
+  records why that disable was removed.
 - The Pylint tier may be slower than Ruff. Running Ruff first keeps most
   high-volume feedback fast.
-- The df12 tools need a managed CPython 3.14 installation in addition to the
-  project's supported interpreter and the PyPy runtime.
 - Interrogate reports paths relative to its invocation directory. The Makefile
   runs it from the repository root and keeps `INTERROGATE_TARGETS`
   repo-root-relative for transparent overrides.
@@ -157,12 +147,10 @@ snapshot redaction checks.
 
 ## Architectural Rationale
 
-The original three-tier decision separated fast feedback, docstring coverage,
-and deeper static analysis. Later amendments extended that decision; the current
-`make lint` pipeline has six checks, documented in the 2026-09-30 amendment.
-The single Makefile entry point keeps the contributor workflow simple while
-making runtimes, package versions, isolated Pylint caches, and source targets
-explicit for maintenance.
+The three-tier approach separates fast feedback, docstring coverage, and deeper
+static analysis. It keeps the normal contributor workflow simple through
+`make lint`, while the Makefile variables make the Interrogate target, Pylint
+runtime, Pylint version, and lint targets explicit for maintenance.
 
 The project treats lint configuration as architecture because it shapes public
 API design, import boundaries, logging correctness, and module size pressure.
@@ -188,11 +176,9 @@ The Pylint configuration no longer disables `syntax-error`. While that message
 was disabled, any module the PyPy runtime could not parse produced no messages
 at all, so the lint passed without linting it. In this repository four modules
 were skipped that way under PyPy 3.11; PyPy 3.12 parses all of them, and they
-The dated addendum below records the lint sequence before the verified PyPy
-runtime and separate DF12 pass were added. Its four-stage sequence is
-historical; the current six checks are listed in the 2026-09-30 amendment.
+lint clean. A parse failure now fails the lint.
 
-## Historical addendum (2026-09-29): Skylos production dead-code check
+## Addendum (2026-09-29): Skylos production dead-code tier
 
 At that point, the original Ruff, Interrogate, and PyPy-backed Pylint decision
 had been extended with a blocking Skylos scan. Skylos scanned
@@ -207,7 +193,7 @@ typed entry-point rules with verified reasons. A named Skylos allow-list entry
 is permitted only when an entry-point rule cannot model the runtime boundary,
 and it must include the verified caller-specific reason.
 
-## Amendment (2026-09-30): verified Pylint on PyPy 3.12
+## Addendum (2026-09-30): verified Pylint on PyPy 3.12
 
 The classic pass uses vanilla Pylint 4.1.1 with Astroid 4.3.3 in an isolated
 `uv tool run` environment on the official PyPy 8.0.0/Python 3.12 Linux x86_64

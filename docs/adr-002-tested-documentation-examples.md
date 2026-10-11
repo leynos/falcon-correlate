@@ -20,9 +20,9 @@ rather than living only in prose.
 Several Markdown execution tools were considered, including `doctest`, Sybil,
 pytest-markdown-docs, mktestdocs, phmdoctest/phmutest, pytest-examples, and
 pytest-codeblocks. They can execute fenced code, but they do not make those
-fences normal Python modules inspected by Ruff, `ty`, and vanilla Pylint on the
-verified PyPy 3.12 lint runtime. Byte-for-byte snippet comparison was also
-rejected because it fails on harmless formatter changes and comments.
+fences normal Python modules inspected by Ruff, `ty`, and PyPy-backed Pylint.
+Byte-for-byte snippet comparison was also rejected because it fails on harmless
+formatter changes and comments.
 
 ## Decision
 
@@ -52,8 +52,8 @@ app.add_route("/hello", HelloResource())
 compares `ast.dump(ast.parse(...), include_attributes=False)`. This checks the
 semantic Python shape, while ignoring whitespace, comments, and line wrapping.
 
-`make lint` includes `examples` in `PYLINT_TARGETS` so both Pylint passes
-inspect runnable examples as well as `src` and `tests`.
+`make lint` includes `examples` in `PYLINT_TARGETS` so the second lint tier
+inspects runnable examples as well as `src` and `tests`.
 
 ## Architectural Rationale
 
@@ -71,3 +71,9 @@ inspect runnable examples as well as `src` and `tests`.
 - Snapshot testing adds a dev-only dependency on `syrupy`.
 - The lint gate now checks `examples`, so example code must meet the same style
   bar as tests and package source.
+
+## Addendum (2026-09-30): current lint coverage for examples
+
+The examples remain part of `PYLINT_TARGETS`. The current `make lint` pipeline
+runs both classic Pylint and DF12 Pylint over that target, so both passes
+inspect `src`, `tests`, and `examples`.

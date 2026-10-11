@@ -1,4 +1,24 @@
-"""Shared lifecycle implementation for Falcon middleware variants."""
+"""Shared request and response lifecycle for Falcon middleware adapters.
+
+``_CorrelationIDMiddlewareBase`` resolves configuration, accepts an incoming
+correlation ID only from a trusted source and after validation, and stores the
+ID in ``req.context`` and the configured ``ContextVar``. Its response hook
+optionally echoes the ID in the configured header and always resets the
+request-local context.
+
+``CorrelationIDMiddleware`` in ``middleware.py`` and
+``CorrelationIDMiddlewareASGI`` in ``middleware_asgi.py`` delegate their Falcon
+hooks to ``_process_request`` and ``_process_response``. Diagnostics retain the
+``falcon_correlate.middleware`` logger namespace so existing tests and
+application logging configuration continue to match them.
+
+Examples
+--------
+Adapter hooks use the shared lifecycle like this::
+
+    self._process_request(req)
+    self._process_response(req, resp)
+"""
 
 from __future__ import annotations
 

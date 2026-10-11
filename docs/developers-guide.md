@@ -55,16 +55,18 @@ integration, and UUID tooling shared by the middleware. It exports
 `ContextualLogFilter` for logging enrichment, and the default UUID generator
 and validator helpers used by middleware configuration.
 
-`middleware.py` and `middleware_asgi.py` both build on
-`_CorrelationIDMiddlewareBase`, which owns the shared request selection,
-response-header echo, and cleanup logic. The base class uses the narrow
-`_RequestLike` and `_ResponseLike` protocols, so the shared lifecycle code only
-depends on the request and response methods that Falcon WSGI and ASGI both
-provide. `_RequestLike` defines `remote_addr` as a read-only `str` property, so
-both Falcon request classes satisfy the boundary without requiring mutation
-support. `middleware.py` exposes the WSGI middleware hooks, while
-`middleware_asgi.py` exposes the public ASGI class with `async`
-`process_request` and `process_response` hooks that delegate to the shared base.
+`middleware_base.py` owns `_CorrelationIDMiddlewareBase`, the private lifecycle
+shared by `middleware.py` and `middleware_asgi.py`. It resolves either a
+`CorrelationIDConfig` object or individual options through
+`CorrelationIDConfig.from_kwargs`, selects and validates incoming IDs, stores
+the result on `req.context.correlation_id` and the configured `ContextVar`, and
+performs response-header echo and request-context cleanup. The module keeps the
+established `falcon_correlate.middleware` logger namespace. The concrete WSGI
+and ASGI hooks delegate to the base class's `_process_request` and
+`_process_response` methods. Its narrow `_RequestLike` and `_ResponseLike`
+protocols limit the shared lifecycle to the methods provided by both Falcon
+request and response types; `_RequestLike.remote_addr` is a read-only `str`
+property.
 
 The middleware's request-scoped correlation ID context variable is typed as
 `contextvars.ContextVar[str | None]`, matching the exported
@@ -74,21 +76,20 @@ The corresponding `ContextVar.reset()` calls cast the verified token back to
 `Token[str | None]`, which keeps the middleware clear to the type checker while
 preserving the runtime contract.
 
-`process_response` in `middleware.py` is responsible for the response-header
-echo and cleanup path. It copies `req.context.correlation_id` into the
-configured response header only when `echo_header_in_response` is enabled, the
-request has a middleware-owned `correlation_id_var` reset token, and the
-request has a resolved correlation ID. This prevents `process_response` from
-echoing a spoofed `req.context.correlation_id` that was set by other code after
-Falcon short-circuited before this middleware's `process_request` ran. The
-method always resets the request-scoped `correlation_id_var` token in a
-`finally` block. If `resp.set_header()` fails, the middleware logs a warning,
-performs cleanup, and re-raises the exception, so Falcon still sees the failure.
+The shared `_process_response` path copies `req.context.correlation_id` into
+the configured response header only when echoing is enabled, the request has a
+middleware-owned reset token, and a correlation ID was resolved. This prevents
+the middleware from echoing a value set by other code after Falcon
+short-circuited before its request hook ran. The method always resets the
+request-scoped `ContextVar` token in a `finally` block. If `resp.set_header()`
+fails, it logs a warning, performs cleanup, and re-raises the exception so
+Falcon still sees the failure.
 
-The architectural boundary is deliberately one-way: `middleware.py` imports
-from both utility modules, while neither `middleware_config.py` nor
-`middleware_utils.py` imports from `middleware.py`. This prevents circular
-imports and keeps configuration and runtime helpers usable independently.
+The architectural boundary is deliberately one-way: `middleware_base.py`
+depends on configuration and utility modules, and the WSGI and ASGI modules
+depend on the base. Configuration and utility modules do not depend on the
+concrete middleware classes. This prevents circular imports and keeps those
+helpers usable independently.
 
 `asgi_middleware_helpers.py` lives under `falcon_correlate.unittests` as shared
 ASGI middleware test infrastructure. It provides lightweight request and
@@ -100,6 +101,12 @@ token. Its `_process_request` and `_process_response` async wrappers invoke
 `set_header()`, enabling failure-path tests around response-header echo and
 cleanup. This module is owned by the unit-test package and must not be imported
 by production code.
+
+`test_httpx_transport_helpers.py` provides recording synchronous and
+asynchronous HTTPX transports plus assertions for captured request headers and
+successful responses. The HTTPX transport tests use these helpers to verify
+header propagation without making network requests. This test support module is
+owned by the unit-test package and must not be imported by production code.
 
 ## Assertion diagnostics and coverage
 
