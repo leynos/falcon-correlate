@@ -2,12 +2,12 @@
 
 ## Status
 
-Accepted on 2026-05-15 and amended on 2026-06-21 and on 2026-09-25. The project
-uses Ruff as the first lint tier, Interrogate as the second lint tier, and a
-focused Pylint pass, executed directly under a pinned PyPy interpreter, as the
-third lint tier. See
-[Amendment (2026-09-25): plain Pylint on PyPy 3.12](#amendment-2026-09-25-plain-pylint-on-pypy-312)
-for the current execution mechanism.
+Accepted on 2026-05-15 and amended on 2026-06-21, 2026-09-25, 2026-09-29 and
+2026-09-30. The original decision established Ruff, Interrogate and PyPy-backed
+Pylint as the first three lint tiers; later addenda record the Skylos tier and
+the current Pylint execution mechanism. See
+[Addendum (2026-09-30): verified Pylint on PyPy 3.12](#addendum-2026-09-30-verified-pylint-on-pypy-312)
+for the current Pylint pins and execution details.
 
 ## Date
 
@@ -177,6 +177,9 @@ was disabled, any module the PyPy runtime could not parse produced no messages
 at all, so the lint passed without linting it. In this repository four modules
 were skipped that way under PyPy 3.11; PyPy 3.12 parses all of them, and they
 lint clean. A parse failure now fails the lint.
+
+The Pylint version pin in this amendment is superseded by the
+[2026-09-30 addendum](#addendum-2026-09-30-verified-pylint-on-pypy-312).
 
 ## Addendum (2026-09-29): Skylos production dead-code tier
 
