@@ -1,4 +1,10 @@
-"""Subprocess contracts for the isolated Pylint toolchains."""
+"""Verify the isolated classic and DF12 Pylint toolchain contracts.
+
+Subprocess tests check pinned PyPy 3.12 and CPython 3.14 package identities,
+PEP 695 parsing, diagnostic and failure propagation, plugin isolation, and
+preservation of the project virtual environment. They exercise the Makefile
+lint targets and ensure CI calls the same blocking ``make lint`` entry point.
+"""
 
 from __future__ import annotations
 

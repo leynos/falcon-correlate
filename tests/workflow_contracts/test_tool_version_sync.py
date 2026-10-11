@@ -1,4 +1,9 @@
-"""Contract tests for CI and Makefile tool-version synchronisation."""
+"""Keep lint toolchain pins aligned across local and hosted entry points.
+
+These contracts compare Makefile CLI and Pylint pins with the CI workflow and
+``pyproject.toml`` development dependencies, including the DF12 Git source
+reference, so local and CI installs resolve the same tool versions.
+"""
 
 from __future__ import annotations
 

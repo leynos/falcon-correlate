@@ -180,10 +180,17 @@ lint clean. A parse failure now fails the lint.
 
 ## Addendum (2026-09-29): Skylos production dead-code tier
 
-At that point, the original Ruff, Interrogate, and PyPy-backed Pylint decision
-had been extended with a blocking Skylos scan. Skylos scanned
-`src/falcon_correlate`, excluded the in-package `unittests` directory, and used
-the strict gate configuration in `pyproject.toml`. The standalone command was
+The original three-tier decision remains the foundation for Ruff, Interrogate,
+and PyPy-backed Pylint. The effective Python lint order is now:
+
+1. Ruff — fast, broad lint rules and docstring style.
+2. Interrogate — 100 per cent package docstring coverage.
+3. PyPy-backed Pylint — focused selected messages.
+4. Skylos — strict production dead-code detection.
+
+Skylos is a blocking fourth tier in `make lint`. It scans
+`src/falcon_correlate`, excludes the in-package `unittests` directory, and uses
+the strict gate configuration in `pyproject.toml`. The standalone command is
 pinned to Python 3.14 because Skylos parses source with its own runtime
 Abstract Syntax Tree (AST); the pin prevents phantom findings when the project
 uses newer supported Python syntax.
