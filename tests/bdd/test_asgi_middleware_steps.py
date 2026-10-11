@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import collections.abc as cabc  # noqa: TC003 - requested runtime import.
+import collections.abc as cabc  # ruff: ignore[typing-only-standard-library-import] - requested runtime import.
 import typing as typ
 from http import HTTPStatus
 

@@ -71,3 +71,9 @@ inspects runnable examples as well as `src` and `tests`.
 - Snapshot testing adds a dev-only dependency on `syrupy`.
 - The lint gate now checks `examples`, so example code must meet the same style
   bar as tests and package source.
+
+## Addendum (2026-09-30): current lint coverage for examples
+
+The examples remain part of `PYLINT_TARGETS`. The current `make lint` pipeline
+runs both classic Pylint and DF12 Pylint over that target, so both passes
+inspect `src`, `tests`, and `examples`.

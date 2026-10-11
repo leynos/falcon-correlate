@@ -46,6 +46,7 @@ from falcon_correlate.unittests.optional_celery_dependency_helpers import (
     _run_celery_tests_with_celery_blocked,
     _run_python_with_celery_blocked,
     _write_celery_import_blocker,
+    _write_child_sentinel_test,
 )
 
 if typ.TYPE_CHECKING:
@@ -58,6 +59,7 @@ _CELERY_BLOCKED_PARENT_TIMEOUT_SECONDS = (
     2 * _CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS + _CELERY_BLOCKED_PARENT_CLEANUP_SECONDS
 )
 pytestmark = pytest.mark.timeout(_CELERY_BLOCKED_PARENT_TIMEOUT_SECONDS)
+_CELERY_BLOCKED_PYTEST_RUN_GROUP = "celery-blocked-pytest-run"
 
 
 @pytest.fixture(scope="module")
@@ -75,11 +77,16 @@ def celery_blocked_pytest_run(
     tmp_path = tmp_path_factory.mktemp("celery-blocked-suite")
     _write_celery_import_blocker(tmp_path)
     celery_test_paths = _discover_celery_test_paths(_PROJECT_ROOT)
-    return _run_celery_tests_with_celery_blocked(
-        tmp_path,
-        celery_test_paths,
-        _PROJECT_ROOT,
-    )
+    sentinel_test = _write_child_sentinel_test(_PROJECT_ROOT)
+    try:
+        return _run_celery_tests_with_celery_blocked(
+            tmp_path,
+            sentinel_test,
+            celery_test_paths,
+            _PROJECT_ROOT,
+        )
+    finally:
+        sentinel_test.unlink()
 
 
 @pytest.fixture(scope="module")
@@ -112,13 +119,24 @@ def test_blocked_celery_environment_prepends_existing_pythonpath(
     """The import blocker should lead PYTHONPATH without discarding callers."""
     env = _blocked_celery_environment(
         tmp_path,
-        {"PYTHONPATH": f"/already{os.pathsep}/present", "KEEP": "1"},
+        {
+            "PYTHONPATH": f"/already{os.pathsep}/present",
+            "PYTEST_ADDOPTS": "-n auto",
+            "PYTEST_XDIST_WORKER": "gw0",
+            "KEEP": "1",
+        },
     )
 
     assert env["KEEP"] == "1", "Blocked environment should preserve unrelated keys."
     assert env["PYTHONPATH"] == (
         f"{tmp_path}{os.pathsep}/already{os.pathsep}/present"
     ), "Blocked environment should prepend the import blocker to PYTHONPATH."
+    assert "PYTEST_ADDOPTS" not in env, (
+        "Blocked environment should not inherit parent pytest options."
+    )
+    assert "PYTEST_XDIST_WORKER" not in env, (
+        "Blocked environment should not inherit parent xdist worker state."
+    )
 
 
 def test_blocked_celery_environment_sets_pythonpath_when_missing(
@@ -192,6 +210,7 @@ def test_celery_import_blocker_rejects_celery_modules(
     )
 
 
+@pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
 def test_celery_tests_emit_no_error_markers_when_celery_is_unavailable(
     celery_blocked_pytest_run: _PytestRun,
 ) -> None:
@@ -204,6 +223,7 @@ def test_celery_tests_emit_no_error_markers_when_celery_is_unavailable(
     )
 
 
+@pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
 def test_celery_tests_exit_successfully_when_celery_is_unavailable(
     celery_blocked_pytest_run: _PytestRun,
 ) -> None:
@@ -216,6 +236,7 @@ def test_celery_tests_exit_successfully_when_celery_is_unavailable(
     )
 
 
+@pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
 def test_celery_tests_report_correct_skip_count_when_celery_is_unavailable(
     celery_blocked_pytest_run: _PytestRun,
 ) -> None:

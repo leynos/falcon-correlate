@@ -313,4 +313,4 @@ class TestMutmutConfig:
                 "&& github.event_name == 'pull_request'",
                 "run": "make test-mutmut-sandbox",
             }
-        ]
+        ], "CI must run the mutmut sandbox for Python 3.13 pull requests"

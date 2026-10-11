@@ -252,7 +252,7 @@ def test_a_document_without_repeats_still_parses() -> None:
     [True, False],
     ids=["true", "false"],
 )
-def test_a_boolean_ceiling_is_refused(declared: bool) -> None:  # noqa: FBT001
+def test_a_boolean_ceiling_is_refused(declared: bool) -> None:  # ruff: ignore[boolean-type-hint-positional-argument] -- bool is the edge case under test
     """``bool`` subclasses ``int``, so the obvious check accepts it.
 
     ``timeout-minutes: true`` would satisfy ``isinstance(value, int)`` and

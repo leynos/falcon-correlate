@@ -26,7 +26,7 @@ pytestmark = pytest.mark.skipif(
     reason="celery is not installed",
 )
 
-from falcon_correlate.celery import (  # noqa: E402
+from falcon_correlate.celery import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     _BEFORE_TASK_PUBLISH_DISPATCH_UID,
     _TASK_POSTRUN_DISPATCH_UID,
     _TASK_PRERUN_DISPATCH_UID,
@@ -70,7 +70,8 @@ def _assert_all_signals_connected_once() -> None:
         (task_prerun, setup_correlation_id_in_worker),
         (task_postrun, clear_correlation_id_in_worker),
     ):
-        assert _receiver_count(signal, receiver) == 1
+        failure_message = "expected _receiver_count(signal, receiver) to equal 1"
+        assert _receiver_count(signal, receiver) == 1, failure_message
 
 
 class _TaskLike:
@@ -179,10 +180,12 @@ def test_context_token_stack_unwinds_lifo(correlation_ids: list[str]) -> None:
         setup_correlation_id_in_worker(task=task)
 
     for expected in reversed(correlation_ids):
-        assert correlation_id_var.get() == expected
+        failure_message = "expected correlation_id_var.get() to equal expected"
+        assert correlation_id_var.get() == expected, failure_message
         clear_correlation_id_in_worker()
 
-    assert correlation_id_var.get() is None
+    failure_message = "expected correlation_id_var.get() to be None"
+    assert correlation_id_var.get() is None, failure_message
 
 
 def test_configure_celery_correlation_isolates_nested_task_context(
@@ -197,13 +200,24 @@ def test_configure_celery_correlation_isolates_nested_task_context(
 
     def _logic() -> None:
         """Exercise the isolated test scenario."""
-        assert correlation_id_var.get() is None
+        failure_message = "expected correlation_id_var.get() to be None"
+        assert correlation_id_var.get() is None, failure_message
 
         task_prerun.send(sender=outer_task, task=outer_task, args=(), kwargs={})
-        assert correlation_id_var.get() == "outer-worker-correlation-id"
+        failure_message = (
+            "expected condition: correlation_id_var.get() == 'outer-worker..."
+        )
+        assert correlation_id_var.get() == "outer-worker-correlation-id", (
+            failure_message
+        )
 
         task_prerun.send(sender=inner_task, task=inner_task, args=(), kwargs={})
-        assert correlation_id_var.get() == "inner-worker-correlation-id"
+        failure_message = (
+            "expected condition: correlation_id_var.get() == 'inner-worker..."
+        )
+        assert correlation_id_var.get() == "inner-worker-correlation-id", (
+            failure_message
+        )
 
         task_postrun.send(
             sender=inner_task,
@@ -213,7 +227,12 @@ def test_configure_celery_correlation_isolates_nested_task_context(
             retval=None,
             state="SUCCESS",
         )
-        assert correlation_id_var.get() == "outer-worker-correlation-id"
+        failure_message = (
+            "expected condition: correlation_id_var.get() == 'outer-worker..."
+        )
+        assert correlation_id_var.get() == "outer-worker-correlation-id", (
+            failure_message
+        )
 
         task_postrun.send(
             sender=outer_task,
@@ -223,7 +242,8 @@ def test_configure_celery_correlation_isolates_nested_task_context(
             retval=None,
             state="SUCCESS",
         )
-        assert correlation_id_var.get() is None
+        failure_message = "expected correlation_id_var.get() to be None"
+        assert correlation_id_var.get() is None, failure_message
 
     isolated_context(_logic)
 
@@ -232,15 +252,20 @@ def test_configure_celery_correlation_returns_app_instance(
     celery_app: Celery,
 ) -> None:
     """Application factories should be able to return the configured app."""
-    assert configure_celery_correlation(celery_app) is celery_app
+    failure_message = "expected condition: configure_celery_correlation(celery_app) ..."
+    assert configure_celery_correlation(celery_app) is celery_app, failure_message
 
 
 def test_configure_celery_correlation_is_exported_from_package_root() -> None:
     """The public helper should be discoverable from falcon_correlate."""
     import falcon_correlate
 
-    assert "configure_celery_correlation" in falcon_correlate.__all__
-    assert falcon_correlate.configure_celery_correlation is configure_celery_correlation
+    failure_message = "expected condition: 'configure_celery_correlation' in falcon_..."
+    assert "configure_celery_correlation" in falcon_correlate.__all__, failure_message
+    failure_message = "expected condition: falcon_correlate.configure_celery_correla..."
+    assert (
+        falcon_correlate.configure_celery_correlation is configure_celery_correlation
+    ), failure_message
 
 
 def test_safe_connect_signal_logs_when_signal_missing(
@@ -265,7 +290,10 @@ def test_safe_connect_signal_logs_when_signal_missing(
             "test.uid",
         )
 
-    assert any("nonexistent_signal" in record.message for record in caplog.records)
+    failure_message = "expected condition: any(('nonexistent_signal' in record.messa..."
+    assert any("nonexistent_signal" in record.message for record in caplog.records), (
+        failure_message
+    )
 
 
 def test_safe_connect_signal_logs_on_successful_connect(
@@ -292,7 +320,12 @@ def test_safe_connect_signal_logs_on_successful_connect(
                 fake_handler,
                 fake_uid,
             )
-        assert any(fake_uid in record.message for record in caplog.records)
+        failure_message = (
+            "expected condition: any((fake_uid in record.message for recor..."
+        )
+        assert any(fake_uid in record.message for record in caplog.records), (
+            failure_message
+        )
     finally:
         before_task_publish.disconnect(dispatch_uid=fake_uid)
 
@@ -317,7 +350,10 @@ def test_safe_connect_signal_suppresses_invalid_receiver(
     with caplog.at_level(logging.DEBUG, logger="falcon_correlate.celery"):
         _safe_connect_signal(fake_module, "before_task_publish", lambda: None, "uid")
 
-    assert any("invalid receiver" in record.message for record in caplog.records)
+    failure_message = "expected condition: any(('invalid receiver' in record.message..."
+    assert any("invalid receiver" in record.message for record in caplog.records), (
+        failure_message
+    )
 
 
 def test_safe_connect_signal_propagates_unexpected_failure() -> None:

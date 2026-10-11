@@ -192,7 +192,7 @@ def test_a_failure_renders_the_workflow_into_its_message() -> None:
 
     assert str(Raised("could not be parsed", "ci.yml")) == (
         "ci.yml: could not be parsed"
-    )
+    ), "a named workflow error must include its workflow in the rendered message"
     assert str(Raised("the directory is absent")) == "the directory is absent", (
         "a failure with no known file must render the reason alone"
     )

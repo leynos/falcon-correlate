@@ -59,8 +59,12 @@ class TestReaderRefusals:
         (tmp_path / "ci.yml").write_bytes(b"jobs:\n  lint:\n    runs-on: \xff\n")
         with pytest.raises(WorkflowReadError) as raised:
             workflow_texts(tmp_path)
-        assert raised.value.workflow == "ci.yml"
-        assert "could not be read" in raised.value.reason
+        assert raised.value.workflow == "ci.yml", (
+            "the refusal must identify the workflow that could not be read"
+        )
+        assert "could not be read" in raised.value.reason, (
+            "the refusal must describe the failed UTF-8 read"
+        )
 
     def test_yaml_that_does_not_parse_is_refused(self) -> None:
         """A parse failure is this reader's own error, not PyYAML's.
@@ -70,8 +74,12 @@ class TestReaderRefusals:
         """
         with pytest.raises(WorkflowReadError) as raised:
             parse("ci.yml", "jobs: [unclosed\n")
-        assert raised.value.workflow == "ci.yml"
-        assert "could not be parsed" in raised.value.reason
+        assert raised.value.workflow == "ci.yml", (
+            "the syntax error must identify the workflow"
+        )
+        assert "could not be parsed" in raised.value.reason, (
+            "the refusal must describe a YAML parse error"
+        )
 
     @pytest.mark.parametrize(
         "text",
@@ -128,7 +136,9 @@ class TestTriggerSpellings:
         failing, which is the worst of the available outcomes.
         """
         document = parse("ci.yml", triggers + "jobs: {}\n")
-        assert serves_pull_requests(document) is serving
+        assert serves_pull_requests(document) is serving, (
+            "the parsed declaration must match its pull-request trigger form"
+        )
 
     @pytest.mark.parametrize(
         ("triggers", "pushes"),
@@ -146,4 +156,6 @@ class TestTriggerSpellings:
     ) -> None:
         """A tag push or a release branch is not the publisher's trigger."""
         document = parse("ci.yml", triggers + "jobs: {}\n")
-        assert pushes_to_main(document) is pushes
+        assert pushes_to_main(document) is pushes, (
+            "only a push to main should satisfy the publisher trigger"
+        )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import shlex
-import subprocess  # noqa: S404 - fixed local parser command.
+import subprocess  # ruff: ignore[suspicious-subprocess-import] - fixed local parser command.
 import typing as typ
 from pathlib import Path
 
@@ -18,19 +18,67 @@ _OPTIONAL_CELERY_TEST_TOKENS: typ.Final = (
 _PROJECT_PYTEST_EXCLUDE_TOKENS: typ.Final = ("--ignore=$(OPTIONAL_CELERY_TEST)",)
 _TYPECHECK_PREREQUISITES: typ.Final = ("build",)
 _TYPECHECK_RECIPE_TOKENS: typ.Final = (
-    ("$(UV_ENV)", "$(UV)", "run", "ty", "--version"),
-    ("$(UV_ENV)", "$(UV)", "run", "ty", "check"),
+    ("$(TY)", "--version"),
+    ("$(TY)", "check"),
 )
-_PROJECT_TEST_RECIPE_TOKENS: typ.Final = (
+_LINT_RECIPE_TOKENS: typ.Final = (
+    ("$(RUFF)", "check"),
+    (
+        "$(UV_ENV)",
+        "$(UV)",
+        "run",
+        "interrogate",
+        "--fail-under",
+        "100",
+        "$(INTERROGATE_TARGETS)",
+    ),
+    ("$(MAKE)", "--no-print-directory", "classic-pylint"),
+    ("$(MAKE)", "--no-print-directory", "df12-pylint"),
+    ("$(AMBRLEAKS)", "tests"),
+    (
+        "$(SKYLOS)",
+        "$(SKYLOS_PRODUCTION_TARGETS)",
+        "--exclude",
+        "$(SKYLOS_EXCLUDES)",
+        "--category",
+        "dead_code",
+        "--gate",
+        "--format",
+        "concise",
+        "--no-upload",
+        "--no-provenance",
+        "--no-grep-verify",
+    ),
+)
+_CLASSIC_PYLINT_PREREQUISITES: typ.Final = ("verify-classic-pylint",)
+_DF12_PYLINT_PREREQUISITES: typ.Final = ("verify-df12-pylint",)
+_PYLINT_TARGET_RECIPE_TOKENS: typ.Final = (("$(PYLINT)", "$(PYLINT_TARGETS)"),)
+_DF12_PYLINT_RECIPE_TOKENS: typ.Final = (("$(DF12_PYLINT)", "$(PYLINT_TARGETS)"),)
+_TY_WRAPPER_TOKENS: typ.Final = (
     "$(UV_ENV)",
     "$(UV)",
     "run",
-    "pytest",
-    "-v",
-    "-n",
-    "auto",
-    "$(PROJECT_PYTEST_EXCLUDES)",
+    "--with",
+    "ty==$(TY_VERSION)",
+    "ty",
 )
+_PROJECT_TEST_RECIPE_TOKENS: typ.Final = (
+    ("$(UV_ENV)", "$(UV)", "run", "pytest", "-v", "$(SERIAL_PY_TESTS)"),
+    (
+        "$(UV_ENV)",
+        "$(UV)",
+        "run",
+        "pytest",
+        "-v",
+        "-n",
+        "$(PYTEST_WORKERS)",
+        "--dist=loadgroup",
+        "$(SERIAL_PY_TEST_EXCLUDES)",
+    ),
+)
+_SERIAL_PY_TESTS_TOKENS: typ.Final = ("$(OPTIONAL_CELERY_TEST)",)
+_SERIAL_PY_TEST_EXCLUDES_TOKENS: typ.Final = ("$(PROJECT_PYTEST_EXCLUDES)",)
+_PYTEST_WORKERS_TOKENS: typ.Final = ("6",)
 _OPTIONAL_CELERY_RECIPE_TOKENS: typ.Final = (
     ("$(UV_ENV)", "$(UV)", "run", "pytest", "-v", "$(OPTIONAL_CELERY_TEST)"),
 )
@@ -43,7 +91,7 @@ _CI_SERIAL_OPTIONAL_CELERY_COMMAND: typ.Final = "make test-optional-celery"
 
 def _makefile_report() -> dict[str, object]:
     """Return a fresh successful Makeutil parse of the repository Makefile."""
-    completed = subprocess.run(  # noqa: S603 - fixed parser command.
+    completed = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - fixed parser command.
         _MAKEUTIL_COMMAND,
         capture_output=True,
         check=True,
@@ -157,17 +205,53 @@ def test_typecheck_and_pytest_targets_use_project_commands() -> None:
     assert _recipe_tokens("typecheck") == _TYPECHECK_RECIPE_TOKENS, (
         "typecheck must run both ty commands through the project uv environment"
     )
+    assert _variable_tokens("TY") == _TY_WRAPPER_TOKENS, (
+        "typecheck must use the pinned project uv wrapper for ty"
+    )
     assert _variable_tokens("OPTIONAL_CELERY_TEST") == _OPTIONAL_CELERY_TEST_TOKENS, (
         "optional-Celery exclusion must name the isolated unit-test module"
     )
     assert (
         _variable_tokens("PROJECT_PYTEST_EXCLUDES") == _PROJECT_PYTEST_EXCLUDE_TOKENS
     ), "project pytest exclusions must omit the optional-Celery module"
-    assert _recipe_tokens("test") == (_PROJECT_TEST_RECIPE_TOKENS,), (
-        "make test must consume the project pytest exclusion variable"
+    assert _variable_tokens("PYTEST_WORKERS") == _PYTEST_WORKERS_TOKENS, (
+        "make test must cap xdist workers at the documented local core count"
+    )
+    assert _variable_tokens("SERIAL_PY_TESTS") == _SERIAL_PY_TESTS_TOKENS, (
+        "make test must run the optional-Celery subprocess module serially"
+    )
+    assert (
+        _variable_tokens("SERIAL_PY_TEST_EXCLUDES") == _SERIAL_PY_TEST_EXCLUDES_TOKENS
+    ), "parallel pytest must reuse the project optional-Celery exclusion"
+    assert _recipe_tokens("test") == _PROJECT_TEST_RECIPE_TOKENS, (
+        "make test must run nested tests serially before bounded xdist"
     )
     assert _recipe_tokens("test-optional-celery") == _OPTIONAL_CELERY_RECIPE_TOKENS, (
         "optional-Celery target must run its module serially without xdist"
+    )
+
+
+def test_lint_target_runs_all_six_stages_in_order() -> None:
+    """`make lint` must keep every blocking lint stage in its intended order."""
+    assert _recipe_tokens("lint") == _LINT_RECIPE_TOKENS, (
+        "make lint must run Ruff, Interrogate, both Pylint passes, Ambrleaks, "
+        "and Skylos in order"
+    )
+
+
+def test_pylint_targets_share_the_project_target_list() -> None:
+    """Both isolated Pylint targets must lint the same project paths."""
+    assert _rule_prerequisites("classic-pylint") == _CLASSIC_PYLINT_PREREQUISITES, (
+        "classic Pylint must verify its pinned interpreter before analysis"
+    )
+    assert _recipe_tokens("classic-pylint") == _PYLINT_TARGET_RECIPE_TOKENS, (
+        "classic Pylint must analyze the shared PYLINT_TARGETS"
+    )
+    assert _rule_prerequisites("df12-pylint") == _DF12_PYLINT_PREREQUISITES, (
+        "DF12 Pylint must verify its pinned interpreter before analysis"
+    )
+    assert _recipe_tokens("df12-pylint") == _DF12_PYLINT_RECIPE_TOKENS, (
+        "DF12 Pylint must analyze the shared PYLINT_TARGETS"
     )
 
 

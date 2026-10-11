@@ -24,8 +24,13 @@ structlog = pytest.importorskip("structlog")
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
-from falcon_correlate import correlation_id_var, user_id_var  # noqa: E402
-from tests.structlog_helpers import inject_correlation_context  # noqa: E402
+from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    correlation_id_var,
+    user_id_var,
+)
+from tests.structlog_helpers import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    inject_correlation_context,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -135,7 +140,7 @@ class TestMergeContextvarsLimitation:
 
         captured = _run_isolated_structlog_test(isolated_context, setup_and_log)
 
-        assert len(captured) == 1
+        assert len(captured) == 1, "expected len(captured) to equal 1"
         assert "correlation_id" not in captured[0], (
             "merge_contextvars should NOT pick up correlation_id_var, "
             f"but event contained: {captured[0]}"
@@ -157,7 +162,7 @@ class TestMergeContextvarsLimitation:
 
         captured = _run_isolated_structlog_test(isolated_context, setup_and_log)
 
-        assert len(captured) == 1
+        assert len(captured) == 1, "expected len(captured) to equal 1"
         assert "user_id" not in captured[0], (
             "merge_contextvars should NOT pick up user_id_var, "
             f"but event contained: {captured[0]}"
@@ -188,7 +193,7 @@ class TestCustomProcessorApproach:
 
         captured = _run_isolated_structlog_test(isolated_context, setup_and_log)
 
-        assert len(captured) == 1
+        assert len(captured) == 1, "expected len(captured) to equal 1"
         assert captured[0]["correlation_id"] == "proc-cid-001", (
             f"expected 'proc-cid-001', got {captured[0].get('correlation_id')!r}"
         )
@@ -211,7 +216,7 @@ class TestCustomProcessorApproach:
 
         captured = _run_isolated_structlog_test(isolated_context, setup_and_log)
 
-        assert len(captured) == 1
+        assert len(captured) == 1, "expected len(captured) to equal 1"
         assert captured[0]["correlation_id"] == "-", (
             f"expected '-', got {captured[0].get('correlation_id')!r}"
         )
@@ -236,7 +241,7 @@ class TestCustomProcessorApproach:
 
         isolated_context(test_logic)
 
-        assert len(captured) == 1
+        assert len(captured) == 1, "expected len(captured) to equal 1"
         assert captured[0]["correlation_id"] == "explicit-value", (
             "setdefault should preserve the explicitly bound value, "
             f"got {captured[0].get('correlation_id')!r}"
@@ -274,7 +279,7 @@ class TestBindContextvarsApproach:
 
         isolated_context(test_logic)
 
-        assert len(captured) == 1
+        assert len(captured) == 1, "expected len(captured) to equal 1"
         assert captured[0]["correlation_id"] == "bind-cid-001", (
             f"expected 'bind-cid-001', got {captured[0].get('correlation_id')!r}"
         )

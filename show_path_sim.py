@@ -28,7 +28,7 @@ def main() -> None:  # pylint: disable=useless-return
     # Explicit return documents the ``None`` contract requested in review; the
     # redundant-return lints (Ruff PLR1711, Pylint useless-return) are
     # intentionally suppressed rather than dropping it.
-    return  # noqa: PLR1711
+    return  # ruff: ignore[useless-return]
 
 
 if __name__ == "__main__":

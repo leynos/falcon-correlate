@@ -2,12 +2,12 @@
 
 ## Status
 
-Accepted on 2026-05-15 and amended on 2026-06-21 and on 2026-09-25. The project
-uses Ruff as the first lint tier, Interrogate as the second lint tier, and a
-focused Pylint pass, executed directly under a pinned PyPy interpreter, as the
-third lint tier. See
-[Amendment (2026-09-25): plain Pylint on PyPy 3.12](#amendment-2026-09-25-plain-pylint-on-pypy-312)
-for the current execution mechanism.
+Accepted on 2026-05-15 and amended on 2026-06-21, 2026-09-25, 2026-09-29 and
+2026-09-30. The original decision established Ruff, Interrogate and PyPy-backed
+Pylint as the first three lint tiers; later addenda record the Skylos tier and
+the current Pylint execution mechanism. See
+[Addendum (2026-09-30): verified Pylint on PyPy 3.12](#addendum-2026-09-30-verified-pylint-on-pypy-312)
+for the current Pylint pins and execution details.
 
 ## Date
 
@@ -178,6 +178,9 @@ at all, so the lint passed without linting it. In this repository four modules
 were skipped that way under PyPy 3.11; PyPy 3.12 parses all of them, and they
 lint clean. A parse failure now fails the lint.
 
+The Pylint version pin in this amendment is superseded by the
+[2026-09-30 addendum](#addendum-2026-09-30-verified-pylint-on-pypy-312).
+
 ## Addendum (2026-09-29): Skylos production dead-code tier
 
 The original three-tier decision remains the foundation for Ruff, Interrogate,
@@ -199,3 +202,53 @@ Framework lifecycle callbacks and required protocol parameters use precise,
 typed entry-point rules with verified reasons. A named Skylos allow-list entry
 is permitted only when an entry-point rule cannot model the runtime boundary,
 and it must include the verified caller-specific reason.
+
+## Addendum (2026-09-30): verified Pylint on PyPy 3.12
+
+The classic pass uses vanilla Pylint 4.1.1 with Astroid 4.3.3 in an isolated
+`uv tool run` environment on the official PyPy 8.0.0/Python 3.12 Linux x86_64
+archive. PyPy identifies this build as beta quality. The Makefile downloads the
+pinned archive into `.lint-tools`, checks its published SHA-256 digest, and
+verifies the executable's implementation, Python version, PyPy version, and
+installed Pylint/Astroid versions before analysis. Caller overrides pass
+through the same identity checks. This leaves the project's `.venv` and
+supported Python baseline unchanged.
+
+Pylint 4.1.1 declares Astroid `>=4.3.2,<=4.4`, so Astroid 4.3.3 falls within
+its supported range. See the
+[Pylint 4.1.1 metadata](https://pypi.org/project/pylint/4.1.1/) and
+[Astroid 4.3.3 release](https://pypi.org/project/astroid/4.3.3/). The separate
+DF12 pass uses the same explicit Pylint/Astroid pins in its own isolated
+environment on CPython 3.14, loads only `df12_python_lints`, and has a distinct
+`PYLINTHOME`. `ambrleaks` remains a separate CPython 3.14 invocation. The
+GitHub repository for `df12-python-lints` is owned by the df12 Productions
+organization, which also owns `falcon-correlate`; the dependency is pinned to
+release `v0.3.0`.
+
+Both Pylint passes set the source `py-version` to 3.12; the host interpreter
+does not redefine the library baseline. Each invocation uses one worker and
+enables syntax and fatal analysis diagnostics after `--disable=all`. Regression
+contracts exercise interpreter identity, PEP 695 AST nodes, actual PyPy live-
+object inspection, invalid syntax, lint failure propagation, plugin isolation,
+and preservation of `.venv`. `make lint` and the CI lint lane remain the
+complete entry points.
+
+The effective `make lint` order is:
+
+1. Pinned Ruff checks.
+2. Interrogate package docstring coverage.
+3. Classic Pylint on checksum-verified PyPy 8.0.0/Python 3.12.
+4. DF12 Pylint on CPython 3.14 with `df12-python-lints` v0.3.0.
+5. Ambrleaks snapshot checks on CPython 3.14.
+6. Skylos strict production dead-code detection on Python 3.14.
+
+The classic and DF12 source sets are `src tests examples`. This checkout has no
+separately versioned `scripts/` tree; if newer-language tooling is added, it
+must receive equivalent built-in Pylint coverage in an explicit
+host-appropriate pass rather than relying only on DF12 checks. The CI lint lane
+and `make lint` remain the complete entry points.
+
+The pinned artefact is listed on the
+[official PyPy downloads page](https://downloads.python.org/pypy/) and its
+digest is published in the
+[PyPy checksums](https://www.pypy.org/checksums.html).

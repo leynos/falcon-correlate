@@ -18,6 +18,7 @@
     ".terraform/**",
     ".uv-cache/**",
     ".uv-tools/**",
+    ".lint-tools/**",
     "CRUSH.md",
     ".vtcode/**",
     "memories/**"

@@ -198,11 +198,12 @@ these are not directly involved in per-request correlation ID handling.[^11]
 
 The implementation exposes WSGI and ASGI as separate public classes:
 `CorrelationIDMiddleware` for `falcon.App` and `CorrelationIDMiddlewareASGI` for
-`falcon.asgi.App`. Both classes share a private lifecycle base so the
-configuration contract, incoming ID selection, response-header echoing, and
-`ContextVar` cleanup are implemented once. The ASGI class only adapts Falcon's
-middleware hook shape by defining `async process_request(self, req, resp)` and
-`async process_response(self, req, resp, resource, req_succeeded)`.
+`falcon.asgi.App`. Both classes delegate to the private
+`_CorrelationIDMiddlewareBase` in `falcon_correlate.middleware_base`, where
+configuration resolution, incoming ID selection, response-header echoing, and
+`ContextVar` cleanup are shared. The ASGI class adapts Falcon's hook shape with
+`async process_request(self, req, resp)` and
+`async process_response(self, req, resp, resource, req_succeeded)` methods.
 
 The ASGI variant relies on the same module-level `correlation_id_var` as the
 WSGI variant. Each request stores the `contextvars.Token` returned by

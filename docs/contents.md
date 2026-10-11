@@ -19,8 +19,8 @@
   explains the middleware architecture, request lifecycle, configuration model,
   and correlation ID propagation rules.
 - [ADR-001: Python linting architecture](adr-001-three-tier-linting.md)
-  records the accepted four-tier linting architecture: Ruff, Interrogate,
-  PyPy-backed Pylint, and Skylos production dead-code detection.
+  records the original decision and its amendments; the current pipeline has
+  six checks, from pinned Ruff through strict Skylos dead-code detection.
 - [ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md)
   records the convention for runnable examples and AST-guarded guide snippets.
 - [ADR-003: docstring completeness and doctest gates](adr-003-docstring-completeness-and-doctest-gates.md)

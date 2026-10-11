@@ -67,12 +67,18 @@ class TestCorrelationIDMiddlewareASGIConfiguration:
 
     def test_process_hooks_are_coroutines(self) -> None:
         """Verify Falcon ASGI hooks are explicit coroutine functions."""
+        failure_message = (
+            "expected condition: inspect.iscoroutinefunction(CorrelationID..."
+        )
         assert inspect.iscoroutinefunction(
             CorrelationIDMiddlewareASGI.process_request,
-        ), "expected CorrelationIDMiddlewareASGI.process_request to be a coroutine"
+        ), failure_message
+        failure_message = (
+            "expected condition: inspect.iscoroutinefunction(CorrelationID..."
+        )
         assert inspect.iscoroutinefunction(
             CorrelationIDMiddlewareASGI.process_response,
-        ), "expected CorrelationIDMiddlewareASGI.process_response to be a coroutine"
+        ), failure_message
 
 
 class TestCorrelationIDMiddlewareASGIRequestLifecycle:
@@ -203,7 +209,7 @@ class TestCorrelationIDMiddlewareASGIRequestLifecycle:
     @pytest.mark.asyncio
     async def test_process_response_honours_echo_configuration(
         self,
-        echo_header_in_response: bool,  # noqa: FBT001 - pytest parametrized value
+        echo_header_in_response: bool,  # ruff: ignore[boolean-type-hint-positional-argument] - pytest parametrized value
         expected_header: str | None,
     ) -> None:
         """Verify ASGI response processing honours header echo configuration."""
