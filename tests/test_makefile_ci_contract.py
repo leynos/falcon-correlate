@@ -21,6 +21,39 @@ _TYPECHECK_RECIPE_TOKENS: typ.Final = (
     ("$(TY)", "--version"),
     ("$(TY)", "check"),
 )
+_LINT_RECIPE_TOKENS: typ.Final = (
+    ("$(RUFF)", "check"),
+    (
+        "$(UV_ENV)",
+        "$(UV)",
+        "run",
+        "interrogate",
+        "--fail-under",
+        "100",
+        "$(INTERROGATE_TARGETS)",
+    ),
+    ("$(MAKE)", "--no-print-directory", "classic-pylint"),
+    ("$(MAKE)", "--no-print-directory", "df12-pylint"),
+    ("$(AMBRLEAKS)", "tests"),
+    (
+        "$(SKYLOS)",
+        "$(SKYLOS_PRODUCTION_TARGETS)",
+        "--exclude",
+        "$(SKYLOS_EXCLUDES)",
+        "--category",
+        "dead_code",
+        "--gate",
+        "--format",
+        "concise",
+        "--no-upload",
+        "--no-provenance",
+        "--no-grep-verify",
+    ),
+)
+_CLASSIC_PYLINT_PREREQUISITES: typ.Final = ("verify-classic-pylint",)
+_DF12_PYLINT_PREREQUISITES: typ.Final = ("verify-df12-pylint",)
+_PYLINT_TARGET_RECIPE_TOKENS: typ.Final = (("$(PYLINT)", "$(PYLINT_TARGETS)"),)
+_DF12_PYLINT_RECIPE_TOKENS: typ.Final = (("$(DF12_PYLINT)", "$(PYLINT_TARGETS)"),)
 _TY_WRAPPER_TOKENS: typ.Final = (
     "$(UV_ENV)",
     "$(UV)",
@@ -195,6 +228,30 @@ def test_typecheck_and_pytest_targets_use_project_commands() -> None:
     )
     assert _recipe_tokens("test-optional-celery") == _OPTIONAL_CELERY_RECIPE_TOKENS, (
         "optional-Celery target must run its module serially without xdist"
+    )
+
+
+def test_lint_target_runs_all_six_stages_in_order() -> None:
+    """`make lint` must keep every blocking lint stage in its intended order."""
+    assert _recipe_tokens("lint") == _LINT_RECIPE_TOKENS, (
+        "make lint must run Ruff, Interrogate, both Pylint passes, Ambrleaks, "
+        "and Skylos in order"
+    )
+
+
+def test_pylint_targets_share_the_project_target_list() -> None:
+    """Both isolated Pylint targets must lint the same project paths."""
+    assert _rule_prerequisites("classic-pylint") == _CLASSIC_PYLINT_PREREQUISITES, (
+        "classic Pylint must verify its pinned interpreter before analysis"
+    )
+    assert _recipe_tokens("classic-pylint") == _PYLINT_TARGET_RECIPE_TOKENS, (
+        "classic Pylint must analyze the shared PYLINT_TARGETS"
+    )
+    assert _rule_prerequisites("df12-pylint") == _DF12_PYLINT_PREREQUISITES, (
+        "DF12 Pylint must verify its pinned interpreter before analysis"
+    )
+    assert _recipe_tokens("df12-pylint") == _DF12_PYLINT_RECIPE_TOKENS, (
+        "DF12 Pylint must analyze the shared PYLINT_TARGETS"
     )
 
 
