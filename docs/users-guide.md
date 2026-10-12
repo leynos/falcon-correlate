@@ -796,10 +796,11 @@ IDs. The application controls whether `INFO` records are visible. These records
 confirm explicit setup only; they cannot detect a missing call to
 `configure_celery_correlation()`.
 
-After explicit configuration in the publisher process, normal task publishing
-APIs such as `delay()` and `apply_async()` propagate the request correlation ID
-automatically. After explicit configuration in the worker process, task
-execution sees that incoming value through `correlation_id_var.get()`.
+After explicit publisher configuration, normal task publishing APIs such as
+`delay()` and `apply_async()` propagate the request correlation ID when the
+active result backend is not `rpc://`. With the `rpc://` backend, Celery's
+task-ID correlation value is preserved. After explicit worker configuration,
+task execution sees the incoming value through `correlation_id_var.get()`.
 
 ```python
 from falcon_correlate import correlation_id_var
