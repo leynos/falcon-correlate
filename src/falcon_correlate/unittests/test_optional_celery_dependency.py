@@ -36,11 +36,13 @@ import typing as typ
 
 import pytest
 
+import falcon_correlate.unittests.optional_celery_dependency_helpers as celery_helpers
 from falcon_correlate.unittests.optional_celery_dependency_helpers import (
     _CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS,
     _MINIMUM_CELERY_TEST_MODULE_COUNT,
     _PROJECT_ROOT,
     _blocked_celery_environment,
+    _count_collected_test_items,
     _discover_celery_test_paths,
     _PytestRun,
     _run_celery_tests_with_celery_blocked,
@@ -51,6 +53,8 @@ from falcon_correlate.unittests.optional_celery_dependency_helpers import (
 
 if typ.TYPE_CHECKING:
     from pathlib import Path
+
+    from syrupy.assertion import SnapshotAssertion
 
 # The fixture runs two bounded child processes sequentially. The parent budget
 # covers both child timeouts plus time to reap them and finish fixture cleanup.
@@ -176,6 +180,7 @@ def test_package_and_celery_module_import_without_celery(
         _PROJECT_ROOT,
         "-c",
         f"import importlib; importlib.import_module({module_name!r})",
+        phase="import probe",
         sitecustomize_dir=tmp_path,
     )
 
@@ -202,6 +207,7 @@ def test_celery_import_blocker_rejects_celery_modules(
         _PROJECT_ROOT,
         "-c",
         f"import importlib; importlib.import_module({module_name!r})",
+        phase="import probe",
         sitecustomize_dir=tmp_path,
     )
 
@@ -211,6 +217,89 @@ def test_celery_import_blocker_rejects_celery_modules(
     )
     assert f"No module named '{blocked_name}'" in result.stderr, (
         f"{module_name} should fail with a missing-Celery import error."
+    )
+
+
+@pytest.mark.parametrize(
+    "child_result",
+    [
+        pytest.param(
+            (2, "collection failed", "import error"),
+            id="non-zero-exit",
+        ),
+        pytest.param(
+            (0, "no tests collected", "collection warning"),
+            id="empty",
+        ),
+    ],
+)
+@pytest.mark.timeout(30)
+@pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
+def test_collection_rejects_incomplete_child_results(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    child_result: tuple[int, str, str],
+    snapshot: SnapshotAssertion,
+) -> None:
+    """Collection failures and empty results should include child diagnostics."""
+    returncode, stdout, stderr = child_result
+
+    def completed_process(
+        *_args: object,
+        **_kwargs: object,
+    ) -> celery_helpers.subprocess.CompletedProcess[str]:
+        """Return the mocked collection result."""
+        return celery_helpers.subprocess.CompletedProcess(
+            args=["python", "-m", "pytest"],
+            returncode=returncode,
+            stdout=stdout,
+            stderr=stderr,
+        )
+
+    monkeypatch.setattr(celery_helpers.subprocess, "run", completed_process)
+
+    with pytest.raises(AssertionError) as error:
+        _count_collected_test_items(tmp_path, (), _PROJECT_ROOT)
+
+    assert str(error.value) == snapshot, (
+        "Collection failure diagnostics should include the phase, exit code, "
+        "stdout and stderr."
+    )
+
+
+@pytest.mark.timeout(30)
+@pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
+def test_child_timeout_includes_phase_command_and_partial_output(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    snapshot: SnapshotAssertion,
+) -> None:
+    """Timeout failures should preserve the phase and captured child output."""
+    command = ["python", "-c", "print('partial')"]
+
+    def timeout(*args: object, **kwargs: object) -> None:
+        """Raise the mocked child-process timeout."""
+        raise celery_helpers.subprocess.TimeoutExpired(
+            cmd=command,
+            timeout=120,
+            output=b"partial stdout",
+            stderr=b"partial stderr",
+        )
+
+    monkeypatch.setattr(celery_helpers.subprocess, "run", timeout)
+
+    with pytest.raises(AssertionError) as error:
+        _run_python(
+            {},
+            _PROJECT_ROOT,
+            "-c",
+            "print('partial')",
+            phase="import probe",
+        )
+
+    assert str(error.value) == snapshot, (
+        "Timeout diagnostics should include the phase, command, timeout, "
+        "stdout and stderr."
     )
 
 
