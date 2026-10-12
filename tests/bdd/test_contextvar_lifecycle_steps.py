@@ -116,6 +116,7 @@ def when_send_concurrent_requests(
     """Send two lifecycle requests concurrently with distinct correlation IDs."""
 
     def _request(correlation_id: str) -> tuple[str, dict[str, str | None]]:
+        """Send a GET to ``/lifecycle`` and return its ID with the JSON payload."""
         result = context["client"].simulate_get(
             "/lifecycle",
             headers={"X-Correlation-ID": correlation_id},

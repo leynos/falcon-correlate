@@ -79,6 +79,7 @@ def given_structlog_configured() -> Context:
         method_name: str,
         event_dict: dict[str, object],
     ) -> dict[str, object]:
+        """Copy the event and raise ``structlog.DropEvent``; do not return normally."""
         captured.append(dict(event_dict))
         raise structlog.DropEvent
 

@@ -117,6 +117,7 @@ def given_configured_task_request(context: Context, value: str) -> None:
 
     @app.task(name="bdd.configured.worker.echo", bind=True)
     def echo(self: celery.Task, payload: str) -> str:
+        """Set ``observed['task_correlation_id_seen']``; return payload unchanged."""
         observed["task_correlation_id_seen"] = correlation_id_var.get()
         return payload
 
@@ -144,6 +145,7 @@ def when_publish_configured_task(context: Context) -> Context:
 
     @app.task(name="bdd.configured.echo")
     def echo(value: str) -> str:
+        """Return the supplied task string unchanged."""
         return value
 
     with mock.patch("kombu.Producer.publish", autospec=True) as publish:

@@ -69,6 +69,7 @@ def test_injects_context_correlation_id_when_header_is_absent(
     captured = _capture_httpx_request(monkeypatch)
 
     def run_request() -> None:
+        """Set context ID; send a GET without the caller's correlation ID header."""
         correlation_id_var.set(correlation_id)
         request_with_correlation_id("GET", "https://example.test/", headers=headers)
 
@@ -98,6 +99,7 @@ def test_does_not_inject_header_when_context_is_unset(
     executed = False
 
     def run_request() -> None:
+        """Send a GET with context unset, then set the nonlocal ``executed`` flag."""
         nonlocal executed
         request_with_correlation_id(
             "GET",
@@ -135,6 +137,7 @@ def test_preserves_caller_supplied_correlation_id_header(
     captured = _capture_httpx_request(monkeypatch)
 
     def run_request() -> None:
+        """Set context ID; send a GET with the caller's correlation ID header."""
         correlation_id_var.set(correlation_id)
         request_with_correlation_id("GET", "https://example.test/", headers=headers)
 
@@ -165,6 +168,7 @@ def _capture_httpx_request(monkeypatch: pytest.MonkeyPatch) -> _CapturedRequest:
         headers: dict[str, str] | httpx.Headers | None,
         **_kwargs: object,
     ) -> httpx.Response:
+        """Normalize headers to ``httpx.Headers``, store them, and return HTTP 200."""
         captured.headers = httpx.Headers(headers)
         return httpx.Response(200)
 

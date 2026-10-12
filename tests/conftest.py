@@ -85,6 +85,7 @@ def isolated_context() -> cabc.Callable[[cabc.Callable[[], None]], None]:
     """
 
     def runner(func: cabc.Callable[[], None]) -> None:
+        """Run the callable inside the copied context."""
         contextvars.copy_context().run(func)
 
     return runner
