@@ -22,7 +22,7 @@ from .celery_diagnostics import (
     _report_configuration_outcome,
     _safe_connect_signal,
 )
-from .middleware import correlation_id_var
+from .middleware_utils import correlation_id_var
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
