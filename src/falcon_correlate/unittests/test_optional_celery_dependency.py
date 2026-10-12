@@ -173,7 +173,6 @@ def test_package_and_celery_module_import_without_celery(
     _write_celery_import_blocker(tmp_path)
     result = _run_python_with_celery_blocked(
         tmp_path,
-        os.environ,
         _PROJECT_ROOT,
         "-c",
         f"import importlib; importlib.import_module({module_name!r})",
@@ -200,7 +199,6 @@ def test_celery_import_blocker_rejects_celery_modules(
     _write_celery_import_blocker(tmp_path)
     result = _run_python_with_celery_blocked(
         tmp_path,
-        os.environ,
         _PROJECT_ROOT,
         "-c",
         f"import importlib; importlib.import_module({module_name!r})",
@@ -284,7 +282,6 @@ def test_child_timeout_includes_phase_command_and_partial_output(
     with pytest.raises(AssertionError) as error:
         _run_python_with_celery_blocked(
             tmp_path,
-            {},
             _PROJECT_ROOT,
             "-c",
             "print('partial')",

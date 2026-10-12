@@ -192,7 +192,6 @@ def _partial_output_text(output: str | bytes | None) -> str:
 
 def _run_python_with_celery_blocked(
     sitecustomize_dir: Path,
-    environ: cabc.Mapping[str, str],
     cwd: Path,
     *args: str,
     phase: str,
@@ -204,7 +203,7 @@ def _run_python_with_celery_blocked(
             command,
             check=False,
             cwd=cwd,
-            env=_blocked_celery_environment(sitecustomize_dir, environ),
+            env=_blocked_celery_environment(sitecustomize_dir, os.environ),
             text=True,
             capture_output=True,
             timeout=_CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS,
@@ -242,7 +241,6 @@ def _count_collected_test_items(
     """Return how many test items the blocked child collects from ``paths``."""
     result = _run_python_with_celery_blocked(
         sitecustomize_dir,
-        os.environ,
         project_root,
         "-m",
         "pytest",
@@ -253,13 +251,16 @@ def _count_collected_test_items(
         *_relative_paths(paths, project_root),
         phase="collection",
     )
-    collected_count = sum(1 for line in result.stdout.splitlines() if "::" in line)
-    if result.returncode != 0 or collected_count == 0:
-        failure_reason = (
-            "child command failed"
-            if result.returncode != 0
-            else "no test items were collected"
-        )
+    collected_count = 0
+    failure_reason = ""
+    if result.returncode != 0:
+        failure_reason = "child command failed"
+    else:
+        collected_count = sum(1 for line in result.stdout.splitlines() if "::" in line)
+        if collected_count == 0:
+            failure_reason = "no test items were collected"
+
+    if failure_reason:
         msg = (
             f"Pytest collection failed: {failure_reason}.\n"
             f"Exit code: {result.returncode}\n"
@@ -282,7 +283,6 @@ def _run_celery_tests_with_celery_blocked(
     # child emit ANSI escapes the normaliser cannot strip.
     result = _run_python_with_celery_blocked(
         sitecustomize_dir,
-        os.environ,
         project_root,
         "-m",
         "pytest",
