@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import subprocess  # noqa: S404 - test intentionally isolates global signal state.
+import subprocess  # ruff: ignore[suspicious-subprocess-import] - test isolates global signal state.
 import sys
 
 import pytest
@@ -13,7 +13,7 @@ from falcon_correlate.unittests.optional_celery_dependency_helpers import (
 )
 
 try:
-    import celery  # noqa: F401 - the import probes whether this Celery test can run.
+    import celery  # ruff: ignore[unused-import] - probes whether this Celery test can run.
 except ModuleNotFoundError as error:  # pragma: no cover - blocked child only
     if error.name != "celery":
         raise
@@ -61,7 +61,7 @@ configure_celery_correlation(Celery("celery-import-boundary", broker="memory://"
 
 assert all(has_receiver(signal, dispatch_uid) for signal, dispatch_uid in signals)
 """
-    result = subprocess.run(  # noqa: S603 - test intentionally runs Python itself.
+    result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - test runs Python itself.
         [sys.executable, "-c", script],
         check=False,
         cwd=_PROJECT_ROOT,
