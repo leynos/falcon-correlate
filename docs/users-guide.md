@@ -781,7 +781,9 @@ instances satisfy this requirement.
 Calling the helper is required to activate Celery propagation. Importing
 `falcon_correlate` or `falcon_correlate.celery` does not import Celery or
 connect the handlers, so library consumers can safely read the ambient context
-variable without mutating Celery's process-global signal registry.
+variable without mutating Celery's process-global signal registry. For workers,
+put the call in the module that defines the Celery app so
+`celery -A <module> worker` activates the handlers when it imports that module.
 
 Those imports also emit no activation diagnostics. Each explicit configuration
 outcome is reported once per app through the `falcon_correlate.celery` logger:
@@ -794,11 +796,10 @@ IDs. The application controls whether `INFO` records are visible. These records
 confirm explicit setup only; they cannot detect a missing call to
 `configure_celery_correlation()`.
 
-Once the handlers are registered in the publisher process, normal task
-publishing APIs such as `delay()` and `apply_async()` propagate the request
-correlation ID automatically. When the worker process also registers the
-handlers, task execution sees that incoming value through
-`correlation_id_var.get()`.
+After explicit configuration in the publisher process, normal task publishing
+APIs such as `delay()` and `apply_async()` propagate the request correlation ID
+automatically. After explicit configuration in the worker process, task
+execution sees that incoming value through `correlation_id_var.get()`.
 
 ```python
 from falcon_correlate import correlation_id_var
