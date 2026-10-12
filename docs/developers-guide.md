@@ -88,8 +88,11 @@ Falcon still sees the failure.
 The architectural boundary is deliberately one-way: `middleware_base.py`
 depends on configuration and utility modules, and the WSGI and ASGI modules
 depend on the base. Configuration and utility modules do not depend on the
-concrete middleware classes. This prevents circular imports and keeps those
-helpers usable independently.
+concrete middleware classes. The `httpx` and `celery` adapters depend on
+`middleware_config.py` and `middleware_utils.py`, not on `middleware.py`.
+`middleware.py` remains the Falcon orchestration and compatibility re-export
+layer. This prevents circular imports and keeps those helpers usable
+independently.
 
 `asgi_middleware_helpers.py` lives under `falcon_correlate.unittests` as shared
 ASGI middleware test infrastructure. It provides lightweight request and

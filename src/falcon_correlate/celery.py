@@ -12,7 +12,7 @@ import importlib
 import logging
 import typing as typ
 
-from .middleware import correlation_id_var
+from .middleware_utils import correlation_id_var
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
