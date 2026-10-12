@@ -108,6 +108,59 @@ successful responses. The HTTPX transport tests use these helpers to verify
 header propagation without making network requests. This test support module is
 owned by the unit-test package and must not be imported by production code.
 
+### Celery signal registration
+
+Maintainers changing `src/falcon_correlate/celery.py` should preserve the
+shared registration path described below. Design rationale is recorded in
+[Appendix A.10](falcon-correlation-id-middleware-design.md#a10-celery-configuration-helper-task-423),
+and implementation history is recorded in the
+[Celery configuration utilities execution plan](execplans/4-2-3-celery-configuration-utilities.md).
+
+Celery signals are process-global, and the integration uses Celery's global
+signal registry. `_maybe_connect_celery_signals()` is the shared coordinator:
+it calls `_maybe_connect_celery_publish_signal()` and
+`_maybe_connect_celery_worker_signals()`. Both route registration through
+`_safe_connect_signal()`, which calls
+`connect(handler, dispatch_uid=dispatch_uid, weak=False)` with a fixed dispatch
+unique identifier (UID). `weak=False` keeps a strong reference to the receiver.
+
+The coordinator has two call sites: an unconditional module-level call at
+import time, and `configure_celery_correlation(app)`. Importing
+`falcon_correlate` triggers the first call through the package root's Celery
+re-exports. The public helper invokes the same coordinator, stores no app-local
+state, and returns the same app unchanged. These paths are complementary: after
+successful import-time registration, a later helper call adds no receivers.
+
+Table: Celery signals, integration receivers, and stable dispatch UIDs.
+
+| Signal                | Receiver                             | Dispatch UID constant               | Constant value                                               |
+| --------------------- | ------------------------------------ | ----------------------------------- | ------------------------------------------------------------ |
+| `before_task_publish` | `propagate_correlation_id_to_celery` | `_BEFORE_TASK_PUBLISH_DISPATCH_UID` | `falcon_correlate.celery.propagate_correlation_id_to_celery` |
+| `task_prerun`         | `setup_correlation_id_in_worker`     | `_TASK_PRERUN_DISPATCH_UID`         | `falcon_correlate.celery.setup_correlation_id_in_worker`     |
+| `task_postrun`        | `clear_correlation_id_in_worker`     | `_TASK_POSTRUN_DISPATCH_UID`        | `falcon_correlate.celery.clear_correlation_id_in_worker`     |
+
+Celery deduplicates receivers by `dispatch_uid`, and its internal
+`threading.Lock` protects receiver mutation. Stable UIDs therefore leave
+exactly one integration receiver per supported signal after successful
+registration, including repeated or concurrent configuration calls. The module
+uses no local registration flag, app-specific guard, or custom lock.
+
+If importing `celery.signals` raises `ImportError`, registration is a no-op.
+The public helper still returns `app`, and a later call can retry registration
+when the optional dependency becomes importable. `_safe_connect_signal()` logs
+at DEBUG level and skips registration when a signal is missing, its `connect`
+attribute is missing or non-callable, or connecting raises `ValueError`. Other
+exceptions propagate.
+
+**Maintainer rules (normative):**
+
+- Keep the dispatch UID constants and their string values stable.
+- Route new receivers through the coordinator and `_safe_connect_signal()`
+  with their own dispatch UID constants.
+- Add no app-local state to `configure_celery_correlation()`.
+- In tests, disconnect known receivers by dispatch UID before exercising the
+  configuration path, so import-time registration cannot mask a broken helper.
+
 ## Assertion diagnostics and coverage
 
 Every test assertion must carry a useful failure message. The shared coverage
