@@ -48,10 +48,11 @@ def test_adapter_source_does_not_import_middleware(
     forbidden_imports = [
         node for node in ast.walk(syntax_tree) if _targets_middleware(node)
     ]
-
-    assert not forbidden_imports, (
+    failure_message = (
         f"{adapter_name} imports middleware orchestration: {forbidden_imports}"
     )
+
+    assert not forbidden_imports, failure_message
 
 
 def test_adapters_share_the_public_correlation_context() -> None:
