@@ -130,11 +130,11 @@ outcome is FAILED, including timeout and inability to execute a command. A
 command that cannot be run is reported as `FAILED (not executed)` with its
 reason. INCONCLUSIVE is forbidden for this mapping.
 
-The shared coverage action does not expose an xdist distribution-strategy
-input, so both coverage lanes set `pytest-workers` to an empty string and run
-the suite serially. Direct test lanes use `--dist=loadgroup` for fixtures that
-share provisioned tools. The pinned action manifest documents the worker input
-and its empty-string setting:
+The shared coverage action has no input for selecting the pytest-xdist
+distribution strategy, so both coverage lanes set `pytest-workers` to an empty
+string and run the suite serially. Direct test lanes use `--dist=loadgroup` for
+fixtures that share provisioned tools. The pinned action's manifest lists the
+worker input and its empty-string setting:
 [generate-coverage action manifest](https://github.com/leynos/shared-actions/blob/0606ca899ce2995a0c4bc78e660e80832e6e8855/.github/actions/generate-coverage/action.yml).
 
 After these implementation changes, each listed gate exited with status 0:
