@@ -780,10 +780,11 @@ needs correlation propagation. Put the call in the module that defines the
 Celery app so `celery -A <module> worker` activates the handlers when it
 imports that module.
 
-After explicit configuration in the publisher process, normal task publishing
-APIs such as `delay()` and `apply_async()` propagate the request correlation ID
-automatically. After explicit configuration in the worker process, task
-execution sees that incoming value through `correlation_id_var.get()`.
+After explicit publisher configuration, normal task publishing APIs such as
+`delay()` and `apply_async()` propagate the request correlation ID when the
+active result backend is not `rpc://`. With the `rpc://` backend, Celery's
+task-ID correlation value is preserved. After explicit worker configuration,
+task execution sees the incoming value through `correlation_id_var.get()`.
 
 ```python
 from falcon_correlate import correlation_id_var

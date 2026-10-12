@@ -1717,6 +1717,9 @@ before delegation.
 
 ### A.8. Celery task publish signal handler (Task 4.2.1)
 
+**Superseded by issue #48:** The import-time registration decision below is
+historical. See A.10 for the current explicit-activation contract.
+
 **Decision:** Add a dedicated optional-integration module at
 `src/falcon_correlate/celery.py` that defines
 `propagate_correlation_id_to_celery` and connects it to Celery's
@@ -1772,6 +1775,9 @@ before delegation.
   the publish-path overwrite policy.
 
 ### A.9. Celery worker signal handlers (Task 4.2.2)
+
+**Superseded by issue #48:** The import-time registration decision below is
+historical. See A.10 for the current explicit-activation contract.
 
 **Decision:** Extend `src/falcon_correlate/celery.py` with
 `setup_correlation_id_in_worker` and `clear_correlation_id_in_worker`, and
