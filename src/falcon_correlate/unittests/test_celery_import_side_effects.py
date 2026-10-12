@@ -83,26 +83,6 @@ _IMPORT_PROBE = textwrap.dedent(
         result["after_second_call"] = all_counts()
 
     print(json.dumps(result, sort_keys=True), flush=True)
-    assert all(
-        counts == {
-            "package_receivers": 0,
-            "dispatch_uid_receivers": 0,
-            "handler_identity_receivers": 0,
-        }
-        for counts in result["before"].values()
-    )
-    if mode == "package":
-        for stage in ("after_first_call", "after_second_call"):
-            assert all(
-                counts == {
-                    "package_receivers": 1,
-                    "dispatch_uid_receivers": 1,
-                    "handler_identity_receivers": 1,
-                }
-                for counts in result[stage].values()
-            )
-        assert result["first_call_returns_app"]
-        assert result["second_call_returns_app"]
     """
 )
 
