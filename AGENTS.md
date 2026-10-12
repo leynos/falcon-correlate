@@ -84,6 +84,14 @@
     afterwards.
   - Code passes lint checks.
   - Formatting is correct and validated.
+- **Review outcome labels:** The project has no dedicated compile-time or UI
+  test lane. Map the external `Testing (Compile-Time / UI)` label to
+  `make typecheck` as the compile-time equivalent and `make test` as the
+  behavioural test gate. Report each gate independently. A gate is **PASSED**
+  only when its command exits with status 0; every other outcome is **FAILED**,
+  including a timeout or an inability to execute the command. If a command
+  cannot be run, report **FAILED (not executed)** and give the reason. Do not
+  report **INCONCLUSIVE** for this mapping.
 - **For Python files:**
   - **Testing:** Passes all relevant unit and behavioural tests (`make test`).
   - **Linting:** Passes lint checks (`make lint`).
