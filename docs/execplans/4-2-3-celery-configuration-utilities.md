@@ -163,6 +163,11 @@ The implementer should keep these references open while working:
 
 ## Risks
 
+- **Superseded by issue #48:** Imports now leave Celery signals untouched;
+  explicit setup through `configure_celery_correlation(app)` is required in
+  each publisher and worker process. Disconnect-before-configure still isolates
+  shared process-global test state.
+
 - Risk: the existing import-time registration may hide a broken helper because
   the signals are already connected before tests call it. Mitigation: write
   tests that explicitly disconnect the known receivers by dispatch UID, then
@@ -402,6 +407,9 @@ commands pass.
   described in the previous task context. The only branch-local commit was the
   ExecPlan draft, so implementation is proceeding from the documented starting
   point rather than attempting to preserve unavailable edits.
+- **Superseded by issue #48:** Imports now leave Celery signals untouched and
+  require explicit setup in each publisher and worker process.
+  Disconnect-before-configure still isolates shared process-global test state.
 - 2026-04-27: Tests that prove the helper must disconnect the known
   `before_task_publish`, `task_prerun`, and `task_postrun` receivers by
   dispatch UID first; otherwise import-time registration can make a missing or
@@ -412,6 +420,10 @@ commands pass.
   correlation ID sequences.
 
 ## Decision Log
+
+- **Superseded by issue #48:** Imports no longer activate Celery signals;
+  callers must configure each publisher and worker process explicitly.
+  Disconnect-before-configure still isolates shared process-global test state.
 
 - 2026-04-21: Draft decision: keep `configure_celery_correlation(app)`
   additive to import-time auto-registration rather than replacing it.
@@ -445,6 +457,10 @@ The main implementation lesson is that tests for explicit configuration must
 first disconnect the import-time receivers by dispatch UID. Without that setup,
 automatic registration can mask a broken helper because the signals are already
 connected before the test exercises the public API.
+
+**Superseded by issue #48:** Imports now leave Celery signals untouched and
+require explicit setup in each publisher and worker process. Disconnecting
+before configuration still isolates shared process-global test state.
 
 Validation completed successfully on 2026-04-27:
 

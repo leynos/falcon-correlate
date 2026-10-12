@@ -1838,9 +1838,10 @@ helpers.
    the Celery app so application factories can expose their intent clearly, but
    it does not store app-local state or duplicate signal logic.
 
-2. **Backwards compatibility:** Import-time registration remains in place, so
-   existing consumers that rely on `import falcon_correlate` continue to get
-   publish and worker propagation automatically.
+2. **Explicit activation:** Importing `falcon_correlate` leaves Celery signals
+   untouched. Each publisher and worker process must call
+   `configure_celery_correlation(app)` to activate propagation. The helper
+   remains idempotent through the stable dispatch UIDs.
 
 3. **Idempotence through existing dispatch UIDs:** The helper delegates to a
    shared `_maybe_connect_celery_signals()` connector, which reuses the stable
@@ -1853,10 +1854,10 @@ helpers.
    `celery_app = configure_celery_correlation(Celery(...))` without losing the
    concrete app object or implying that the helper creates a new application.
 
-5. **Testing isolates import-time side effects:** Unit and behavioural tests
-   explicitly disconnect the known receivers by dispatch UID before calling the
-   helper. This prevents the existing import-time registration from hiding a
-   broken public configuration path.
+5. **Testing isolates shared process-global state:** Celery's signal registry
+   is process-global. Unit and behavioural tests disconnect the known receivers
+   by dispatch UID before calling the helper, so previously connected receivers
+   cannot hide a broken public configuration path.
 
 **Files created/modified:**
 
@@ -1868,13 +1869,17 @@ helpers.
 - `src/falcon_correlate/unittests/test_celery_configuration.py` — Added unit
   coverage for full-signal configuration, idempotence, return value, and root
   export.
+- `src/falcon_correlate/unittests/test_celery_import_side_effects.py` — Added
+  fresh-interpreter coverage that package and integration-module imports leave
+  Celery signals untouched, then verifies explicit configuration and
+  idempotence.
 - `tests/bdd/celery_configuration.feature` — Added behavioural scenarios for
   explicit configuration of publish and worker propagation.
 - `tests/bdd/test_celery_configuration_steps.py` — Added BDD steps that
-  disconnect import-time receivers and prove the public helper reconnects the
+  disconnect existing receivers and prove the public helper connects the
   publish and worker paths.
 - `docs/users-guide.md` — Documented the explicit helper, return contract,
-  idempotence, and relationship to import-time auto-registration.
+  idempotence, and required activation in publisher and worker processes.
 - `docs/roadmap.md` — Marked roadmap item 4.2.3 complete.
 
 ### A.11. Optional Celery integration validation (Task 4.2.4)
@@ -1903,6 +1908,10 @@ validation test that exercises pytest collection in a child process.
    which install the base package without the Celery extra can still import the
    library without one import masking the other through module caching.
 
+   Issue #48 adds a separate fresh-interpreter regression test for the
+   no-registration contract: imports leave Celery signals untouched until
+   `configure_celery_correlation(app)` is called.
+
 4. **No new runtime or test dependency is required:** The child process uses a
    temporary `sitecustomize.py` import hook to raise `ModuleNotFoundError` for
    `celery` and `celery.*` only. This avoids uninstalling Celery, adding a
@@ -1921,15 +1930,17 @@ validation test that exercises pytest collection in a child process.
    with a normalized exact snapshot so skip counts are explicit while
    nondeterministic runtime duration is redacted.
 
-**Compile-time validation:**
+**Static and import-safety validation:**
 
 Type safety is verified by mypy through `make typecheck` over the full source
-tree. Import-time correctness is validated by the subprocess-based import tests
-in `src/falcon_correlate/unittests/test_optional_celery_dependency.py`, which
-assert that `falcon_correlate` and `falcon_correlate.celery` load without error
-when `celery` is unavailable. No `trybuild`-style compile-time artefacts are
-produced; this is a Python project, and the equivalent guarantees are provided
-by static type checking and import-time subprocess validation.
+tree. Optional-dependency import safety is validated by the subprocess-based
+tests in `src/falcon_correlate/unittests/test_optional_celery_dependency.py`,
+which assert that `falcon_correlate` and `falcon_correlate.celery` load without
+error when `celery` is unavailable. The separate issue #48 regression test
+checks that imports do not register Celery signal receivers. No
+`trybuild`-style compile-time artefacts are produced; this is a Python project,
+and the equivalent guarantees are provided by static type checking and
+subprocess validation.
 
 **Files created/modified:**
 
