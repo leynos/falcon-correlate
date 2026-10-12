@@ -256,7 +256,7 @@ Complete documentation, examples, and prepare for initial release.
   - [ ] Verify package installs correctly from test PyPI.
   - [ ] Review documentation for completeness.
 - [ ] 6.3.3. Publish initial release
-  - [ ] Tag release version (0.1.0).
+  - [ ] Tag release version (v0.2.0).
   - [ ] Publish to PyPI.
   - [ ] Announce release.
 

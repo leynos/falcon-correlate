@@ -59,8 +59,11 @@ and validator helpers used by middleware configuration.
 helper caches definite per-app result-backend verdicts and establishes the
 publishing app around `send_task()` calls because Celery's publish signal
 sender is only a task name. Backend inspection failures remain retryable and
-preserve Celery's task ID. The full decision and compatibility constraints are
-recorded in
+preserve Celery's task ID. Importing `falcon_correlate` or
+`falcon_correlate.celery` does not import Celery or connect signal handlers;
+publisher and worker bootstrap code must call
+`configure_celery_correlation(app)` before relying on correlation propagation.
+The full decision and compatibility constraints are recorded in
 [Appendix A.10 of the middleware design](falcon-correlation-id-middleware-design.md#a10-celery-configuration-helper-task-423).
 
 `middleware_base.py` owns `_CorrelationIDMiddlewareBase`, the private lifecycle
