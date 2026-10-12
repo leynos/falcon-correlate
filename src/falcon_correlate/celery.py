@@ -10,12 +10,36 @@ from __future__ import annotations
 import contextvars
 import importlib
 import logging
+import threading
+import types
 import typing as typ
+import weakref
 
 from .middleware import correlation_id_var
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
+
+    class _BackendLike(typ.Protocol):
+        """Structural type for the Celery backend used by this module."""
+
+        def as_uri(self) -> str:
+            """Return the backend URI."""
+            ...
+
+    class _CeleryAppLike(typ.Protocol):
+        """Structural app type; instances must support weak cache keys."""
+
+        def __hash__(self) -> int:
+            """Return the hash required by the weak verdict cache."""
+            ...
+
+        @property
+        def backend(self) -> _BackendLike:
+            """The application's result backend."""
+            ...
+
+        send_task: typ.Any
 
 
 _BEFORE_TASK_PUBLISH_DISPATCH_UID = (
@@ -26,14 +50,27 @@ _TASK_POSTRUN_DISPATCH_UID = "falcon_correlate.celery.clear_correlation_id_in_wo
 _CORRELATION_ID_CONTEXT_KEY = "correlation_id"
 _logger = logging.getLogger(__name__)
 
+
 _ContextToken = contextvars.Token[str | None]
 type _CeleryContextTokens = dict[str, list[_ContextToken]]
 _celery_context_tokens: contextvars.ContextVar[_CeleryContextTokens | None] = (
     contextvars.ContextVar("celery_context_tokens", default=None)
 )
+_celery_publishing_app: contextvars.ContextVar[_CeleryAppLike | None] = (
+    contextvars.ContextVar("celery_publishing_app", default=None)
+)
+_configured_app_backend_rpc_verdicts: weakref.WeakKeyDictionary[
+    _CeleryAppLike, bool
+] = weakref.WeakKeyDictionary()
+_configured_apps_with_send_task_context: weakref.WeakSet[_CeleryAppLike] = (
+    weakref.WeakSet()
+)
+_configured_app_backend_rpc_verdicts_lock = threading.RLock()
 
 
 def propagate_correlation_id_to_celery(
+    *,
+    sender: object | None = None,
     **kwargs: object,
 ) -> None:
     """Copy the ambient correlation ID into Celery publish properties.
@@ -45,6 +82,10 @@ def propagate_correlation_id_to_celery(
 
     Parameters
     ----------
+    sender : object | None
+        Task name emitted by Celery's publish signal. It provides context for
+        backend-inspection diagnostics but does not identify the publisher,
+        because another app can publish a registered task by name.
     **kwargs : dict
         Celery signal keyword arguments. Must contain a ``properties`` key
         mapping to a mutable mapping (typically :class:`dict`) that holds
@@ -52,9 +93,12 @@ def propagate_correlation_id_to_celery(
 
     Notes
     -----
-    When the active Celery application uses the ``rpc://`` result backend,
-    this handler preserves the task ID in ``correlation_id`` to maintain
-    Celery's result retrieval contract.
+    A configured app's ``send_task`` method establishes publisher identity for
+    the duration of its synchronous publish call. When no configured publisher
+    context is active, this handler falls back to Celery's active application.
+    For an ``rpc://`` result backend, or when backend inspection is inconclusive,
+    it preserves the task ID in ``correlation_id`` to maintain Celery's result
+    retrieval contract.
 
     """
     properties = typ.cast(
@@ -68,13 +112,96 @@ def propagate_correlation_id_to_celery(
     if properties is None:
         return
 
-    if _current_result_backend_uses_rpc():
+    publishing_app = _celery_publishing_app.get()
+    if publishing_app is None:
+        backend_uses_rpc = _current_result_backend_uses_rpc()
+    else:
+        backend_uses_rpc = _cache_app_backend_rpc_verdict(
+            publishing_app, task_name=sender
+        )
+
+    if backend_uses_rpc is not False:
         return
 
     properties["correlation_id"] = correlation_id
 
 
-def _current_result_backend_uses_rpc() -> bool:
+def _app_backend_uses_rpc(
+    app: _CeleryAppLike, *, task_name: object | None = None
+) -> bool | None:
+    """Return whether an application's result backend URI uses RPC."""
+    try:
+        backend = getattr(app, "backend", None)
+        if backend is None:
+            return False
+
+        as_uri = getattr(backend, "as_uri", None)
+        if not callable(as_uri):
+            return False
+
+        return str(as_uri()).startswith("rpc://")
+    except Exception:
+        # A failed inspection is unknown, not evidence that the backend is non-RPC.
+        message = "Unable to inspect Celery result backend URI"
+        if isinstance(task_name, str):
+            message += f" for publishing task {task_name!r}"
+        _logger.debug("%s; preserving task ID.", message, exc_info=True)
+        return None
+
+
+def _cache_app_backend_rpc_verdict(
+    app: _CeleryAppLike, *, task_name: object | None = None
+) -> bool | None:
+    """Cache a definite backend verdict; leave inspection failures retryable."""
+    with _configured_app_backend_rpc_verdicts_lock:
+        cached_verdict = _configured_app_backend_rpc_verdicts.get(app)
+    if cached_verdict is not None:
+        return cached_verdict
+
+    backend_uses_rpc = _app_backend_uses_rpc(app, task_name=task_name)
+    if backend_uses_rpc is None:
+        return None
+
+    with _configured_app_backend_rpc_verdicts_lock:
+        return _configured_app_backend_rpc_verdicts.setdefault(app, backend_uses_rpc)
+
+
+def _configure_app_send_task_context(app: _CeleryAppLike) -> None:
+    """Wrap ``send_task`` so its publish signal carries the actual app locally."""
+    with _configured_app_backend_rpc_verdicts_lock:
+        if app in _configured_apps_with_send_task_context:
+            return
+
+        bound_send_task = getattr(app, "send_task", None)
+        original_send_task = getattr(bound_send_task, "__func__", None)
+        if not callable(original_send_task):
+            return
+
+        def send_task_with_publishing_app(
+            configured_app: _CeleryAppLike,
+            *args: object,
+            **kwargs: object,
+        ) -> object:
+            """Set publisher identity while Celery emits its publish signal."""
+            token = _celery_publishing_app.set(configured_app)
+            try:
+                return original_send_task(configured_app, *args, **kwargs)
+            finally:
+                _celery_publishing_app.reset(token)
+
+        try:
+            app.send_task = types.MethodType(send_task_with_publishing_app, app)
+        except (AttributeError, TypeError):
+            _logger.debug(
+                "Unable to attach publisher context to Celery app.",
+                exc_info=True,
+            )
+            return
+
+        _configured_apps_with_send_task_context.add(app)
+
+
+def _current_result_backend_uses_rpc() -> bool | None:
     """Return whether the active Celery app uses the RPC result backend."""
     try:
         celery_module = importlib.import_module("celery")
@@ -85,15 +212,7 @@ def _current_result_backend_uses_rpc() -> bool:
     if current_app is None:
         return False
 
-    backend = getattr(current_app, "backend", None)
-    if backend is None:
-        return False
-
-    as_uri = getattr(backend, "as_uri", None)
-    if not callable(as_uri):
-        return False
-
-    return str(as_uri()).startswith("rpc://")
+    return _app_backend_uses_rpc(typ.cast("_CeleryAppLike", current_app))
 
 
 def setup_correlation_id_in_worker(*, task: object | None = None, **_: object) -> None:
@@ -232,28 +351,38 @@ def _maybe_connect_celery_signals() -> None:
     _maybe_connect_celery_worker_signals()
 
 
-def configure_celery_correlation[CeleryAppT](app: CeleryAppT) -> CeleryAppT:
+def configure_celery_correlation[CeleryAppT: _CeleryAppLike](
+    app: CeleryAppT,
+) -> CeleryAppT:
     """Configure Celery correlation ID propagation for an application.
 
-    The current integration uses Celery's global signal registry, so the
-    ``app`` parameter is returned unchanged for application-factory ergonomics.
-    Stable dispatch UIDs keep repeated calls idempotent.
+    The integration uses Celery's global signal registry and caches this
+    application's definite ``rpc://`` result-backend verdict, and wraps its
+    ``send_task`` method to identify the publishing application while Celery
+    emits a publish signal. Signal sender values are task names and cannot
+    reliably identify the publisher. If backend inspection fails, the verdict
+    remains uncached and publishes preserve Celery's task ID until inspection
+    succeeds. Stable dispatch UIDs keep repeated calls idempotent.
 
     Parameters
     ----------
     app : CeleryAppT
-        Celery application instance being configured. The instance is used as
-        the caller's explicit setup marker; signal registration remains global
-        and requires Celery's signal objects to be importable.
+        Celery application instance whose RPC result-backend verdict is cached
+        and whose ``send_task`` method establishes publisher identity. The app
+        must be hashable and weak-referenceable for the weak-key cache. Signal
+        registration remains global and requires Celery's signal objects to be
+        importable.
 
     Returns
     -------
     CeleryAppT
         The same ``app`` instance, returned for application-factory ergonomics.
-        Repeated calls are idempotent because registration uses stable dispatch
-        UIDs.
+        Repeated calls are idempotent because publisher wrapping is guarded per
+        app and signal registration uses stable dispatch UIDs.
 
     """
+    _cache_app_backend_rpc_verdict(app)
+    _configure_app_send_task_context(app)
     _maybe_connect_celery_signals()
     return app
 

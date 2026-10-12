@@ -9,6 +9,8 @@ Fixtures
 request_response_factory
     Factory callable that builds ``falcon.Request`` / ``falcon.Response``
     pairs from keyword arguments (``correlation_id``, ``remote_addr``).
+isolated_celery_app_configuration_cache
+    Restores the configured Celery app cache for each unit-test scope.
 isolated_context
     Runner callable that executes a zero-argument function inside a fresh
     ``contextvars.Context``, preventing cross-test leakage.
@@ -65,7 +67,10 @@ import falcon.testing
 import pytest
 
 from falcon_correlate import ContextualLogFilter, CorrelationIDMiddleware
-from tests.conftest import CorrelationEchoResource
+from tests.conftest import (
+    CorrelationEchoResource,
+    isolated_celery_app_configuration_cache,  # ruff: ignore[unused-import] -- re-export pytest fixture to unit tests.
+)
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc

@@ -34,6 +34,7 @@ from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file]
 )
 from falcon_correlate.celery import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     _maybe_connect_celery_publish_signal,
+    configure_celery_correlation,
 )
 
 if typ.TYPE_CHECKING:
@@ -102,6 +103,7 @@ def _publish_task(**apply_async_kwargs: str) -> Context:
     """Publish a task and capture the final broker correlation ID."""
     app = Celery("bdd-celery-propagation", broker="memory://")
     app.conf.task_always_eager = False
+    configure_celery_correlation(app)
 
     @app.task(name="bdd.echo")
     def echo(value: str) -> str:

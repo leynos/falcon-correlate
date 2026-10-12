@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import contextvars
+import sys
 import typing as typ
+import weakref
 
 import pytest
 
@@ -88,3 +90,30 @@ def isolated_context() -> cabc.Callable[[cabc.Callable[[], None]], None]:
         contextvars.copy_context().run(func)
 
     return runner
+
+
+@pytest.fixture(autouse=True)
+def isolated_celery_app_configuration_cache() -> cabc.Iterator[None]:
+    """Restore the configured-app cache around each test that loads Celery."""
+    celery_module = sys.modules.get("falcon_correlate.celery")
+    if celery_module is None:
+        yield
+        return
+
+    cache_name = "_configured_app_backend_rpc_verdicts"
+    lock_name = "_configured_app_backend_rpc_verdicts_lock"
+    cached_verdicts = getattr(celery_module, cache_name, None)
+    cache_lock = getattr(celery_module, lock_name, None)
+    if not isinstance(cached_verdicts, weakref.WeakKeyDictionary) or cache_lock is None:
+        yield
+        return
+
+    with cache_lock:
+        setattr(celery_module, cache_name, weakref.WeakKeyDictionary())
+
+    try:
+        yield
+    finally:
+        restored_lock = getattr(celery_module, lock_name, cache_lock)
+        with restored_lock:
+            setattr(celery_module, cache_name, cached_verdicts)

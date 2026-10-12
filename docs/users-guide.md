@@ -770,9 +770,14 @@ middleware = CorrelationIDMiddleware()
 ```
 
 The helper connects the `before_task_publish`, `task_prerun`, and
-`task_postrun` handlers in one idempotent call and returns the same app
-instance. It is safe to call repeatedly, which is useful when publisher and
-worker bootstrap code share an application factory.
+`task_postrun` handlers in one idempotent call, caches that app's definite
+`rpc://` result-backend verdict, and returns the same app instance. It also
+wraps the app's `send_task` method so the publish handler can identify the
+actual publishing app while Celery emits its global signal. Backend inspection
+errors are left uncached and retried on publish; while the verdict is unknown,
+Celery's task ID is preserved. Configured app instances must be hashable and
+weak-referenceable for the per-app verdict cache; Celery's own application
+instances satisfy this requirement.
 
 Importing `falcon_correlate` also registers those handlers automatically when
 Celery is installed. If the publisher process or worker process already imports
@@ -809,9 +814,18 @@ def send_invoice_email(self, user_id: str) -> None:
 
 ### Behaviour
 
-- When `correlation_id_var` is set and the active Celery result backend is not
-  `rpc://`, the outgoing Celery message uses that value as its publish-time
-  `correlation_id`.
+- When `correlation_id_var` is set and a configured app publishes through its
+  `send_task` method, the cached result-backend verdict controls propagation. A
+  non-RPC backend uses the ambient request value as the publish-time
+  `correlation_id`; an RPC backend preserves Celery's task ID. This remains
+  correct when `send_task()` publishes a task name registered on another app.
+- The `before_task_publish` signal's `sender` is a task name, not the publisher
+  app. Configured apps therefore establish publisher identity around
+  `send_task()`; the handler does not infer it from task-registry ownership.
+  Signals emitted without that configured publisher context fall back to
+  Celery's active app.
+- If backend URI inspection raises, the verdict is not cached and the handler
+  preserves Celery's task ID until a later inspection succeeds.
 - When `correlation_id_var` is not set, `falcon-correlate` leaves Celery's
   generated publish value unchanged.
 - If the caller passes `apply_async(correlation_id=...)` while a request
@@ -819,7 +833,7 @@ def send_invoice_email(self, user_id: str) -> None:
   fills `correlation_id` by default, so overwriting the publish value is the
   only way to guarantee request-to-task propagation through
   `before_task_publish`.
-- If the active Celery result backend is `rpc://`, `falcon-correlate`
+- If the publishing app's result backend is `rpc://`, `falcon-correlate`
   preserves Celery's task-id correlation contract and does not overwrite the
   publish `correlation_id`.
 - Inside a running Celery task, `correlation_id_var.get()` returns the
