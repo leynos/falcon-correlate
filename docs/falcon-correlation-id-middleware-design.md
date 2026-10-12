@@ -1827,9 +1827,9 @@ signals.
 ### A.10. Celery configuration helper (Task 4.2.3)
 
 **Decision:** Keep `configure_celery_correlation(app)` as the explicit Celery
-setup helper, cache each configured app's `rpc://` result-backend verdict in a
-weak per-app cache, and resolve the publishing app from the
-`before_task_publish` signal sender.
+setup helper, cache each configured app's definite `rpc://` result-backend
+verdict in a weak per-app cache, and establish publisher identity around that
+app's `send_task` method while its global publish signal is emitted.
 
 **Rationale:**
 
@@ -1842,18 +1842,23 @@ weak per-app cache, and resolve the publishing app from the
    existing consumers that rely on `import falcon_correlate` continue to get
    publish and worker propagation automatically.
 
-3. **Correct and efficient publish resolution:** `before_task_publish` carries
-   the task name as `sender`. The handler matches that name against finalized
-   configured app task registries and reads the cached verdict, avoiding a
-   per-publish `celery.current_app` lookup when one app owns the task.
-   Unfinalized app registries are skipped so lookup does not finalize an app as
-   a side effect. If multiple configured apps contain the name, the signal does
-   not identify which app is publishing; the handler preserves Celery's task ID
-   instead of applying an arbitrary backend verdict. When no configured app
-   owns the task, the handler retains the `current_app` fallback for
-   import-time-only and unconfigured processes.
+3. **Correct and efficient publisher resolution:** `before_task_publish` carries
+   a task name as `sender`, not the publishing app. Registry membership is not
+   a safe proxy because `app.send_task()` can publish a task name registered on
+   another app. Configuration wraps the app's `send_task` method and sets a
+   context-local publisher identity only for the synchronous publish call. The
+   handler then reads that app's cached verdict without resolving
+   `celery.current_app`. Signals emitted without a configured publisher context
+   retain the `current_app` fallback for import-time-only and unconfigured
+   processes.
 
-4. **Idempotence and application-factory ergonomics:** The helper delegates to
+4. **Unknown backend verdicts do not corrupt task results:** Missing backend
+   attributes retain the defensive non-RPC result, but an exception from
+   `backend.as_uri()` is treated as unknown and is not cached. While inspection
+   remains inconclusive, the handler preserves Celery's task ID; a later
+   successful inspection supplies and caches the definite verdict.
+
+5. **Idempotence and application-factory ergonomics:** The helper delegates to
    a shared `_maybe_connect_celery_signals()` connector, which reuses stable
    dispatch UIDs for `before_task_publish`, `task_prerun`, and `task_postrun`.
    Repeated calls leave exactly one integration receiver connected to each
@@ -1861,7 +1866,12 @@ weak per-app cache, and resolve the publishing app from the
    Consumers can write `celery_app = configure_celery_correlation(Celery(...))`
    without losing the concrete app object.
 
-5. **Testing isolates import-time side effects:** Unit and behavioural tests
+6. **Testing exercises real publish calls:** Unit and behavioural tests
+   publish tasks through configured Celery apps and verify the broker
+   properties, including cross-app `send_task()` and transient backend
+   inspection failures.
+
+7. **Testing isolates import-time side effects:** Unit and behavioural tests
    explicitly disconnect the known receivers by dispatch UID before calling the
    helper. This prevents the existing import-time registration from hiding a
    broken public configuration path.
@@ -1876,7 +1886,8 @@ separate companion issue
 - `src/falcon_correlate/celery.py` — Added
   `configure_celery_correlation(app)`, the shared
   `_maybe_connect_celery_signals()` connector, the weak per-app backend cache,
-  and sender-based publishing-app resolution.
+  and context-local publisher identity around configured app `send_task()`
+  calls.
 - `src/falcon_correlate/__init__.py` — Re-exported
   `configure_celery_correlation` from the package root.
 - `src/falcon_correlate/unittests/test_celery_configuration.py` — Added unit

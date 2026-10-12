@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import functools
 import typing as typ
-from unittest import mock
 
 import pytest
 
 try:
-    from celery import Celery
     from celery.signals import before_task_publish
 except ModuleNotFoundError as error:  # pragma: no cover - blocked child only
     if error.name != "celery":
@@ -28,7 +26,6 @@ from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file]
 )
 from falcon_correlate.celery import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     _maybe_connect_celery_publish_signal,
-    configure_celery_correlation,
     propagate_correlation_id_to_celery,
 )
 
@@ -121,135 +118,6 @@ def test_handler_tolerates_missing_properties_mapping(
         propagate_correlation_id_to_celery(properties=None)
 
     isolated_context(_logic)
-
-
-def test_handler_uses_configured_app_for_rpc_backend(
-    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-) -> None:
-    """Configured task ownership should select each app's cached backend."""
-    rpc_app = Celery(
-        "configured-rpc-publish-app",
-        backend="rpc://",
-        broker="memory://",
-    )
-    non_rpc_app = Celery(
-        "configured-non-rpc-publish-app",
-        backend="cache+memory://",
-        broker="memory://",
-    )
-
-    @rpc_app.task(name="configured-rpc-publish-task", shared=False)
-    def configured_rpc_publish_task() -> None:
-        """Provide a task name owned by the RPC application."""
-
-    @non_rpc_app.task(name="configured-non-rpc-publish-task", shared=False)
-    def configured_non_rpc_publish_task() -> None:
-        """Provide a task name owned by the non-RPC application."""
-
-    rpc_app.finalize()
-    non_rpc_app.finalize()
-    configure_celery_correlation(rpc_app)
-    configure_celery_correlation(non_rpc_app)
-    rpc_properties = {"correlation_id": "rpc-task-id"}
-    non_rpc_properties = {"correlation_id": "non-rpc-task-id"}
-
-    def _logic() -> None:
-        """Exercise publish handling for both configured applications."""
-        correlation_id_var.set("request-correlation-id")
-        propagate_correlation_id_to_celery(
-            sender=configured_rpc_publish_task.name,
-            properties=rpc_properties,
-        )
-        propagate_correlation_id_to_celery(
-            sender=configured_non_rpc_publish_task.name,
-            properties=non_rpc_properties,
-        )
-
-    isolated_context(_logic)
-
-    assert rpc_properties["correlation_id"] == "rpc-task-id", (
-        "RPC result backends should preserve Celery task-ID correlation"
-    )
-    assert non_rpc_properties["correlation_id"] == "request-correlation-id", (
-        "non-RPC result backends should receive request correlation"
-    )
-
-
-def test_configured_app_uses_cached_backend_verdict_without_global_lookup(
-    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Configured task publishing should use its app cache, not current_app."""
-    celery_app = Celery(
-        "configured-cache-publish-app",
-        backend="cache+memory://",
-        broker="memory://",
-    )
-
-    @celery_app.task(name="configured-cache-publish-task", shared=False)
-    def configured_cache_publish_task() -> None:
-        """Provide a task name owned by the configured application."""
-
-    celery_app.finalize()
-    configure_celery_correlation(celery_app)
-    properties = {"correlation_id": "celery-task-id"}
-    current_result_backend_uses_rpc = mock.Mock(return_value=False)
-    monkeypatch.setattr(
-        "falcon_correlate.celery._current_result_backend_uses_rpc",
-        current_result_backend_uses_rpc,
-    )
-
-    def _logic() -> None:
-        """Exercise publishing through the configured task name."""
-        correlation_id_var.set("request-correlation-id")
-        propagate_correlation_id_to_celery(
-            sender=configured_cache_publish_task.name,
-            properties=properties,
-        )
-
-    isolated_context(_logic)
-
-    current_result_backend_uses_rpc.assert_not_called()
-    assert properties["correlation_id"] == "request-correlation-id", (
-        "configured publishing should use the cached backend verdict"
-    )
-
-
-def test_handler_falls_back_when_no_configured_app_owns_task(
-    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Unowned task names should retain the active-app compatibility fallback."""
-    properties = {"correlation_id": "celery-task-id"}
-    result_backend_lookup_count = 0
-
-    def _current_result_backend_uses_rpc() -> bool:
-        """Record use of the active-app compatibility fallback."""
-        nonlocal result_backend_lookup_count
-        result_backend_lookup_count += 1
-        return True
-
-    monkeypatch.setattr(
-        "falcon_correlate.celery._current_result_backend_uses_rpc",
-        _current_result_backend_uses_rpc,
-    )
-
-    def _logic() -> None:
-        """Exercise the fallback path from an isolated context."""
-        correlation_id_var.set("request-correlation-id")
-        propagate_correlation_id_to_celery(
-            sender="unconfigured-publish-task",
-            properties=properties,
-        )
-
-    isolated_context(_logic)
-
-    assert result_backend_lookup_count == 1, (
-        "unowned tasks should consult the active-app fallback once"
-    )
-    assert properties["correlation_id"] == "celery-task-id", (
-        "RPC fallback should preserve Celery task-ID correlation"
-    )
 
 
 def test_signal_handler_is_connected_to_before_task_publish() -> None:

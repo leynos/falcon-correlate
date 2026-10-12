@@ -6,6 +6,7 @@ import concurrent.futures
 import threading
 import typing as typ
 from types import SimpleNamespace
+from unittest import mock
 
 import pytest
 from hypothesis import given, settings
@@ -123,6 +124,11 @@ def test_configure_celery_correlation_is_safe_under_concurrent_calls(
         for future in futures:
             future.result(timeout=5)
 
+    send_task_function = celery_app.send_task.__func__
+    configure_celery_correlation(celery_app)
+    assert celery_app.send_task.__func__ is send_task_function, (
+        "concurrent configuration should install only one publisher wrapper"
+    )
     _assert_all_signals_connected_once()
 
 
@@ -254,6 +260,20 @@ def test_configure_celery_correlation_returns_app_instance(
     """Application factories should be able to return the configured app."""
     failure_message = "expected condition: configure_celery_correlation(celery_app) ..."
     assert configure_celery_correlation(celery_app) is celery_app, failure_message
+
+
+def test_configure_celery_correlation_records_backend_verdict(
+    celery_app: Celery,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The configured app's definite backend verdict is cached immediately."""
+    backend_uri = mock.Mock(wraps=celery_app.backend.as_uri)
+    monkeypatch.setattr(celery_app.backend, "as_uri", backend_uri)
+
+    configure_celery_correlation(celery_app)
+    configure_celery_correlation(celery_app)
+
+    backend_uri.assert_called_once()
 
 
 def test_configure_celery_correlation_is_exported_from_package_root() -> None:

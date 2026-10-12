@@ -1,11 +1,9 @@
-"""Tests for app resolution during Celery publish handling."""
+"""Tests for configured Celery publishers and backend verdicts."""
 
 from __future__ import annotations
 
 import logging
-import threading
 import typing as typ
-from concurrent.futures import ThreadPoolExecutor
 from unittest import mock
 
 import pytest
@@ -29,9 +27,7 @@ from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file]
 )
 from falcon_correlate.celery import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     _app_backend_uses_rpc,
-    _resolve_publishing_app,
     configure_celery_correlation,
-    propagate_correlation_id_to_celery,
 )
 
 if typ.TYPE_CHECKING:
@@ -42,7 +38,7 @@ class _FailingBackend:
     """Backend test double whose URI inspection fails."""
 
     def as_uri(self) -> str:
-        """Raise to model a malformed or unavailable backend configuration."""
+        """Raise to model a temporarily unavailable backend inspection."""
         raise RuntimeError
 
 
@@ -50,50 +46,31 @@ class _MalformedCeleryApp:
     """Celery-shaped app with a backend that cannot report its URI."""
 
     def __init__(self) -> None:
-        """Initialize members inspected by the app protocol."""
+        """Initialize the backend member inspected by the helper."""
         self.backend = _FailingBackend()
-        self.finalized = True
-        self.tasks: dict[str, object] = {}
+
+    def send_task(self, *args: object, **kwargs: object) -> object:
+        """Satisfy the configured-app shape without publishing a task."""
+        return None
 
 
-class _BlockingTaskRegistry:
-    """Task registry that pauses membership checks for a concurrency test."""
+class _AppWithoutBackend:
+    """Malformed app double without an optional backend attribute."""
 
-    def __init__(self, task_name: str) -> None:
-        """Set up events that let the test control a membership check."""
-        self.task_name = task_name
-        self.lookup_started = threading.Event()
-        self.allow_lookup_to_finish = threading.Event()
-
-    def __contains__(self, candidate: object) -> bool:
-        """Pause before returning whether the registry owns the task name."""
-        self.lookup_started.set()
-        self.allow_lookup_to_finish.wait(timeout=5)
-        return candidate == self.task_name
+    def send_task(self, *args: object, **kwargs: object) -> object:
+        """Satisfy the configured-app shape without publishing a task."""
+        return None
 
 
-class _AppWithTaskRegistry:
-    """Minimal app shape for deterministic app-resolution concurrency tests."""
-
-    def __init__(
-        self,
-        tasks: dict[str, object] | _BlockingTaskRegistry,
-    ) -> None:
-        """Provide the members inspected by Celery app configuration."""
-        self.backend = _FailingBackend()
-        self.finalized = True
-        self.tasks = tasks
-
-
-def test_backend_uri_failure_does_not_escape_the_app_check(
+def test_backend_uri_failure_is_unknown_and_logged(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A broken backend URI must not raise through the optional integration."""
+    """A backend error must not be mistaken for a non-RPC verdict."""
     with caplog.at_level(logging.DEBUG, logger="falcon_correlate.celery"):
         backend_uses_rpc = _app_backend_uses_rpc(_MalformedCeleryApp())
 
-    assert backend_uses_rpc is False, (
-        "a failed backend lookup should use the non-RPC fallback"
+    assert backend_uses_rpc is None, (
+        "an inspection exception must remain distinct from a non-RPC verdict"
     )
     assert any(
         "Unable to inspect Celery result backend URI" in record.message
@@ -101,125 +78,55 @@ def test_backend_uri_failure_does_not_escape_the_app_check(
     ), "a failed backend lookup should emit a diagnostic"
 
 
-def test_configuring_an_app_during_resolution_does_not_mutate_its_snapshot() -> None:
-    """A concurrent configure call cannot invalidate app resolution."""
-    task_name = "resolution-during-configure-task"
-    registry = _BlockingTaskRegistry(task_name)
-    publishing_app = _AppWithTaskRegistry(registry)
-    configure_celery_correlation(publishing_app)
-
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        resolution = executor.submit(_resolve_publishing_app, task_name)
-        assert registry.lookup_started.wait(timeout=5), (
-            "resolution should reach the blocking membership check"
-        )
-        newly_configured_app = _AppWithTaskRegistry({})
-        configure_celery_correlation(newly_configured_app)
-        registry.allow_lookup_to_finish.set()
-
-        assert resolution.result(timeout=5) is publishing_app, (
-            "resolution should continue over its stable app snapshot"
-        )
+def test_missing_backend_attribute_is_a_non_rpc_verdict() -> None:
+    """Missing optional backend members retain the defensive false result."""
+    app_without_backend = typ.cast("typ.Any", _AppWithoutBackend())
+    assert _app_backend_uses_rpc(app_without_backend) is False, (
+        "an app without backend configuration should be treated as non-RPC"
+    )
 
 
-def test_unfinalized_configured_app_is_not_finalized_during_resolution(
+def test_publish_retries_failed_backend_inspection_without_losing_task_id(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Resolution skips unfinished registries while finding another app."""
-    unfinished_app = Celery(
-        "unfinished-resolution-app",
-        backend="cache+memory://",
-        broker="memory://",
-        autofinalize=False,
-    )
-    publishing_app = Celery(
-        "finalized-resolution-app",
+    """A transient URI failure is not cached as a non-RPC result."""
+    celery_app = Celery(
+        "retry-backend-verdict-app",
         backend="cache+memory://",
         broker="memory://",
     )
-
-    @publishing_app.task(name="finalized-resolution-task", shared=False)
-    def finalized_resolution_task() -> None:
-        """Provide a task name owned by the finalized application."""
-
-    publishing_app.finalize()
-    configure_celery_correlation(unfinished_app)
-    configure_celery_correlation(publishing_app)
-    fallback = mock.Mock(return_value=False)
+    backend_uri = mock.Mock(
+        side_effect=[
+            RuntimeError("configure inspection failed"),
+            RuntimeError("publish inspection failed"),
+            "rpc://",
+        ]
+    )
+    monkeypatch.setattr(celery_app.backend, "as_uri", backend_uri)
+    configure_celery_correlation(celery_app)
+    current_backend_lookup = mock.Mock(return_value=False)
     monkeypatch.setattr(
         "falcon_correlate.celery._current_result_backend_uses_rpc",
-        fallback,
-    )
-    properties = {"correlation_id": "celery-task-id"}
-
-    def _logic() -> None:
-        """Exercise resolution with one unfinished configured app."""
-        correlation_id_var.set("request-correlation-id")
-        propagate_correlation_id_to_celery(
-            sender=finalized_resolution_task.name,
-            properties=properties,
-        )
-
-    isolated_context(_logic)
-
-    fallback.assert_not_called()
-    assert unfinished_app.finalized is False, (
-        "publish resolution must not finalize an application owned by its caller"
-    )
-    assert properties["correlation_id"] == "request-correlation-id", (
-        "the unique finalized task owner should supply the backend verdict"
+        current_backend_lookup,
     )
 
+    with mock.patch("kombu.Producer.publish", autospec=True) as publish:
 
-def test_shared_task_name_preserves_task_id_when_app_is_ambiguous(
-    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A shared name cannot select between apps with different backends."""
-    rpc_app = Celery(
-        "shared-resolution-rpc-app",
-        backend="rpc://",
-        broker="memory://",
-    )
-    non_rpc_app = Celery(
-        "shared-resolution-non-rpc-app",
-        backend="cache+memory://",
-        broker="memory://",
-    )
+        def _logic() -> None:
+            """Publish once while unknown and once after RPC is confirmed."""
+            correlation_id_var.set("request-correlation-id")
+            celery_app.send_task("unregistered-task", task_id="first-task-id")
+            celery_app.send_task("unregistered-task", task_id="second-task-id")
 
-    @rpc_app.task(name="shared-resolution-task")
-    def shared_resolution_task() -> None:
-        """Provide a task registered with Celery's shared-task mechanism."""
+        isolated_context(_logic)
 
-    rpc_app.finalize()
-    non_rpc_app.finalize()
-    assert shared_resolution_task.name in rpc_app.tasks, (
-        "the shared task should be present in its defining application"
+    assert publish.call_count == 2, "both task publishes should reach Kombu"
+    assert [call.kwargs["correlation_id"] for call in publish.call_args_list] == [
+        "first-task-id",
+        "second-task-id",
+    ], "unknown and RPC verdicts must both preserve Celery task IDs"
+    assert backend_uri.call_count == 3, (
+        "failed inspections should retry and the definite verdict should be cached"
     )
-    assert shared_resolution_task.name in non_rpc_app.tasks, (
-        "Celery should register the shared task in the other application"
-    )
-    configure_celery_correlation(rpc_app)
-    configure_celery_correlation(non_rpc_app)
-    fallback = mock.Mock(return_value=False)
-    monkeypatch.setattr(
-        "falcon_correlate.celery._current_result_backend_uses_rpc",
-        fallback,
-    )
-    properties = {"correlation_id": "celery-task-id"}
-
-    def _logic() -> None:
-        """Exercise publish handling for the shared task name."""
-        correlation_id_var.set("request-correlation-id")
-        propagate_correlation_id_to_celery(
-            sender=shared_resolution_task.name,
-            properties=properties,
-        )
-
-    isolated_context(_logic)
-
-    fallback.assert_not_called()
-    assert properties["correlation_id"] == "celery-task-id", (
-        "ambiguous ownership must preserve Celery's task-id correlation"
-    )
+    current_backend_lookup.assert_not_called()
