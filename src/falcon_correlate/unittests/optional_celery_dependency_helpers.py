@@ -199,18 +199,17 @@ def _partial_output_text(output: str | bytes | None) -> str:
 
 
 def _run_python(
-    environ: cabc.Mapping[str, str],
     cwd: Path,
     *args: str,
     phase: str,
     sitecustomize_dir: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a fresh Python child with captured output and the shared timeout."""
-    child_environment = _child_environment(environ)
+    child_environment = _child_environment(os.environ)
     if sitecustomize_dir is not None:
         child_environment["PYTHONPATH"] = _pythonpath_with_import_blocker(
             sitecustomize_dir,
-            environ,
+            os.environ,
         )
 
     command = [sys.executable, *args]
@@ -256,7 +255,6 @@ def _count_collected_test_items(
 ) -> int:
     """Return how many test items the blocked child collects from ``paths``."""
     result = _run_python(
-        os.environ,
         project_root,
         "-m",
         "pytest",
@@ -268,13 +266,16 @@ def _count_collected_test_items(
         phase="collection",
         sitecustomize_dir=sitecustomize_dir,
     )
-    collected_count = sum(1 for line in result.stdout.splitlines() if "::" in line)
-    if result.returncode != 0 or collected_count == 0:
-        failure_reason = (
-            "child command failed"
-            if result.returncode != 0
-            else "no test items were collected"
-        )
+    collected_count = 0
+    failure_reason = ""
+    if result.returncode != 0:
+        failure_reason = "child command failed"
+    else:
+        collected_count = sum(1 for line in result.stdout.splitlines() if "::" in line)
+        if collected_count == 0:
+            failure_reason = "no test items were collected"
+
+    if failure_reason:
         msg = (
             f"Pytest collection failed: {failure_reason}.\n"
             f"Exit code: {result.returncode}\n"
@@ -296,7 +297,6 @@ def _run_celery_tests_with_celery_blocked(
     # of an ambient ``FORCE_COLOR``/``PY_COLORS`` that would otherwise make the
     # child emit ANSI escapes the normaliser cannot strip.
     result = _run_python(
-        os.environ,
         project_root,
         "-m",
         "pytest",

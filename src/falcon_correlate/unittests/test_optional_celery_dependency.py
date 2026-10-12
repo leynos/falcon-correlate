@@ -176,7 +176,6 @@ def test_package_and_celery_module_import_without_celery(
     """Package modules should import independently when Celery is unavailable."""
     _write_celery_import_blocker(tmp_path)
     result = _run_python(
-        os.environ,
         _PROJECT_ROOT,
         "-c",
         f"import importlib; importlib.import_module({module_name!r})",
@@ -203,7 +202,6 @@ def test_celery_import_blocker_rejects_celery_modules(
     """The subprocess hook should block top-level and nested Celery imports."""
     _write_celery_import_blocker(tmp_path)
     result = _run_python(
-        os.environ,
         _PROJECT_ROOT,
         "-c",
         f"import importlib; importlib.import_module({module_name!r})",
@@ -261,7 +259,10 @@ def test_collection_rejects_incomplete_child_results(
     with pytest.raises(AssertionError) as error:
         _count_collected_test_items(tmp_path, (), _PROJECT_ROOT)
 
-    assert str(error.value) == snapshot, "Collection preserves child output."
+    assert str(error.value) == snapshot, (
+        "Collection failure diagnostics should include the phase, exit code, "
+        "stdout and stderr."
+    )
 
 
 @pytest.mark.timeout(30)
@@ -287,14 +288,17 @@ def test_child_timeout_includes_phase_command_and_partial_output(
 
     with pytest.raises(AssertionError) as error:
         _run_python(
-            {},
             _PROJECT_ROOT,
             "-c",
             "print('partial')",
             phase="import probe",
+            sitecustomize_dir=tmp_path,
         )
 
-    assert str(error.value) == snapshot, "Timeout preserves phase and output."
+    assert str(error.value) == snapshot, (
+        "Timeout diagnostics should include the phase, command, timeout, "
+        "stdout and stderr."
+    )
 
 
 @pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
