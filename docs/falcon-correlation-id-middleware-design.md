@@ -1843,11 +1843,15 @@ weak per-app cache, and resolve the publishing app from the
    publish and worker propagation automatically.
 
 3. **Correct and efficient publish resolution:** `before_task_publish` carries
-   the task name as `sender`. The handler matches that name against configured
-   app task registries and reads the cached verdict, avoiding a per-publish
-   `celery.current_app` lookup and selecting the application that owns the
-   task. When no configured app owns the task, the handler retains the
-   `current_app` fallback for import-time-only and unconfigured processes.
+   the task name as `sender`. The handler matches that name against finalized
+   configured app task registries and reads the cached verdict, avoiding a
+   per-publish `celery.current_app` lookup when one app owns the task.
+   Unfinalized app registries are skipped so lookup does not finalize an app as
+   a side effect. If multiple configured apps contain the name, the signal does
+   not identify which app is publishing; the handler preserves Celery's task ID
+   instead of applying an arbitrary backend verdict. When no configured app
+   owns the task, the handler retains the `current_app` fallback for
+   import-time-only and unconfigured processes.
 
 4. **Idempotence and application-factory ergonomics:** The helper delegates to
    a shared `_maybe_connect_celery_signals()` connector, which reuses stable
@@ -1861,6 +1865,11 @@ weak per-app cache, and resolve the publishing app from the
    explicitly disconnect the known receivers by dispatch UID before calling the
    helper. This prevents the existing import-time registration from hiding a
    broken public configuration path.
+
+Import-time signal registration remains in place as a compatibility measure;
+removing it and making explicit configuration the only registration seam is a
+separate companion issue
+([#158](https://github.com/leynos/falcon-correlate/issues/158)).
 
 **Files created/modified:**
 

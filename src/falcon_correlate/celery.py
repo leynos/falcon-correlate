@@ -8,6 +8,7 @@ Celery's publish and worker task signals when Celery is available.
 from __future__ import annotations
 
 import contextvars
+import enum
 import importlib
 import logging
 import typing as typ
@@ -28,12 +29,21 @@ if typ.TYPE_CHECKING:
     class _TaskRegistryLike(typ.Protocol):
         """Structural type for configured task-name membership checks."""
 
-        def __contains__(self, task_name: object) -> bool:
+        def __contains__(self, task_name: object, /) -> bool:
             """Return whether the registry contains a task name."""
             ...
 
     class _CeleryAppLike(typ.Protocol):
-        """Structural type for the Celery app members used by this module."""
+        """Structural app type; instances must support weak cache keys."""
+
+        def __hash__(self) -> int:
+            """Return the hash required by the weak verdict cache."""
+            ...
+
+        @property
+        def finalized(self) -> bool:
+            """Whether the application's task registry is safe to inspect."""
+            ...
 
         @property
         def backend(self) -> _BackendLike:
@@ -53,6 +63,13 @@ _TASK_PRERUN_DISPATCH_UID = "falcon_correlate.celery.setup_correlation_id_in_wor
 _TASK_POSTRUN_DISPATCH_UID = "falcon_correlate.celery.clear_correlation_id_in_worker"
 _CORRELATION_ID_CONTEXT_KEY = "correlation_id"
 _logger = logging.getLogger(__name__)
+
+
+class _PublishingAppResolution(enum.Enum):
+    """Sentinel for sender names that do not identify one configured app."""
+
+    AMBIGUOUS = enum.auto()
+
 
 _ContextToken = contextvars.Token[str | None]
 type _CeleryContextTokens = dict[str, list[_ContextToken]]
@@ -80,8 +97,9 @@ def propagate_correlation_id_to_celery(
     ----------
     sender : object | None
         Task name emitted by Celery's publish signal. When it belongs to a
-        configured application, the handler uses that application's cached
-        result-backend verdict.
+        single configured application, the handler uses that application's
+        cached result-backend verdict. Shared task names preserve Celery's task
+        ID because the signal does not identify one owning application.
     **kwargs : dict
         Celery signal keyword arguments. Must contain a ``properties`` key
         mapping to a mutable mapping (typically :class:`dict`) that holds
@@ -93,7 +111,8 @@ def propagate_correlation_id_to_celery(
     handler uses that application's cached result-backend verdict. Otherwise,
     it falls back to the active Celery application. For an ``rpc://`` result
     backend, it preserves the task ID in ``correlation_id`` to maintain
-    Celery's result retrieval contract.
+    Celery's result retrieval contract. If multiple configured applications
+    share the task name, ownership is ambiguous and the task ID is preserved.
 
     """
     properties = typ.cast(
@@ -108,6 +127,9 @@ def propagate_correlation_id_to_celery(
         return
 
     publishing_app = _resolve_publishing_app(sender)
+    if publishing_app is _PublishingAppResolution.AMBIGUOUS:
+        return
+
     if publishing_app is None:
         backend_uses_rpc = _current_result_backend_uses_rpc()
     else:
@@ -125,15 +147,23 @@ def propagate_correlation_id_to_celery(
 
 def _app_backend_uses_rpc(app: _CeleryAppLike) -> bool:
     """Return whether an application's result backend URI uses RPC."""
-    backend = getattr(app, "backend", None)
-    if backend is None:
-        return False
+    try:
+        backend = getattr(app, "backend", None)
+        if backend is None:
+            return False
 
-    as_uri = getattr(backend, "as_uri", None)
-    if not callable(as_uri):
-        return False
+        as_uri = getattr(backend, "as_uri", None)
+        if not callable(as_uri):
+            return False
 
-    return str(as_uri()).startswith("rpc://")
+        return str(as_uri()).startswith("rpc://")
+    except Exception:
+        # Backend inspection is optional and must not break task publishing.
+        _logger.debug(
+            "Unable to inspect Celery result backend URI; treating it as non-RPC.",
+            exc_info=True,
+        )
+        return False
 
 
 def _cache_app_backend_rpc_verdict(app: _CeleryAppLike) -> bool:
@@ -143,15 +173,29 @@ def _cache_app_backend_rpc_verdict(app: _CeleryAppLike) -> bool:
     return backend_uses_rpc
 
 
-def _resolve_publishing_app(sender: object | None) -> _CeleryAppLike | None:
-    """Return the configured application that owns a publishing task name."""
+def _resolve_publishing_app(
+    sender: object | None,
+) -> _CeleryAppLike | _PublishingAppResolution | None:
+    """Return a unique finalized owner, ambiguity, or no configured owner."""
+    publishing_app: _CeleryAppLike | None = None
     for app in _configured_app_backend_rpc_verdicts:
-        tasks = getattr(app, "tasks", None)
-        contains = getattr(tasks, "__contains__", None)
-        if callable(contains) and contains(sender):
-            return app
+        try:
+            if not getattr(app, "finalized", False):
+                continue
 
-    return None
+            tasks = getattr(app, "tasks", None)
+            contains = getattr(tasks, "__contains__", None)
+            if not callable(contains) or not contains(sender):
+                continue
+        except (AttributeError, RuntimeError, TypeError):
+            # An unfinished or malformed registry must not interrupt publish.
+            continue
+
+        if publishing_app is not None:
+            return _PublishingAppResolution.AMBIGUOUS
+        publishing_app = app
+
+    return publishing_app
 
 
 def _current_result_backend_uses_rpc() -> bool:
@@ -311,15 +355,18 @@ def configure_celery_correlation[CeleryAppT: _CeleryAppLike](
 
     The integration uses Celery's global signal registry and caches this
     application's ``rpc://`` result-backend verdict. Publish handling uses that
-    cached verdict when the signal sender belongs to this application's task
-    registry. Stable dispatch UIDs keep repeated calls idempotent.
+    cached verdict when this is the unique finalized app whose task registry
+    contains the signal sender. If multiple configured apps share the task
+    name, the handler preserves Celery's task ID. Stable dispatch UIDs keep
+    repeated calls idempotent.
 
     Parameters
     ----------
     app : CeleryAppT
         Celery application instance whose RPC result-backend verdict is cached.
-        Signal registration remains global and requires Celery's signal objects
-        to be importable.
+        The app must be hashable and weak-referenceable for the weak-key cache.
+        Signal registration remains global and requires Celery's signal
+        objects to be importable.
 
     Returns
     -------

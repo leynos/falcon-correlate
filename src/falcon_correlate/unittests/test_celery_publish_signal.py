@@ -146,6 +146,8 @@ def test_handler_uses_configured_app_for_rpc_backend(
     def configured_non_rpc_publish_task() -> None:
         """Provide a task name owned by the non-RPC application."""
 
+    rpc_app.finalize()
+    non_rpc_app.finalize()
     configure_celery_correlation(rpc_app)
     configure_celery_correlation(non_rpc_app)
     rpc_properties = {"correlation_id": "rpc-task-id"}
@@ -188,6 +190,7 @@ def test_configured_app_uses_cached_backend_verdict_without_global_lookup(
     def configured_cache_publish_task() -> None:
         """Provide a task name owned by the configured application."""
 
+    celery_app.finalize()
     configure_celery_correlation(celery_app)
     properties = {"correlation_id": "celery-task-id"}
     current_result_backend_uses_rpc = mock.Mock(return_value=False)

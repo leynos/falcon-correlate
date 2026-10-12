@@ -773,7 +773,9 @@ The helper connects the `before_task_publish`, `task_prerun`, and
 `task_postrun` handlers in one idempotent call, caches that app's `rpc://`
 result-backend verdict, and returns the same app instance. It is safe to call
 repeatedly, which is useful when publisher and worker bootstrap code share an
-application factory.
+application factory. Configured app instances must be hashable and
+weak-referenceable for the per-app verdict cache; Celery's own application
+instances satisfy this requirement.
 
 Importing `falcon_correlate` also registers those handlers automatically when
 Celery is installed. If the publisher process or worker process already imports
@@ -814,6 +816,10 @@ def send_invoice_email(self, user_id: str) -> None:
   configured app whose result backend is not `rpc://`, the outgoing Celery
   message uses that value as its publish-time `correlation_id`. For task names
   not owned by a configured app, the handler falls back to Celery's active app.
+- When more than one configured app contains the publishing task name, as can
+  happen with Celery shared tasks, the handler preserves Celery's task ID. The
+  `before_task_publish` signal provides a task name, not an unambiguous app
+  identity.
 - When `correlation_id_var` is not set, `falcon-correlate` leaves Celery's
   generated publish value unchanged.
 - If the caller passes `apply_async(correlation_id=...)` while a request
