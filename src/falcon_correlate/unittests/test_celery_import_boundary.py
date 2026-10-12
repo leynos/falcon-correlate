@@ -34,7 +34,7 @@ import sys
 
 import falcon_correlate
 
-assert "celery" not in sys.modules
+assert "celery" not in sys.modules, "package import must not load Celery"
 
 from celery import Celery
 from celery.signals import before_task_publish, task_postrun, task_prerun
@@ -55,11 +55,15 @@ signals = (
     (task_prerun, _TASK_PRERUN_DISPATCH_UID),
     (task_postrun, _TASK_POSTRUN_DISPATCH_UID),
 )
-assert not any(has_receiver(signal, dispatch_uid) for signal, dispatch_uid in signals)
+assert not any(
+    has_receiver(signal, dispatch_uid) for signal, dispatch_uid in signals
+), "Celery handlers must not connect before configuration"
 
 configure_celery_correlation(Celery("celery-import-boundary", broker="memory://"))
 
-assert all(has_receiver(signal, dispatch_uid) for signal, dispatch_uid in signals)
+assert all(has_receiver(signal, dispatch_uid) for signal, dispatch_uid in signals), (
+    "configuration must connect all Celery handlers"
+)
 """
     result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - test runs Python itself.
         [sys.executable, "-c", script],
