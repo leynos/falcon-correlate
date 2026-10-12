@@ -12,7 +12,7 @@ activation seam.
 
 ## Context and problem statement
 
-The package root re-exports the Celery integration. As a result, importing a
+The package root re-exports the Celery integration. As a result, importing an
 unrelated package submodule first executed `falcon_correlate.__init__`, which
 imported the Celery integration, loaded Celery, and connected three handlers to
 Celery's process-global signal registry. This imposed an import cost and a
