@@ -2,9 +2,10 @@
 
 This module is import-safe when the optional ``celery`` dependency is not
 installed. Importing this module defines integration names only: it neither
-imports Celery nor connects its global signals. Call
-``configure_celery_correlation(app)`` to register the publish and worker task
-handlers.
+imports Celery nor connects its process-global signals. Call
+:func:`configure_celery_correlation` explicitly in every publisher and worker
+process that needs correlation ID propagation; it registers the publish and
+worker task handlers. Stable dispatch UIDs keep activation idempotent.
 """
 
 from __future__ import annotations
@@ -320,13 +321,16 @@ def configure_celery_correlation[CeleryAppT: _CeleryAppLike](
 ) -> CeleryAppT:
     """Configure Celery correlation ID propagation for an application.
 
-    The integration uses Celery's global signal registry and caches this
-    application's definite ``rpc://`` result-backend verdict, and wraps its
-    ``send_task`` method to identify the publishing application while Celery
-    emits a publish signal. Signal sender values are task names and cannot
-    reliably identify the publisher. If backend inspection fails, the verdict
-    remains uncached and publishes preserve Celery's task ID until inspection
-    succeeds. Stable dispatch UIDs keep repeated calls idempotent.
+    Call this helper explicitly in each publisher and worker process that needs
+    correlation ID propagation. Signal registration uses Celery's process-global
+    registry; stable dispatch UIDs keep repeated activation idempotent.
+
+    The integration caches this application's definite ``rpc://``
+    result-backend verdict and wraps its ``send_task`` method to identify the
+    publishing application while Celery emits a publish signal. Signal sender
+    values are task names and cannot reliably identify the publisher. If backend
+    inspection fails, the verdict remains uncached and publishes preserve
+    Celery's task ID until inspection succeeds.
 
     Each distinct configuration outcome emits one structured ``INFO`` record
     when complete or ``WARNING`` record when incomplete for this app's lifetime.

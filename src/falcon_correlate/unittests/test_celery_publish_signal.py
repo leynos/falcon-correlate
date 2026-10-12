@@ -193,10 +193,10 @@ def _assert_signal_delivery(
     assert _count_integration_receivers(signal_responses) == 1, failure_message
 
 
-def test_signal_connection_is_idempotent_across_reload(
+def test_signal_connection_is_idempotent_on_repeated_explicit_calls(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
 ) -> None:
-    """Test idempotency of the connection helper."""
+    """Repeated explicit connection keeps one publish receiver."""
     probe_calls: list[str] = []
     probe_dispatch_uid = "test_probe_publish_receiver"
     receiver = functools.partial(probe_receiver, probe_calls)
@@ -208,6 +208,7 @@ def test_signal_connection_is_idempotent_across_reload(
             dispatch_uid=probe_dispatch_uid,
             weak=False,
         )
+        _maybe_connect_celery_publish_signal()
         initial_properties, initial_responses = _send_signal(isolated_context)
         _assert_signal_delivery(initial_properties, initial_responses, probe_calls)
 
