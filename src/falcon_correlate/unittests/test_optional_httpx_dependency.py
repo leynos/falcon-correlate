@@ -68,11 +68,12 @@ def test_package_modules_import_without_httpx(module_name: str) -> None:
     result = _run_python_with_httpx_blocked(
         f"import importlib; importlib.import_module({module_name!r})",
     )
-
-    assert result.returncode == 0, (
+    failure_message = (
         f"{module_name} should import when HTTPX is unavailable.\n"
         f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     )
+
+    assert result.returncode == 0, failure_message
 
 
 def test_httpx_import_blocker_rejects_httpx() -> None:
