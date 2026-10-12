@@ -74,7 +74,7 @@ def _reset_context_variables() -> cabc.Generator[None, None, None]:
 
 @given("Celery correlation handlers have been disconnected")
 def given_celery_handlers_disconnected() -> None:
-    """Disconnect integration receivers so the scenario proves configuration."""
+    """Reset shared process-global receivers before the configuration scenario."""
     before_task_publish.disconnect(dispatch_uid=_BEFORE_TASK_PUBLISH_DISPATCH_UID)
     task_prerun.disconnect(dispatch_uid=_TASK_PRERUN_DISPATCH_UID)
     task_postrun.disconnect(dispatch_uid=_TASK_POSTRUN_DISPATCH_UID)

@@ -48,7 +48,7 @@ class _SignalWithReceivers(typ.Protocol):
 
 
 def _disconnect_integration_receivers() -> None:
-    """Remove existing integration receivers by stable dispatch UID."""
+    """Reset this integration's receivers in Celery's shared process state."""
     before_task_publish.disconnect(dispatch_uid=_BEFORE_TASK_PUBLISH_DISPATCH_UID)
     task_prerun.disconnect(dispatch_uid=_TASK_PRERUN_DISPATCH_UID)
     task_postrun.disconnect(dispatch_uid=_TASK_POSTRUN_DISPATCH_UID)
