@@ -40,6 +40,15 @@
 - [Scripting standards](scripting-standards.md) describes secure helper-script
   conventions, including `Cyclopts`, `cuprum`, `pathlib`, and `cmd-mox` usage.
 
+## Debugging records
+
+- [PR #33 inconclusive Testing check](debugging/issue-34-inconclusive-testing-compile-time-ui-pr-33.md)
+  records the repository gate reruns and the limits of the available external
+  review evidence.
+- [Optional-Celery subprocess timeout](debugging/debugging-plan-2026-08-21-optional-celery-subprocess-timeout.md)
+  records the earlier investigation of child pytest timeouts and its
+  falsification results.
+
 ## Planning documents
 
 - [Roadmap](roadmap.md) tracks the structured delivery plan for the middleware.
