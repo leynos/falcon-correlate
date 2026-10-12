@@ -11,6 +11,7 @@ import contextvars
 import enum
 import importlib
 import logging
+import threading
 import typing as typ
 import weakref
 
@@ -79,6 +80,7 @@ _celery_context_tokens: contextvars.ContextVar[_CeleryContextTokens | None] = (
 _configured_app_backend_rpc_verdicts: weakref.WeakKeyDictionary[
     _CeleryAppLike, bool
 ] = weakref.WeakKeyDictionary()
+_configured_app_backend_rpc_verdicts_lock = threading.RLock()
 
 
 def propagate_correlation_id_to_celery(
@@ -133,11 +135,7 @@ def propagate_correlation_id_to_celery(
     if publishing_app is None:
         backend_uses_rpc = _current_result_backend_uses_rpc()
     else:
-        backend_uses_rpc = _configured_app_backend_rpc_verdicts.get(
-            publishing_app,
-        )
-        if backend_uses_rpc is None:
-            backend_uses_rpc = _cache_app_backend_rpc_verdict(publishing_app)
+        backend_uses_rpc = _cache_app_backend_rpc_verdict(publishing_app)
 
     if backend_uses_rpc:
         return
@@ -168,9 +166,14 @@ def _app_backend_uses_rpc(app: _CeleryAppLike) -> bool:
 
 def _cache_app_backend_rpc_verdict(app: _CeleryAppLike) -> bool:
     """Cache and return an application's RPC result-backend verdict."""
+    with _configured_app_backend_rpc_verdicts_lock:
+        cached_verdict = _configured_app_backend_rpc_verdicts.get(app)
+    if cached_verdict is not None:
+        return cached_verdict
+
     backend_uses_rpc = _app_backend_uses_rpc(app)
-    _configured_app_backend_rpc_verdicts[app] = backend_uses_rpc
-    return backend_uses_rpc
+    with _configured_app_backend_rpc_verdicts_lock:
+        return _configured_app_backend_rpc_verdicts.setdefault(app, backend_uses_rpc)
 
 
 def _resolve_publishing_app(
@@ -178,7 +181,10 @@ def _resolve_publishing_app(
 ) -> _CeleryAppLike | _PublishingAppResolution | None:
     """Return a unique finalized owner, ambiguity, or no configured owner."""
     publishing_app: _CeleryAppLike | None = None
-    for app in _configured_app_backend_rpc_verdicts:
+    with _configured_app_backend_rpc_verdicts_lock:
+        configured_apps = tuple(_configured_app_backend_rpc_verdicts.keys())
+
+    for app in configured_apps:
         try:
             if not getattr(app, "finalized", False):
                 continue

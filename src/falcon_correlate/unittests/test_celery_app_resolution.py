@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import threading
 import typing as typ
+from concurrent.futures import ThreadPoolExecutor
 from unittest import mock
 
 import pytest
@@ -27,6 +29,7 @@ from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file]
 )
 from falcon_correlate.celery import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     _app_backend_uses_rpc,
+    _resolve_publishing_app,
     configure_celery_correlation,
     propagate_correlation_id_to_celery,
 )
@@ -53,6 +56,35 @@ class _MalformedCeleryApp:
         self.tasks: dict[str, object] = {}
 
 
+class _BlockingTaskRegistry:
+    """Task registry that pauses membership checks for a concurrency test."""
+
+    def __init__(self, task_name: str) -> None:
+        """Set up events that let the test control a membership check."""
+        self.task_name = task_name
+        self.lookup_started = threading.Event()
+        self.allow_lookup_to_finish = threading.Event()
+
+    def __contains__(self, candidate: object) -> bool:
+        """Pause before returning whether the registry owns the task name."""
+        self.lookup_started.set()
+        self.allow_lookup_to_finish.wait(timeout=5)
+        return candidate == self.task_name
+
+
+class _AppWithTaskRegistry:
+    """Minimal app shape for deterministic app-resolution concurrency tests."""
+
+    def __init__(
+        self,
+        tasks: dict[str, object] | _BlockingTaskRegistry,
+    ) -> None:
+        """Provide the members inspected by Celery app configuration."""
+        self.backend = _FailingBackend()
+        self.finalized = True
+        self.tasks = tasks
+
+
 def test_backend_uri_failure_does_not_escape_the_app_check(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -67,6 +99,27 @@ def test_backend_uri_failure_does_not_escape_the_app_check(
         "Unable to inspect Celery result backend URI" in record.message
         for record in caplog.records
     ), "a failed backend lookup should emit a diagnostic"
+
+
+def test_configuring_an_app_during_resolution_does_not_mutate_its_snapshot() -> None:
+    """A concurrent configure call cannot invalidate app resolution."""
+    task_name = "resolution-during-configure-task"
+    registry = _BlockingTaskRegistry(task_name)
+    publishing_app = _AppWithTaskRegistry(registry)
+    configure_celery_correlation(publishing_app)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        resolution = executor.submit(_resolve_publishing_app, task_name)
+        assert registry.lookup_started.wait(timeout=5), (
+            "resolution should reach the blocking membership check"
+        )
+        newly_configured_app = _AppWithTaskRegistry({})
+        configure_celery_correlation(newly_configured_app)
+        registry.allow_lookup_to_finish.set()
+
+        assert resolution.result(timeout=5) is publishing_app, (
+            "resolution should continue over its stable app snapshot"
+        )
 
 
 def test_unfinalized_configured_app_is_not_finalized_during_resolution(
