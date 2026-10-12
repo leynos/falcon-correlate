@@ -257,10 +257,7 @@ def test_collection_rejects_incomplete_child_results(
     with pytest.raises(AssertionError) as error:
         _count_collected_test_items(tmp_path, (), _PROJECT_ROOT)
 
-    assert str(error.value) == snapshot, (
-        "Collection failure diagnostics should include the phase, exit code, "
-        "stdout and stderr."
-    )
+    assert str(error.value) == snapshot, "Collection preserves child output."
 
 
 @pytest.mark.timeout(30)
@@ -294,10 +291,7 @@ def test_child_timeout_includes_phase_command_and_partial_output(
             phase="import probe",
         )
 
-    assert str(error.value) == snapshot, (
-        "Timeout diagnostics should include the phase, command, timeout, "
-        "stdout and stderr."
-    )
+    assert str(error.value) == snapshot, "Timeout preserves phase and output."
 
 
 @pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
