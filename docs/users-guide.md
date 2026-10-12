@@ -774,17 +774,17 @@ The helper connects the `before_task_publish`, `task_prerun`, and
 instance. It is safe to call repeatedly, which is useful when publisher and
 worker bootstrap code share an application factory.
 
-Importing `falcon_correlate` also registers those handlers automatically when
-Celery is installed. If the publisher process or worker process already imports
-anything from the package root, no extra registration call is needed. The
-explicit helper remains the preferred form for new application setup because it
-makes Celery integration visible at the point where the Celery app is created.
+Importing `falcon_correlate` does not register Celery handlers. Call
+`configure_celery_correlation(app)` in every publisher and worker process that
+needs correlation propagation. Put the call in the module that defines the
+Celery app so `celery -A <module> worker` activates the handlers when it
+imports that module.
 
-Once the handlers are registered in the publisher process, normal task
-publishing APIs such as `delay()` and `apply_async()` propagate the request
-correlation ID automatically. When the worker process also registers the
-handlers, task execution sees that incoming value through
-`correlation_id_var.get()`.
+After explicit publisher configuration, normal task publishing APIs such as
+`delay()` and `apply_async()` propagate the request correlation ID when the
+active result backend is not `rpc://`. With the `rpc://` backend, Celery's
+task-ID correlation value is preserved. After explicit worker configuration,
+task execution sees the incoming value through `correlation_id_var.get()`.
 
 ```python
 from falcon_correlate import correlation_id_var

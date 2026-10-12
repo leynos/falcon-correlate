@@ -44,7 +44,7 @@ from falcon_correlate.unittests.optional_celery_dependency_helpers import (
     _discover_celery_test_paths,
     _PytestRun,
     _run_celery_tests_with_celery_blocked,
-    _run_python_with_celery_blocked,
+    _run_python,
     _write_celery_import_blocker,
     _write_child_sentinel_test,
 )
@@ -167,12 +167,12 @@ def test_package_and_celery_module_import_without_celery(
 ) -> None:
     """Package modules should import independently when Celery is unavailable."""
     _write_celery_import_blocker(tmp_path)
-    result = _run_python_with_celery_blocked(
-        tmp_path,
+    result = _run_python(
         os.environ,
         _PROJECT_ROOT,
         "-c",
         f"import importlib; importlib.import_module({module_name!r})",
+        sitecustomize_dir=tmp_path,
     )
 
     assert result.returncode == 0, (
@@ -193,12 +193,12 @@ def test_celery_import_blocker_rejects_celery_modules(
 ) -> None:
     """The subprocess hook should block top-level and nested Celery imports."""
     _write_celery_import_blocker(tmp_path)
-    result = _run_python_with_celery_blocked(
-        tmp_path,
+    result = _run_python(
         os.environ,
         _PROJECT_ROOT,
         "-c",
         f"import importlib; importlib.import_module({module_name!r})",
+        sitecustomize_dir=tmp_path,
     )
 
     blocked_name = module_name.split(".", maxsplit=1)[0]

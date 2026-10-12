@@ -92,6 +92,12 @@ easy to read and test.
 - Preserve import-time signal registration behaviour. Importing the package in
   a Celery worker process should remain sufficient to register the integration
   when Celery is installed.
+
+**Superseded by issue #48:** Imports now leave Celery signals untouched.
+Explicit setup through `configure_celery_correlation(app)` is required in each
+publisher and worker process. Disconnect-before-configure still isolates shared
+process-global test state where relevant.
+
 - Use British English in documentation.
 - Wrap Markdown paragraphs and list items at 80 columns, and keep code blocks
   within 120 columns.

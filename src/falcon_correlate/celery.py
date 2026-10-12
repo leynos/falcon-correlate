@@ -1,8 +1,9 @@
 """Celery signal integration for correlation ID propagation.
 
-This module is import-safe when the optional ``celery`` dependency is not
-installed. Importing this module opportunistically registers handlers for
-Celery's publish and worker task signals when Celery is available.
+This module is import-safe when the optional ``celery`` dependency is absent.
+Call :func:`configure_celery_correlation` in each publisher and worker process
+that needs correlation ID propagation. Activation uses Celery's process-global
+signal registry and is idempotent.
 """
 
 from __future__ import annotations
@@ -184,7 +185,7 @@ def _safe_connect_signal(
 
 
 def _maybe_connect_celery_publish_signal() -> None:
-    """Register the Celery publish handler once when Celery is installed."""
+    """Register the Celery publish handler during explicit configuration."""
     try:
         celery_signals = importlib.import_module("celery.signals")
     except ImportError:
@@ -199,7 +200,7 @@ def _maybe_connect_celery_publish_signal() -> None:
 
 
 def _maybe_connect_celery_worker_signals() -> None:
-    """Register the Celery worker handlers once when Celery is installed."""
+    """Register Celery worker handlers during explicit configuration."""
     try:
         celery_signals = importlib.import_module("celery.signals")
     except ImportError:
@@ -220,7 +221,7 @@ def _maybe_connect_celery_worker_signals() -> None:
 
 
 def _maybe_connect_celery_signals() -> None:
-    """Register all supported Celery signal handlers when Celery is installed.
+    """Register all supported Celery signal handlers during explicit setup.
 
     Celery's Django-derived signal implementation protects receiver mutation
     with an internal ``threading.Lock``. Stable dispatch UIDs provide the
@@ -233,32 +234,30 @@ def _maybe_connect_celery_signals() -> None:
 
 
 def configure_celery_correlation[CeleryAppT](app: CeleryAppT) -> CeleryAppT:
-    """Configure Celery correlation ID propagation for an application.
+    """Explicitly activate Celery correlation ID propagation in this process.
 
-    The current integration uses Celery's global signal registry, so the
-    ``app`` parameter is returned unchanged for application-factory ergonomics.
-    Stable dispatch UIDs keep repeated calls idempotent.
+    Call this helper in each publisher and worker process that needs
+    correlation ID propagation. It connects the publish and worker receivers
+    through Celery's process-global signal registry. Stable dispatch UIDs make
+    repeated activation idempotent. The ``app`` argument is returned unchanged
+    for application-factory ergonomics.
 
     Parameters
     ----------
     app : CeleryAppT
-        Celery application instance being configured. The instance is used as
-        the caller's explicit setup marker; signal registration remains global
-        and requires Celery's signal objects to be importable.
+        Celery application instance being configured. Signal registration is
+        process-global and requires Celery's signal objects to be importable.
 
     Returns
     -------
     CeleryAppT
         The same ``app`` instance, returned for application-factory ergonomics.
-        Repeated calls are idempotent because registration uses stable dispatch
-        UIDs.
+        The three supported receivers are connected idempotently through their
+        stable dispatch UIDs.
 
     """
     _maybe_connect_celery_signals()
     return app
-
-
-_maybe_connect_celery_signals()
 
 
 __all__ = [
