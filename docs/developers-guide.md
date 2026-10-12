@@ -347,6 +347,13 @@ each event, which interpreter the suite runs on and how often: every
 interpreter exactly once. It fails on a duplicate as well as on an interpreter
 that stops being tested.
 
+Both coverage lanes pass `pytest-workers: ''` to the shared action and run the
+suite serially. The action exposes the xdist worker count, but not the
+`--dist=loadgroup` strategy required for `pytest.mark.xdist_group` to keep a
+group on one worker. Serial coverage runs keep tests that provision shared
+toolchains from racing. The direct pytest commands use `--dist=loadgroup`, so
+those lanes retain bounded parallelism while keeping each group together.
+
 No checksum input is passed. The pinned action carries a CLI manifest naming
 `cs-coverage` 1.0.101, so the installation is deterministic without one;
 `installer-checksum` is deprecated and rejected when non-empty at that pin, and

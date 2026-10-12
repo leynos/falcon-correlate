@@ -181,11 +181,13 @@ def _blocked_celery_environment(
 
 def _partial_output_text(output: str | bytes | None) -> str:
     """Decode any partial output captured before a child timeout."""
-    if output is None:
-        return ""
-    if isinstance(output, bytes):
-        return output.decode(errors="replace")
-    return output
+    match output:
+        case None:
+            return ""
+        case bytes():
+            return output.decode(errors="replace")
+        case str():
+            return output
 
 
 def _run_python_with_celery_blocked(
