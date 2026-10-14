@@ -1,8 +1,9 @@
-"""Falcon WSGI correlation ID middleware and public middleware exports.
+"""Falcon middleware orchestration and compatibility re-exports.
 
-This module defines the WSGI middleware, delegates shared lifecycle behaviour
-to ``_CorrelationIDMiddlewareBase`` in ``middleware_base.py``, and exposes the
-ASGI middleware and shared ``CorrelationIDConfig`` configuration.
+This module orchestrates the Falcon WSGI middleware and exposes the ASGI
+middleware and shared ``CorrelationIDConfig`` configuration. For backward
+compatibility only, it re-exports ``DEFAULT_HEADER_NAME``,
+``correlation_id_var``, and ``user_id_var`` from their owning modules.
 """
 
 from __future__ import annotations

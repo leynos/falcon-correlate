@@ -15,7 +15,8 @@ from __future__ import annotations
 import importlib
 import typing as typ
 
-from .middleware import DEFAULT_HEADER_NAME, correlation_id_var
+from .middleware_config import DEFAULT_HEADER_NAME
+from .middleware_utils import correlation_id_var
 
 if typ.TYPE_CHECKING:
     from types import TracebackType
