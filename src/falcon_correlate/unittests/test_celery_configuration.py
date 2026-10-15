@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import concurrent.futures
+import logging
 import threading
 import typing as typ
 from types import SimpleNamespace
@@ -109,8 +110,10 @@ def test_configure_celery_correlation_connects_all_supported_signals(
 
 def test_configure_celery_correlation_is_safe_under_concurrent_calls(
     celery_app: Celery,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Concurrent configuration calls should still connect each signal once."""
+    """Concurrent setup connects each signal and reports activation only once."""
+    caplog.set_level(logging.INFO, logger="falcon_correlate.celery")
     _disconnect_integration_receivers()
     barrier = threading.Barrier(4)
 
@@ -130,6 +133,17 @@ def test_configure_celery_correlation_is_safe_under_concurrent_calls(
         "concurrent configuration should install only one publisher wrapper"
     )
     _assert_all_signals_connected_once()
+    activation_records = [
+        record
+        for record in caplog.records
+        if getattr(record, "operation", None) == "configure_celery_correlation"
+    ]
+    assert len(activation_records) == 1, (
+        "Concurrent configuration should emit one activation record."
+    )
+    assert activation_records[0].levelno == logging.INFO, (
+        "Complete concurrent setup should be reported at INFO."
+    )
 
 
 def test_configure_celery_correlation_is_idempotent(celery_app: Celery) -> None:
@@ -288,12 +302,8 @@ def test_configure_celery_correlation_is_exported_from_package_root() -> None:
     ), failure_message
 
 
-def test_safe_connect_signal_logs_when_signal_missing(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """_safe_connect_signal should emit a DEBUG message for a missing signal."""
-    import logging
-
+def test_safe_connect_signal_reports_when_signal_missing() -> None:
+    """Missing signals should produce a bounded outcome for the caller."""
     from falcon_correlate.celery import _safe_connect_signal
 
     def fake_handler(**_: object) -> None:
@@ -302,29 +312,23 @@ def test_safe_connect_signal_logs_when_signal_missing(
 
     module_without_signal = object()
 
-    with caplog.at_level(logging.DEBUG, logger="falcon_correlate.celery"):
-        _safe_connect_signal(
-            module_without_signal,
-            "nonexistent_signal",
-            fake_handler,
-            "test.uid",
-        )
+    outcome = _safe_connect_signal(
+        module_without_signal,
+        "nonexistent_signal",
+        fake_handler,
+        "test.uid",
+    )
 
-    failure_message = "expected condition: any(('nonexistent_signal' in record.messa..."
-    assert any("nonexistent_signal" in record.message for record in caplog.records), (
-        failure_message
+    assert outcome == "signal_missing", (
+        "Missing signal attributes should report a bounded failure outcome."
     )
 
 
-def test_safe_connect_signal_logs_on_successful_connect(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """_safe_connect_signal should emit a DEBUG message on successful connect."""
-    import logging
-
+def test_safe_connect_signal_reports_successful_connect() -> None:
+    """Successful connection should produce a bounded outcome for the caller."""
     from falcon_correlate.celery import _safe_connect_signal
 
-    fake_uid = "falcon_correlate.test.debug_log_uid"
+    fake_uid = "falcon_correlate.test.connection_outcome_uid"
 
     def fake_handler(**_: object) -> None:
         """Stand in for a Celery signal receiver."""
@@ -333,29 +337,19 @@ def test_safe_connect_signal_logs_on_successful_connect(
     fake_module = SimpleNamespace(before_task_publish=before_task_publish)
 
     try:
-        with caplog.at_level(logging.DEBUG, logger="falcon_correlate.celery"):
-            _safe_connect_signal(
-                fake_module,
-                "before_task_publish",
-                fake_handler,
-                fake_uid,
-            )
-        failure_message = (
-            "expected condition: any((fake_uid in record.message for recor..."
+        outcome = _safe_connect_signal(
+            fake_module,
+            "before_task_publish",
+            fake_handler,
+            fake_uid,
         )
-        assert any(fake_uid in record.message for record in caplog.records), (
-            failure_message
-        )
+        assert outcome == "connected", "Successful connection should be reported."
     finally:
         before_task_publish.disconnect(dispatch_uid=fake_uid)
 
 
-def test_safe_connect_signal_suppresses_invalid_receiver(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
+def test_safe_connect_signal_suppresses_invalid_receiver() -> None:
     """Invalid receiver signatures should remain an optional integration failure."""
-    import logging
-
     from falcon_correlate.celery import _safe_connect_signal
 
     def reject_receiver(*_: object, **__: object) -> None:
@@ -367,12 +361,11 @@ def test_safe_connect_signal_suppresses_invalid_receiver(
         before_task_publish=SimpleNamespace(connect=reject_receiver)
     )
 
-    with caplog.at_level(logging.DEBUG, logger="falcon_correlate.celery"):
-        _safe_connect_signal(fake_module, "before_task_publish", lambda: None, "uid")
-
-    failure_message = "expected condition: any(('invalid receiver' in record.message..."
-    assert any("invalid receiver" in record.message for record in caplog.records), (
-        failure_message
+    outcome = _safe_connect_signal(
+        fake_module, "before_task_publish", lambda: None, "uid"
+    )
+    assert outcome == "receiver_rejected", (
+        "Invalid receivers should return the bounded rejection outcome."
     )
 
 

@@ -1719,16 +1719,17 @@ before delegation.
 
 **Decision:** Add a dedicated optional-integration module at
 `src/falcon_correlate/celery.py` that defines
-`propagate_correlation_id_to_celery` and connects it to Celery's
-`before_task_publish` signal at import time.
+`propagate_correlation_id_to_celery`. Calling
+`configure_celery_correlation(app)` connects it to Celery's
+`before_task_publish` signal.
 
 **Rationale:**
 
 1. **Feature isolation and import safety:** Keeping the implementation in its
    own module mirrors the existing `httpx` integration and preserves
-   `import falcon_correlate` when Celery is not installed. The module loads the
-   signal dynamically and becomes a no-op when the optional dependency is
-   absent.
+   `import falcon_correlate` when Celery is not installed. Importing the
+   package or module neither loads Celery nor mutates its global signal
+   registry; configuration dynamically loads signals only when a caller opts in.
 
 2. **Idempotent signal registration:** The signal connection uses a stable
    `dispatch_uid` (
@@ -1749,9 +1750,9 @@ before delegation.
    `properties` mapping. If `properties` is `None`, the handler returns without
    rebinding local variables that Celery would not observe.
 
-5. **Public package export:** The handler is re-exported from
-   `falcon_correlate.__init__` so consumers can discover the integration from
-   the package root while still getting automatic registration on import.
+5. **Public package export:** The handler and configuration helper are
+   re-exported from `falcon_correlate.__init__` so consumers can discover the
+   integration from the package root without triggering it.
 
 **Files created/modified:**
 
@@ -1768,15 +1769,15 @@ before delegation.
   scenarios.
 - `tests/bdd/test_celery_publish_signal_steps.py` — Added BDD steps that patch
   the Kombu publish boundary and assert the final broker correlation ID.
-- `docs/users-guide.md` — Documented installation, automatic registration, and
+- `docs/users-guide.md` — Documented installation, explicit registration, and
   the publish-path overwrite policy.
 
 ### A.9. Celery worker signal handlers (Task 4.2.2)
 
 **Decision:** Extend `src/falcon_correlate/celery.py` with
 `setup_correlation_id_in_worker` and `clear_correlation_id_in_worker`, and
-register them at import time with Celery's `task_prerun` and `task_postrun`
-signals.
+register them through `configure_celery_correlation(app)` with Celery's
+`task_prerun` and `task_postrun` signals.
 
 **Rationale:**
 
@@ -1793,8 +1794,8 @@ signals.
    context.
 
 3. **Registration stays idempotent:** Stable dispatch UIDs are used for both
-   worker signals so repeated imports or reloads do not create duplicate
-   receivers.
+   worker signals so repeated explicit configuration calls do not create
+   duplicate receivers.
 
 4. **Behavioural testing uses explicit task signal dispatch:** Celery eager
    execution fires `task_prerun` and `task_postrun`, but on Celery 5.6.3 it
@@ -1811,8 +1812,7 @@ signals.
 **Files created/modified:**
 
 - `src/falcon_correlate/celery.py` — Added worker setup and cleanup handlers,
-  the internal token store, worker signal registration, and import-time
-  connection.
+  the internal token store, and worker signal registration.
 - `src/falcon_correlate/__init__.py` — Re-exported
   `setup_correlation_id_in_worker` and `clear_correlation_id_in_worker`.
 - `src/falcon_correlate/unittests/test_celery_worker_signal.py` — Added unit
@@ -1826,10 +1826,9 @@ signals.
 
 ### A.10. Celery configuration helper (Task 4.2.3)
 
-**Decision:** Keep `configure_celery_correlation(app)` as the explicit Celery
-setup helper, cache each configured app's definite `rpc://` result-backend
-verdict in a weak per-app cache, and establish publisher identity around that
-app's `send_task` method while its global publish signal is emitted.
+**Decision:** Add `configure_celery_correlation(app)` to
+`src/falcon_correlate/celery.py`, re-export it from `falcon_correlate`, and
+make it the sole entry point for Celery signal registration.
 
 **Rationale:**
 
@@ -1838,9 +1837,9 @@ app's `send_task` method while its global publish signal is emitted.
    helper now caches the configured app's result-backend verdict, so calling it
    has a concrete per-app effect without duplicating signal registration logic.
 
-2. **Backwards compatibility:** Import-time registration remains in place, so
-   existing consumers that rely on `import falcon_correlate` continue to get
-   publish and worker propagation automatically.
+2. **Explicit opt-in:** Import-time registration is removed in version 0.2.0.
+   This breaking change avoids Celery's import cost and implicit mutation of
+   its process-global signal registry in processes that never use Celery.
 
 3. **Correct and efficient publisher resolution:** `before_task_publish` carries
    a task name as `sender`, not the publishing app. Registry membership is not
@@ -1849,8 +1848,7 @@ app's `send_task` method while its global publish signal is emitted.
    context-local publisher identity only for the synchronous publish call. The
    handler then reads that app's cached verdict without resolving
    `celery.current_app`. Signals emitted without a configured publisher context
-   retain the `current_app` fallback for import-time-only and unconfigured
-   processes.
+   retain the `current_app` fallback.
 
 4. **Unknown backend verdicts do not corrupt task results:** Missing backend
    attributes retain the defensive non-RPC result, but an exception from
@@ -1871,15 +1869,29 @@ app's `send_task` method while its global publish signal is emitted.
    properties, including cross-app `send_task()` and transient backend
    inspection failures.
 
-7. **Testing isolates import-time side effects:** Unit and behavioural tests
-   explicitly disconnect the known receivers by dispatch UID before calling the
-   helper. This prevents the existing import-time registration from hiding a
-   broken public configuration path.
+7. **Testing proves the import boundary:** A clean-process regression test
+   proves package import does not load Celery or register a receiver, then
+   verifies that the helper registers all three handlers.
 
-Import-time signal registration remains in place as a compatibility measure;
-removing it and making explicit configuration the only registration seam is a
-separate companion issue
-([#158](https://github.com/leynos/falcon-correlate/issues/158)).
+8. **Configuration outcomes are observable without adding an implicit
+   health check:** Calls to `configure_celery_correlation(app)` emit one
+   structured record for each distinct outcome observed for that app. Complete
+   activation is logged at `INFO`; incomplete setup is logged at `WARNING`.
+   Weak-reference state deduplicates repeated outcomes without retaining apps.
+   These records report only explicit configuration attempts and cannot detect
+   an omitted call. The application controls whether `INFO` records are visible.
+
+   The `falcon_correlate.celery` logger uses the fields `operation`,
+   `registration_state`, `before_task_publish_state`, `task_prerun_state`,
+   `task_postrun_state`, `publisher_context_state`, and `backend_rpc_verdict`.
+   The `operation` value is `configure_celery_correlation`. Registration is
+   `active` or `incomplete`; signal states are `connected`,
+   `celery_signals_unavailable`, `signal_missing`, `connect_not_callable`, or
+   `receiver_rejected`; publisher-context states are `configured`,
+   `send_task_unavailable`, or `assignment_rejected`. Backend verdicts are
+   `rpc`, `non_rpc`, or `unknown`, and `unknown` alone is not a registration
+   failure. Records exclude app representations, backend URIs, credentials,
+   payloads, correlation IDs, and user IDs.
 
 **Files created/modified:**
 
@@ -1895,11 +1907,15 @@ separate companion issue
   export.
 - `tests/bdd/celery_configuration.feature` — Added behavioural scenarios for
   explicit configuration of publish and worker propagation.
-- `tests/bdd/test_celery_configuration_steps.py` — Added BDD steps that
-  disconnect import-time receivers and prove the public helper reconnects the
-  publish and worker paths.
+- `tests/bdd/test_celery_configuration_steps.py` — Added BDD steps that prove
+  the public helper enables the publish and worker paths.
 - `docs/users-guide.md` — Documented the explicit helper, return contract,
-  idempotence, and relationship to import-time auto-registration.
+  idempotence, explicit-registration requirement, and bounded activation
+  diagnostics.
+- `docs/developers-guide.md` — Documented the internal activation diagnostic
+  boundary and its stable fields and outcomes.
+- `src/falcon_correlate/celery_diagnostics.py` — Added private bounded outcome
+  reporting and per-app weak-reference deduplication for explicit setup.
 - `docs/roadmap.md` — Marked roadmap item 4.2.3 complete.
 
 ### A.11. Optional Celery integration validation (Task 4.2.4)

@@ -249,14 +249,14 @@ Complete documentation, examples, and prepare for initial release.
 - [ ] 6.3.1. Prepare package for PyPI
   - [ ] Finalize `pyproject.toml` metadata.
   - [ ] Add LICENSE file.
-  - [ ] Add CHANGELOG.md.
+  - [x] Add CHANGELOG.md.
   - [ ] Configure build and publish workflow.
 - [ ] 6.3.2. Perform pre-release validation
   - [ ] Run full test suite across Python versions.
   - [ ] Verify package installs correctly from test PyPI.
   - [ ] Review documentation for completeness.
 - [ ] 6.3.3. Publish initial release
-  - [ ] Tag release version (0.1.0).
+  - [ ] Tag release version (v0.2.0).
   - [ ] Publish to PyPI.
   - [ ] Announce release.
 

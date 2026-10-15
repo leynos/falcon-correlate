@@ -49,6 +49,9 @@ _CELERY_TEST_GLOBS = (
     "src/falcon_correlate/unittests/test_celery_*.py",
     "tests/bdd/test_celery_*_steps.py",
 )
+# These tests use signal doubles and deliberately remain runnable without the
+# optional Celery package, so they do not belong in the blocked-dependency run.
+_CELERY_INDEPENDENT_TEST_MODULES = frozenset({"test_celery_diagnostics.py"})
 _MINIMUM_CELERY_TEST_MODULE_COUNT = 6
 _PYTEST_DURATION_PATTERN = re.compile(
     r"\d+\.\d+s(?: \(\d+:\d{2}:\d{2}\))?",
@@ -148,7 +151,7 @@ def _discover_celery_test_paths(project_root: Path) -> tuple[Path, ...]:
         path
         for pattern in _CELERY_TEST_GLOBS
         for path in project_root.glob(pattern)
-        if path.is_file()
+        if path.is_file() and path.name not in _CELERY_INDEPENDENT_TEST_MODULES
     }
     return tuple(sorted(paths))
 

@@ -107,6 +107,10 @@ def test_celery_test_path_discovery_finds_expected_minimum(
 ) -> None:
     """Enough Celery test modules must be discovered for meaningful checks."""
     celery_test_paths = _discover_celery_test_paths(project_root)
+    discovered_names = {path.name for path in celery_test_paths}
+    assert "test_celery_diagnostics.py" not in discovered_names, (
+        "Dependency-free Celery diagnostics tests should run in blocked environments."
+    )
     assert len(celery_test_paths) >= _MINIMUM_CELERY_TEST_MODULE_COUNT, (
         "Celery test discovery should find enough guarded modules for "
         "missing-dependency skip validation."
