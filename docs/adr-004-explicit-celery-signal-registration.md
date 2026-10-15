@@ -59,7 +59,13 @@ connects its signals. Publisher and worker bootstrap code must call
 Stable dispatch identifiers keep repeated configuration calls idempotent. A
 subprocess test proves that the package import leaves Celery absent from
 `sys.modules`, that no integration receiver is connected initially, and that
-the helper connects every supported receiver.
+the helper connects every supported receiver. Each explicit configuration
+outcome is also reported once per app and outcome through the
+`falcon_correlate.celery` logger: active setup at `INFO`, incomplete setup at
+`WARNING`. The structured record uses bounded connection and publisher-context
+statuses plus the backend RPC verdict. A backend verdict of `unknown` is not
+itself a registration failure. Weak-reference state deduplicates records
+without retaining configured apps.
 
 ## Compatibility and migration
 
@@ -71,4 +77,10 @@ during setup in every publisher and worker process.
 
 Non-Celery consumers can import the package and read `correlation_id_var`
 without paying the Celery import cost or mutating Celery process state.
-Applications that use Celery gain an explicit, testable configuration seam.
+Applications that use Celery gain an explicit, testable configuration seam and
+bounded diagnostics for calls made through that seam. No diagnostic is emitted
+on package or module import, and the records cannot detect an omitted
+configuration call. Applications control whether `INFO` records are visible.
+Records do not include app representations, backend URIs, credentials,
+payloads, correlation IDs, or user IDs. The public configuration signature and
+same-app return value remain unchanged; no health API is added.

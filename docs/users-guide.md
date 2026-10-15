@@ -783,6 +783,17 @@ Calling the helper is required to activate Celery propagation. Importing
 connect the handlers, so library consumers can safely read the ambient context
 variable without mutating Celery's process-global signal registry.
 
+Those imports also emit no activation diagnostics. Each explicit configuration
+outcome is reported once per app through the `falcon_correlate.celery` logger:
+complete activation is `INFO`, and incomplete setup is `WARNING`. The record
+describes the three signal connections, publisher context setup, and the
+result-backend verdict. An `unknown` backend verdict does not make registration
+incomplete. Records contain bounded status fields only; they do not include app
+representations, backend URIs, credentials, payloads, correlation IDs, or user
+IDs. The application controls whether `INFO` records are visible. These records
+confirm explicit setup only; they cannot detect a missing call to
+`configure_celery_correlation()`.
+
 Once the handlers are registered in the publisher process, normal task
 publishing APIs such as `delay()` and `apply_async()` propagate the request
 correlation ID automatically. When the worker process also registers the

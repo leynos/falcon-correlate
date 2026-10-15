@@ -30,11 +30,26 @@ pytestmark = pytest.mark.skipif(
 def test_package_import_defers_celery_and_signal_registration() -> None:
     """Package import must not load Celery or mutate its global signals."""
     script = """
+import logging
 import sys
 
+records = []
+
+
+class CaptureConfiguration(logging.Handler):
+    def emit(self, record):
+        records.append(record)
+
+
+logger = logging.getLogger("falcon_correlate.celery")
+logger.setLevel(logging.DEBUG)
+logger.addHandler(CaptureConfiguration())
+
 import falcon_correlate
+import falcon_correlate.celery
 
 assert "celery" not in sys.modules, "package import must not load Celery"
+assert not records, "imports must not emit configuration diagnostics"
 
 from celery import Celery
 from celery.signals import before_task_publish, task_postrun, task_prerun
@@ -58,12 +73,15 @@ signals = (
 assert not any(
     has_receiver(signal, dispatch_uid) for signal, dispatch_uid in signals
 ), "Celery handlers must not connect before configuration"
+assert not records, "loading Celery must not emit configuration diagnostics"
 
 configure_celery_correlation(Celery("celery-import-boundary", broker="memory://"))
 
 assert all(has_receiver(signal, dispatch_uid) for signal, dispatch_uid in signals), (
     "configuration must connect all Celery handlers"
 )
+assert len(records) == 1, "explicit configuration must emit one diagnostic"
+assert records[0].registration_state == "active", "expected active registration"
 """
     result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - test runs Python itself.
         [sys.executable, "-c", script],

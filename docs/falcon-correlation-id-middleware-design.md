@@ -1873,6 +1873,26 @@ make it the sole entry point for Celery signal registration.
    proves package import does not load Celery or register a receiver, then
    verifies that the helper registers all three handlers.
 
+8. **Configuration outcomes are observable without adding an implicit
+   health check:** Calls to `configure_celery_correlation(app)` emit one
+   structured record for each distinct outcome observed for that app. Complete
+   activation is logged at `INFO`; incomplete setup is logged at `WARNING`.
+   Weak-reference state deduplicates repeated outcomes without retaining apps.
+   These records report only explicit configuration attempts and cannot detect
+   an omitted call. The application controls whether `INFO` records are visible.
+
+   The `falcon_correlate.celery` logger uses the fields `operation`,
+   `registration_state`, `before_task_publish_state`, `task_prerun_state`,
+   `task_postrun_state`, `publisher_context_state`, and `backend_rpc_verdict`.
+   The `operation` value is `configure_celery_correlation`. Registration is
+   `active` or `incomplete`; signal states are `connected`,
+   `celery_signals_unavailable`, `signal_missing`, `connect_not_callable`, or
+   `receiver_rejected`; publisher-context states are `configured`,
+   `send_task_unavailable`, or `assignment_rejected`. Backend verdicts are
+   `rpc`, `non_rpc`, or `unknown`, and `unknown` alone is not a registration
+   failure. Records exclude app representations, backend URIs, credentials,
+   payloads, correlation IDs, and user IDs.
+
 **Files created/modified:**
 
 - `src/falcon_correlate/celery.py` — Added
@@ -1890,7 +1910,12 @@ make it the sole entry point for Celery signal registration.
 - `tests/bdd/test_celery_configuration_steps.py` — Added BDD steps that prove
   the public helper enables the publish and worker paths.
 - `docs/users-guide.md` — Documented the explicit helper, return contract,
-  idempotence, and explicit-registration requirement.
+  idempotence, explicit-registration requirement, and bounded activation
+  diagnostics.
+- `docs/developers-guide.md` — Documented the internal activation diagnostic
+  boundary and its stable fields and outcomes.
+- `src/falcon_correlate/celery_diagnostics.py` — Added private bounded outcome
+  reporting and per-app weak-reference deduplication for explicit setup.
 - `docs/roadmap.md` — Marked roadmap item 4.2.3 complete.
 
 ### A.11. Optional Celery integration validation (Task 4.2.4)

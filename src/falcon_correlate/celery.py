@@ -17,10 +17,16 @@ import types
 import typing as typ
 import weakref
 
+from .celery_diagnostics import (
+    _report_configuration_outcome,
+    _safe_connect_signal,
+)
 from .middleware import correlation_id_var
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
+
+    from .celery_diagnostics import _PublisherContextState, _SignalState
 
     class _BackendLike(typ.Protocol):
         """Structural type for the Celery backend used by this module."""
@@ -168,16 +174,16 @@ def _cache_app_backend_rpc_verdict(
         return _configured_app_backend_rpc_verdicts.setdefault(app, backend_uses_rpc)
 
 
-def _configure_app_send_task_context(app: _CeleryAppLike) -> None:
+def _configure_app_send_task_context(app: _CeleryAppLike) -> _PublisherContextState:
     """Wrap ``send_task`` so its publish signal carries the actual app locally."""
     with _configured_app_backend_rpc_verdicts_lock:
         if app in _configured_apps_with_send_task_context:
-            return
+            return "configured"
 
         bound_send_task = getattr(app, "send_task", None)
         original_send_task = getattr(bound_send_task, "__func__", None)
         if not callable(original_send_task):
-            return
+            return "send_task_unavailable"
 
         def send_task_with_publishing_app(
             configured_app: _CeleryAppLike,
@@ -194,13 +200,10 @@ def _configure_app_send_task_context(app: _CeleryAppLike) -> None:
         try:
             app.send_task = types.MethodType(send_task_with_publishing_app, app)
         except (AttributeError, TypeError):
-            _logger.debug(
-                "Unable to attach publisher context to Celery app.",
-                exc_info=True,
-            )
-            return
+            return "assignment_rejected"
 
         _configured_apps_with_send_task_context.add(app)
+        return "configured"
 
 
 def _current_result_backend_uses_rpc() -> bool | None:
@@ -257,61 +260,14 @@ def _get_task_request_correlation_id(task: object | None) -> str | None:
     return correlation_id if isinstance(correlation_id, str) else None
 
 
-def _safe_connect_signal(
-    signal_module: object,
-    signal_name: str,
-    handler: cabc.Callable[..., object],
-    dispatch_uid: str,
-) -> None:
-    """Connect a Celery signal when the signal object exposes ``connect``.
-
-    Emits ``DEBUG`` log lines for each connection attempt, skipped signal, and
-    invalid receiver so that optional integration failures are diagnosable.
-
-    """
-    signal = getattr(signal_module, signal_name, None)
-    if signal is None:
-        _logger.debug(
-            "falcon_correlate: signal %r not found on %r; skipping",
-            signal_name,
-            signal_module,
-        )
-        return
-
-    connect = getattr(signal, "connect", None)
-    if not callable(connect):
-        _logger.debug(
-            "falcon_correlate: signal %r has no callable connect(); skipping",
-            signal_name,
-        )
-        return
-
-    try:
-        handler_name = getattr(handler, "__name__", repr(handler))
-        connect(handler, dispatch_uid=dispatch_uid, weak=False)
-        _logger.debug(
-            "falcon_correlate: connected %r to %r (dispatch_uid=%r)",
-            handler_name,
-            signal_name,
-            dispatch_uid,
-        )
-    except ValueError:
-        _logger.debug(
-            "falcon_correlate: invalid receiver %r for %r",
-            getattr(handler, "__name__", repr(handler)),
-            signal_name,
-            exc_info=True,
-        )
-
-
-def _maybe_connect_celery_publish_signal() -> None:
+def _maybe_connect_celery_publish_signal() -> _SignalState:
     """Register the Celery publish handler once when Celery is installed."""
     try:
         celery_signals = importlib.import_module("celery.signals")
     except ImportError:
-        return
+        return "celery_signals_unavailable"
 
-    _safe_connect_signal(
+    return _safe_connect_signal(
         celery_signals,
         "before_task_publish",
         propagate_correlation_id_to_celery,
@@ -319,28 +275,29 @@ def _maybe_connect_celery_publish_signal() -> None:
     )
 
 
-def _maybe_connect_celery_worker_signals() -> None:
+def _maybe_connect_celery_worker_signals() -> tuple[_SignalState, _SignalState]:
     """Register the Celery worker handlers once when Celery is installed."""
     try:
         celery_signals = importlib.import_module("celery.signals")
     except ImportError:
-        return
+        return ("celery_signals_unavailable", "celery_signals_unavailable")
 
-    _safe_connect_signal(
+    prerun_state = _safe_connect_signal(
         celery_signals,
         "task_prerun",
         setup_correlation_id_in_worker,
         _TASK_PRERUN_DISPATCH_UID,
     )
-    _safe_connect_signal(
+    postrun_state = _safe_connect_signal(
         celery_signals,
         "task_postrun",
         clear_correlation_id_in_worker,
         _TASK_POSTRUN_DISPATCH_UID,
     )
+    return prerun_state, postrun_state
 
 
-def _maybe_connect_celery_signals() -> None:
+def _maybe_connect_celery_signals() -> tuple[_SignalState, _SignalState, _SignalState]:
     """Register all supported Celery signal handlers when Celery is installed.
 
     Celery's Django-derived signal implementation protects receiver mutation
@@ -348,9 +305,14 @@ def _maybe_connect_celery_signals() -> None:
     duplicate-registration guard when several callers configure the integration
     concurrently.
 
+    Returns
+    -------
+    tuple[_SignalState, _SignalState, _SignalState]
+        Connection outcomes for publish, task-prerun, and task-postrun signals.
+
     """
-    _maybe_connect_celery_publish_signal()
-    _maybe_connect_celery_worker_signals()
+    publish_state = _maybe_connect_celery_publish_signal()
+    return publish_state, *_maybe_connect_celery_worker_signals()
 
 
 def configure_celery_correlation[CeleryAppT: _CeleryAppLike](
@@ -365,6 +327,11 @@ def configure_celery_correlation[CeleryAppT: _CeleryAppLike](
     reliably identify the publisher. If backend inspection fails, the verdict
     remains uncached and publishes preserve Celery's task ID until inspection
     succeeds. Stable dispatch UIDs keep repeated calls idempotent.
+
+    Each distinct configuration outcome emits one structured ``INFO`` record
+    when complete or ``WARNING`` record when incomplete for this app's lifetime.
+    Backend inspection uncertainty is reported separately from registration.
+    Importing the integration does not emit these diagnostics.
 
     Parameters
     ----------
@@ -383,9 +350,15 @@ def configure_celery_correlation[CeleryAppT: _CeleryAppLike](
         app and signal registration uses stable dispatch UIDs.
 
     """
-    _cache_app_backend_rpc_verdict(app)
-    _configure_app_send_task_context(app)
-    _maybe_connect_celery_signals()
+    backend_uses_rpc = _cache_app_backend_rpc_verdict(app)
+    publisher_context_state = _configure_app_send_task_context(app)
+    signal_states = _maybe_connect_celery_signals()
+    _report_configuration_outcome(
+        app,
+        signal_states,
+        publisher_context_state,
+        backend_uses_rpc=backend_uses_rpc,
+    )
     return app
 
 
