@@ -344,6 +344,7 @@ def given_logger_via_dictconfig_with_recommended_format(
             h.stream = stream
 
     def _cleanup() -> None:
+        """Detach all handlers from the test logger."""
         for h in list(test_logger.handlers):
             test_logger.removeHandler(h)
 

@@ -130,6 +130,7 @@ class TestQuickstartLoggingSetup:
         try:
 
             def test_logic() -> None:
+                """Set ``cid-log-1``/``uid-log-1``; log ``hello from quickstart``."""
                 correlation_id_var.set("cid-log-1")
                 user_id_var.set("uid-log-1")
                 logger.info("hello from quickstart")

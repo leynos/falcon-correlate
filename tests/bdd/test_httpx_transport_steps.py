@@ -168,6 +168,7 @@ def when_send_async_request_with_transport(context: Context) -> Context:
     """
 
     async def _run() -> dict[str, str]:
+        """Send GET via ``AsyncCorrelationIDTransport``; return recorded headers."""
         transport = _RecordingAsyncTransport()
         async with httpx.AsyncClient(
             transport=AsyncCorrelationIDTransport(transport)

@@ -90,6 +90,7 @@ def given_task_request_with_correlation_id(value: str) -> Context:
 
     @app.task(name="bdd.worker.echo", bind=True)
     def echo(self: celery.Task, payload: str) -> str:
+        """Record the current correlation ID and return the unchanged payload."""
         observed["task_correlation_id_seen"] = correlation_id_var.get()
         return payload
 
