@@ -139,3 +139,14 @@ ______________________________________________________________________
 Do not change the child-process timeout without a reproducible child-operation
 failure. The documented evidence currently supports a transient condition, not
 a timeout-configuration change.
+
+## Follow-up: PR #33 review check
+
+The separate investigation of the external Testing (Compile-Time / UI) result
+on PR #33 is recorded in
+[issue #34's investigation record](issue-34-inconclusive-testing-compile-time-ui-pr-33.md).
+That work added phase-specific collection and timeout diagnostics to the
+optional-Celery subprocess helpers. It kept the 120-second child and 270-second
+parent timeout budgets unchanged. The available evidence does not link the
+timeout described here or those helper limits to the external INCONCLUSIVE
+result.

@@ -14,6 +14,7 @@ virtual-environment directories, and build artefacts.
 ├── .github/
 ├── .rules/
 ├── docs/
+│   ├── debugging/
 │   └── execplans/
 ├── src/
 │   └── falcon_correlate/
@@ -42,6 +43,7 @@ paths._
 | `.github/`                        | Stores GitHub Actions workflows and local composite actions used by repository automation.              |
 | `.rules/`                         | Holds Python-specific coding guidance referenced by `AGENTS.md` and maintainer documentation.           |
 | `docs/`                           | Contains long-lived user, developer, design, decision, reference, and planning documentation.           |
+| `docs/debugging/`                 | Records evidence-led investigations and follow-up findings for repository issues.                       |
 | `docs/execplans/`                 | Stores task-level execution plans for implementation work.                                              |
 | `src/falcon_correlate/`           | Contains the installable Python package and public middleware implementation.                           |
 | `src/falcon_correlate/unittests/` | Contains package-local unit tests that exercise implementation units close to the source.               |
@@ -63,6 +65,8 @@ _Table 1: Maintained repository paths and their responsibilities._
 - Put accepted decisions in Architecture Decision Records (ADRs) under
   `docs/`, using the naming convention from
   [the documentation style guide](documentation-style-guide.md).
+- Put evidence-led investigations and their follow-up findings in
+  `docs/debugging/`.
 - Put pre-implementation or task-level plans in `docs/execplans/`.
 - Put Python package code under `src/falcon_correlate/`; avoid placing runtime
   package modules under `tests/` or repository-root helper paths.
