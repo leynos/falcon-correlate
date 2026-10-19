@@ -142,7 +142,8 @@ def test_a_fork_fallback_contributes_both_arms(
     second parse.
     """
     runs_on = (
-        f"${{{{{before}github.event.pull_request.head.repo.fork"
+        f"${{{{{before}(github.event.pull_request.head.repo.fork"
+        " || github.event.pull_request.user.login == 'dependabot[bot]')"
         f"{after}&& '{fork_arm}' || '{branch_arm}' }}}}"
     )
     job = {"runs-on": runs_on}

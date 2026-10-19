@@ -46,10 +46,14 @@ GITHUB_HOSTED_LABELS = frozenset({
 #: label.
 MATRIX_DEFERRAL = "${{ matrix.os }}"
 
-#: The fork fallback, parsed. The guard names the fork field; the true arm is
-#: the hosted fallback and the false arm is the paid runner.
+#: The fork fallback, parsed. The guard names the fork field or the pull
+#: request's author (not ``github.actor``: the actor is whoever triggered the
+#: run, so a person pushing to a Dependabot branch would flip the runner); the
+#: true arm is the hosted fallback and the false arm is the paid runner.
 FORK_FALLBACK = re.compile(
-    r"^\$\{\{\s*github\.event\.pull_request\.head\.repo\.fork\s*"
+    r"^\$\{\{\s*\(\s*github\.event\.pull_request\.head\.repo\.fork\s*"
+    r"\|\|\s*github\.event\.pull_request\.user\.login\s*==\s*"
+    r"'dependabot\[bot\]'\s*\)\s*"
     r"&&\s*'(?P<when_fork>[^']+)'\s*"
     r"\|\|\s*'(?P<when_branch>[^']+)'\s*\}\}$"
 )

@@ -9,11 +9,13 @@ latency benefit, which is the shape this repository is moving away from.
 
 **The fork fallback.** A pull request from a fork cannot obtain an Ubicloud
 runner, so a lane serving pull requests falls back to a GitHub-hosted runner
-for forks only. The expression is written as a folded scalar, and a folded
-scalar whose continuation is indented more deeply than its first line keeps
-the line break: the resulting value carries a newline inside an expression
-that GitHub evaluates anyway. A green run is therefore not evidence the
-defect is absent, and nothing but a contract will find it.
+for forks and for Dependabot's pull requests (hosted minutes cost nothing on a
+public repository), and for nothing else. The expression is written as a
+folded scalar, and a folded scalar whose continuation is indented more deeply
+than its first line keeps the line break: the resulting value carries a
+newline inside an expression that GitHub evaluates anyway. A green run is
+therefore not evidence the defect is absent, and nothing but a contract will
+find it.
 
 **Ceilings.** An Ubicloud runner is a self-hosted JIT runner, so GitHub's
 six-hour ceiling for hosted jobs does not apply to it; the limit is five
@@ -134,7 +136,7 @@ def test_a_pull_request_lane_falls_back_for_forks(lane: str) -> None:
     fallback = FORK_FALLBACK.match(runs_on.strip())
     assert fallback is not None, (
         f"{lane} serves pull requests and must carry the fork fallback, "
-        f"guarded on the fork field; got {runs_on!r}"
+        f"guarded on the fork field or the Dependabot author; got {runs_on!r}"
     )
     assert fallback["when_fork"] in GITHUB_HOSTED_LABELS, (
         f"{lane}'s fork arm must be GitHub-hosted, because a fork cannot "
@@ -143,6 +145,31 @@ def test_a_pull_request_lane_falls_back_for_forks(lane: str) -> None:
     assert fallback["when_branch"] == UBICLOUD_LABEL, (
         f"{lane}'s branch arm must be the paid runner; got {fallback['when_branch']!r}"
     )
+
+
+@pytest.mark.parametrize(
+    "guard",
+    [
+        "github.event.pull_request.head.repo.fork",
+        (
+            "(github.event.pull_request.head.repo.fork"
+            " || github.actor == 'dependabot[bot]')"
+        ),
+    ],
+    ids=["fork-only", "actor-instead-of-author"],
+)
+def test_a_guard_without_the_dependabot_author_test_is_not_the_fallback(
+    guard: str,
+) -> None:
+    """Refuse the fork-only guard and the `github.actor` stand-in.
+
+    The fallback is read in one form: the fork field or the Dependabot author.
+    A guard that omits the author sends Dependabot's pull requests to the paid
+    runner, and `github.actor` is whoever triggered the run, so a person
+    pushing to a Dependabot branch would flip the runner.
+    """
+    runs_on = "${{ " + guard + " && 'ubuntu-latest' || 'ubicloud-standard-2' }}"
+    assert FORK_FALLBACK.match(runs_on) is None, f"{runs_on!r} was read as the fallback"
 
 
 @pytest.mark.parametrize("lane", sorted(PAID_LANES), ids=str)
@@ -277,7 +304,8 @@ def test_a_reusable_workflow_caller_contributes_no_labels() -> None:
         pytest.param("ubuntu-latest", set(), id="hosted-literal"),
         pytest.param(UBICLOUD_LABEL, {UBICLOUD_LABEL}, id="paid-literal"),
         pytest.param(
-            "${{ github.event.pull_request.head.repo.fork"
+            "${{ (github.event.pull_request.head.repo.fork"
+            " || github.event.pull_request.user.login == 'dependabot[bot]')"
             " && 'ubuntu-latest' || 'ubicloud-standard-2' }}",
             {UBICLOUD_LABEL},
             id="fork-fallback-both-arms",
