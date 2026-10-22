@@ -142,19 +142,15 @@ and implementation history is recorded in the
 [Celery configuration utilities execution plan](execplans/4-2-3-celery-configuration-utilities.md).
 
 Celery signals are process-global, and the integration uses Celery's global
-signal registry. `_maybe_connect_celery_signals()` is the shared coordinator:
-it calls `_maybe_connect_celery_publish_signal()` and
+signal registry. Importing `falcon_correlate` or `falcon_correlate.celery` does
+not import Celery or connect its signals. `configure_celery_correlation(app)`
+is the only activation path and its only caller of
+`_maybe_connect_celery_signals()`, the shared coordinator. The coordinator calls
+`_maybe_connect_celery_publish_signal()` and
 `_maybe_connect_celery_worker_signals()`. Both route registration through
 `_safe_connect_signal()`, which calls
 `connect(handler, dispatch_uid=dispatch_uid, weak=False)` with a fixed dispatch
 unique identifier (UID). `weak=False` keeps a strong reference to the receiver.
-
-The coordinator has two call sites: an unconditional module-level call at
-import time, and `configure_celery_correlation(app)`. Importing
-`falcon_correlate` triggers the first call through the package root's Celery
-re-exports. The public helper invokes the same coordinator, stores no app-local
-state, and returns the same app unchanged. These paths are complementary: after
-successful import-time registration, a later helper call adds no receivers.
 
 Table: Celery signals, integration receivers, and stable dispatch UIDs.
 
@@ -167,24 +163,31 @@ Table: Celery signals, integration receivers, and stable dispatch UIDs.
 Celery deduplicates receivers by `dispatch_uid`, and its internal
 `threading.Lock` protects receiver mutation. Stable UIDs therefore leave
 exactly one integration receiver per supported signal after successful
-registration, including repeated or concurrent configuration calls. The module
-uses no local registration flag, app-specific guard, or custom lock.
+registration, including repeated or concurrent configuration calls. Signal
+registration has no parallel per-app flag or custom lock. Separately, the
+configuration helper keeps weak per-app state: it caches a definite result
+backend verdict, wraps `send_task` once to establish publisher context, and
+reports each distinct outcome once. It returns the same app instance.
 
-If importing `celery.signals` raises `ImportError`, registration is a no-op.
-The public helper still returns `app`, and a later call can retry registration
-when the optional dependency becomes importable. `_safe_connect_signal()` logs
-at DEBUG level and skips registration when a signal is missing, its `connect`
-attribute is missing or non-callable, or connecting raises `ValueError`. Other
-exceptions propagate.
+If importing `celery.signals` raises `ImportError`, signal registration reports
+`celery_signals_unavailable`; a later explicit configuration can retry when the
+optional dependency becomes importable. `_safe_connect_signal()` returns a
+bounded status without logging when a signal is missing, its `connect`
+attribute is missing or non-callable, or connecting raises `ValueError` (which
+maps to `receiver_rejected`). Other exceptions propagate. The configuration
+helper reports each distinct per-app outcome once at `INFO` when complete or
+`WARNING` when incomplete.
 
 **Maintainer rules (normative):**
 
 - Keep the dispatch UID constants and their string values stable.
 - Route new receivers through the coordinator and `_safe_connect_signal()`
   with their own dispatch UID constants.
-- Add no app-local state to `configure_celery_correlation()`.
+- Keep signal registration process-global and deduplicated by dispatch UID;
+  keep any per-app configuration state weakly referenced and idempotent.
 - In tests, disconnect known receivers by dispatch UID before exercising the
-  configuration path, so import-time registration cannot mask a broken helper.
+  configuration path, isolating shared process-global state left by earlier
+  tests.
 
 ## Assertion diagnostics and coverage
 
