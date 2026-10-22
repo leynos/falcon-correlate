@@ -1858,6 +1858,34 @@ helpers.
    helper. This prevents the existing import-time registration from hiding a
    broken public configuration path.
 
+```mermaid
+erDiagram
+    CELERY_SIGNAL ||--|| INTEGRATION_RECEIVER : registers
+    INTEGRATION_RECEIVER ||--|| DISPATCH_UID : uses
+
+    CELERY_SIGNAL {
+        string before_task_publish
+        string task_prerun
+        string task_postrun
+    }
+    INTEGRATION_RECEIVER {
+        string propagate_correlation_id_to_celery
+        string setup_correlation_id_in_worker
+        string clear_correlation_id_in_worker
+    }
+    DISPATCH_UID {
+        string stable_identifier
+    }
+```
+
+**Figure 3 screen reader caption:** Each signal connects to one integration
+receiver, and that receiver uses one stable dispatch UID. `before_task_publish`
+connects to `propagate_correlation_id_to_celery`, which uses
+`_BEFORE_TASK_PUBLISH_DISPATCH_UID`. `task_prerun` connects to
+`setup_correlation_id_in_worker`, which uses `_TASK_PRERUN_DISPATCH_UID`.
+`task_postrun` connects to `clear_correlation_id_in_worker`, which uses
+`_TASK_POSTRUN_DISPATCH_UID`.
+
 **Files created/modified:**
 
 - `src/falcon_correlate/celery.py` — Added
