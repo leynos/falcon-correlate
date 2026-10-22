@@ -44,6 +44,7 @@ def _run_async_request(**kwargs: typ.Any) -> dict[str, str]:  # ruff: ignore[any
     import asyncio
 
     async def _run() -> dict[str, str]:
+        """Mock the async client, call the wrapper, and return its captured headers."""
         mock_response = httpx.Response(200)
         with mock.patch("httpx.AsyncClient") as mock_cls:
             mock_client = mock.AsyncMock()

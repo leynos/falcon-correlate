@@ -191,6 +191,7 @@ def when_send_concurrent_req_context_requests(
     def _request(
         correlation_id: str,
     ) -> tuple[str, _ParityPayload]:
+        """GET ``/req-context``; assert HTTP 200 and return its ID with the payload."""
         client = falcon.testing.TestClient(context["app"])
         result = client.simulate_get(
             "/req-context",

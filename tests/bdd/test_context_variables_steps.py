@@ -78,6 +78,7 @@ def when_set_value(context: Context, value: str) -> Context:
     var = context["var"]
 
     def _inner() -> str | None:
+        """Set the variable, capture its value, reset with the token, and return it."""
         token = var.set(value)
         result = var.get()
         var.reset(token)

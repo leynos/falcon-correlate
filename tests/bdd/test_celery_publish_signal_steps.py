@@ -107,6 +107,7 @@ def _publish_task(**apply_async_kwargs: str) -> Context:
 
     @app.task(name="bdd.echo")
     def echo(value: str) -> str:
+        """Return the supplied task string unchanged."""
         return value
 
     with mock.patch("kombu.Producer.publish", autospec=True) as publish:
