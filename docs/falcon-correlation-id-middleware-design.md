@@ -1858,10 +1858,13 @@ helpers.
    helper. This prevents the existing import-time registration from hiding a
    broken public configuration path.
 
-**Screen reader description:** The entity relationship diagram groups the
-supported signals, receivers, and dispatch UIDs by type. Each signal maps to
-its matching receiver and stable UID; the following flowchart shows the three
-individual registration chains.
+**Screen reader description:** The entity relationship diagram groups signals,
+receivers, and dispatch UIDs by type. The three registration chains are:
+`before_task_publish` registers `propagate_correlation_id_to_celery` with
+`_BEFORE_TASK_PUBLISH_DISPATCH_UID`; `task_prerun` registers
+`setup_correlation_id_in_worker` with `_TASK_PRERUN_DISPATCH_UID`; and
+`task_postrun` registers `clear_correlation_id_in_worker` with
+`_TASK_POSTRUN_DISPATCH_UID`.
 
 ```mermaid
 erDiagram
@@ -1886,8 +1889,12 @@ erDiagram
 *Figure 3: The entity types and relationships used for Celery signal
 registration.*
 
-**Screen reader description:** The flowchart shows each signal leading to its
-matching receiver and stable dispatch UID.
+**Screen reader description:** The flowchart shows three registration chains:
+`before_task_publish` registers `propagate_correlation_id_to_celery` with
+`_BEFORE_TASK_PUBLISH_DISPATCH_UID`; `task_prerun` registers
+`setup_correlation_id_in_worker` with `_TASK_PRERUN_DISPATCH_UID`; and
+`task_postrun` registers `clear_correlation_id_in_worker` with
+`_TASK_POSTRUN_DISPATCH_UID`.
 
 ```mermaid
 flowchart LR
