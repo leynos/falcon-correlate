@@ -47,6 +47,10 @@ stabilized in commit `fc92042` ("Make validation tools available to hooks",
 
 ## Context and orientation
 
+**Superseded by issue #48:** The current-state description below is historical.
+Importing the integration no longer connects handlers; call
+`configure_celery_correlation(app)` in each publisher and worker process.
+
 The current Celery integration already lives in
 `src/falcon_correlate/celery.py`. That file defines three public handlers:
 `propagate_correlation_id_to_celery`, `setup_correlation_id_in_worker`, and
