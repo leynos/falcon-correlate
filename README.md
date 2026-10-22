@@ -20,8 +20,8 @@ app, forwarded to a downstream API, and queued as a background task. Without a
 shared identifier, joining those records into one story is guesswork.
 
 - **Trusted IDs, not just generated ones.** An incoming header is accepted only
-  from a trusted source and only when it passes validation; otherwise the
-  middleware generates a fresh UUIDv7.
+  from a trusted source; when a validator is configured, it must also pass that
+  format check. Otherwise the middleware generates a fresh UUIDv7.
 - **Both Falcon flavours.** Synchronous Web Server Gateway Interface (WSGI)
   apps and Asynchronous Server Gateway Interface (ASGI) apps get the same
   behaviour from one shared configuration object.
@@ -123,6 +123,7 @@ import logging
 from falcon_correlate import RECOMMENDED_LOG_FORMAT, ContextualLogFilter
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter(RECOMMENDED_LOG_FORMAT))
@@ -182,6 +183,10 @@ Install the extra in every process that publishes or executes tasks:
 pip install "falcon-correlate[celery]"
 ```
 
+The `celery` extra installs Celery itself, not a broker transport. Install the
+transport package for the broker you use alongside it; the example below
+publishes to Redis, which needs `pip install "celery[redis]"`.
+
 Register the signal handlers when the Celery application is created:
 
 ```python
@@ -196,7 +201,9 @@ celery_app = configure_celery_correlation(
 
 Publishing a task during a request copies the correlation ID into the task
 message's `correlation_id`, and the worker restores it for the lifetime of the
-task body:
+task body. When the active application uses the `rpc://` result backend, the
+handler instead leaves Celery's task-ID `correlation_id` in place, preserving
+Celery's result retrieval contract:
 
 ```python
 from falcon_correlate import correlation_id_var
@@ -233,7 +240,7 @@ ______________________________________________________________________
 
 ## Licence
 
-`falcon-correlate` is released under the ISC licence — see [LICENSE](LICENSE)
+`falcon-correlate` is released under the ISC licence — see [licence](LICENSE)
 for the full text.
 
 ______________________________________________________________________
