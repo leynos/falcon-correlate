@@ -1,4 +1,11 @@
-"""Verify Celery signal registration requires explicit configuration."""
+"""Verify Celery signal registration requires explicit configuration.
+
+Fresh interpreters isolate Celery's process-global receiver registry, so these
+probes can detect mutations caused by importing the package or module. Run the
+tests from the project root with::
+
+    uv run pytest -v src/falcon_correlate/unittests/test_celery_import_side_effects.py
+"""
 
 from __future__ import annotations
 
