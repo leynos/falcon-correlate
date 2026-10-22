@@ -95,7 +95,7 @@ def test_complete_configuration_reports_safe_structured_info(
         "task_prerun_state": "connected",
         "task_postrun_state": "connected",
         "publisher_context_state": "configured",
-        "backend_rpc_verdict": "non_rpc",
+        "backend_rpc_verdict": "unknown",
     }
     assert {key: getattr(record, key) for key in expected_fields} == expected_fields, (
         "Activation records should contain the bounded expected fields."
@@ -249,25 +249,14 @@ def test_unavailable_publisher_context_reports_warning(
     )
 
 
-@pytest.mark.parametrize(
-    "scenario",
-    [
-        pytest.param(("rpc://", "rpc"), id="rpc"),
-        pytest.param((None, "unknown"), id="unknown-inspection"),
-    ],
-)
-def test_backend_verdict_is_separate_from_activation(
+def test_backend_verdict_is_deferred_until_publishing(
     signal_module: SimpleNamespace,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
-    scenario: tuple[str | None, str],
 ) -> None:
-    """Unknown backend inspection does not make a complete registration fail."""
-    backend_uri, expected_verdict = scenario
+    """Activation leaves Celery's lazy backend alone and reports it as unknown."""
     app = _App()
-    inspection = mock.Mock(return_value=backend_uri)
-    if backend_uri is None:
-        inspection.side_effect = RuntimeError("transient inspection failure")
+    inspection = mock.Mock(wraps=app.backend.as_uri)
     monkeypatch.setattr(app.backend, "as_uri", inspection)
 
     with caplog.at_level(logging.INFO, logger="falcon_correlate.celery"):
@@ -280,9 +269,10 @@ def test_backend_verdict_is_separate_from_activation(
     assert getattr(record, "registration_state", None) == "active", (
         "Backend uncertainty should not mark registered signals as incomplete."
     )
-    assert getattr(record, "backend_rpc_verdict", None) == expected_verdict, (
-        "Activation records should report the backend verdict separately."
+    assert getattr(record, "backend_rpc_verdict", None) == "unknown", (
+        "Activation should report an uninspected backend verdict."
     )
+    inspection.assert_not_called()
 
 
 def test_failed_configuration_can_report_success_on_retry(

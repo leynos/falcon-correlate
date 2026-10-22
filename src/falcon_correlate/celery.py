@@ -327,26 +327,28 @@ def configure_celery_correlation[CeleryAppT: _CeleryAppLike](
     process-global registry. Stable dispatch UIDs keep repeated activation
     idempotent.
 
-    The integration caches this application's definite ``rpc://``
-    result-backend verdict and wraps its ``send_task`` method to identify the
-    publishing application while Celery emits a publish signal. Signal sender
-    values are task names and cannot reliably identify the publisher. If backend
+    The integration wraps this application's ``send_task`` method to identify
+    the publishing application while Celery emits a publish signal. Signal
+    sender values are task names and cannot reliably identify the publisher.
+    Backend inspection is deferred until the first publish so activation does
+    not access Celery's lazy backend before application configuration is
+    complete. A definite ``rpc://`` verdict is then cached for this app. If
     inspection fails, the verdict remains uncached and publishes preserve
     Celery's task ID until inspection succeeds.
 
     Each distinct configuration outcome emits one structured ``INFO`` record
     when complete or ``WARNING`` record when incomplete for this app's lifetime.
-    Backend inspection uncertainty is reported separately from registration.
-    Importing the integration does not emit these diagnostics.
+    Backend inspection is not part of activation, so its diagnostic verdict is
+    ``unknown`` until publishing resolves it. Importing the integration does
+    not emit these diagnostics.
 
     Parameters
     ----------
     app : CeleryAppT
-        Celery application instance whose RPC result-backend verdict is cached
-        and whose ``send_task`` method establishes publisher identity. The app
-        must be hashable and weak-referenceable for the weak-key cache. Signal
-        registration remains global and requires Celery's signal objects to be
-        importable.
+        Celery application instance whose ``send_task`` method establishes
+        publisher identity. The app must be hashable and weak-referenceable for
+        the weak-key state. Signal registration remains global and requires
+        Celery's signal objects to be importable.
 
     Returns
     -------
@@ -356,14 +358,13 @@ def configure_celery_correlation[CeleryAppT: _CeleryAppLike](
         app and signal registration uses stable dispatch UIDs.
 
     """
-    backend_uses_rpc = _cache_app_backend_rpc_verdict(app)
     publisher_context_state = _configure_app_send_task_context(app)
     signal_states = _maybe_connect_celery_signals()
     _report_configuration_outcome(
         app,
         signal_states,
         publisher_context_state,
-        backend_uses_rpc=backend_uses_rpc,
+        backend_uses_rpc=None,
     )
     return app
 

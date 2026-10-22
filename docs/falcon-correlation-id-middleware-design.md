@@ -1840,8 +1840,11 @@ make it the sole entry point for Celery signal registration.
 
 1. **Load-bearing application setup without a second registration model:**
    Celery's signals remain process-global in the integration used here. The
-   helper now caches the configured app's result-backend verdict, so calling it
-   has a concrete per-app effect without duplicating signal registration logic.
+   helper wraps the configured app's `send_task` method without accessing its
+   lazy result backend. The first publish resolves and caches a definite
+   backend verdict, so explicit activation has a concrete per-app effect
+   without freezing Celery configuration or duplicating signal registration
+   logic.
 
 2. **Explicit activation:** Import-time registration was removed in version
    0.2.0. This breaking change avoids Celery's import cost and implicit
@@ -1859,11 +1862,13 @@ make it the sole entry point for Celery signal registration.
    `celery.current_app`. Signals emitted without a configured publisher context
    retain the `current_app` fallback.
 
-4. **Unknown backend verdicts do not corrupt task results:** Missing backend
-   attributes retain the defensive non-RPC result, but an exception from
-   `backend.as_uri()` is treated as unknown and is not cached. While inspection
-   remains inconclusive, the handler preserves Celery's task ID; a later
-   successful inspection supplies and caches the definite verdict.
+4. **Unknown backend verdicts do not corrupt task results:** Backend inspection
+   is deferred until the configured app's first publish so setup can finish
+   before Celery's lazy backend is accessed. Missing backend attributes retain
+   the defensive non-RPC result, but an exception from `backend.as_uri()` is
+   treated as unknown and is not cached. While inspection remains inconclusive,
+   the handler preserves Celery's task ID; a later successful inspection
+   supplies and caches the definite verdict.
 
 5. **Idempotence and application-factory ergonomics:** The helper delegates to
    a shared `_maybe_connect_celery_signals()` connector, which reuses stable
@@ -1897,10 +1902,11 @@ make it the sole entry point for Celery signal registration.
    `active` or `incomplete`; signal states are `connected`,
    `celery_signals_unavailable`, `signal_missing`, `connect_not_callable`, or
    `receiver_rejected`; publisher-context states are `configured`,
-   `send_task_unavailable`, or `assignment_rejected`. Backend verdicts are
-   `rpc`, `non_rpc`, or `unknown`, and `unknown` alone is not a registration
-   failure. Records exclude app representations, backend URIs, credentials,
-   payloads, correlation IDs, and user IDs.
+   `send_task_unavailable`, or `assignment_rejected`. The activation record's
+   backend verdict is `unknown` until the first publish inspects the configured
+   backend. Backend verdicts are `rpc`, `non_rpc`, or `unknown`, and `unknown`
+   alone is not a registration failure. Records exclude app representations,
+   backend URIs, credentials, payloads, correlation IDs, and user IDs.
 
 9. **Testing isolates shared process-global state:** Celery's signal registry is
    process-global. Unit and behavioural tests disconnect the known receivers by

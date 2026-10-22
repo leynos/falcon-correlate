@@ -56,10 +56,11 @@ integration, and UUID tooling shared by the middleware. It exports
 and validator helpers used by middleware configuration.
 
 `celery.py` owns the optional Celery signal integration. Its configuration
-helper caches definite per-app result-backend verdicts and establishes the
-publishing app around `send_task()` calls because Celery's publish signal
-sender is only a task name. Backend inspection failures remain retryable and
-preserve Celery's task ID. Importing `falcon_correlate` or
+helper establishes the publishing app around `send_task()` calls because
+Celery's publish signal sender is only a task name. Backend inspection is
+deferred until the app's first publish to preserve Celery's lazy configuration;
+a definite per-app verdict is then cached. Inspection failures remain retryable
+and preserve Celery's task ID. Importing `falcon_correlate` or
 `falcon_correlate.celery` does not import Celery or connect signal handlers,
 nor do these imports emit activation diagnostics. Publisher and worker
 bootstrap code must call `configure_celery_correlation(app)` before relying on
@@ -68,8 +69,10 @@ distinct outcome for an app through the `falcon_correlate.celery` logger:
 `INFO` for active setup and `WARNING` for incomplete setup. Its fields are
 `operation`, `registration_state`, `before_task_publish_state`,
 `task_prerun_state`, `task_postrun_state`, `publisher_context_state`, and
-`backend_rpc_verdict`. The `operation` value is `configure_celery_correlation`.
-Signal states are `connected`, `celery_signals_unavailable`, `signal_missing`,
+`backend_rpc_verdict`. The activation record reports the backend verdict as
+`unknown` until the first publish inspects the configured backend. The
+`operation` value is `configure_celery_correlation`. Signal states are
+`connected`, `celery_signals_unavailable`, `signal_missing`,
 `connect_not_callable`, or `receiver_rejected`; publisher-context states are
 `configured`, `send_task_unavailable`, or `assignment_rejected`. The backend
 verdict is `rpc`, `non_rpc`, or `unknown`; `unknown` is not a registration
@@ -165,9 +168,10 @@ Celery deduplicates receivers by `dispatch_uid`, and its internal
 exactly one integration receiver per supported signal after successful
 registration, including repeated or concurrent configuration calls. Signal
 registration has no parallel per-app flag or custom lock. Separately, the
-configuration helper keeps weak per-app state: it caches a definite result
-backend verdict, wraps `send_task` once to establish publisher context, and
-reports each distinct outcome once. It returns the same app instance.
+configuration helper keeps weak per-app state: it defers result-backend
+inspection until the first publish, caches a definite verdict then, wraps
+`send_task` once to establish publisher context, and reports each distinct
+activation outcome once. It returns the same app instance.
 
 If importing `celery.signals` raises `ImportError`, signal registration reports
 `celery_signals_unavailable`; a later explicit configuration can retry when the
