@@ -19,15 +19,53 @@ _IMPORT_PROBE = textwrap.dedent(
     import sys
 
     mode = sys.argv[1]
+    is_celery_preloaded = mode.endswith("-preloaded")
+    import_mode = mode.removesuffix("-preloaded")
+
+    if is_celery_preloaded:
+        import celery.signals as signals
+
+        preloaded_signals = {
+            "before_task_publish": signals.before_task_publish,
+            "task_prerun": signals.task_prerun,
+            "task_postrun": signals.task_postrun,
+        }
+
+        def integration_receiver_counts(signal):
+            return {
+                "package_receivers": sum(
+                    getattr(receiver, "__module__", "").startswith(
+                        "falcon_correlate"
+                    )
+                    for _, receiver in signal.receivers
+                ),
+                "dispatch_uid_receivers": sum(
+                    isinstance(lookup_key[0], str)
+                    and lookup_key[0].startswith("falcon_correlate.celery.")
+                    for lookup_key, _ in signal.receivers
+                ),
+            }
+
+        receiver_counts_before_import = {
+            name: integration_receiver_counts(signal)
+            for name, signal in preloaded_signals.items()
+        }
+
     celery_modules_before_import = {
         name for name in sys.modules if name == "celery" or name.startswith("celery.")
     }
-    if mode == "package":
+    if import_mode == "package":
         import falcon_correlate
-    elif mode == "module":
+    elif import_mode == "module":
         import falcon_correlate.celery as integration
     else:
         raise ValueError(f"unsupported import mode: {mode}")
+
+    if is_celery_preloaded:
+        receiver_counts_after_import = {
+            name: integration_receiver_counts(signal)
+            for name, signal in preloaded_signals.items()
+        }
 
     celery_modules_imported_by_integration = sorted(
         name
@@ -36,7 +74,8 @@ _IMPORT_PROBE = textwrap.dedent(
         and name not in celery_modules_before_import
     )
 
-    import celery.signals as signals
+    if not is_celery_preloaded:
+        import celery.signals as signals
     from celery import Celery
     import falcon_correlate.celery as integration
 
@@ -87,6 +126,9 @@ _IMPORT_PROBE = textwrap.dedent(
         ),
         "before": all_counts(),
     }
+    if is_celery_preloaded:
+        result["receiver_counts_before_import"] = receiver_counts_before_import
+        result["receiver_counts_after_import"] = receiver_counts_after_import
     if mode == "package":
         app = Celery("probe")
         result["first_call_returns_app"] = (
@@ -187,5 +229,34 @@ def test_direct_celery_module_import_does_not_connect_signal_receivers() -> None
     assert result["mode"] == "module", "module probe should report module mode"
     assert result["celery_modules_imported_by_integration"] == [], (
         "direct integration import should not load Celery modules"
+    )
+    _assert_no_receivers(result["before"])
+
+
+@pytest.mark.parametrize("mode", ["package-preloaded", "module-preloaded"])
+def test_import_with_celery_preloaded_does_not_connect_signal_receivers(
+    mode: str,
+) -> None:
+    """Integration imports must not mutate already-loaded Celery signals."""
+    pytest.importorskip("celery")
+    result = _run_import_probe(mode)
+
+    expected_empty_counts = {
+        signal_name: {"package_receivers": 0, "dispatch_uid_receivers": 0}
+        for signal_name in (
+            "before_task_publish",
+            "task_prerun",
+            "task_postrun",
+        )
+    }
+    assert result["mode"] == mode, f"probe should report {mode} mode"
+    assert result["celery_modules_imported_by_integration"] == [], (
+        "preloading Celery should leave no Celery modules newly imported"
+    )
+    assert result["receiver_counts_before_import"] == expected_empty_counts, (
+        "preloaded Celery signals should start without integration receivers"
+    )
+    assert result["receiver_counts_after_import"] == expected_empty_counts, (
+        f"{mode} import should not add integration receivers"
     )
     _assert_no_receivers(result["before"])

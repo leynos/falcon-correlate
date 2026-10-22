@@ -89,9 +89,9 @@ easy to read and test.
 - Keep the implementation scoped to roadmap item 4.2.2. Do not implement the
   public `configure_celery_correlation(app)` helper from 4.2.3 in the same
   change unless a blocker makes it strictly necessary.
-- Preserve import-time signal registration behaviour. Importing the package in
-  a Celery worker process should remain sufficient to register the integration
-  when Celery is installed.
+- **Superseded historical requirement:** Preserve import-time signal
+  registration behaviour. Importing the package in a Celery worker process
+  should remain sufficient to register the integration when Celery is installed.
 
 **Superseded on 2026-08-27 by ADR-004 and restated by issue #48:** Import-time
 registration is not preserved. Each publisher and worker process must call
