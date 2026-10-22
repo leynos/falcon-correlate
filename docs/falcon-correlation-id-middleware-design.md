@@ -1841,10 +1841,10 @@ make it the sole entry point for Celery signal registration.
 1. **Load-bearing application setup without a second registration model:**
    Celery's signals remain process-global in the integration used here. The
    helper wraps the configured app's `send_task` method without accessing its
-   lazy result backend. The first publish resolves and caches a definite
-   backend verdict, so explicit activation has a concrete per-app effect
-   without freezing Celery configuration or duplicating signal registration
-   logic.
+   lazy result backend. An eligible publish inspects and, when successful,
+   caches a definite backend verdict internally, so explicit activation has a
+   concrete per-app effect without freezing Celery configuration or duplicating
+   signal registration logic.
 
 2. **Explicit activation:** Import-time registration was removed in version
    0.2.0. This breaking change avoids Celery's import cost and implicit
@@ -1903,10 +1903,12 @@ make it the sole entry point for Celery signal registration.
    `celery_signals_unavailable`, `signal_missing`, `connect_not_callable`, or
    `receiver_rejected`; publisher-context states are `configured`,
    `send_task_unavailable`, or `assignment_rejected`. The activation record's
-   backend verdict is `unknown` until the first publish inspects the configured
-   backend. Backend verdicts are `rpc`, `non_rpc`, or `unknown`, and `unknown`
-   alone is not a registration failure. Records exclude app representations,
-   backend URIs, credentials, payloads, correlation IDs, and user IDs.
+   backend verdict is always `unknown`, because inspection is deferred. An
+   eligible publish caches a definite verdict internally when inspection
+   succeeds; this does not update the activation record. Backend verdicts are
+   `rpc`, `non_rpc`, or `unknown`, and `unknown` alone is not a registration
+   failure. Records exclude app representations, backend URIs, credentials,
+   payloads, correlation IDs, and user IDs.
 
 9. **Testing isolates shared process-global state:** Celery's signal registry is
    process-global. Unit and behavioural tests disconnect the known receivers by

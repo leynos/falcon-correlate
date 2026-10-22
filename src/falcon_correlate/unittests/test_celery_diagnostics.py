@@ -14,6 +14,7 @@ from unittest import mock
 import pytest
 
 import falcon_correlate.celery as celery_integration
+from falcon_correlate import celery_diagnostics
 from falcon_correlate.celery import configure_celery_correlation
 
 if typ.TYPE_CHECKING:
@@ -273,6 +274,26 @@ def test_backend_verdict_is_deferred_until_publishing(
         "Activation should report an uninspected backend verdict."
     )
     inspection.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("inspection", "expected_verdict"),
+    [
+        pytest.param("unknown", "unknown", id="unknown"),
+        pytest.param("rpc", "rpc", id="rpc"),
+        pytest.param("non_rpc", "non_rpc", id="non-rpc"),
+    ],
+)
+def test_backend_inspection_maps_to_bounded_diagnostic_verdict(
+    inspection: str,
+    expected_verdict: str,
+) -> None:
+    """Backend inspection has one stable diagnostic value per outcome."""
+    backend_uses_rpc = {"unknown": None, "rpc": True, "non_rpc": False}[inspection]
+    assert (
+        celery_diagnostics._backend_rpc_verdict(backend_uses_rpc=backend_uses_rpc)
+        == expected_verdict
+    ), "Backend inspection should map to its bounded diagnostic verdict."
 
 
 def test_failed_configuration_can_report_success_on_retry(

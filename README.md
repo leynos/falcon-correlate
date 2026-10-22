@@ -201,9 +201,9 @@ celery_app = configure_celery_correlation(
 
 Publishing a task during a request copies the correlation ID into the task
 message's `correlation_id`, and the worker restores it for the lifetime of the
-task body. When the active application uses the `rpc://` result backend, the
-handler instead leaves Celery's task-ID `correlation_id` in place, preserving
-Celery's result retrieval contract:
+task body. When the publishing application uses the `rpc://` result backend,
+the handler instead leaves Celery's task-ID `correlation_id` in place,
+preserving Celery's result retrieval contract:
 
 ```python
 from falcon_correlate import correlation_id_var
@@ -215,11 +215,10 @@ def send_invoice_email(user_id: str) -> None:
     # log, call downstream services, or forward the task on
 ```
 
-Importing `falcon_correlate` also registers the handlers when Celery is
-installed, but the explicit `configure_celery_correlation` call is the
-preferred form: it makes the integration visible where the application is
-built. The worker context is reset after each task, so the next task never
-inherits a stale ID.
+Importing `falcon_correlate` neither imports Celery nor registers the handlers.
+Call `configure_celery_correlation(app)` in each publisher and worker process
+to activate propagation. The worker context is reset after each task, so the
+next task never inherits a stale ID.
 
 ______________________________________________________________________
 

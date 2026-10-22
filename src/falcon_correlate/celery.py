@@ -338,9 +338,11 @@ def configure_celery_correlation[CeleryAppT: _CeleryAppLike](
 
     Each distinct configuration outcome emits one structured ``INFO`` record
     when complete or ``WARNING`` record when incomplete for this app's lifetime.
-    Backend inspection is not part of activation, so its diagnostic verdict is
-    ``unknown`` until publishing resolves it. Importing the integration does
-    not emit these diagnostics.
+    Activation records always report an ``unknown`` backend verdict because
+    inspection is not part of configuration. An eligible publish caches a
+    definite verdict internally when inspection succeeds; the record is not
+    updated afterwards. Importing the integration does not emit these
+    diagnostics.
 
     Parameters
     ----------

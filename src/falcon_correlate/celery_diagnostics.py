@@ -56,6 +56,17 @@ def _safe_connect_signal(
     return "connected"
 
 
+def _backend_rpc_verdict(*, backend_uses_rpc: bool | None) -> _BackendRpcVerdict:
+    """Map a backend inspection result to its bounded diagnostic value."""
+    match backend_uses_rpc:
+        case None:
+            return "unknown"
+        case True:
+            return "rpc"
+        case False:
+            return "non_rpc"
+
+
 def _report_configuration_outcome(
     app: object,
     signal_states: tuple[_SignalState, _SignalState, _SignalState],
@@ -64,13 +75,7 @@ def _report_configuration_outcome(
     backend_uses_rpc: bool | None,
 ) -> None:
     """Report each bounded configuration outcome once during an app's lifetime."""
-    backend_rpc_verdict: _BackendRpcVerdict
-    if backend_uses_rpc is None:
-        backend_rpc_verdict = "unknown"
-    elif backend_uses_rpc:
-        backend_rpc_verdict = "rpc"
-    else:
-        backend_rpc_verdict = "non_rpc"
+    backend_rpc_verdict = _backend_rpc_verdict(backend_uses_rpc=backend_uses_rpc)
     outcome: _ConfigurationOutcome = (
         *signal_states,
         publisher_context_state,

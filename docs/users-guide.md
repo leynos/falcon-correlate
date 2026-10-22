@@ -791,13 +791,14 @@ Those imports also emit no activation diagnostics. Each explicit configuration
 outcome is reported once per app through the `falcon_correlate.celery` logger:
 complete activation is `INFO`, and incomplete setup is `WARNING`. The record
 describes the three signal connections, publisher context setup, and the
-result-backend verdict. Activation reports `unknown` until the first publish
-inspects the configured backend; that inspection is cached for later publishes.
-An `unknown` backend verdict does not make registration incomplete. Records
-contain bounded status fields only; they do not include app representations,
-backend URIs, credentials, payloads, correlation IDs, or user IDs. The
-application controls whether `INFO` records are visible. These records confirm
-explicit setup only; they cannot detect a missing call to
+result-backend verdict. The activation record reports `unknown` because
+inspection is deferred. An eligible publish caches a definite verdict
+internally when inspection succeeds; this does not update or replace the
+activation record. An `unknown` backend verdict does not make registration
+incomplete. Records contain bounded status fields only; they do not include app
+representations, backend URIs, credentials, payloads, correlation IDs, or user
+IDs. The application controls whether `INFO` records are visible. These records
+confirm explicit setup only; they cannot detect a missing call to
 `configure_celery_correlation()`.
 
 After explicit publisher configuration, normal task publishing APIs such as

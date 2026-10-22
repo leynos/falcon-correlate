@@ -69,10 +69,11 @@ distinct outcome for an app through the `falcon_correlate.celery` logger:
 `INFO` for active setup and `WARNING` for incomplete setup. Its fields are
 `operation`, `registration_state`, `before_task_publish_state`,
 `task_prerun_state`, `task_postrun_state`, `publisher_context_state`, and
-`backend_rpc_verdict`. The activation record reports the backend verdict as
-`unknown` until the first publish inspects the configured backend. The
-`operation` value is `configure_celery_correlation`. Signal states are
-`connected`, `celery_signals_unavailable`, `signal_missing`,
+`backend_rpc_verdict`. The activation record reports `unknown` because backend
+inspection is deferred. An eligible publish caches a definite verdict
+internally when inspection succeeds; this does not update the activation
+record. The `operation` value is `configure_celery_correlation`. Signal states
+are `connected`, `celery_signals_unavailable`, `signal_missing`,
 `connect_not_callable`, or `receiver_rejected`; publisher-context states are
 `configured`, `send_task_unavailable`, or `assignment_rejected`. The backend
 verdict is `rpc`, `non_rpc`, or `unknown`; `unknown` is not a registration
