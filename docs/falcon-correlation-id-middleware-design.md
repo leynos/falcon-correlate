@@ -1858,6 +1858,11 @@ helpers.
    helper. This prevents the existing import-time registration from hiding a
    broken public configuration path.
 
+**Screen reader description:** The entity relationship diagram groups the
+supported signals, receivers, and dispatch UIDs by type. Each signal maps to
+its matching receiver and stable UID; the following flowchart shows the three
+individual registration chains.
+
 ```mermaid
 erDiagram
     CELERY_SIGNAL ||--|| INTEGRATION_RECEIVER : registers
@@ -1878,13 +1883,25 @@ erDiagram
     }
 ```
 
-**Figure 3 screen reader caption:** Each signal connects to one integration
-receiver, and that receiver uses one stable dispatch UID. `before_task_publish`
-connects to `propagate_correlation_id_to_celery`, which uses
-`_BEFORE_TASK_PUBLISH_DISPATCH_UID`. `task_prerun` connects to
-`setup_correlation_id_in_worker`, which uses `_TASK_PRERUN_DISPATCH_UID`.
-`task_postrun` connects to `clear_correlation_id_in_worker`, which uses
-`_TASK_POSTRUN_DISPATCH_UID`.
+*Figure 3: The entity types and relationships used for Celery signal
+registration.*
+
+**Screen reader description:** The flowchart shows each signal leading to its
+matching receiver and stable dispatch UID.
+
+```mermaid
+flowchart LR
+    Publish[before_task_publish] --> Propagate[propagate_correlation_id_to_celery]
+    Propagate --> BeforeUid[_BEFORE_TASK_PUBLISH_DISPATCH_UID]
+
+    Prerun[task_prerun] --> Setup[setup_correlation_id_in_worker]
+    Setup --> PrerunUid[_TASK_PRERUN_DISPATCH_UID]
+
+    Postrun[task_postrun] --> Clear[clear_correlation_id_in_worker]
+    Clear --> PostrunUid[_TASK_POSTRUN_DISPATCH_UID]
+```
+
+*Figure 4: The three Celery signal, receiver, and dispatch UID chains.*
 
 **Files created/modified:**
 
