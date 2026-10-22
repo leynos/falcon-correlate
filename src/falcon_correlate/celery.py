@@ -322,8 +322,10 @@ def configure_celery_correlation[CeleryAppT: _CeleryAppLike](
     """Configure Celery correlation ID propagation for an application.
 
     Call this helper explicitly in each publisher and worker process that needs
-    correlation ID propagation. Signal registration uses Celery's process-global
-    registry; stable dispatch UIDs keep repeated activation idempotent.
+    correlation ID propagation. It connects the ``before_task_publish``,
+    ``task_prerun``, and ``task_postrun`` receivers through Celery's
+    process-global registry. Stable dispatch UIDs keep repeated activation
+    idempotent.
 
     The integration caches this application's definite ``rpc://``
     result-backend verdict and wraps its ``send_task`` method to identify the

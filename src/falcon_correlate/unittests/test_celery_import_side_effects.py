@@ -19,12 +19,22 @@ _IMPORT_PROBE = textwrap.dedent(
     import sys
 
     mode = sys.argv[1]
+    celery_modules_before_import = {
+        name for name in sys.modules if name == "celery" or name.startswith("celery.")
+    }
     if mode == "package":
         import falcon_correlate
     elif mode == "module":
         import falcon_correlate.celery as integration
     else:
         raise ValueError(f"unsupported import mode: {mode}")
+
+    celery_modules_imported_by_integration = sorted(
+        name
+        for name in sys.modules
+        if (name == "celery" or name.startswith("celery."))
+        and name not in celery_modules_before_import
+    )
 
     import celery.signals as signals
     from celery import Celery
@@ -70,7 +80,13 @@ _IMPORT_PROBE = textwrap.dedent(
             for name, (signal, handler, dispatch_uid) in signal_handlers.items()
         }
 
-    result = {"mode": mode, "before": all_counts()}
+    result = {
+        "mode": mode,
+        "celery_modules_imported_by_integration": (
+            celery_modules_imported_by_integration
+        ),
+        "before": all_counts(),
+    }
     if mode == "package":
         app = Celery("probe")
         result["first_call_returns_app"] = (
@@ -149,6 +165,9 @@ def test_package_import_and_configuration_control_signal_registration() -> None:
     result = _run_import_probe("package")
 
     assert result["mode"] == "package", "package probe should report package mode"
+    assert result["celery_modules_imported_by_integration"] == [], (
+        "package import should not load Celery modules"
+    )
     _assert_no_receivers(result["before"])
     _assert_one_receiver_per_signal(result["after_first_call"], "first call")
     _assert_one_receiver_per_signal(result["after_second_call"], "second call")
@@ -166,4 +185,7 @@ def test_direct_celery_module_import_does_not_connect_signal_receivers() -> None
     result = _run_import_probe("module")
 
     assert result["mode"] == "module", "module probe should report module mode"
+    assert result["celery_modules_imported_by_integration"] == [], (
+        "direct integration import should not load Celery modules"
+    )
     _assert_no_receivers(result["before"])

@@ -1844,11 +1844,11 @@ make it the sole entry point for Celery signal registration.
    has a concrete per-app effect without duplicating signal registration logic.
 
 2. **Explicit activation:** Import-time registration was removed in version
-   0.2.0. This breaking change avoids Celery's import cost and implicit mutation
-   of its process-global signal registry in processes that never use Celery.
-   Importing `falcon_correlate` leaves Celery signals untouched; each publisher
-   and worker process must call `configure_celery_correlation(app)` to activate
-   propagation.
+   0.2.0. This breaking change avoids Celery's import cost and implicit
+   mutation of its process-global signal registry in processes that never use
+   Celery. Importing `falcon_correlate` leaves Celery signals untouched; each
+   publisher and worker process must call `configure_celery_correlation(app)`
+   to activate propagation.
 
 3. **Correct and efficient publisher resolution:** `before_task_publish` carries
    a task name as `sender`, not the publishing app. Registry membership is not

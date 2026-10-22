@@ -97,6 +97,7 @@ easy to read and test.
 registration is not preserved. Each publisher and worker process must call
 `configure_celery_correlation(app)` to register the integration.
 Disconnect-before-configure isolates the shared process-global test state.
+
 - Use British English in documentation.
 - Wrap Markdown paragraphs and list items at 80 columns, and keep code blocks
   within 120 columns.
