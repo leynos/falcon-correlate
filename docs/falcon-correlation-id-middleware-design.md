@@ -1893,6 +1893,58 @@ make it the sole entry point for Celery signal registration.
    failure. Records exclude app representations, backend URIs, credentials,
    payloads, correlation IDs, and user IDs.
 
+**Screen reader description:** The entity relationship diagram groups signals,
+receivers, and dispatch UIDs by type. The three registration chains are:
+`before_task_publish` registers `propagate_correlation_id_to_celery` with
+`_BEFORE_TASK_PUBLISH_DISPATCH_UID`; `task_prerun` registers
+`setup_correlation_id_in_worker` with `_TASK_PRERUN_DISPATCH_UID`; and
+`task_postrun` registers `clear_correlation_id_in_worker` with
+`_TASK_POSTRUN_DISPATCH_UID`.
+
+```mermaid
+erDiagram
+    CELERY_SIGNAL ||--|| INTEGRATION_RECEIVER : registers
+    INTEGRATION_RECEIVER ||--|| DISPATCH_UID : uses
+
+    CELERY_SIGNAL {
+        string before_task_publish
+        string task_prerun
+        string task_postrun
+    }
+    INTEGRATION_RECEIVER {
+        string propagate_correlation_id_to_celery
+        string setup_correlation_id_in_worker
+        string clear_correlation_id_in_worker
+    }
+    DISPATCH_UID {
+        string stable_identifier
+    }
+```
+
+*Figure 3: The entity types and relationships used for Celery signal
+registration.*
+
+**Screen reader description:** The flowchart shows three registration chains:
+`before_task_publish` registers `propagate_correlation_id_to_celery` with
+`_BEFORE_TASK_PUBLISH_DISPATCH_UID`; `task_prerun` registers
+`setup_correlation_id_in_worker` with `_TASK_PRERUN_DISPATCH_UID`; and
+`task_postrun` registers `clear_correlation_id_in_worker` with
+`_TASK_POSTRUN_DISPATCH_UID`.
+
+```mermaid
+flowchart LR
+    Publish[before_task_publish] --> Propagate[propagate_correlation_id_to_celery]
+    Propagate --> BeforeUid[_BEFORE_TASK_PUBLISH_DISPATCH_UID]
+
+    Prerun[task_prerun] --> Setup[setup_correlation_id_in_worker]
+    Setup --> PrerunUid[_TASK_PRERUN_DISPATCH_UID]
+
+    Postrun[task_postrun] --> Clear[clear_correlation_id_in_worker]
+    Clear --> PostrunUid[_TASK_POSTRUN_DISPATCH_UID]
+```
+
+*Figure 4: The three Celery signal, receiver, and dispatch UID chains.*
+
 **Files created/modified:**
 
 - `src/falcon_correlate/celery.py` — Added
