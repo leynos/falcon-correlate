@@ -207,32 +207,36 @@ class _CorrelationIDMiddlewareBase:
             )
             raise
 
+    def _classify_incoming(
+        self,
+        req: _RequestLike,
+        incoming: str | None,
+    ) -> tuple[IncomingIDOutcome, SourceTrust]:
+        """Classify the incoming ID and preserve existing validation logs."""
+        if incoming is None:
+            return IncomingIDOutcome.missing, SourceTrust.not_evaluated
+        if not self._is_trusted_source(req.remote_addr):
+            return IncomingIDOutcome.untrusted, SourceTrust.untrusted
+
+        validation_result, validator_raised = self._validate_id(incoming)
+        is_valid = not validator_raised and bool(validation_result)
+        if validator_raised:
+            outcome = IncomingIDOutcome.rejected_validator_error
+        elif is_valid:
+            outcome = IncomingIDOutcome.accepted
+        else:
+            outcome = IncomingIDOutcome.rejected_invalid
+        if not is_valid:
+            logger.debug(
+                "Correlation ID failed validation, generating new ID",
+                extra=self._log_context(incoming),
+            )
+        return outcome, SourceTrust.trusted
+
     def _process_request(self, req: _RequestLike) -> None:
         """Establish request-local correlation ID state."""
         incoming = self._get_incoming_header_value(req)
-        should_generate = True
-        if incoming is None:
-            outcome = IncomingIDOutcome.missing
-            trust = SourceTrust.not_evaluated
-        elif not self._is_trusted_source(req.remote_addr):
-            outcome = IncomingIDOutcome.untrusted
-            trust = SourceTrust.untrusted
-        else:
-            trust = SourceTrust.trusted
-            validation_result, validator_raised = self._validate_id(incoming)
-            is_valid = not validator_raised and bool(validation_result)
-            if validator_raised:
-                outcome = IncomingIDOutcome.rejected_validator_error
-            elif is_valid:
-                outcome = IncomingIDOutcome.accepted
-                should_generate = False
-            else:
-                outcome = IncomingIDOutcome.rejected_invalid
-            if not is_valid:
-                logger.debug(
-                    "Correlation ID failed validation, generating new ID",
-                    extra=self._log_context(incoming),
-                )
+        outcome, trust = self._classify_incoming(req, incoming)
 
         self._record_selection(
             CorrelationIDSelectionEvent(
@@ -242,7 +246,9 @@ class _CorrelationIDMiddlewareBase:
             ),
         )
         correlation_id = (
-            self._generate_id() if should_generate else typ.cast("str", incoming)
+            self._generate_id()
+            if outcome is not IncomingIDOutcome.accepted
+            else typ.cast("str", incoming)
         )
 
         req.context.correlation_id = correlation_id

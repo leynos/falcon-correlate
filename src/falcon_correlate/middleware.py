@@ -71,7 +71,7 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
     **kwargs : object
         Individual configuration options passed to
         ``CorrelationIDConfig.from_kwargs``: ``header_name``,
-        ``trusted_sources``, ``generator``, ``validator``, and
+        ``trusted_sources``, ``generator``, ``validator``,
         ``echo_header_in_response``, and ``metrics_recorder``.
 
     Raises

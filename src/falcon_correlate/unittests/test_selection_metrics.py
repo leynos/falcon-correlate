@@ -177,7 +177,7 @@ def test_wsgi_records_one_selection_event(
     case: _OutcomeCase,
 ) -> None:
     """WSGI reports each outcome once without changing selected IDs or calls."""
-    events = []
+    events: list[CorrelationIDSelectionEvent] = []
     recorder = events.append
     calls = _CallbackCalls()
 
@@ -231,7 +231,7 @@ async def test_asgi_records_one_selection_event(
     case: _OutcomeCase,
 ) -> None:
     """ASGI reports the same outcomes and call counts as WSGI."""
-    events = []
+    events: list[CorrelationIDSelectionEvent] = []
     recorder = events.append
     calls = _CallbackCalls()
 
@@ -356,7 +356,7 @@ def test_selection_event_is_recorded_before_generator_failure(
     ],
 ) -> None:
     """Rejected selection metrics are retained when fallback generation fails."""
-    events = []
+    events: list[CorrelationIDSelectionEvent] = []
     failure = RuntimeError("generator failed")
 
     def generator() -> str:
