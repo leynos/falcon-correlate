@@ -245,8 +245,12 @@ class CorrelationIDConfig:
         Raises
         ------
         TypeError
-            If an unknown keyword is supplied, or if a trusted source is a
-            bare string.
+            If an unknown keyword is supplied; ``trusted_sources`` is a string
+            or contains a non-string member; or ``generator`` or ``validator``
+            is not callable.
+        ValueError
+            If ``header_name`` is empty or whitespace-only, or a trusted
+            source is empty, whitespace-only, or malformed.
 
         Examples
         --------
@@ -256,7 +260,7 @@ class CorrelationIDConfig:
         >>> config.trusted_sources
         frozenset()
 
-        """
+        """  # ruff: ignore[docstring-extraneous-exception] - cls validates inputs.
         unknown = set(kwargs) - VALID_CONFIG_KWARGS
         if unknown:
             msg = f"Unknown keyword arguments: {', '.join(sorted(unknown))}"
