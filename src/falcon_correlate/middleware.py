@@ -108,6 +108,7 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
         ------
         Exception
             If the configured correlation ID generator raises an exception.
+            The failure is logged at ``ERROR`` and the exception is propagated.
 
         """  # ruff: ignore[docstring-extraneous-exception] - generator exceptions are delegated.
         self._process_request(req)

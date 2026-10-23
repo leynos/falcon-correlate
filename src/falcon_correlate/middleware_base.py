@@ -171,6 +171,18 @@ class _CorrelationIDMiddlewareBase:
             )
             return False
 
+    def _generate_id(self) -> str:
+        """Generate a new ID, logging and propagating generator failures."""
+        try:
+            return self._config.generator()
+        except Exception:
+            logger.error(
+                "Correlation ID generator raised an exception",
+                exc_info=True,
+                extra={"header_name": self._config.header_name},
+            )
+            raise
+
     def _process_request(self, req: _RequestLike) -> None:
         """Establish request-local correlation ID state."""
         incoming = self._get_incoming_header_value(req)
@@ -183,9 +195,9 @@ class _CorrelationIDMiddlewareBase:
                     "Correlation ID failed validation, generating new ID",
                     extra=self._log_context(incoming),
                 )
-                correlation_id = self._config.generator()
+                correlation_id = self._generate_id()
         else:
-            correlation_id = self._config.generator()
+            correlation_id = self._generate_id()
 
         req.context.correlation_id = correlation_id
         reset_token = self._correlation_id_var.set(correlation_id)
