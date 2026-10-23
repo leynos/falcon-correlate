@@ -244,6 +244,19 @@ Stop and escalate when any of these is reached:
 
 ## Decision log
 
+- Decision: Preserve the upstream issue #37 configuration-test split when
+  rebasing issue #36. Keep direct `from_kwargs` behaviour cases in
+  `test_config_validation.py` and the middleware-construction equivalence test
+  in `TestConfigConstruction`, including generator and validator identity.
+  Rationale: the upstream split gives each test class a clear responsibility;
+  issue #36's coverage fits those boundaries without restoring the old
+  monolithic class. Date/Author: 2026-10-23, implementation agent.
+
+- Decision: Retain issue #49's adapter-boundary guidance in
+  `developers-guide.md` alongside issue #36's factory-delegation guidance.
+  Rationale: these describe separate module boundaries and both apply after the
+  rebase. Date/Author: 2026-10-23, implementation agent.
+
 - Decision: Stop before enabling repo-wide `DOC` because the measured baseline
   exceeds the plan's exception threshold. Rationale: the plan permits
   autonomous implementation only while the `DOC` scope stays below roughly 60
