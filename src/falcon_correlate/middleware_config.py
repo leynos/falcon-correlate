@@ -20,6 +20,8 @@ import typing as typ
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
+    from .middleware_metrics import MetricsRecorder
+
     class CorrelationIDConfigKwargs(typ.TypedDict, total=False):
         """Type definition for CorrelationIDConfig keyword arguments."""
 
@@ -28,6 +30,7 @@ if typ.TYPE_CHECKING:
         generator: cabc.Callable[[], str] | None
         validator: cabc.Callable[[str], bool] | None
         echo_header_in_response: bool
+        metrics_recorder: MetricsRecorder | None
 
 
 from .middleware_utils import default_uuid7_generator
@@ -90,13 +93,16 @@ class CorrelationIDConfig:
         Optional function to validate incoming IDs. Defaults to ``None``.
     echo_header_in_response : bool
         Whether to echo the ID in response headers. Defaults to ``True``.
+    metrics_recorder : MetricsRecorder | None
+        Optional synchronous callback for bounded selection events. The callback
+        must not block because ASGI invokes it on the event loop.
 
     Raises
     ------
     ValueError
         If ``header_name`` is empty or ``trusted_sources`` contains empty strings.
     TypeError
-        If ``generator`` or ``validator`` is not callable.
+        If ``generator``, ``validator``, or ``metrics_recorder`` is not callable.
 
     """
 
@@ -105,6 +111,10 @@ class CorrelationIDConfig:
     generator: cabc.Callable[[], str] = default_uuid7_generator
     validator: cabc.Callable[[str], bool] | None = None
     echo_header_in_response: bool = True
+    metrics_recorder: MetricsRecorder | None = dataclasses.field(
+        default=None,
+        kw_only=True,
+    )
     _parsed_networks: tuple[_NetworkType, ...] = dataclasses.field(
         default=(),
         init=False,
@@ -122,7 +132,7 @@ class CorrelationIDConfig:
             source is empty, whitespace-only, or malformed.
         TypeError
             If ``trusted_sources`` is a string or contains non-string values, or
-            if ``generator`` or ``validator`` is not callable.
+            if ``generator``, ``validator``, or ``metrics_recorder`` is not callable.
 
         """  # ruff: ignore[docstring-extraneous-exception] - validators raise indirectly.
         if isinstance(self.trusted_sources, str):
@@ -134,6 +144,7 @@ class CorrelationIDConfig:
         self._validate_trusted_sources()
         self._validate_generator()
         self._validate_validator()
+        self._validate_metrics_recorder()
 
     def _validate_header_name(self) -> None:
         """Validate that header_name is not empty or whitespace."""
@@ -221,6 +232,17 @@ class CorrelationIDConfig:
             msg = "validator must be callable"
             raise TypeError(msg)
 
+    def _validate_metrics_recorder(self) -> None:
+        """Validate that the optional metrics recorder is callable."""
+        if self.metrics_recorder is not None and not callable(self.metrics_recorder):
+            _log_validation_failure(
+                "metrics_recorder",
+                self.metrics_recorder,
+                type_only=True,
+            )
+            msg = "metrics_recorder must be callable"
+            raise TypeError(msg)
+
     @staticmethod
     def _normalize_trusted_sources(
         trusted_sources: cabc.Iterable[str] | None,
@@ -275,8 +297,12 @@ class CorrelationIDConfig:
             ``DEFAULT_HEADER_NAME``), ``trusted_sources`` (default ``None``,
             normalized to an empty ``frozenset``), ``generator`` (default
             ``None``, resolved to ``default_uuid7_generator``), ``validator``
-            (default ``None``, passed through unchanged), and
-            ``echo_header_in_response`` (default ``True``).
+            (default ``None``, passed through unchanged),
+            ``echo_header_in_response`` (default ``True``), and
+            ``metrics_recorder`` (default ``None``), a synchronous callback for
+            bounded selection events that must not block under ASGI.
+
+        Unknown keywords are rejected in sorted order.
 
         Returns
         -------
@@ -287,8 +313,8 @@ class CorrelationIDConfig:
         ------
         TypeError
             If an unknown keyword is supplied; ``trusted_sources`` is a string
-            or contains a non-string member; or ``generator`` or ``validator``
-            is not callable.
+            or contains a non-string member; or ``generator``, ``validator`` or
+            ``metrics_recorder`` is not callable.
         ValueError
             If ``header_name`` is empty or whitespace-only, or a trusted
             source is empty, whitespace-only, or malformed.
@@ -315,6 +341,7 @@ class CorrelationIDConfig:
             generator=cls._resolve_generator(kwargs.get("generator")),
             validator=kwargs.get("validator"),
             echo_header_in_response=kwargs.get("echo_header_in_response", True),
+            metrics_recorder=kwargs.get("metrics_recorder"),
         )
 
 

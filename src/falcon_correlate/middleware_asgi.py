@@ -35,7 +35,7 @@ class CorrelationIDMiddlewareASGI(_CorrelationIDMiddlewareBase):
     **kwargs
         Individual configuration parameters. Valid keys are: ``header_name``,
         ``trusted_sources``, ``generator``, ``validator``, and
-        ``echo_header_in_response``. See
+        ``echo_header_in_response``, and ``metrics_recorder``. See
         :meth:`CorrelationIDConfig.from_kwargs` for parameter details.
 
     Attributes
@@ -53,6 +53,9 @@ class CorrelationIDMiddlewareASGI(_CorrelationIDMiddlewareBase):
         Optional validator for incoming correlation IDs.
     echo_header_in_response : bool
         Whether to echo middleware-owned correlation IDs in response headers.
+    metrics_recorder : MetricsRecorder | None
+        Synchronous callback for selection events. It must be quick and
+        non-blocking because it runs on the event loop.
 
     Raises
     ------
@@ -60,8 +63,8 @@ class CorrelationIDMiddlewareASGI(_CorrelationIDMiddlewareBase):
         If both ``config`` and other keyword arguments are provided, or if
         ``header_name`` is empty or ``trusted_sources`` contains empty strings.
     TypeError
-        If unknown keyword arguments are provided, or if ``generator`` or
-        ``validator`` is provided but not callable.
+        If unknown keyword arguments are provided, or if ``generator``,
+        ``validator``, or ``metrics_recorder`` is not callable.
 
     Examples
     --------
