@@ -110,6 +110,14 @@ The corresponding `ContextVar.reset()` calls cast the verified token back to
 `Token[str | None]`, which keeps the middleware clear to the type checker while
 preserving the runtime contract.
 
+`middleware_metrics.py` owns the middleware-specific, backend-agnostic metrics
+contract. It defines the immutable selection event, the finite outcome and
+trust enums, and the `MetricsRecorder` callback type. The module has no metrics
+backend dependency; applications inject their own synchronous recorder through
+`CorrelationIDConfig`. Reuse stays within correlation ID selection rather than
+growing this module into a general metrics framework. Recorder callbacks must
+be quick and non-blocking because ASGI invokes them on the event loop.
+
 ### Request lifecycle and reset-token storage
 
 `middleware_utils.py` defines `CORRELATION_ID_RESET_TOKEN_ATTR` as
@@ -151,13 +159,13 @@ and
 for the token-storage rationale.
 
 The architectural boundary is deliberately one-way: `middleware_base.py`
-depends on configuration and utility modules, and the WSGI and ASGI modules
-depend on the base. Configuration and utility modules do not depend on the
-concrete middleware classes. The `httpx` and `celery` adapters depend on
-`middleware_config.py` and `middleware_utils.py`, not on `middleware.py`.
-`middleware.py` remains the Falcon orchestration and compatibility re-export
-layer. This prevents circular imports and keeps those helpers usable
-independently.
+depends on configuration, metrics, and utility modules, and the WSGI and ASGI
+modules depend on the base. Configuration, metrics, and utility modules do not
+depend on the concrete middleware classes. The `httpx` and `celery` adapters
+depend on `middleware_config.py` and `middleware_utils.py`, not on
+`middleware.py`. `middleware.py` remains the Falcon orchestration and
+compatibility re-export layer. This prevents circular imports and keeps those
+helpers usable independently.
 
 `asgi_middleware_helpers.py` lives under `falcon_correlate.unittests` as shared
 ASGI middleware test infrastructure. It provides lightweight request and

@@ -28,7 +28,7 @@ class IncomingIDOutcome(enum.StrEnum):
     """The incoming ID failed the configured validator."""
 
     rejected_validator_error = "rejected_validator_error"
-    """The configured validator raised while checking the incoming ID."""
+    """The validator or its result raised during validation."""
 
 
 class SourceTrust(enum.StrEnum):
