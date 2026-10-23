@@ -69,7 +69,7 @@ class CorrelationIDSelectionEvent:
     header_name: str
 
 
-MetricsRecorder = cabc.Callable[[CorrelationIDSelectionEvent], None]
+type MetricsRecorder = cabc.Callable[[CorrelationIDSelectionEvent], None]
 """Synchronous callback that records one correlation ID selection event.
 
 The callback must be quick and non-blocking because ASGI invokes it on the

@@ -48,6 +48,17 @@ if typ.TYPE_CHECKING:
 logger = logging.getLogger("falcon_correlate.middleware")
 
 
+def _validation_outcome(
+    result: object,
+    *,
+    validator_raised: bool,
+) -> IncomingIDOutcome:
+    """Map one validator result to its selection outcome."""
+    if validator_raised:
+        return IncomingIDOutcome.rejected_validator_error
+    return IncomingIDOutcome.accepted if result else IncomingIDOutcome.rejected_invalid
+
+
 class _CorrelationIDMiddlewareBase:
     """Shared lifecycle logic for Falcon correlation ID middleware variants."""
 
@@ -219,24 +230,24 @@ class _CorrelationIDMiddlewareBase:
             return IncomingIDOutcome.untrusted, SourceTrust.untrusted
 
         validation_result, validator_raised = self._validate_id(incoming)
-        is_valid = not validator_raised and bool(validation_result)
-        if validator_raised:
-            outcome = IncomingIDOutcome.rejected_validator_error
-        elif is_valid:
-            outcome = IncomingIDOutcome.accepted
-        else:
-            outcome = IncomingIDOutcome.rejected_invalid
-        if not is_valid:
-            logger.debug(
-                "Correlation ID failed validation, generating new ID",
-                extra=self._log_context(incoming),
-            )
+        outcome = _validation_outcome(
+            validation_result,
+            validator_raised=validator_raised,
+        )
         return outcome, SourceTrust.trusted
 
     def _process_request(self, req: _RequestLike) -> None:
         """Establish request-local correlation ID state."""
         incoming = self._get_incoming_header_value(req)
         outcome, trust = self._classify_incoming(req, incoming)
+        if outcome in {
+            IncomingIDOutcome.rejected_invalid,
+            IncomingIDOutcome.rejected_validator_error,
+        }:
+            logger.debug(
+                "Correlation ID failed validation, generating new ID",
+                extra=self._log_context(incoming),
+            )
 
         self._record_selection(
             CorrelationIDSelectionEvent(
