@@ -768,6 +768,28 @@ is excluded from the xdist run. CI applies the same split; use
 `make typecheck` runs `ty` through the project `uv` environment. This ensures
 the type checker can resolve project dependencies such as `pathspec`.
 
+### Optional-Celery subprocess contract
+
+The optional-Celery checks in
+`src/falcon_correlate/unittests/test_optional_celery_dependency.py` launch
+Python children through the helpers in
+`src/falcon_correlate/unittests/optional_celery_dependency_helpers.py`. Callers
+pass the child's environment explicitly. Blocked-Celery callers add the import
+blocker to that mapping, and the runner removes inherited `PYTEST_` controls.
+
+`_run_python(..., phase=...)` uses a 120-second child timeout. On timeout it
+raises an `AssertionError` containing the phase, command, timeout and captured
+partial stdout and stderr. Callers label import checks `import probe`, test
+execution `blocked execution`, and pytest collection `collection`. Collection
+also fails when pytest exits non-zero or collects no items; its assertion
+includes the exit code, stdout and stderr. The enclosing serial test retains a
+270-second timeout.
+
+The rationale and evidence are in the
+[issue #34 investigation record][issue-34-investigation].
+
+[issue-34-investigation]: debugging/issue-34-inconclusive-testing-compile-time-ui-pr-33.md
+
 ## Spelling policy
 
 Run the spelling gate with:
