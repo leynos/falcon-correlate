@@ -10,7 +10,6 @@ tests from the project root with::
 from __future__ import annotations
 
 import json
-import os
 import textwrap
 
 import pytest
@@ -154,7 +153,13 @@ _IMPORT_PROBE = textwrap.dedent(
 
 def _run_import_probe(mode: str) -> dict[str, object]:
     """Run one import scenario in an unmodified fresh Python interpreter."""
-    result = _run_python(os.environ, _PROJECT_ROOT, "-c", _IMPORT_PROBE, mode)
+    result = _run_python(
+        _PROJECT_ROOT,
+        "-c",
+        _IMPORT_PROBE,
+        mode,
+        phase="import probe",
+    )
     failure_message = (
         f"import probe failed for {mode}: stdout={result.stdout!r}, "
         f"stderr={result.stderr!r}"

@@ -135,7 +135,7 @@ distribution strategy, so both coverage lanes set `pytest-workers` to an empty
 string and run the suite serially. Direct test lanes use `--dist=loadgroup` for
 fixtures that share provisioned tools. The pinned action's manifest lists the
 worker input and its empty-string setting:
-[generate-coverage action manifest](https://github.com/leynos/shared-actions/blob/0606ca899ce2995a0c4bc78e660e80832e6e8855/.github/actions/generate-coverage/action.yml).
+[generate-coverage action manifest](https://github.com/leynos/shared-actions/blob/d5fded1107ee6822fdbf9539d81ff18ce6ce073a/.github/actions/generate-coverage/action.yml).
 
 After these implementation changes, each listed gate exited with status 0:
 `make check-fmt`, `make typecheck`, `make lint`, `make test`,
