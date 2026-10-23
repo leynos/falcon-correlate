@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import dataclasses
 import ipaddress
+import logging
 import typing as typ
 
 if typ.TYPE_CHECKING:
@@ -31,10 +32,33 @@ if typ.TYPE_CHECKING:
 
 from .middleware_utils import default_uuid7_generator
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_HEADER_NAME = "X-Correlation-ID"
 
 # Type alias for parsed network objects
 _NetworkType = ipaddress.IPv4Network | ipaddress.IPv6Network
+
+
+def _format_rejected_value(value: object) -> str:
+    """Render string values safely and other values by type name."""
+    if isinstance(value, str):
+        return repr(value)
+    return type(value).__qualname__
+
+
+def _log_validation_failure(field: str, value: object) -> None:
+    """Log one safe diagnostic for a rejected configuration value."""
+    rejected_value = _format_rejected_value(value)
+    logger.debug(
+        "Correlation ID configuration validation failed for %s: rejected value %s",
+        field,
+        rejected_value,
+        extra={
+            "config_field": field,
+            "config_rejected_value": rejected_value,
+        },
+    )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -93,6 +117,7 @@ class CorrelationIDConfig:
 
         """  # ruff: ignore[docstring-extraneous-exception] - validators raise indirectly.
         if isinstance(self.trusted_sources, str):
+            _log_validation_failure("trusted_sources", self.trusted_sources)
             msg = "trusted_sources must be an iterable of strings, not a string"
             raise TypeError(msg)
         object.__setattr__(self, "trusted_sources", frozenset(self.trusted_sources))
@@ -104,6 +129,7 @@ class CorrelationIDConfig:
     def _validate_header_name(self) -> None:
         """Validate that header_name is not empty or whitespace."""
         if not self.header_name or not self.header_name.strip():
+            _log_validation_failure("header_name", self.header_name)
             msg = "header_name must not be empty"
             raise ValueError(msg)
 
@@ -112,6 +138,7 @@ class CorrelationIDConfig:
         parsed: list[_NetworkType] = []
         for source in self.trusted_sources:
             if not isinstance(source, str):
+                _log_validation_failure("trusted_sources", source)
                 msg = "trusted_sources must contain strings"
                 raise TypeError(msg)
             self._validate_source_not_empty(source)
@@ -136,6 +163,7 @@ class CorrelationIDConfig:
 
         """
         if not source or not source.strip():
+            _log_validation_failure("trusted_sources", source)
             msg = "trusted_sources must not contain empty strings"
             raise ValueError(msg)
 
@@ -167,17 +195,20 @@ class CorrelationIDConfig:
                 msg = f"Invalid CIDR notation '{source}': has host bits set"
             else:
                 msg = f"Invalid IP address or CIDR notation: '{source}'"
+            _log_validation_failure("trusted_sources", source)
             raise ValueError(msg) from err
 
     def _validate_generator(self) -> None:
         """Validate that generator is callable."""
         if not callable(self.generator):
+            _log_validation_failure("generator", self.generator)
             msg = "generator must be callable"
             raise TypeError(msg)
 
     def _validate_validator(self) -> None:
         """Validate that validator is callable when provided."""
         if self.validator is not None and not callable(self.validator):
+            _log_validation_failure("validator", self.validator)
             msg = "validator must be callable"
             raise TypeError(msg)
 
@@ -207,6 +238,7 @@ class CorrelationIDConfig:
         if trusted_sources is None:
             return frozenset()
         if isinstance(trusted_sources, str):
+            _log_validation_failure("trusted_sources", trusted_sources)
             msg = "trusted_sources must be an iterable of strings, not a str"
             raise TypeError(msg)
         return frozenset(trusted_sources)
