@@ -63,8 +63,10 @@ class _CorrelationIDMiddlewareBase:
         ------
         ValueError
             If a configuration object and individual options are both supplied.
+        TypeError
+            If an unknown individual option is supplied.
 
-        """
+        """  # ruff: ignore[docstring-extraneous-exception] - from_kwargs raises it.
         self._correlation_id_var = correlation_id_context_var
         if config is not None and kwargs:
             msg = "Cannot specify both 'config' and individual parameters"
