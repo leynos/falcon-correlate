@@ -357,10 +357,10 @@ declare no runner at all: the called workflow places its own jobs.
 A pull request from a fork cannot obtain an Ubicloud runner, so a lane serving
 pull requests names both. A pull request Dependabot opened takes the hosted arm
 too: hosted minutes cost nothing on a public repository, and Dependabot opens
-many pull requests, which therefore build cold on the hosted pool. The guard
-tests the pull request's author, not `github.actor`, because the actor is
-whoever triggered the run, so a person pushing to a Dependabot branch would
-flip the runner:
+many pull requests, which therefore run on the hosted pool, whose fresh
+filesystem cannot read Ubicloud's cache store. The guard tests the pull
+request's author, not `github.actor`, because the actor is whoever triggered
+the run, so a person pushing to a Dependabot branch would flip the runner:
 
 ```yaml
 runs-on: >-
