@@ -111,7 +111,11 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
         """  # ruff: ignore[docstring-extraneous-exception] - generator exceptions are delegated.
         self._process_request(req)
 
-    # Falcon middleware hook requires this exact callback signature; see #38.
+    # Falcon's WSGI middleware contract mandates the four-parameter
+    # process_response signature: req, resp, resource, req_succeeded.
+    # This hook uses only req and resp, so argument-count warnings are disabled
+    # because the framework callback signature is fixed.
+    # FIXME: https://github.com/leynos/falcon-correlate/issues/38  # ruff: ignore[invalid-todo-tag, missing-todo-author]
     # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def process_response(
         self,
