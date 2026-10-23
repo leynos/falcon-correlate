@@ -308,8 +308,15 @@ The trust value records whether the source was checked:
 A backend can use the enum outcomes and trust values as stable counter labels,
 along with the configured header name. For example, a counter-backed recorder
 can increment with stable event labels:
-`counter.labels(outcome=event.outcome.value, trust=event.trust.value,
-header_name=event.header_name).inc()`.
+
+```python
+counter.labels(
+    outcome=event.outcome.value,
+    trust=event.trust.value,
+    header_name=event.header_name,
+).inc()
+```
+
 The event omits request-specific values, so do not derive labels from incoming
 IDs or client addresses.
 
