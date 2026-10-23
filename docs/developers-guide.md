@@ -137,6 +137,11 @@ successful responses. The HTTPX transport tests use these helpers to verify
 header propagation without making network requests. This test support module is
 owned by the unit-test package and must not be imported by production code.
 
+`_contextual_log_filter_support.py` provides the `HasCorrelationID`,
+`HasUserID`, and `HasContextIDs` protocols and the `make_log_record` factory
+shared by the focused contextual log filter tests. Keep this helper scoped to
+those unit tests; production code must not import it.
+
 ### Celery signal registration
 
 Maintainers changing `src/falcon_correlate/celery.py` should preserve the
