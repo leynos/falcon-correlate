@@ -97,7 +97,15 @@ class CorrelationIDMiddlewareASGI(_CorrelationIDMiddlewareBase):
         req: falcon.asgi.Request,
         resp: falcon.asgi.Response,
     ) -> None:
-        """Process an incoming ASGI request to establish correlation ID context."""
+        """Process an incoming ASGI request to establish correlation ID context.
+
+        Raises
+        ------
+        Exception
+            If the configured generator raises an exception. The failure is
+            logged at ``ERROR`` and the exception is propagated.
+
+        """  # ruff: ignore[docstring-extraneous-exception] - generator exceptions are delegated.
         self._process_request(req)
 
     # Falcon ASGI middleware hook requires this exact signature.
