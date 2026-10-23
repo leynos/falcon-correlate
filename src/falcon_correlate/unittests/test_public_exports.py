@@ -55,6 +55,8 @@ def _assigns_name(node: ast.stmt, name: str) -> bool:
 
     """
     match node:
+        case ast.TypeAlias(name=ast.Name(id=target_name)):
+            return target_name == name
         case ast.AnnAssign(target=ast.Name(id=target_name)):
             return target_name == name
         case ast.Assign(targets=targets):
