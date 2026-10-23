@@ -772,13 +772,15 @@ The helper connects the `before_task_publish`, `task_prerun`, and
 `task_postrun` handlers in one idempotent call and returns the same app
 instance. It also wraps the app's `send_task` method so the publish handler can
 identify the actual publishing app while Celery emits its global signal. The
-helper defers result-backend inspection until the first publish so it does not
-freeze Celery's lazy backend before application configuration has loaded. A
-successful inspection caches that app's definite `rpc://` verdict; errors are
-left uncached and retried on later publishes. While the verdict is unknown,
-Celery's task ID is preserved. Configured app instances must be hashable and
-weak-referenceable for the per-app verdict cache; Celery's own application
-instances satisfy this requirement.
+helper defers result-backend inspection until an eligible publish has an
+ambient correlation ID and message properties, so it does not freeze Celery's
+lazy backend before application configuration has loaded. The first eligible
+publish attempts inspection, and only a definite verdict is cached for that
+app; failed inspections remain uncached and can be retried on later eligible
+publishes. While the verdict is unknown, Celery's task ID is preserved.
+Configured app instances must be hashable and weak-referenceable for the
+per-app verdict cache; Celery's own application instances satisfy this
+requirement.
 
 Calling the helper is required to activate Celery propagation. Importing
 `falcon_correlate` or `falcon_correlate.celery` does not import Celery or
@@ -803,9 +805,10 @@ confirm explicit setup only; they cannot detect a missing call to
 
 After explicit publisher configuration, normal task publishing APIs such as
 `delay()` and `apply_async()` propagate the request correlation ID when the
-active result backend is not `rpc://`. With the `rpc://` backend, Celery's
-task-ID correlation value is preserved. After explicit worker configuration,
-task execution sees the incoming value through `correlation_id_var.get()`.
+publishing app's result backend is not `rpc://`. With the `rpc://` backend,
+Celery's task-ID correlation value is preserved. After explicit worker
+configuration, task execution sees the incoming value through
+`correlation_id_var.get()`.
 
 ```python
 from falcon_correlate import correlation_id_var
@@ -831,11 +834,13 @@ def send_invoice_email(self, user_id: str) -> None:
 ### Behaviour
 
 - When `correlation_id_var` is set and a configured app publishes through its
-  `send_task` method, its first publish inspects and caches the result-backend
-  verdict; that cached value controls later propagation. A non-RPC backend uses
-  the ambient request value as the publish-time `correlation_id`; an RPC
-  backend preserves Celery's task ID. This remains correct when `send_task()`
-  publishes a task name registered on another app.
+  `send_task` method, the first eligible publish with message properties
+  attempts result-backend inspection if no verdict is cached. A definite
+  verdict is cached only after successful inspection, and that cached value
+  controls later propagation. A non-RPC backend uses the ambient request value
+  as the publish-time `correlation_id`; an RPC backend preserves Celery's task
+  ID. This remains correct when `send_task()` publishes a task name registered
+  on another app.
 - The `before_task_publish` signal's `sender` is a task name, not the publisher
   app. Configured apps therefore establish publisher identity around
   `send_task()`; the handler does not infer it from task-registry ownership.

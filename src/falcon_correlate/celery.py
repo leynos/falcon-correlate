@@ -330,9 +330,11 @@ def configure_celery_correlation[CeleryAppT: _CeleryAppLike](
     The integration wraps this application's ``send_task`` method to identify
     the publishing application while Celery emits a publish signal. Signal
     sender values are task names and cannot reliably identify the publisher.
-    Backend inspection is deferred until the first publish so activation does
-    not access Celery's lazy backend before application configuration is
-    complete. A definite ``rpc://`` verdict is then cached for this app. If
+    Backend inspection is deferred until an eligible publish has an ambient
+    correlation ID and message properties, so activation does not access
+    Celery's lazy backend before application configuration is complete. If no
+    verdict is cached, the first eligible publish attempts inspection; only a
+    definite verdict from successful inspection is cached for this app. If
     inspection fails, the verdict remains uncached and publishes preserve
     Celery's task ID until inspection succeeds.
 

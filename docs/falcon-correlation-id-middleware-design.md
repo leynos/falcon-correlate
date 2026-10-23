@@ -1863,12 +1863,14 @@ make it the sole entry point for Celery signal registration.
    retain the `current_app` fallback.
 
 4. **Unknown backend verdicts do not corrupt task results:** Backend inspection
-   is deferred until the configured app's first publish so setup can finish
-   before Celery's lazy backend is accessed. Missing backend attributes retain
-   the defensive non-RPC result, but an exception from `backend.as_uri()` is
-   treated as unknown and is not cached. While inspection remains inconclusive,
-   the handler preserves Celery's task ID; a later successful inspection
-   supplies and caches the definite verdict.
+   is deferred until an eligible publish has an ambient correlation ID and
+   message properties, so setup can finish before Celery's lazy backend is
+   accessed. If no verdict is cached, the first eligible publish attempts
+   inspection. Missing backend attributes retain the defensive non-RPC result,
+   but an exception from `backend.as_uri()` is treated as unknown and is not
+   cached. While inspection remains inconclusive, the handler preserves
+   Celery's task ID; a later successful inspection supplies and caches the
+   definite verdict.
 
 5. **Idempotence and application-factory ergonomics:** The helper delegates to
    a shared `_maybe_connect_celery_signals()` connector, which reuses stable
