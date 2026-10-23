@@ -769,35 +769,45 @@ middleware = CorrelationIDMiddleware()
 ```
 
 The helper connects the `before_task_publish`, `task_prerun`, and
-`task_postrun` handlers in one idempotent call, caches that app's definite
-`rpc://` result-backend verdict, and returns the same app instance. It also
-wraps the app's `send_task` method so the publish handler can identify the
-actual publishing app while Celery emits its global signal. Backend inspection
-errors are left uncached and retried on publish; while the verdict is unknown,
-Celery's task ID is preserved. Configured app instances must be hashable and
-weak-referenceable for the per-app verdict cache; Celery's own application
-instances satisfy this requirement.
+`task_postrun` handlers in one idempotent call and returns the same app
+instance. It also wraps the app's `send_task` method so the publish handler can
+identify the actual publishing app while Celery emits its global signal. The
+helper defers result-backend inspection until an eligible publish has an
+ambient correlation ID and message properties, so it does not freeze Celery's
+lazy backend before application configuration has loaded. The first eligible
+publish attempts inspection, and only a definite verdict is cached for that
+app; failed inspections remain uncached and can be retried on later eligible
+publishes. While the verdict is unknown, Celery's task ID is preserved.
+Configured app instances must be hashable and weak-referenceable for the
+per-app verdict cache; Celery's own application instances satisfy this
+requirement.
 
 Calling the helper is required to activate Celery propagation. Importing
 `falcon_correlate` or `falcon_correlate.celery` does not import Celery or
 connect the handlers, so library consumers can safely read the ambient context
-variable without mutating Celery's process-global signal registry.
+variable without mutating Celery's process-global signal registry. For workers,
+put the call in the module that defines the Celery app so
+`celery -A <module> worker` activates the handlers when it imports that module.
 
 Those imports also emit no activation diagnostics. Each explicit configuration
 outcome is reported once per app through the `falcon_correlate.celery` logger:
 complete activation is `INFO`, and incomplete setup is `WARNING`. The record
 describes the three signal connections, publisher context setup, and the
-result-backend verdict. An `unknown` backend verdict does not make registration
+result-backend verdict. The activation record reports `unknown` because
+inspection is deferred. An eligible publish caches a definite verdict
+internally when inspection succeeds; this does not update or replace the
+activation record. An `unknown` backend verdict does not make registration
 incomplete. Records contain bounded status fields only; they do not include app
 representations, backend URIs, credentials, payloads, correlation IDs, or user
 IDs. The application controls whether `INFO` records are visible. These records
 confirm explicit setup only; they cannot detect a missing call to
 `configure_celery_correlation()`.
 
-Once the handlers are registered in the publisher process, normal task
-publishing APIs such as `delay()` and `apply_async()` propagate the request
-correlation ID automatically. When the worker process also registers the
-handlers, task execution sees that incoming value through
+After explicit publisher configuration, normal task publishing APIs such as
+`delay()` and `apply_async()` propagate the request correlation ID when the
+publishing app's result backend is not `rpc://`. With the `rpc://` backend,
+Celery's task-ID correlation value is preserved. After explicit worker
+configuration, task execution sees the incoming value through
 `correlation_id_var.get()`.
 
 ```python
@@ -824,10 +834,13 @@ def send_invoice_email(self, user_id: str) -> None:
 ### Behaviour
 
 - When `correlation_id_var` is set and a configured app publishes through its
-  `send_task` method, the cached result-backend verdict controls propagation. A
-  non-RPC backend uses the ambient request value as the publish-time
-  `correlation_id`; an RPC backend preserves Celery's task ID. This remains
-  correct when `send_task()` publishes a task name registered on another app.
+  `send_task` method, the first eligible publish with message properties
+  attempts result-backend inspection if no verdict is cached. A definite
+  verdict is cached only after successful inspection, and that cached value
+  controls later propagation. A non-RPC backend uses the ambient request value
+  as the publish-time `correlation_id`; an RPC backend preserves Celery's task
+  ID. This remains correct when `send_task()` publishes a task name registered
+  on another app.
 - The `before_task_publish` signal's `sender` is a task name, not the publisher
   app. Configured apps therefore establish publisher identity around
   `send_task()`; the handler does not infer it from task-registry ownership.

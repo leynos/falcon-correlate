@@ -7,7 +7,6 @@ import logging
 import threading
 import typing as typ
 from types import SimpleNamespace
-from unittest import mock
 
 import pytest
 from hypothesis import given, settings
@@ -50,7 +49,7 @@ class _SignalWithReceivers(typ.Protocol):
 
 
 def _disconnect_integration_receivers() -> None:
-    """Remove existing integration receivers by stable dispatch UID."""
+    """Reset this integration's receivers in Celery's shared process state."""
     before_task_publish.disconnect(dispatch_uid=_BEFORE_TASK_PUBLISH_DISPATCH_UID)
     task_prerun.disconnect(dispatch_uid=_TASK_PRERUN_DISPATCH_UID)
     task_postrun.disconnect(dispatch_uid=_TASK_POSTRUN_DISPATCH_UID)
@@ -276,18 +275,20 @@ def test_configure_celery_correlation_returns_app_instance(
     assert configure_celery_correlation(celery_app) is celery_app, failure_message
 
 
-def test_configure_celery_correlation_records_backend_verdict(
-    celery_app: Celery,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The configured app's definite backend verdict is cached immediately."""
-    backend_uri = mock.Mock(wraps=celery_app.backend.as_uri)
-    monkeypatch.setattr(celery_app.backend, "as_uri", backend_uri)
+def test_configure_does_not_resolve_backend_before_later_app_configuration() -> None:
+    """Explicit activation must not freeze Celery's lazy result backend."""
+    app = Celery(
+        "late-backend-configuration",
+        broker="memory://",
+        set_as_current=False,
+    )
+    _disconnect_integration_receivers()
 
-    configure_celery_correlation(celery_app)
-    configure_celery_correlation(celery_app)
+    configure_celery_correlation(app)
+    app.config_from_object({"result_backend": "rpc://"}, force=True)
 
-    backend_uri.assert_called_once()
+    failure_message = "expected late Celery configuration to select the RPC backend"
+    assert app.backend.as_uri().startswith("rpc://"), failure_message
 
 
 def test_configure_celery_correlation_is_exported_from_package_root() -> None:

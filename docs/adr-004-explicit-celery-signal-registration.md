@@ -63,9 +63,11 @@ the helper connects every supported receiver. Each explicit configuration
 outcome is also reported once per app and outcome through the
 `falcon_correlate.celery` logger: active setup at `INFO`, incomplete setup at
 `WARNING`. The structured record uses bounded connection and publisher-context
-statuses plus the backend RPC verdict. A backend verdict of `unknown` is not
-itself a registration failure. Weak-reference state deduplicates records
-without retaining configured apps.
+statuses plus the backend RPC verdict. The activation record reports the
+backend as `unknown` because inspection is deferred. An eligible publish caches
+a definite verdict internally when inspection succeeds; this does not update
+the activation record. `unknown` is not itself a registration failure.
+Weak-reference state deduplicates records without retaining configured apps.
 
 ## Compatibility and migration
 

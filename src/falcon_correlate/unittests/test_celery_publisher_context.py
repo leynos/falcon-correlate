@@ -124,11 +124,11 @@ def test_publisher_identity_does_not_depend_on_task_registry_owner(
     )
 
 
-def test_configured_app_uses_cached_backend_verdict_without_global_lookup(
+def test_configured_app_caches_backend_verdict_on_first_publish(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Configured task publishing should use its app cache, not current_app."""
+    """Publishing caches the app verdict without consulting ``current_app``."""
     celery_app = Celery(
         "configured-cache-publish-app",
         backend="cache+memory://",
@@ -143,9 +143,8 @@ def test_configured_app_uses_cached_backend_verdict_without_global_lookup(
     original_as_uri = mock.Mock(wraps=backend.as_uri)
     monkeypatch.setattr(backend, "as_uri", original_as_uri)
     configure_celery_correlation(celery_app)
-    original_as_uri.assert_called_once()
+    original_as_uri.assert_not_called()
     changed_as_uri = mock.Mock(return_value="rpc://")
-    monkeypatch.setattr(backend, "as_uri", changed_as_uri)
     current_result_backend_uses_rpc = mock.Mock(return_value=False)
     monkeypatch.setattr(
         "falcon_correlate.celery._current_result_backend_uses_rpc",
@@ -155,17 +154,22 @@ def test_configured_app_uses_cached_backend_verdict_without_global_lookup(
     with mock.patch("kombu.Producer.publish", autospec=True) as publish:
 
         def _logic() -> None:
-            """Exercise publishing through the configured Celery app."""
+            """Exercise cache creation and reuse through the configured app."""
             correlation_id_var.set("request-correlation-id")
+            configured_cache_publish_task.apply_async()
+            monkeypatch.setattr(backend, "as_uri", changed_as_uri)
             configured_cache_publish_task.apply_async()
 
         isolated_context(_logic)
 
     current_result_backend_uses_rpc.assert_not_called()
+    original_as_uri.assert_called_once()
     changed_as_uri.assert_not_called()
-    assert publish.call_args.kwargs["correlation_id"] == "request-correlation-id", (
-        "configured publishing should use the cached backend verdict"
-    )
+    assert publish.call_count == 2, "both configured-app tasks should publish"
+    assert [call.kwargs["correlation_id"] for call in publish.call_args_list] == [
+        "request-correlation-id",
+        "request-correlation-id",
+    ], "repeated publishing should keep using the first cached verdict"
 
 
 def test_handler_falls_back_when_no_configured_app_owns_task(

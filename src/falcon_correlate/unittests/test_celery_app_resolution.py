@@ -98,7 +98,6 @@ def test_publish_retries_failed_backend_inspection_without_losing_task_id(
     )
     backend_uri = mock.Mock(
         side_effect=[
-            RuntimeError("configure inspection failed"),
             RuntimeError("publish inspection failed"),
             "rpc://",
         ]
@@ -126,7 +125,7 @@ def test_publish_retries_failed_backend_inspection_without_losing_task_id(
         "first-task-id",
         "second-task-id",
     ], "unknown and RPC verdicts must both preserve Celery task IDs"
-    assert backend_uri.call_count == 3, (
-        "failed inspections should retry and the definite verdict should be cached"
+    assert backend_uri.call_count == 2, (
+        "publish inspection should retry once and cache its definite verdict"
     )
     current_backend_lookup.assert_not_called()

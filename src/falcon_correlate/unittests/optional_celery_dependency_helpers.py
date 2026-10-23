@@ -173,27 +173,39 @@ def _blocked_celery_environment(
     environ: cabc.Mapping[str, str],
 ) -> dict[str, str]:
     """Build an isolated pytest environment with the Celery import blocker first."""
-    return {
-        key: value
-        for key, value in environ.items()
-        if not key.startswith(_PYTEST_ENVIRONMENT_PREFIX)
-    } | {
+    return _child_environment(environ) | {
         "PYTHONPATH": _pythonpath_with_import_blocker(sitecustomize_dir, environ),
     }
 
 
-def _run_python_with_celery_blocked(
-    sitecustomize_dir: Path,
+def _child_environment(environ: cabc.Mapping[str, str]) -> dict[str, str]:
+    """Return a child environment without pytest's inherited control variables."""
+    return {
+        key: value
+        for key, value in environ.items()
+        if not key.startswith(_PYTEST_ENVIRONMENT_PREFIX)
+    }
+
+
+def _run_python(
     environ: cabc.Mapping[str, str],
     cwd: Path,
     *args: str,
+    sitecustomize_dir: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run a Python child process where importing Celery raises ImportError."""
+    """Run a fresh Python child with captured output and the shared timeout."""
+    child_environment = _child_environment(environ)
+    if sitecustomize_dir is not None:
+        child_environment["PYTHONPATH"] = _pythonpath_with_import_blocker(
+            sitecustomize_dir,
+            environ,
+        )
+
     return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- fixed child interpreter and arguments.
         [sys.executable, *args],
         check=False,
         cwd=cwd,
-        env=_blocked_celery_environment(sitecustomize_dir, environ),
+        env=child_environment,
         text=True,
         capture_output=True,
         timeout=_CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS,
@@ -220,8 +232,7 @@ def _count_collected_test_items(
     project_root: Path,
 ) -> int:
     """Return how many test items the blocked child collects from ``paths``."""
-    result = _run_python_with_celery_blocked(
-        sitecustomize_dir,
+    result = _run_python(
         os.environ,
         project_root,
         "-m",
@@ -231,6 +242,7 @@ def _count_collected_test_items(
         "-n=0",
         "--color=no",
         *_relative_paths(paths, project_root),
+        sitecustomize_dir=sitecustomize_dir,
     )
     return sum(1 for line in result.stdout.splitlines() if "::" in line)
 
@@ -245,8 +257,7 @@ def _run_celery_tests_with_celery_blocked(
     # Force plain output so the captured snapshot is deterministic regardless
     # of an ambient ``FORCE_COLOR``/``PY_COLORS`` that would otherwise make the
     # child emit ANSI escapes the normaliser cannot strip.
-    result = _run_python_with_celery_blocked(
-        sitecustomize_dir,
+    result = _run_python(
         os.environ,
         project_root,
         "-m",
@@ -258,6 +269,7 @@ def _run_celery_tests_with_celery_blocked(
         "--color=no",
         *_relative_paths((sentinel_test,), project_root),
         *_relative_paths(celery_test_paths, project_root),
+        sitecustomize_dir=sitecustomize_dir,
     )
     # Build the expected snapshot from the child's own collection rather than a
     # bare literal. Each Celery module imports cleanly but marks itself

@@ -1717,6 +1717,9 @@ before delegation.
 
 ### A.8. Celery task publish signal handler (Task 4.2.1)
 
+**Superseded by issue #48:** The import-time registration decision below is
+historical. See A.10 for the current explicit-activation contract.
+
 **Decision:** Add a dedicated optional-integration module at
 `src/falcon_correlate/celery.py` that defines
 `propagate_correlation_id_to_celery`. Calling
@@ -1773,6 +1776,9 @@ before delegation.
   the publish-path overwrite policy.
 
 ### A.9. Celery worker signal handlers (Task 4.2.2)
+
+**Superseded by issue #48:** The import-time registration decision below is
+historical. See A.10 for the current explicit-activation contract.
 
 **Decision:** Extend `src/falcon_correlate/celery.py` with
 `setup_correlation_id_in_worker` and `clear_correlation_id_in_worker`, and
@@ -1834,12 +1840,18 @@ make it the sole entry point for Celery signal registration.
 
 1. **Load-bearing application setup without a second registration model:**
    Celery's signals remain process-global in the integration used here. The
-   helper now caches the configured app's result-backend verdict, so calling it
-   has a concrete per-app effect without duplicating signal registration logic.
+   helper wraps the configured app's `send_task` method without accessing its
+   lazy result backend. An eligible publish inspects and, when successful,
+   caches a definite backend verdict internally, so explicit activation has a
+   concrete per-app effect without freezing Celery configuration or duplicating
+   signal registration logic.
 
-2. **Explicit opt-in:** Import-time registration is removed in version 0.2.0.
-   This breaking change avoids Celery's import cost and implicit mutation of
-   its process-global signal registry in processes that never use Celery.
+2. **Explicit activation:** Import-time registration was removed in version
+   0.2.0. This breaking change avoids Celery's import cost and implicit
+   mutation of its process-global signal registry in processes that never use
+   Celery. Importing `falcon_correlate` leaves Celery signals untouched; each
+   publisher and worker process must call `configure_celery_correlation(app)`
+   to activate propagation.
 
 3. **Correct and efficient publisher resolution:** `before_task_publish` carries
    a task name as `sender`, not the publishing app. Registry membership is not
@@ -1850,11 +1862,15 @@ make it the sole entry point for Celery signal registration.
    `celery.current_app`. Signals emitted without a configured publisher context
    retain the `current_app` fallback.
 
-4. **Unknown backend verdicts do not corrupt task results:** Missing backend
-   attributes retain the defensive non-RPC result, but an exception from
-   `backend.as_uri()` is treated as unknown and is not cached. While inspection
-   remains inconclusive, the handler preserves Celery's task ID; a later
-   successful inspection supplies and caches the definite verdict.
+4. **Unknown backend verdicts do not corrupt task results:** Backend inspection
+   is deferred until an eligible publish has an ambient correlation ID and
+   message properties, so setup can finish before Celery's lazy backend is
+   accessed. If no verdict is cached, the first eligible publish attempts
+   inspection. Missing backend attributes retain the defensive non-RPC result,
+   but an exception from `backend.as_uri()` is treated as unknown and is not
+   cached. While inspection remains inconclusive, the handler preserves
+   Celery's task ID; a later successful inspection supplies and caches the
+   definite verdict.
 
 5. **Idempotence and application-factory ergonomics:** The helper delegates to
    a shared `_maybe_connect_celery_signals()` connector, which reuses stable
@@ -1888,10 +1904,18 @@ make it the sole entry point for Celery signal registration.
    `active` or `incomplete`; signal states are `connected`,
    `celery_signals_unavailable`, `signal_missing`, `connect_not_callable`, or
    `receiver_rejected`; publisher-context states are `configured`,
-   `send_task_unavailable`, or `assignment_rejected`. Backend verdicts are
+   `send_task_unavailable`, or `assignment_rejected`. The activation record's
+   backend verdict is always `unknown`, because inspection is deferred. An
+   eligible publish caches a definite verdict internally when inspection
+   succeeds; this does not update the activation record. Backend verdicts are
    `rpc`, `non_rpc`, or `unknown`, and `unknown` alone is not a registration
    failure. Records exclude app representations, backend URIs, credentials,
    payloads, correlation IDs, and user IDs.
+
+9. **Testing isolates shared process-global state:** Celery's signal registry is
+   process-global. Unit and behavioural tests disconnect the known receivers by
+   dispatch UID before configuration, so receivers left by earlier tests cannot
+   hide a broken public configuration path.
 
 **Screen reader description:** The entity relationship diagram groups signals,
 receivers, and dispatch UIDs by type. The three registration chains are:
@@ -1957,13 +1981,18 @@ flowchart LR
 - `src/falcon_correlate/unittests/test_celery_configuration.py` — Added unit
   coverage for full-signal configuration, idempotence, return value, and root
   export.
+- `src/falcon_correlate/unittests/test_celery_import_side_effects.py` — Added
+  fresh-interpreter coverage that package and integration-module imports leave
+  Celery signals untouched, then verifies explicit configuration and
+  idempotence.
 - `tests/bdd/celery_configuration.feature` — Added behavioural scenarios for
   explicit configuration of publish and worker propagation.
-- `tests/bdd/test_celery_configuration_steps.py` — Added BDD steps that prove
-  the public helper enables the publish and worker paths.
+- `tests/bdd/test_celery_configuration_steps.py` — Added BDD steps that
+  disconnect existing receivers and prove the public helper connects the
+  publish and worker paths.
 - `docs/users-guide.md` — Documented the explicit helper, return contract,
-  idempotence, explicit-registration requirement, and bounded activation
-  diagnostics.
+  idempotence, required activation in publisher and worker processes, and
+  bounded activation diagnostics.
 - `docs/developers-guide.md` — Documented the internal activation diagnostic
   boundary and its stable fields and outcomes.
 - `src/falcon_correlate/celery_diagnostics.py` — Added private bounded outcome
@@ -1996,6 +2025,10 @@ validation test that exercises pytest collection in a child process.
    which install the base package without the Celery extra can still import the
    library without one import masking the other through module caching.
 
+   Issue #48 adds a separate fresh-interpreter regression test for the
+   no-registration contract: imports leave Celery signals untouched until
+   `configure_celery_correlation(app)` is called.
+
 4. **No new runtime or test dependency is required:** The child process uses a
    temporary `sitecustomize.py` import hook to raise `ModuleNotFoundError` for
    `celery` and `celery.*` only. This avoids uninstalling Celery, adding a
@@ -2014,15 +2047,17 @@ validation test that exercises pytest collection in a child process.
    with a normalized exact snapshot so skip counts are explicit while
    nondeterministic runtime duration is redacted.
 
-**Compile-time validation:**
+**Static and import-safety validation:**
 
 Type safety is verified by mypy through `make typecheck` over the full source
-tree. Import-time correctness is validated by the subprocess-based import tests
-in `src/falcon_correlate/unittests/test_optional_celery_dependency.py`, which
-assert that `falcon_correlate` and `falcon_correlate.celery` load without error
-when `celery` is unavailable. No `trybuild`-style compile-time artefacts are
-produced; this is a Python project, and the equivalent guarantees are provided
-by static type checking and import-time subprocess validation.
+tree. Optional-dependency import safety is validated by the subprocess-based
+tests in `src/falcon_correlate/unittests/test_optional_celery_dependency.py`,
+which assert that `falcon_correlate` and `falcon_correlate.celery` load without
+error when `celery` is unavailable. The separate issue #48 regression test
+checks that imports do not register Celery signal receivers. No
+`trybuild`-style compile-time artefacts are produced; this is a Python project,
+and the equivalent guarantees are provided by static type checking and
+subprocess validation.
 
 **Files created/modified:**
 
