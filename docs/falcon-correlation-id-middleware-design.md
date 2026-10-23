@@ -1385,6 +1385,11 @@ can use `event.outcome.value`, `event.trust.value`, and a stable
 callback is synchronous and ASGI calls it on the event loop, it must remain
 quick and non-blocking.
 
+The package root and `middleware.py` re-export the four public metrics symbols
+for stable user imports. Internal modules and adapters should import metrics
+symbols directly from `middleware_metrics.py`, so public re-exports do not
+change module ownership or dependency direction.
+
 Falsey validator results map to `rejected_invalid`. Exceptions from the
 validator or from checking its result's truth value map to
 `rejected_validator_error` and still produce one selection event.
@@ -2266,8 +2271,10 @@ the Falcon middleware orchestration and compatibility re-export layer.
    `middleware_config.py` and `correlation_id_var` from `middleware_utils.py`.
    `celery.py` imports `correlation_id_var` from `middleware_utils.py`.
 2. **Compatibility:** `middleware.py` continues to re-export
-   `DEFAULT_HEADER_NAME`, `correlation_id_var`, and `user_id_var`. Package-root
-   exports remain unchanged.
+   `DEFAULT_HEADER_NAME`, `correlation_id_var`, and `user_id_var`. Issue #40
+   adds the public metrics symbols to the `middleware.py` and package-root
+   exports; internal adapters continue importing from each symbol's owning
+   module.
 3. **Optional dependency safety:** HTTPX and Celery remain lazily imported, so
    importing the package or adapter module does not require the corresponding
    optional dependency.

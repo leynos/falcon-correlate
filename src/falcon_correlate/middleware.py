@@ -1,9 +1,9 @@
 """Falcon middleware orchestration and compatibility re-exports.
 
 This module orchestrates the Falcon WSGI middleware and exposes the ASGI
-middleware and shared ``CorrelationIDConfig`` configuration. For backward
-compatibility only, it re-exports ``DEFAULT_HEADER_NAME``,
-``correlation_id_var``, and ``user_id_var`` from their owning modules.
+middleware, shared configuration, and public support types. It re-exports
+symbols from their owning modules for stable public imports. Internal adapters
+should import each symbol directly from the module that owns it.
 """
 
 from __future__ import annotations
