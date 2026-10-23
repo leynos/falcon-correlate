@@ -28,6 +28,11 @@ import logging
 import typing as typ
 
 from .middleware_config import VALID_CONFIG_KWARGS, CorrelationIDConfig
+from .middleware_metrics import (
+    CorrelationIDSelectionEvent,
+    IncomingIDOutcome,
+    SourceTrust,
+)
 from .middleware_utils import (
     CORRELATION_ID_RESET_TOKEN_ATTR as _CORRELATION_ID_RESET_TOKEN_ATTR,
 )
@@ -163,17 +168,36 @@ class _CorrelationIDMiddlewareBase:
 
     def _is_valid_id(self, value: str) -> bool:
         """Return whether a correlation ID passes the configured validator."""
+        result, _ = self._validate_id(value)
+        return bool(result)
+
+    def _validate_id(self, value: str) -> tuple[object, bool]:
+        """Return the validator result and whether it raised an exception."""
         if self._config.validator is None:
-            return True
+            return True, False
         try:
-            return self._config.validator(value)
+            return self._config.validator(value), False
         except Exception:
             logger.warning(
                 "Validator raised an exception for correlation ID, treating as invalid",
                 extra=self._log_context(value),
                 exc_info=True,
             )
-            return False
+            return False, True
+
+    def _record_selection(self, event: CorrelationIDSelectionEvent) -> None:
+        """Send a selection event while keeping recorder failures isolated."""
+        recorder = self._config.metrics_recorder
+        if recorder is None:
+            return
+        try:
+            recorder(event)
+        except Exception:
+            logger.warning(
+                "Metrics recorder raised an exception, ignoring",
+                exc_info=True,
+                extra={"header_name": self._config.header_name},
+            )
 
     def _generate_id(self) -> str:
         """Generate a new ID, logging and propagating generator failures."""
@@ -190,18 +214,40 @@ class _CorrelationIDMiddlewareBase:
     def _process_request(self, req: _RequestLike) -> None:
         """Establish request-local correlation ID state."""
         incoming = self._get_incoming_header_value(req)
-
-        if incoming is not None and self._is_trusted_source(req.remote_addr):
-            if self._is_valid_id(incoming):
-                correlation_id = incoming
+        should_generate = True
+        if incoming is None:
+            outcome = IncomingIDOutcome.missing
+            trust = SourceTrust.not_evaluated
+        elif not self._is_trusted_source(req.remote_addr):
+            outcome = IncomingIDOutcome.untrusted
+            trust = SourceTrust.untrusted
+        else:
+            trust = SourceTrust.trusted
+            validation_result, validator_raised = self._validate_id(incoming)
+            is_valid = not validator_raised and bool(validation_result)
+            if validator_raised:
+                outcome = IncomingIDOutcome.rejected_validator_error
+            elif is_valid:
+                outcome = IncomingIDOutcome.accepted
+                should_generate = False
             else:
+                outcome = IncomingIDOutcome.rejected_invalid
+            if not is_valid:
                 logger.debug(
                     "Correlation ID failed validation, generating new ID",
                     extra=self._log_context(incoming),
                 )
-                correlation_id = self._generate_id()
-        else:
-            correlation_id = self._generate_id()
+
+        self._record_selection(
+            CorrelationIDSelectionEvent(
+                outcome=outcome,
+                trust=trust,
+                header_name=self._config.header_name,
+            ),
+        )
+        correlation_id = (
+            self._generate_id() if should_generate else typ.cast("str", incoming)
+        )
 
         req.context.correlation_id = correlation_id
         reset_token = self._correlation_id_var.set(correlation_id)

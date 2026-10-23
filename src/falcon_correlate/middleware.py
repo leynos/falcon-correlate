@@ -17,6 +17,12 @@ from .middleware_base import (
 )
 from .middleware_base import _CorrelationIDMiddlewareBase
 from .middleware_config import DEFAULT_HEADER_NAME, CorrelationIDConfig
+from .middleware_metrics import (
+    CorrelationIDSelectionEvent,
+    IncomingIDOutcome,
+    MetricsRecorder,
+    SourceTrust,
+)
 from .middleware_utils import (
     RECOMMENDED_LOG_FORMAT,
     ContextualLogFilter,
@@ -33,6 +39,10 @@ __all__ = [
     "CorrelationIDConfig",
     "CorrelationIDMiddleware",
     "CorrelationIDMiddlewareASGI",
+    "CorrelationIDSelectionEvent",
+    "IncomingIDOutcome",
+    "MetricsRecorder",
+    "SourceTrust",
     "correlation_id_var",
     "default_uuid7_generator",
     "default_uuid_validator",
@@ -62,7 +72,7 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
         Individual configuration options passed to
         ``CorrelationIDConfig.from_kwargs``: ``header_name``,
         ``trusted_sources``, ``generator``, ``validator``, and
-        ``echo_header_in_response``.
+        ``echo_header_in_response``, and ``metrics_recorder``.
 
     Raises
     ------
