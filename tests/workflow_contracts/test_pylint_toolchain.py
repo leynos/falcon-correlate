@@ -31,7 +31,10 @@ PYLINT_ANALYSIS_MESSAGES = (
     "syntax-error,astroid-error,parse-error,config-parse-error,method-check-failed,"
     "raw-checker-failed,bad-plugin-value"
 )
-pytestmark = pytest.mark.xdist_group(name=_PYLINT_TOOLCHAIN_PYTEST_GROUP)
+pytestmark = [
+    pytest.mark.timeout(TOOL_TIMEOUT_SECONDS),
+    pytest.mark.xdist_group(name=_PYLINT_TOOLCHAIN_PYTEST_GROUP),
+]
 
 
 @dc.dataclass(frozen=True, slots=True)
