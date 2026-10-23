@@ -1613,10 +1613,11 @@ imported lazily at call time.
 
 **Rationale:**
 
-1. **Separate module:** httpx propagation is a distinct feature domain
-   from the Falcon middleware, logging filter, and context variables in
-   `middleware.py`. A dedicated `httpx.py` module follows the "group by
-   feature, not layer" convention and isolates the optional dependency.
+1. **Separate module:** HTTPX propagation is a distinct feature domain from
+   the Falcon middleware and logging filter. The adapter reads the
+   request-scoped context from `middleware_utils.py`. A dedicated `httpx.py`
+   module follows the "group by feature, not layer" convention and isolates the
+   optional dependency.
 
 2. **Lazy imports:** Each wrapper function performs
    `import httpx as _httpx` inside its body. The module itself can be imported
@@ -1632,10 +1633,10 @@ imported lazily at call time.
    `_prepare_headers` function eliminates duplication and keeps both public
    functions focused on their `httpx` call semantics.
 
-4. **`DEFAULT_HEADER_NAME` constant:** The wrapper uses the
-   `DEFAULT_HEADER_NAME` constant from `middleware.py` rather than hardcoding
+4. **`DEFAULT_HEADER_NAME` constant:** The wrapper imports
+   `DEFAULT_HEADER_NAME` from `middleware_config.py` rather than hardcoding
    `"X-Correlation-ID"`, keeping the header name in sync with the middleware
-   default.
+   default. `middleware.py` re-exports the constant for backward compatibility.
 
 5. **Function names:** The roadmap names `request_with_correlation_id` and
    `async_request_with_correlation_id` were used rather than the design
@@ -2138,3 +2139,24 @@ doctests through `make test`. The complete convention is recorded in
   callable and attribute-docstring regression checks.
 - `docs/adr-003-docstring-completeness-and-doctest-gates.md` — Recorded the
   accepted convention and validation architecture.
+
+### A.14. Adapter imports from owning modules (Issue #49, 2026-10-23)
+
+**Decision:** The HTTPX and Celery adapters import shared primitives from the
+modules that own them. They do not import from `middleware.py`, which remains
+the Falcon middleware orchestration and compatibility re-export layer.
+
+**Rationale:**
+
+1. **Clear ownership:** `httpx.py` imports `DEFAULT_HEADER_NAME` from
+   `middleware_config.py` and `correlation_id_var` from `middleware_utils.py`.
+   `celery.py` imports `correlation_id_var` from `middleware_utils.py`.
+2. **Compatibility:** `middleware.py` continues to re-export
+   `DEFAULT_HEADER_NAME`, `correlation_id_var`, and `user_id_var`. Package-root
+   exports remain unchanged.
+3. **Optional dependency safety:** HTTPX and Celery remain lazily imported, so
+   importing the package or adapter module does not require the corresponding
+   optional dependency.
+4. **Boundary validation:** Static AST tests reject adapter imports from
+   `middleware.py` and verify public primitive identity. Blocked-HTTPX
+   subprocess tests check package and adapter imports without HTTPX installed.
