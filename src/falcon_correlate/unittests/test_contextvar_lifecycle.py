@@ -291,3 +291,68 @@ class TestContextVariableLifecycle:
         assert correlation_id_var.get() is None, (
             "Expected top-level correlation_id_var to remain None after concurrent run"
         )
+
+    def test_response_header_is_isolated_between_concurrent_requests(
+        self,
+        request_response_factory: cabc.Callable[
+            ..., tuple[falcon.Request, falcon.Response]
+        ],
+    ) -> None:
+        """Verify concurrent responses echo only their own correlation ID."""
+        middleware = CorrelationIDMiddleware(trusted_sources=["127.0.0.1"])
+        barrier = threading.Barrier(2)
+        request_ids = ["request-a", "request-b"]
+
+        def _worker(correlation_id: str) -> tuple[str | None, str | None]:
+            """Run one concurrent response header scenario."""
+
+            def _inner() -> tuple[str | None, str | None]:
+                """Exercise response header echo inside an isolated context."""
+                req, resp = request_response_factory(correlation_id=correlation_id)
+
+                middleware.process_request(req, resp)
+                barrier.wait(timeout=2.0)
+                middleware.process_response(
+                    req,
+                    resp,
+                    resource=None,
+                    req_succeeded=True,
+                )
+                barrier.wait(timeout=2.0)
+
+                echoed_header = resp.get_header("X-Correlation-ID")
+                context_after_response = correlation_id_var.get()
+                return echoed_header, context_after_response
+
+            return contextvars.copy_context().run(_inner)
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(_worker, request_ids))
+
+        echoed_headers: list[str | None] = []
+        for expected_id, (echoed_header, context_after_response) in zip(
+            request_ids,
+            results,
+            strict=True,
+        ):
+            other_ids = set(request_ids) - {expected_id}
+            assert echoed_header not in other_ids, (
+                f"Cross-request header contamination for {expected_id!r}: "
+                f"received {echoed_header!r}"
+            )
+            assert echoed_header == expected_id, (
+                f"Expected echoed header {expected_id!r}, got {echoed_header!r}"
+            )
+            assert context_after_response is None, (
+                f"Expected cleared context for {expected_id!r}, "
+                f"got {context_after_response!r}"
+            )
+            echoed_headers.append(echoed_header)
+
+        assert set(echoed_headers) == set(request_ids), (
+            f"Expected distinct echoed headers {set(request_ids)!r}, "
+            f"got {set(echoed_headers)!r}"
+        )
+        assert correlation_id_var.get() is None, (
+            "Expected top-level correlation_id_var to remain None after concurrent run"
+        )
