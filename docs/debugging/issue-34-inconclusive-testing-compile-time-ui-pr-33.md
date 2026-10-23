@@ -148,10 +148,10 @@ directory is this worktree. The branch reflog places
 `dc83c815fcef05195855ea615f867065b092717b` at the branch tip from 03:43 until
 the next branch update at 06:29 CEST, when
 `d7c2b2a3c1ce29a91a5e307cb1c6d31f8bb2da7e` was committed. This identifies the
-branch revision associated with the historical run. The logs do not contain a
+branch revision associated with the historical run. The logs do not contain an
 SHA or establish that the worktree was clean, so the exact source tree is not
-independently verified. These historical counts do not describe the later
-reviewed PR head `47d39ab1da053ba2f1f83c9b6fb6ecb9518eef58`.
+independently verified. These historical counts do not describe the PR head
+that CodeRabbit reviewed later, `47d39ab1da053ba2f1f83c9b6fb6ecb9518eef58`.
 
 ## References
 
