@@ -63,8 +63,9 @@ class CorrelationIDMiddlewareASGI(_CorrelationIDMiddlewareBase):
         If both ``config`` and other keyword arguments are provided, or if
         ``header_name`` is empty or ``trusted_sources`` contains empty strings.
     TypeError
-        If unknown keyword arguments are provided, or if ``generator``,
-        ``validator``, or ``metrics_recorder`` is not callable.
+        If unknown keyword arguments are provided, if ``generator`` or
+        ``validator`` is not callable, or if ``metrics_recorder`` is not
+        synchronous and callable.
 
     Examples
     --------
@@ -101,6 +102,13 @@ class CorrelationIDMiddlewareASGI(_CorrelationIDMiddlewareBase):
         resp: falcon.asgi.Response,
     ) -> None:
         """Process an incoming ASGI request to establish correlation ID context.
+
+        Parameters
+        ----------
+        req : falcon.asgi.Request
+            The incoming request object.
+        resp : falcon.asgi.Response
+            The response object, which is not yet populated.
 
         Raises
         ------

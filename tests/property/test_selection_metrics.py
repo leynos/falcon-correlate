@@ -27,7 +27,7 @@ _scenario_values = st.tuples(
     st.sampled_from([SourceTrust.trusted, SourceTrust.untrusted]),
     st.sampled_from(["accept", "reject", "raise"]),
 )
-_ExpectedSelection = tuple[IncomingIDOutcome, SourceTrust, int, str]
+type _ExpectedSelection = tuple[IncomingIDOutcome, SourceTrust, int, str]
 
 
 class _CountingValidator:

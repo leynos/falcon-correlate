@@ -13,6 +13,7 @@ settings, while this module depends on ``middleware_utils.py`` for
 from __future__ import annotations
 
 import dataclasses
+import inspect
 import ipaddress
 import logging
 import typing as typ
@@ -102,7 +103,8 @@ class CorrelationIDConfig:
     ValueError
         If ``header_name`` is empty or ``trusted_sources`` contains empty strings.
     TypeError
-        If ``generator``, ``validator``, or ``metrics_recorder`` is not callable.
+        If ``generator`` or ``validator`` is not callable, or if
+        ``metrics_recorder`` is not a synchronous callable.
 
     """
 
@@ -132,7 +134,8 @@ class CorrelationIDConfig:
             source is empty, whitespace-only, or malformed.
         TypeError
             If ``trusted_sources`` is a string or contains non-string values, or
-            if ``generator``, ``validator``, or ``metrics_recorder`` is not callable.
+            if ``generator`` or ``validator`` is not callable, or if
+            ``metrics_recorder`` is not a synchronous callable.
 
         """  # ruff: ignore[docstring-extraneous-exception] - validators raise indirectly.
         if isinstance(self.trusted_sources, str):
@@ -233,14 +236,27 @@ class CorrelationIDConfig:
             raise TypeError(msg)
 
     def _validate_metrics_recorder(self) -> None:
-        """Validate that the optional metrics recorder is callable."""
-        if self.metrics_recorder is not None and not callable(self.metrics_recorder):
+        """Validate that the optional metrics recorder is synchronous."""
+        recorder = self.metrics_recorder
+        if recorder is None:
+            return
+        if not callable(recorder):
             _log_validation_failure(
                 "metrics_recorder",
-                self.metrics_recorder,
+                recorder,
                 type_only=True,
             )
             msg = "metrics_recorder must be callable"
+            raise TypeError(msg)
+        if inspect.iscoroutinefunction(recorder) or inspect.iscoroutinefunction(
+            type(recorder).__call__
+        ):
+            _log_validation_failure(
+                "metrics_recorder",
+                recorder,
+                type_only=True,
+            )
+            msg = "metrics_recorder must be a synchronous callable"
             raise TypeError(msg)
 
     @staticmethod
