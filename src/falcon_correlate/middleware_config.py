@@ -42,9 +42,11 @@ _NetworkType = ipaddress.IPv4Network | ipaddress.IPv6Network
 
 def _format_rejected_value(value: object) -> str:
     """Render string values safely and other values by type name."""
-    if isinstance(value, str):
-        return repr(value)
-    return type(value).__qualname__
+    match value:
+        case str() as string_value:
+            return repr(string_value)
+        case _:
+            return type(value).__qualname__
 
 
 def _log_validation_failure(field: str, value: object) -> None:
