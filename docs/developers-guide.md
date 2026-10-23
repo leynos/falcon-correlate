@@ -97,6 +97,11 @@ protocols limit the shared lifecycle to the methods provided by both Falcon
 request and response types; `_RequestLike.remote_addr` is a read-only `str`
 property.
 
+`CorrelationIDConfig.from_kwargs` accepts
+`**kwargs: typ.Unpack[CorrelationIDConfigKwargs]` and owns runtime validation
+of unknown keys. The middleware base delegates individual options to the
+factory after checking for a conflict with an explicit `config` object.
+
 The middleware's request-scoped correlation ID context variable is typed as
 `contextvars.ContextVar[str | None]`, matching the exported
 `correlation_id_var`. That narrow typing keeps `ty` and Ruff's annotation

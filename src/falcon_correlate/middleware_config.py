@@ -220,48 +220,56 @@ class CorrelationIDConfig:
             return default_uuid7_generator
         return generator
 
-    # @CodeScene(disable:"Excess Number of Function Arguments")
     @classmethod
-    # pylint: disable-next=too-many-arguments  # from_kwargs mirrors middleware constructor compatibility. FIXME: https://github.com/leynos/falcon-correlate/issues/36
-    def from_kwargs(  # ruff: ignore[too-many-arguments] -- from_kwargs preserves the public factory API.
+    def from_kwargs(
         cls,
-        *,
-        header_name: str = DEFAULT_HEADER_NAME,
-        trusted_sources: cabc.Iterable[str] | None = None,
-        generator: cabc.Callable[[], str] | None = None,
-        validator: cabc.Callable[[str], bool] | None = None,
-        echo_header_in_response: bool = True,
+        **kwargs: typ.Unpack[CorrelationIDConfigKwargs],
     ) -> CorrelationIDConfig:
-        """Create a configuration from individual keyword arguments.
-
-        This factory method handles conversion of ``trusted_sources`` to a
-        frozenset and applies the default generator if none is provided.
+        """Create a validated configuration from middleware keyword arguments.
 
         Parameters
         ----------
-        header_name : str
-            The HTTP header name. Defaults to ``X-Correlation-ID``.
-        trusted_sources : Iterable[str] | None
-            IP addresses to trust. Converted to frozenset.
-        generator : Callable[[], str] | None
-            ID generator function. Defaults to ``default_uuid7_generator``.
-        validator : Callable[[str], bool] | None
-            ID validation function.
-        echo_header_in_response : bool
-            Whether to echo ID in response.
+        kwargs : Unpack[CorrelationIDConfigKwargs]
+            Accepted keys are ``header_name`` (default
+            ``DEFAULT_HEADER_NAME``), ``trusted_sources`` (default ``None``,
+            normalized to an empty ``frozenset``), ``generator`` (default
+            ``None``, resolved to ``default_uuid7_generator``), ``validator``
+            (default ``None``, passed through unchanged), and
+            ``echo_header_in_response`` (default ``True``).
 
         Returns
         -------
         CorrelationIDConfig
             A new configuration instance.
 
+        Raises
+        ------
+        TypeError
+            If an unknown keyword is supplied, or if a trusted source is a
+            bare string.
+
+        Examples
+        --------
+        >>> config = CorrelationIDConfig.from_kwargs()
+        >>> config.header_name
+        'X-Correlation-ID'
+        >>> config.trusted_sources
+        frozenset()
+
         """
+        unknown = set(kwargs) - VALID_CONFIG_KWARGS
+        if unknown:
+            msg = f"Unknown keyword arguments: {', '.join(sorted(unknown))}"
+            raise TypeError(msg)
+
         return cls(
-            header_name=header_name,
-            trusted_sources=cls._normalize_trusted_sources(trusted_sources),
-            generator=cls._resolve_generator(generator),
-            validator=validator,
-            echo_header_in_response=echo_header_in_response,
+            header_name=kwargs.get("header_name", DEFAULT_HEADER_NAME),
+            trusted_sources=cls._normalize_trusted_sources(
+                kwargs.get("trusted_sources")
+            ),
+            generator=cls._resolve_generator(kwargs.get("generator")),
+            validator=kwargs.get("validator"),
+            echo_header_in_response=kwargs.get("echo_header_in_response", True),
         )
 
 
