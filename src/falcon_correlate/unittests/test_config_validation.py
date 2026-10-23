@@ -301,6 +301,42 @@ class TestCorrelationIDConfigValidation:
             "expected the bare-string diagnostic to render the supplied value"
         )
 
+    @pytest.mark.parametrize("field", ["generator", "validator"])
+    @pytest.mark.parametrize(
+        "factory",
+        [
+            pytest.param(CorrelationIDConfig, id="direct-construction"),
+            pytest.param(CorrelationIDConfig.from_kwargs, id="from-kwargs"),
+        ],
+    )
+    def test_non_callable_string_logs_only_its_type(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        factory: cabc.Callable[..., CorrelationIDConfig],
+        field: str,
+    ) -> None:
+        """Verify callback-shaped strings cannot leak into diagnostics."""
+        callback_text = "credential-like-callback-value"
+        with (
+            caplog.at_level(logging.DEBUG, logger=_CONFIG_LOGGER_NAME),
+            pytest.raises(TypeError),
+        ):
+            factory(**{field: callback_text})
+
+        records = [
+            record for record in caplog.records if record.name == _CONFIG_LOGGER_NAME
+        ]
+        assert len(records) == 1, f"expected one validation record, got {records!r}"
+        assert records[0].__dict__.get("config_field") == field, (
+            "expected the rejected callback field"
+        )
+        assert records[0].__dict__.get("config_rejected_value") == "str", (
+            "expected callback details to use only the supplied value's type"
+        )
+        assert callback_text not in records[0].getMessage(), (
+            "callback string contents must not appear in the diagnostic"
+        )
+
     def test_valid_construction_does_not_log_validation_records(
         self,
         caplog: pytest.LogCaptureFixture,

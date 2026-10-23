@@ -40,8 +40,10 @@ DEFAULT_HEADER_NAME = "X-Correlation-ID"
 _NetworkType = ipaddress.IPv4Network | ipaddress.IPv6Network
 
 
-def _format_rejected_value(value: object) -> str:
+def _format_rejected_value(value: object, *, type_only: bool = False) -> str:
     """Render string values safely and other values by type name."""
+    if type_only:
+        return type(value).__qualname__
     match value:
         case str() as string_value:
             return repr(string_value)
@@ -49,9 +51,14 @@ def _format_rejected_value(value: object) -> str:
             return type(value).__qualname__
 
 
-def _log_validation_failure(field: str, value: object) -> None:
+def _log_validation_failure(
+    field: str,
+    value: object,
+    *,
+    type_only: bool = False,
+) -> None:
     """Log one safe diagnostic for a rejected configuration value."""
-    rejected_value = _format_rejected_value(value)
+    rejected_value = _format_rejected_value(value, type_only=type_only)
     logger.debug(
         "Correlation ID configuration validation failed for %s: rejected value %s",
         field,
@@ -203,14 +210,14 @@ class CorrelationIDConfig:
     def _validate_generator(self) -> None:
         """Validate that generator is callable."""
         if not callable(self.generator):
-            _log_validation_failure("generator", self.generator)
+            _log_validation_failure("generator", self.generator, type_only=True)
             msg = "generator must be callable"
             raise TypeError(msg)
 
     def _validate_validator(self) -> None:
         """Validate that validator is callable when provided."""
         if self.validator is not None and not callable(self.validator):
-            _log_validation_failure("validator", self.validator)
+            _log_validation_failure("validator", self.validator, type_only=True)
             msg = "validator must be callable"
             raise TypeError(msg)
 
