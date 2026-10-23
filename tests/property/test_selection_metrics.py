@@ -36,7 +36,7 @@ class _CountingValidator:
     __slots__ = ("calls", "mode")
 
     def __init__(self, mode: str) -> None:
-        """Store the generated validator outcome and initialise call tracking."""
+        """Store the generated validator outcome and initialize call tracking."""
         self.mode = mode
         self.calls: list[str] = []
 

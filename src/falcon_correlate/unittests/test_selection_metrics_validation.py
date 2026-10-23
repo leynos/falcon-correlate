@@ -6,6 +6,7 @@ import typing as typ
 
 from falcon_correlate import (
     CorrelationIDMiddleware,
+    CorrelationIDSelectionEvent,
     IncomingIDOutcome,
     SourceTrust,
     correlation_id_var,
@@ -21,7 +22,7 @@ class _FalseResult:
     """A falsey validator result that rejects repeated truthiness checks."""
 
     def __init__(self) -> None:
-        """Initialise the truthiness call counter."""
+        """Initialize the truthiness call counter."""
         self.calls = 0
 
     def __bool__(self) -> bool:
@@ -41,7 +42,7 @@ def test_rejected_result_is_coerced_once(
 ) -> None:
     """Classify one falsey validator result without repeating its coercion."""
     result = _FalseResult()
-    events = []
+    events: list[CorrelationIDSelectionEvent] = []
 
     def validator(_: str) -> bool:
         """Expose a stateful falsey result through the validator API."""

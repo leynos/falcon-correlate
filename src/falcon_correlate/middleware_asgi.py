@@ -34,7 +34,7 @@ class CorrelationIDMiddlewareASGI(_CorrelationIDMiddlewareBase):
         arguments may be specified. Defaults to ``None``.
     **kwargs
         Individual configuration parameters. Valid keys are: ``header_name``,
-        ``trusted_sources``, ``generator``, ``validator``, and
+        ``trusted_sources``, ``generator``, ``validator``,
         ``echo_header_in_response``, and ``metrics_recorder``. See
         :meth:`CorrelationIDConfig.from_kwargs` for parameter details.
 
