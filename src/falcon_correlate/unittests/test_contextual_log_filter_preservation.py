@@ -44,7 +44,7 @@ def preservation_case(request: pytest.FixtureRequest) -> PreservationTestCase:
     Parameters
     ----------
     request : pytest.FixtureRequest
-        Fixture request supplying the parameterised ``PreservationTestCase``
+        Fixture request supplying the parameterized ``PreservationTestCase``
         through ``request.param``.
 
     Returns
