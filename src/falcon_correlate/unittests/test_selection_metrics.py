@@ -13,6 +13,7 @@ from falcon_correlate import (
     CorrelationIDMiddlewareASGI,
     CorrelationIDSelectionEvent,
     IncomingIDOutcome,
+    MetricsRecorder,
     SourceTrust,
     correlation_id_var,
 )
@@ -165,6 +166,40 @@ def _assert_selection(
     return "generated-id" if should_generate else "private-id"
 
 
+def _failing_recorder() -> tuple[RuntimeError, MetricsRecorder]:
+    """Return a recorder that raises a stable backend failure."""
+    failure = RuntimeError("backend unavailable")
+
+    def recorder(_event: CorrelationIDSelectionEvent) -> None:
+        """Raise the captured backend failure."""
+        raise failure
+
+    return failure, recorder
+
+
+def _assert_recorder_warning(
+    caplog: pytest.LogCaptureFixture,
+    failure: RuntimeError,
+    context: object,
+) -> None:
+    """Assert recorder failures are logged safely and selection continues."""
+    records = [
+        record
+        for record in caplog.records
+        if record.getMessage() == "Metrics recorder raised an exception, ignoring"
+    ]
+    assert len(records) == 1, f"expected one recorder warning, got {records!r}"
+    record_exception = records[0].exc_info
+    assert record_exception is not None, "expected recorder failure in warning exc_info"
+    assert record_exception[1] is failure, "wrong exception logged for recorder failure"
+    assert "correlation_id" not in records[0].__dict__, (
+        "recorder warning must not include a correlation ID"
+    )
+    assert getattr(context, "correlation_id", None) == "generated-id", (
+        "expected request to continue after recorder failure"
+    )
+
+
 @pytest.mark.parametrize(
     "case",
     _OUTCOME_CASES,
@@ -280,11 +315,7 @@ def test_metrics_recorder_failure_is_ignored_and_logged(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """A failing WSGI recorder logs once and leaves request processing intact."""
-    failure = RuntimeError("backend unavailable")
-
-    def recorder(event: CorrelationIDSelectionEvent) -> None:
-        """Raise the configured metrics backend failure."""
-        raise failure
+    failure, recorder = _failing_recorder()
 
     middleware = CorrelationIDMiddleware(
         generator=lambda: "generated-id",
@@ -294,21 +325,7 @@ def test_metrics_recorder_failure_is_ignored_and_logged(
     with caplog.at_level(logging.WARNING, logger="falcon_correlate.middleware"):
         middleware.process_request(req, resp)
 
-    records = [
-        record
-        for record in caplog.records
-        if record.getMessage() == "Metrics recorder raised an exception, ignoring"
-    ]
-    assert len(records) == 1, f"expected one recorder warning, got {records!r}"
-    record_exception = records[0].exc_info
-    assert record_exception is not None, "expected recorder failure in warning exc_info"
-    assert record_exception[1] is failure, "wrong exception logged for recorder failure"
-    assert "correlation_id" not in records[0].__dict__, (
-        "recorder warning must not include a correlation ID"
-    )
-    assert req.context.correlation_id == "generated-id", (
-        "expected request to continue after recorder failure"
-    )
+    _assert_recorder_warning(caplog, failure, req.context)
     middleware.process_response(req, resp, resource=None, req_succeeded=True)
 
 
@@ -317,11 +334,7 @@ async def test_asgi_metrics_recorder_failure_is_ignored_and_logged(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """A failing ASGI recorder logs once and leaves request processing intact."""
-    failure = RuntimeError("backend unavailable")
-
-    def recorder(event: CorrelationIDSelectionEvent) -> None:
-        """Raise the configured metrics backend failure."""
-        raise failure
+    failure, recorder = _failing_recorder()
 
     middleware = CorrelationIDMiddlewareASGI(
         generator=lambda: "generated-id",
@@ -332,21 +345,7 @@ async def test_asgi_metrics_recorder_failure_is_ignored_and_logged(
     with caplog.at_level(logging.WARNING, logger="falcon_correlate.middleware"):
         await _process_asgi_request(middleware, req, resp)
 
-    records = [
-        record
-        for record in caplog.records
-        if record.getMessage() == "Metrics recorder raised an exception, ignoring"
-    ]
-    assert len(records) == 1, f"expected one recorder warning, got {records!r}"
-    record_exception = records[0].exc_info
-    assert record_exception is not None, "expected recorder failure in warning exc_info"
-    assert record_exception[1] is failure, "wrong exception logged for recorder failure"
-    assert "correlation_id" not in records[0].__dict__, (
-        "recorder warning must not include a correlation ID"
-    )
-    assert req.context.correlation_id == "generated-id", (
-        "expected request to continue after recorder failure"
-    )
+    _assert_recorder_warning(caplog, failure, req.context)
     await _process_asgi_response(middleware, req, resp)
 
 
