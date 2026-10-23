@@ -177,11 +177,6 @@ class _CorrelationIDMiddlewareBase:
 
         return any(addr in network for network in self._config._parsed_networks)
 
-    def _is_valid_id(self, value: str) -> bool:
-        """Return whether a correlation ID passes the configured validator."""
-        result, _ = self._validate_id(value)
-        return bool(result)
-
     def _validate_id(self, value: str) -> tuple[object, bool]:
         """Return the validator result and whether it raised an exception."""
         if self._config.validator is None:

@@ -17,6 +17,17 @@ if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
 
+async def _async_recorder(_: object) -> None:
+    """Stand in for a recorder implemented as an async function."""
+
+
+class _AsyncRecorder:
+    """Stand in for a recorder with an asynchronous call method."""
+
+    async def __call__(self, _: object) -> None:
+        """Represent an asynchronous callable recorder."""
+
+
 def test_metrics_recorder_configuration_paths_and_positional_compatibility() -> None:
     """All config entry points accept the callback and retain five old args."""
     events = []
@@ -85,3 +96,39 @@ def test_non_callable_metrics_recorder_logs_type_only(
     assert "private-value" not in records[0].getMessage(), (
         "metrics recorder diagnostic exposed its supplied value"
     )
+
+
+@pytest.mark.parametrize(
+    "factory", [CorrelationIDConfig, CorrelationIDConfig.from_kwargs]
+)
+@pytest.mark.parametrize("recorder", [_async_recorder, _AsyncRecorder()])
+def test_async_metrics_recorder_is_rejected_and_logged(
+    caplog: pytest.LogCaptureFixture,
+    factory: cabc.Callable[..., CorrelationIDConfig],
+    recorder: object,
+) -> None:
+    """Configuration rejects coroutine functions and async callables."""
+    with (
+        caplog.at_level(
+            logging.DEBUG,
+            logger="falcon_correlate.middleware_config",
+        ),
+        pytest.raises(
+            TypeError,
+            match="metrics_recorder must be a synchronous callable",
+        ),
+    ):
+        factory(metrics_recorder=typ.cast("MetricsRecorder", recorder))
+
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "falcon_correlate.middleware_config"
+    ]
+    assert len(records) == 1, f"expected one async-recorder log: {records!r}"
+    assert records[0].__dict__.get("config_field") == "metrics_recorder", (
+        "wrong config field"
+    )
+    assert (
+        records[0].__dict__.get("config_rejected_value") == type(recorder).__qualname__
+    ), "expected type-only async-recorder value"
