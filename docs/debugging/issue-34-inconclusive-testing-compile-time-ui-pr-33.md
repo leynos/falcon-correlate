@@ -139,12 +139,19 @@ worker input and its empty-string setting:
 
 [coverage-action]: https://github.com/leynos/shared-actions/blob/d5fded1107ee6822fdbf9539d81ff18ce6ce073a/.github/actions/generate-coverage/action.yml
 
-After these implementation changes, each listed gate exited with status 0:
-`make check-fmt`, `make typecheck`, `make lint`, `make test`,
-`make test-optional-celery`, `make markdownlint`, and `make nixie` all passed.
-The full suite reported 591 passed and 11 skipped; the optional-Celery lane
-reported 13 passed and 3 snapshots passed. CodeRabbit completed with no
-findings.
+The retained local gate logs report exit status 0 for `make check-fmt`,
+`make typecheck`, `make lint`, `make test`, `make test-optional-celery`,
+`make markdownlint`, and `make nixie`. Their full-suite log reports 591 passed
+and 11 skipped; their optional-Celery log reports 13 passed and 3 snapshots
+passed. The logs' file timestamps are 05:05 CEST on 2026-10-12, and their root
+directory is this worktree. The branch reflog places
+`dc83c815fcef05195855ea615f867065b092717b` at the branch tip from 03:43 until
+the next branch update at 06:29 CEST, when
+`d7c2b2a3c1ce29a91a5e307cb1c6d31f8bb2da7e` was committed. This identifies the
+branch revision associated with the historical run. The logs do not contain a
+SHA or establish that the worktree was clean, so the exact source tree is not
+independently verified. These historical counts do not describe the later
+reviewed PR head `47d39ab1da053ba2f1f83c9b6fb6ecb9518eef58`.
 
 ## References
 
