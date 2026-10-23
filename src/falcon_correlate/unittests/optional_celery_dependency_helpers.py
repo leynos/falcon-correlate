@@ -199,19 +199,13 @@ def _partial_output_text(output: str | bytes | None) -> str:
 
 
 def _run_python(
+    environ: cabc.Mapping[str, str],
     cwd: Path,
     *args: str,
     phase: str,
-    sitecustomize_dir: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a fresh Python child with captured output and the shared timeout."""
-    child_environment = _child_environment(os.environ)
-    if sitecustomize_dir is not None:
-        child_environment["PYTHONPATH"] = _pythonpath_with_import_blocker(
-            sitecustomize_dir,
-            os.environ,
-        )
-
+    child_environment = _child_environment(environ)
     command = [sys.executable, *args]
     try:
         return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- fixed child interpreter and arguments.
@@ -255,6 +249,7 @@ def _count_collected_test_items(
 ) -> int:
     """Return how many test items the blocked child collects from ``paths``."""
     result = _run_python(
+        _blocked_celery_environment(sitecustomize_dir, os.environ),
         project_root,
         "-m",
         "pytest",
@@ -264,7 +259,6 @@ def _count_collected_test_items(
         "--color=no",
         *_relative_paths(paths, project_root),
         phase="collection",
-        sitecustomize_dir=sitecustomize_dir,
     )
     collected_count = 0
     failure_reason = ""
@@ -297,6 +291,7 @@ def _run_celery_tests_with_celery_blocked(
     # of an ambient ``FORCE_COLOR``/``PY_COLORS`` that would otherwise make the
     # child emit ANSI escapes the normaliser cannot strip.
     result = _run_python(
+        _blocked_celery_environment(sitecustomize_dir, os.environ),
         project_root,
         "-m",
         "pytest",
@@ -308,7 +303,6 @@ def _run_celery_tests_with_celery_blocked(
         *_relative_paths((sentinel_test,), project_root),
         *_relative_paths(celery_test_paths, project_root),
         phase="blocked execution",
-        sitecustomize_dir=sitecustomize_dir,
     )
     # Build the expected snapshot from the child's own collection rather than a
     # bare literal. Each Celery module imports cleanly but marks itself
