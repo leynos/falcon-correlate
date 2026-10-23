@@ -1,8 +1,4 @@
 """Unit tests for CorrelationIDMiddleware configuration options."""
-# TODO(TECHDEBT): split classes; see https://github.com/leynos/falcon-correlate/issues/37.
-# Suggested groups: DefaultValueTests, ValidationTests,
-# ImmutabilityTests, and ConfigConstructionTests before this class grows.
-# pylint: disable=too-many-public-methods
 
 from __future__ import annotations
 
@@ -12,10 +8,8 @@ from falcon_correlate import CorrelationIDConfig, CorrelationIDMiddleware
 from falcon_correlate.middleware import default_uuid7_generator
 
 
-class TestCorrelationIDMiddlewareConfiguration:
-    """Tests for CorrelationIDMiddleware configuration options."""
-
-    # Default value tests
+class TestDefaultValues:
+    """Tests for default CorrelationIDMiddleware configuration values."""
 
     def test_default_header_name(self) -> None:
         """Verify default header_name is X-Correlation-ID."""
@@ -50,7 +44,105 @@ class TestCorrelationIDMiddlewareConfiguration:
         failure_message = "expected middleware.echo_header_in_response to be True"
         assert middleware.echo_header_in_response is True, failure_message
 
-    # Custom configuration tests
+
+class TestValidation:
+    """Tests for configuration validation and error handling."""
+
+    def test_empty_header_name_raises_value_error(self) -> None:
+        """Verify empty header_name raises ValueError."""
+        with pytest.raises(ValueError, match="header_name must not be empty"):
+            CorrelationIDMiddleware(header_name="")
+
+    def test_whitespace_header_name_raises_value_error(self) -> None:
+        """Verify whitespace-only header_name raises ValueError."""
+        with pytest.raises(ValueError, match="header_name must not be empty"):
+            CorrelationIDMiddleware(header_name="   ")
+
+    def test_empty_trusted_source_raises_value_error(self) -> None:
+        """Verify empty string in trusted_sources raises ValueError."""
+        with pytest.raises(
+            ValueError,
+            match="trusted_sources must not contain empty strings",
+        ):
+            CorrelationIDMiddleware(trusted_sources=["127.0.0.1", ""])
+
+    def test_whitespace_trusted_source_raises_value_error(self) -> None:
+        """Verify whitespace-only string in trusted_sources raises ValueError."""
+        with pytest.raises(
+            ValueError,
+            match="trusted_sources must not contain empty strings",
+        ):
+            CorrelationIDMiddleware(trusted_sources=["127.0.0.1", "   "])
+
+    def test_non_callable_generator_raises_type_error(self) -> None:
+        """Verify non-callable generator raises TypeError."""
+        with pytest.raises(TypeError, match="generator must be callable"):
+            CorrelationIDMiddleware(generator="not-callable")
+
+    def test_non_callable_validator_raises_type_error(self) -> None:
+        """Verify non-callable validator raises TypeError."""
+        with pytest.raises(TypeError, match="validator must be callable"):
+            CorrelationIDMiddleware(validator="not-callable")
+
+    def test_unknown_kwarg_raises_type_error(self) -> None:
+        """Verify unknown keyword arguments raise TypeError with helpful message."""
+        with pytest.raises(TypeError) as excinfo:
+            CorrelationIDMiddleware(foo=1)
+
+        message = str(excinfo.value)
+        assert "foo" in message, "expected 'foo' to be present in message"
+        failure_message = (
+            "expected 'Unknown keyword arguments' to be present in message"
+        )
+        assert "Unknown keyword arguments" in message, failure_message
+
+    def test_config_and_kwargs_conflict_raises_value_error(self) -> None:
+        """Verify providing both config and other kwargs raises ValueError."""
+        config = CorrelationIDConfig()
+
+        with pytest.raises(
+            ValueError,
+            match="Cannot specify both 'config' and individual parameters",
+        ):
+            CorrelationIDMiddleware(
+                config=config,
+                header_name="X-Request-ID",
+            )
+
+
+class TestImmutability:
+    """Tests for immutable trusted source configuration."""
+
+    def test_trusted_sources_is_immutable(self) -> None:
+        """Verify trusted_sources cannot be modified after creation."""
+        sources = ["127.0.0.1"]
+        middleware = CorrelationIDMiddleware(trusted_sources=sources)
+        # Modifying original list should not affect middleware
+        sources.append("10.0.0.1")
+        failure_message = (
+            "expected condition: middleware.trusted_sources == frozenset([..."
+        )
+        assert middleware.trusted_sources == frozenset(["127.0.0.1"]), failure_message
+
+    def test_config_trusted_sources_is_frozen_from_mutable_input(self) -> None:
+        """Verify direct config construction freezes trusted source inputs."""
+        sources = {"127.0.0.1"}
+        config = CorrelationIDConfig(trusted_sources=sources)
+
+        sources.add("10.0.0.1")
+
+        failure_message = (
+            "expected condition: config.trusted_sources == frozenset(['127..."
+        )
+        assert config.trusted_sources == frozenset(["127.0.0.1"]), failure_message
+        failure_message = (
+            "expected condition: isinstance(config.trusted_sources, frozen..."
+        )
+        assert isinstance(config.trusted_sources, frozenset), failure_message
+
+
+class TestConfigConstruction:
+    """Tests for constructing middleware from configuration."""
 
     def test_custom_header_name(self) -> None:
         """Verify custom header_name is stored."""
@@ -127,100 +219,6 @@ class TestCorrelationIDMiddlewareConfiguration:
         failure_message = "expected middleware.echo_header_in_response to be False"
         assert middleware.echo_header_in_response is False, failure_message
 
-    # Validation and error handling tests
-
-    def test_empty_header_name_raises_value_error(self) -> None:
-        """Verify empty header_name raises ValueError."""
-        with pytest.raises(ValueError, match="header_name must not be empty"):
-            CorrelationIDMiddleware(header_name="")
-
-    def test_whitespace_header_name_raises_value_error(self) -> None:
-        """Verify whitespace-only header_name raises ValueError."""
-        with pytest.raises(ValueError, match="header_name must not be empty"):
-            CorrelationIDMiddleware(header_name="   ")
-
-    def test_empty_trusted_source_raises_value_error(self) -> None:
-        """Verify empty string in trusted_sources raises ValueError."""
-        with pytest.raises(
-            ValueError,
-            match="trusted_sources must not contain empty strings",
-        ):
-            CorrelationIDMiddleware(trusted_sources=["127.0.0.1", ""])
-
-    def test_whitespace_trusted_source_raises_value_error(self) -> None:
-        """Verify whitespace-only string in trusted_sources raises ValueError."""
-        with pytest.raises(
-            ValueError,
-            match="trusted_sources must not contain empty strings",
-        ):
-            CorrelationIDMiddleware(trusted_sources=["127.0.0.1", "   "])
-
-    def test_non_callable_generator_raises_type_error(self) -> None:
-        """Verify non-callable generator raises TypeError."""
-        with pytest.raises(TypeError, match="generator must be callable"):
-            CorrelationIDMiddleware(generator="not-callable")
-
-    def test_non_callable_validator_raises_type_error(self) -> None:
-        """Verify non-callable validator raises TypeError."""
-        with pytest.raises(TypeError, match="validator must be callable"):
-            CorrelationIDMiddleware(validator="not-callable")
-
-    def test_unknown_kwarg_raises_type_error(self) -> None:
-        """Verify unknown keyword arguments raise TypeError with helpful message."""
-        with pytest.raises(TypeError) as excinfo:
-            CorrelationIDMiddleware(foo=1)
-
-        message = str(excinfo.value)
-        assert "foo" in message, "expected 'foo' to be present in message"
-        failure_message = (
-            "expected 'Unknown keyword arguments' to be present in message"
-        )
-        assert "Unknown keyword arguments" in message, failure_message
-
-    def test_config_and_kwargs_conflict_raises_value_error(self) -> None:
-        """Verify providing both config and other kwargs raises ValueError."""
-        config = CorrelationIDConfig()
-
-        with pytest.raises(
-            ValueError,
-            match="Cannot specify both 'config' and individual parameters",
-        ):
-            CorrelationIDMiddleware(
-                config=config,
-                header_name="X-Request-ID",
-            )
-
-    # Immutability tests
-
-    def test_trusted_sources_is_immutable(self) -> None:
-        """Verify trusted_sources cannot be modified after creation."""
-        sources = ["127.0.0.1"]
-        middleware = CorrelationIDMiddleware(trusted_sources=sources)
-        # Modifying original list should not affect middleware
-        sources.append("10.0.0.1")
-        failure_message = (
-            "expected condition: middleware.trusted_sources == frozenset([..."
-        )
-        assert middleware.trusted_sources == frozenset(["127.0.0.1"]), failure_message
-
-    def test_config_trusted_sources_is_frozen_from_mutable_input(self) -> None:
-        """Verify direct config construction freezes trusted source inputs."""
-        sources = {"127.0.0.1"}
-        config = CorrelationIDConfig(trusted_sources=sources)
-
-        sources.add("10.0.0.1")
-
-        failure_message = (
-            "expected condition: config.trusted_sources == frozenset(['127..."
-        )
-        assert config.trusted_sources == frozenset(["127.0.0.1"]), failure_message
-        failure_message = (
-            "expected condition: isinstance(config.trusted_sources, frozen..."
-        )
-        assert isinstance(config.trusted_sources, frozenset), failure_message
-
-    # Combined configuration tests
-
     def test_all_parameters_can_be_set(self) -> None:
         """Verify all parameters can be set together."""
 
@@ -263,8 +261,6 @@ class TestCorrelationIDMiddlewareConfiguration:
         assert middleware.validator is val, "expected middleware.validator to be val"
         failure_message = "expected middleware.echo_header_in_response to be False"
         assert middleware.echo_header_in_response is False, failure_message
-
-    # Config-based construction tests
 
     def test_config_based_construction_uses_given_config(self) -> None:
         """Verify supplying a CorrelationIDConfig sets and exposes the same config."""
