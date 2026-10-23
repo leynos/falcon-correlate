@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextvars
+import logging
 import typing as typ
 from unittest import mock
 
@@ -9,8 +11,8 @@ import falcon
 import falcon.testing
 import pytest
 
-from falcon_correlate import CorrelationIDMiddleware
-from falcon_correlate.middleware import default_uuid7_generator
+from falcon_correlate import CorrelationIDMiddleware, correlation_id_var
+from falcon_correlate.middleware_utils import CORRELATION_ID_RESET_TOKEN_ATTR
 from falcon_correlate.unittests.uuid7_helpers import assert_uuid7_hex
 from tests.conftest import CorrelationEchoResource
 
@@ -23,6 +25,7 @@ class _MiddlewareKwargs(typ.TypedDict, total=False):
 
     generator: cabc.Callable[[], str]
     trusted_sources: cabc.Iterable[str]
+    validator: cabc.Callable[[str], bool]
 
 
 def _verify_generator_called_and_id_matches(
@@ -326,28 +329,67 @@ class TestCustomGeneratorBehaviour:
             f"Expected 'request-2', got '{response2.json['correlation_id']}'"
         )
 
-    def test_middleware_generator_property_returns_configured_generator(self) -> None:
-        """Verify middleware.generator returns the configured generator."""
 
-        def my_gen() -> str:
-            """Generate a custom correlation ID for the test.
+@pytest.mark.parametrize(
+    ("scenario", "incoming_id"),
+    [
+        ("missing", None),
+        ("untrusted", "incoming-untrusted"),
+        ("rejected", "incoming-invalid"),
+    ],
+    ids=["missing-header", "untrusted", "validator-rejection"],
+)
+def test_generator_failure_is_logged_and_propagated(
+    caplog: pytest.LogCaptureFixture,
+    request_response_factory: cabc.Callable[
+        ..., tuple[falcon.Request, falcon.Response]
+    ],
+    scenario: str,
+    incoming_id: str | None,
+) -> None:
+    """Log generator failures without setting request or ContextVar state."""
+    failure = RuntimeError("generator failed")
 
-            Returns
-            -------
-            str
-                The literal correlation ID ``test``.
+    def failing_generator() -> str:
+        """Raise the same exception object for propagation assertions."""
+        raise failure
 
-            """
-            return "test"
+    kwargs: _MiddlewareKwargs = {"generator": failing_generator}
+    match scenario:
+        case "missing":
+            pass
+        case "untrusted":
+            kwargs["trusted_sources"] = ["10.0.0.1"]
+        case "rejected":
+            kwargs["trusted_sources"] = ["127.0.0.1"]
+            kwargs["validator"] = lambda _value: False
+    middleware = CorrelationIDMiddleware(**kwargs)
+    req, resp = request_response_factory(correlation_id=incoming_id)
+    request_context = contextvars.Context()
+    with (
+        caplog.at_level(logging.ERROR, logger="falcon_correlate.middleware"),
+        pytest.raises(RuntimeError) as exc_info,
+    ):
+        request_context.run(middleware.process_request, req, resp)
+    assert exc_info.value is failure, "expected original generator exception"
+    assert getattr(req.context, "correlation_id", None) is None, "request ID set"
+    assert getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None) is None, (
+        "ContextVar reset token stored"
+    )
+    assert request_context.get(correlation_id_var) is None, "ContextVar was changed"
 
-        middleware = CorrelationIDMiddleware(generator=my_gen)
-        assert middleware.generator is my_gen, (
-            "Expected middleware.generator to be the configured generator"
-        )
-
-    def test_middleware_uses_default_generator_when_none_provided(self) -> None:
-        """Verify middleware uses default_uuid7_generator when no generator given."""
-        middleware = CorrelationIDMiddleware()
-        assert middleware.generator is default_uuid7_generator, (
-            "Expected middleware.generator to be default_uuid7_generator"
-        )
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "falcon_correlate.middleware"
+        and record.levelno == logging.ERROR
+    ]
+    assert len(records) == 1, f"expected one ERROR record, got {records!r}"
+    record = records[0]
+    assert record.getMessage() == "Correlation ID generator raised an exception", (
+        "wrong message"
+    )
+    assert record.exc_info is not None, "expected generator exception details"
+    assert record.exc_info[1] is failure, "wrong exception in exc_info"
+    assert record.__dict__.get("header_name") == "X-Correlation-ID", "wrong header"
+    assert "correlation_id" not in record.__dict__, "correlation ID attached"

@@ -1,9 +1,9 @@
 """Falcon middleware orchestration and compatibility re-exports.
 
 This module orchestrates the Falcon WSGI middleware and exposes the ASGI
-middleware and shared ``CorrelationIDConfig`` configuration. For backward
-compatibility only, it re-exports ``DEFAULT_HEADER_NAME``,
-``correlation_id_var``, and ``user_id_var`` from their owning modules.
+middleware, shared configuration, and public support types. It re-exports
+symbols from their owning modules for stable public imports. Internal adapters
+should import each symbol directly from the module that owns it.
 """
 
 from __future__ import annotations
@@ -17,6 +17,12 @@ from .middleware_base import (
 )
 from .middleware_base import _CorrelationIDMiddlewareBase
 from .middleware_config import DEFAULT_HEADER_NAME, CorrelationIDConfig
+from .middleware_metrics import (
+    CorrelationIDSelectionEvent,
+    IncomingIDOutcome,
+    MetricsRecorder,
+    SourceTrust,
+)
 from .middleware_utils import (
     RECOMMENDED_LOG_FORMAT,
     ContextualLogFilter,
@@ -33,6 +39,10 @@ __all__ = [
     "CorrelationIDConfig",
     "CorrelationIDMiddleware",
     "CorrelationIDMiddlewareASGI",
+    "CorrelationIDSelectionEvent",
+    "IncomingIDOutcome",
+    "MetricsRecorder",
+    "SourceTrust",
     "correlation_id_var",
     "default_uuid7_generator",
     "default_uuid_validator",
@@ -61,8 +71,8 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
     **kwargs : object
         Individual configuration options passed to
         ``CorrelationIDConfig.from_kwargs``: ``header_name``,
-        ``trusted_sources``, ``generator``, ``validator``, and
-        ``echo_header_in_response``.
+        ``trusted_sources``, ``generator``, ``validator``,
+        ``echo_header_in_response``, and ``metrics_recorder``.
 
     Raises
     ------
@@ -108,6 +118,7 @@ class CorrelationIDMiddleware(_CorrelationIDMiddlewareBase):
         ------
         Exception
             If the configured correlation ID generator raises an exception.
+            The failure is logged at ``ERROR`` and the exception is propagated.
 
         """  # ruff: ignore[docstring-extraneous-exception] - generator exceptions are delegated.
         self._process_request(req)

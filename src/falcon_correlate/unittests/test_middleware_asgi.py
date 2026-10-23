@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 
 import pytest
 
@@ -12,6 +13,7 @@ from falcon_correlate import (
     CorrelationIDMiddlewareASGI,
     correlation_id_var,
 )
+from falcon_correlate.middleware_utils import CORRELATION_ID_RESET_TOKEN_ATTR
 from falcon_correlate.unittests.asgi_middleware_helpers import (
     _HeaderFailingResponse,
     _process_request,
@@ -111,6 +113,49 @@ class TestCorrelationIDMiddlewareASGIRequestLifecycle:
             "expected resp.get_header('X-Correlation-ID') to be 'generated-asgi' "
             f"but got {resp.get_header('X-Correlation-ID')!r}"
         )
+
+    @pytest.mark.asyncio
+    async def test_generator_failure_is_logged_and_propagated(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Log and propagate a generator error before setting request state."""
+        failure = RuntimeError("ASGI generator failed")
+
+        def failing_generator() -> str:
+            """Raise the same failure object for propagation assertions."""
+            raise failure
+
+        middleware = CorrelationIDMiddlewareASGI(generator=failing_generator)
+        req = _Request()
+        resp = _Response()
+        with (
+            caplog.at_level(logging.ERROR, logger="falcon_correlate.middleware"),
+            pytest.raises(RuntimeError) as exc_info,
+        ):
+            await _process_request(middleware, req, resp)
+
+        assert exc_info.value is failure, "expected original generator exception"
+        assert req.context.correlation_id is None, "request ID must remain unset"
+        assert getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None) is None, (
+            "ContextVar reset token must remain unset"
+        )
+        assert correlation_id_var.get() is None, "correlation ID ContextVar changed"
+        records = [
+            record
+            for record in caplog.records
+            if record.name == "falcon_correlate.middleware"
+            and record.levelno == logging.ERROR
+        ]
+        assert len(records) == 1, f"expected one ERROR record, got {records!r}"
+        record = records[0]
+        assert record.getMessage() == "Correlation ID generator raised an exception", (
+            "wrong generator failure message"
+        )
+        assert record.exc_info is not None, "expected generator exception details"
+        assert record.exc_info[1] is failure, "wrong exception in exc_info"
+        assert record.__dict__.get("header_name") == "X-Correlation-ID", "wrong header"
+        assert "correlation_id" not in record.__dict__, "correlation ID attached"
 
     @pytest.mark.parametrize(
         ("middleware", "req", "expected_id"),

@@ -98,6 +98,7 @@ _METHOD_ENTRY_POINTS: typ.Final = frozenset({
     "falcon_correlate.middleware_config.CorrelationIDConfig._parse_network",
     "falcon_correlate.middleware_config.CorrelationIDConfig._validate_generator",
     "falcon_correlate.middleware_config.CorrelationIDConfig._validate_validator",
+    "falcon_correlate.middleware_config.CorrelationIDConfig._validate_metrics_recorder",
     "falcon_correlate.middleware.CorrelationIDMiddleware.process_request",
     "falcon_correlate.middleware.CorrelationIDMiddleware.process_response",
     "falcon_correlate.middleware_asgi.CorrelationIDMiddlewareASGI.process_request",
