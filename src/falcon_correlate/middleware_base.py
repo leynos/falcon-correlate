@@ -49,8 +49,8 @@ logger = logging.getLogger("falcon_correlate.middleware")
 
 
 def _validation_outcome(
-    result: object,
     *,
+    result: bool,
     validator_raised: bool,
 ) -> IncomingIDOutcome:
     """Map one validator result to its selection outcome."""
@@ -173,12 +173,12 @@ class _CorrelationIDMiddlewareBase:
 
         return any(addr in network for network in self._config._parsed_networks)
 
-    def _validate_id(self, value: str) -> tuple[object, bool]:
-        """Return the validator result and whether it raised an exception."""
+    def _validate_id(self, value: str) -> tuple[bool, bool]:
+        """Return the validator result and whether validation raised."""
         if self._config.validator is None:
             return True, False
         try:
-            return self._config.validator(value), False
+            return bool(self._config.validator(value)), False
         except Exception:
             logger.warning(
                 "Validator raised an exception for correlation ID, treating as invalid",
@@ -226,7 +226,7 @@ class _CorrelationIDMiddlewareBase:
 
         validation_result, validator_raised = self._validate_id(incoming)
         outcome = _validation_outcome(
-            validation_result,
+            result=validation_result,
             validator_raised=validator_raised,
         )
         return outcome, SourceTrust.trusted
