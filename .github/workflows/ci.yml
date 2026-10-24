@@ -7,8 +7,12 @@ on:
 
 jobs:
   lint:
+    # Dependabot pull requests run on the hosted pool too (free on a public
+    # repository). The author is tested, not the actor, which changes when
+    # someone else pushes to the branch.
     runs-on: >-
-      ${{ github.event.pull_request.head.repo.fork
+      ${{ (github.event.pull_request.head.repo.fork
+      || github.event.pull_request.user.login == 'dependabot[bot]')
       && 'ubuntu-latest' || 'ubicloud-standard-2' }}
     # 308 s is the slowest observed run, on a merge push with a cold
     # Merman cache; a warm cache finishes in about 55 s. Four times the
@@ -117,7 +121,8 @@ jobs:
 
   test:
     runs-on: >-
-      ${{ github.event.pull_request.head.repo.fork
+      ${{ (github.event.pull_request.head.repo.fork
+      || github.event.pull_request.user.login == 'dependabot[bot]')
       && 'ubuntu-latest' || 'ubicloud-standard-2' }}
     # The slowest leg observed is 27 s, the 3.13 leg on a pull request
     # where it generates coverage instead of running pytest plainly. A
