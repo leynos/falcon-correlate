@@ -221,10 +221,33 @@ class _CorrelationIDMiddlewareBase:
 
         return self._validate_id(incoming), SourceTrust.trusted
 
-    def _process_request(self, req: _RequestLike) -> None:
-        """Establish request-local correlation ID state."""
-        incoming = self._get_incoming_header_value(req)
+    def _can_accept_incoming_id(
+        self,
+        req: _RequestLike,
+        incoming: str,
+    ) -> bool:
+        """Check trust before validation and report the selection outcome.
+
+        Untrusted sources return before the validator runs and emit no
+        rejection log. A trusted incoming ID that fails validation emits the
+        existing DEBUG record after any validator warning. The metrics recorder
+        receives one bounded event for each incoming ID.
+
+        Returns
+        -------
+        bool
+            Whether the incoming ID is trusted and passes validation.
+        """
         outcome, trust = self._classify_incoming(req, incoming)
+        event = CorrelationIDSelectionEvent(
+            outcome=outcome,
+            trust=trust,
+            header_name=_bounded_header_name(self._config.header_name),
+        )
+        if trust is SourceTrust.untrusted:
+            self._record_selection(event)
+            return False
+
         if outcome in {
             IncomingIDOutcome.rejected_invalid,
             IncomingIDOutcome.rejected_validator_error,
@@ -234,22 +257,54 @@ class _CorrelationIDMiddlewareBase:
                 extra={"header_name": self._config.header_name},
             )
 
-        self._record_selection(
-            CorrelationIDSelectionEvent(
-                outcome=outcome,
-                trust=trust,
-                header_name=_bounded_header_name(self._config.header_name),
-            ),
-        )
-        correlation_id = (
-            self._generate_id()
-            if outcome is not IncomingIDOutcome.accepted
-            else typ.cast("str", incoming)
-        )
+        self._record_selection(event)
+        return outcome is IncomingIDOutcome.accepted
 
+    def _resolve_correlation_id(self, req: _RequestLike) -> str:
+        """Select an ID without writing request or ContextVar state.
+
+        This query may call the configured validator, metrics recorder, or
+        generator; log validation decisions; and trigger the default
+        generator's lazy ``uuid_utils`` import. It is therefore not pure.
+
+        Returns
+        -------
+        str
+            The accepted incoming ID or a newly generated ID.
+        """
+        incoming = self._get_incoming_header_value(req)
+
+        if incoming is None:
+            self._record_selection(
+                CorrelationIDSelectionEvent(
+                    outcome=IncomingIDOutcome.missing,
+                    trust=SourceTrust.not_evaluated,
+                    header_name=_bounded_header_name(self._config.header_name),
+                ),
+            )
+        elif self._can_accept_incoming_id(req, incoming):
+            return incoming
+
+        return self._generate_id()
+
+    def _store_request_correlation_id(
+        self,
+        req: _RequestLike,
+        correlation_id: str,
+    ) -> None:
+        """Perform the only request-side mutation for the selected ID.
+
+        ``_process_response`` and ``_reset_correlation_id_context`` own
+        request-scoped cleanup.
+        """
         req.context.correlation_id = correlation_id
         reset_token = self._correlation_id_var.set(correlation_id)
         setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, reset_token)
+
+    def _process_request(self, req: _RequestLike) -> None:
+        """Establish request-local correlation ID state."""
+        correlation_id = self._resolve_correlation_id(req)
+        self._store_request_correlation_id(req, correlation_id)
 
     def _echo_correlation_id_header(
         self,

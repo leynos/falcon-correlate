@@ -87,15 +87,22 @@ are recorded in
 `middleware_base.py` owns `_CorrelationIDMiddlewareBase`, the private lifecycle
 shared by `middleware.py` and `middleware_asgi.py`. It resolves either a
 `CorrelationIDConfig` object or individual options through
-`CorrelationIDConfig.from_kwargs`, selects and validates incoming IDs, stores
-the result on `req.context.correlation_id` and the configured `ContextVar`, and
-performs response-header echo and request-context cleanup. The module keeps the
-established `falcon_correlate.middleware` logger namespace. The concrete WSGI
-and ASGI hooks delegate to the base class's `_process_request` and
-`_process_response` methods. Its narrow `_RequestLike` and `_ResponseLike`
-protocols limit the shared lifecycle to the methods provided by both Falcon
-request and response types; `_RequestLike.remote_addr` is a read-only `str`
-property.
+`CorrelationIDConfig.from_kwargs`. `_process_request` calls
+`_resolve_correlation_id` to select the ID, then
+`_store_request_correlation_id` to store it. The query does not write to the
+request or `ContextVar`; it may call configured callbacks, log decisions, and
+trigger the default generator's lazy `uuid_utils` import. Its
+`_can_accept_incoming_id` predicate checks source trust before validation and
+logs a DEBUG rejection when a trusted incoming ID fails validation.
+`_store_request_correlation_id` is the only request-side mutation point: it
+writes `req.context.correlation_id`, sets the configured `ContextVar`, and
+stores the returned reset token on the request context. `_process_response` and
+`_reset_correlation_id_context` own cleanup. The module keeps the established
+`falcon_correlate.middleware` logger namespace. The concrete WSGI and ASGI
+hooks delegate to the base class's `_process_request` and `_process_response`
+methods. Its narrow `_RequestLike` and `_ResponseLike` protocols limit the
+shared lifecycle to the methods provided by both Falcon request and response
+types; `_RequestLike.remote_addr` is a read-only `str` property.
 
 `CorrelationIDConfig.from_kwargs` accepts
 `**kwargs: typ.Unpack[CorrelationIDConfigKwargs]` and owns runtime validation

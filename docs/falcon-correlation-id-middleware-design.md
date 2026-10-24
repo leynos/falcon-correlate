@@ -278,12 +278,12 @@ process_response methods.
 
 In process_request:
 
-1. The middleware will inspect incoming request headers for an existing
-   correlation ID.
-2. Based on trusted source rules, it will either accept the incoming ID or
-   generate a new one.
-3. The determined correlation ID will be stored in a way that is accessible
-   throughout the request's lifecycle.
+1. `_resolve_correlation_id` reads the incoming header and selects it only
+   when the source is trusted and validation succeeds; otherwise, it generates
+   a new ID. This query does not write request or `ContextVar` state.
+2. `_store_request_correlation_id` stores the selected ID on
+   `req.context.correlation_id`, sets the configured `ContextVar`, and stores
+   the returned reset token on the request context.
 
 Falcon middleware components are executed hierarchically. If multiple
 middleware components are registered, their `process_request` methods are
@@ -308,10 +308,10 @@ In `process_response`:
 3. Perform any necessary cleanup, such as resetting context-local variables.
 
 **Figure 1 screen reader caption:** Sequence diagram showing a client request
-entering a Falcon application, the correlation middleware setting request
-context in `process_request`, the resource handling the request, and
-`process_response` optionally echoing the correlation ID header before
-resetting the stored context variable token.
+entering a Falcon application, the correlation middleware resolving the ID
+before storing it in request context and the `ContextVar`, the resource
+handling the request, and `process_response` optionally echoing the correlation
+ID header before resetting the stored context variable token.
 
 ```mermaid
 sequenceDiagram
@@ -320,11 +320,15 @@ sequenceDiagram
     participant CorrelationIDMiddleware
     participant Resource
     participant Request
+    participant ContextVar
     participant Response
 
     Client->>FalconApp: HTTP request
     FalconApp->>CorrelationIDMiddleware: process_request(req, resp)
-    CorrelationIDMiddleware->>Request: set context.correlation_id
+    CorrelationIDMiddleware->>CorrelationIDMiddleware: resolve correlation ID
+    CorrelationIDMiddleware->>Request: store context.correlation_id
+    CorrelationIDMiddleware->>ContextVar: set correlation ID
+    CorrelationIDMiddleware->>Request: store ContextVar reset token
     CorrelationIDMiddleware-->>FalconApp: return
 
     FalconApp->>Resource: on_request(req, resp)
