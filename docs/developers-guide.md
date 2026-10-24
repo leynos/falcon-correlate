@@ -105,14 +105,45 @@ The corresponding `ContextVar.reset()` calls cast the verified token back to
 `Token[str | None]`, which keeps the middleware clear to the type checker while
 preserving the runtime contract.
 
-The shared `_process_response` path copies `req.context.correlation_id` into
-the configured response header only when echoing is enabled, the request has a
-middleware-owned reset token, and a correlation ID was resolved. This prevents
-the middleware from echoing a value set by other code after Falcon
-short-circuited before its request hook ran. The method always resets the
-request-scoped `ContextVar` token in a `finally` block. If `resp.set_header()`
-fails, it logs a warning, performs cleanup, and re-raises the exception so
-Falcon still sees the failure.
+### Request lifecycle and reset-token storage
+
+`middleware_utils.py` defines `CORRELATION_ID_RESET_TOKEN_ATTR` as
+`"_correlation_id_reset_token"`. The shared base imports it under the private
+alias `_CORRELATION_ID_RESET_TOKEN_ATTR`, which `middleware.py` re-exports
+under the same private name for internal use. The attribute stores the
+`contextvars.Token` returned when the middleware sets its correlation ID
+`ContextVar`.
+
+The token lives on `req.context`, rather than on the reusable middleware
+instance, so concurrent requests keep separate reset state. It also marks
+middleware ownership for the response-header echo gate. WSGI and ASGI hooks
+delegate to the shared `_CorrelationIDMiddlewareBase` lifecycle methods.
+
+The response header is written only when echo is enabled, a middleware-owned
+token is present, and `req.context.correlation_id` is not `None`. The value
+written is the resolved request ID, including a regenerated ID, and
+`resp.set_header()` overwrites any existing value for that header. If Falcon
+skips the request hook, no token exists, so a correlation ID set by other code
+is not echoed.
+
+`_process_response` performs the echo inside `try` and always runs cleanup in
+`finally`. If `resp.set_header()` fails, the middleware logs a warning, cleanup
+runs, and the exception propagates to Falcon. Cleanup first clears the token
+attribute to `None`, ignores values that are not `contextvars.Token` instances,
+and ignores tokens belonging to a different `ContextVar`. It resets only an
+owned token; a `ValueError` from `reset()` is swallowed after a `DEBUG` log.
+
+`test_process_response_echoes_header_before_contextvar_cleanup` verifies the
+response header and post-response reset. The test
+`test_process_response_cleans_up_context_when_header_echo_fails` verifies that
+cleanup still runs and the exception propagates after a header-write failure.
+The security test `test_process_response_skips_echo_without_middleware_token`
+confirms that a request-context ID without the middleware token is not echoed.
+For the lifecycle pseudocode, see
+[Section 4.1 of the middleware design](falcon-correlation-id-middleware-design.md#41-core-middleware-code-snippet-falcon-wsgi)
+and
+[Appendix A.3](falcon-correlation-id-middleware-design.md#a3-context-variable-lifecycle-management-task-242)
+for the token-storage rationale.
 
 The architectural boundary is deliberately one-way: `middleware_base.py`
 depends on configuration and utility modules, and the WSGI and ASGI modules
