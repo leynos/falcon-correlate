@@ -251,6 +251,46 @@ async def test_async_transport_delegates_aclose() -> None:
     transport.aclose.assert_awaited_once_with()
 
 
+@pytest.mark.asyncio
+async def test_async_transport_preserves_aclose_return_value() -> None:
+    """Async transport should preserve the wrapped aclose result."""
+    transport = mock.AsyncMock(spec=httpx.AsyncBaseTransport)
+    expected = object()
+    transport.aclose.return_value = expected
+    wrapped_transport = AsyncCorrelationIDTransport(transport)
+
+    assert await wrapped_transport.aclose() is expected, (
+        "aclose result was not forwarded"
+    )
+    transport.aclose.assert_awaited_once_with()
+
+
+@pytest.mark.parametrize("transport_kind", ["sync", "async"])
+@pytest.mark.asyncio
+async def test_transport_enters_wrapped_context_and_returns_wrapper(
+    transport_kind: str,
+) -> None:
+    """Transport should delegate entry and return its own wrapper instance."""
+    is_async = transport_kind == "async"
+    transport_spec = httpx.AsyncBaseTransport if is_async else httpx.BaseTransport
+    wrapped_cls = AsyncCorrelationIDTransport if is_async else CorrelationIDTransport
+    enter_attr = "__aenter__" if is_async else "__enter__"
+    mock_factory = mock.AsyncMock if is_async else mock.MagicMock
+    transport = mock_factory(spec=transport_spec)
+    entry_mock = getattr(transport, enter_attr)
+    entry_mock.return_value = object()
+    wrapped_transport = wrapped_cls(transport)
+
+    raw = getattr(wrapped_transport, enter_attr)()
+    result = await raw if asyncio.iscoroutine(raw) else raw
+
+    assert result is wrapped_transport, "context entry did not return the wrapper"
+    if is_async:
+        entry_mock.assert_awaited_once_with()
+    else:
+        entry_mock.assert_called_once_with()
+
+
 @pytest.mark.parametrize(
     ("mock_factory", "transport_spec", "wrapped_cls", "exit_attr"),
     [

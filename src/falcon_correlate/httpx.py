@@ -143,12 +143,19 @@ class _CorrelationIDTransportBase[WrappedTransportT]:
         self._wrapped_transport = wrapped_transport
         self._header_name = header_name.strip()
 
+    def _prepare_request(self, request: httpx.Request) -> None:
+        """Inject the configured correlation ID header into a request."""
+        _inject_correlation_id_header(request.headers, self._header_name)
+
     @staticmethod
-    def _cast_to_none(result: object) -> None:
-        """Cast an exit result to None while preserving the runtime value."""
-        # `typ.cast()` only changes the static type view; it intentionally keeps
-        # the original runtime value so callers can forward `_wrapped_transport`
-        # `__exit__` / `__aexit__` return values without changing behaviour.
+    def _forward_lifecycle_result(result: object) -> None:
+        """Preserve wrapped lifecycle results under HTTPX's ``None`` contract.
+
+        HTTPX declares ``close``, ``aclose``, ``__exit__``, and ``__aexit__`` as
+        returning ``None``. A wrapped exit may return a truthy value to suppress
+        an exception, so this cast preserves each runtime result while keeping
+        the wrapper signatures aligned with HTTPX.
+        """
         return typ.cast("None", result)
 
 
@@ -172,7 +179,7 @@ class CorrelationIDTransport(
             The response returned by the wrapped transport.
 
         """
-        _inject_correlation_id_header(request.headers, self._header_name)
+        self._prepare_request(request)
         return self._wrapped_transport.handle_request(request)
 
     def close(self) -> None:
@@ -185,7 +192,7 @@ class CorrelationIDTransport(
             transport's result is forwarded unchanged.
 
         """
-        return self._cast_to_none(self._wrapped_transport.close())
+        return self._forward_lifecycle_result(self._wrapped_transport.close())
 
     def __enter__(self) -> CorrelationIDTransport:
         """Enter the transport context (required by httpx.Client).
@@ -207,7 +214,9 @@ class CorrelationIDTransport(
     ) -> None:
         """Exit the transport context (required by httpx.Client)."""
         wrapped = typ.cast("_SupportsSyncExit", self._wrapped_transport)
-        return self._cast_to_none(wrapped.__exit__(exc_type, exc_value, traceback))
+        return self._forward_lifecycle_result(
+            wrapped.__exit__(exc_type, exc_value, traceback)
+        )
 
 
 class AsyncCorrelationIDTransport(
@@ -230,12 +239,21 @@ class AsyncCorrelationIDTransport(
             The response returned by the wrapped transport.
 
         """
-        _inject_correlation_id_header(request.headers, self._header_name)
+        self._prepare_request(request)
         return await self._wrapped_transport.handle_async_request(request)
 
     async def aclose(self) -> None:
-        """Delegate transport shutdown to the wrapped transport."""
-        await self._wrapped_transport.aclose()
+        """Delegate shutdown to the wrapped transport.
+
+        Returns
+        -------
+        None
+            The declared HTTPX contract is ``None``. At runtime, the wrapped
+            transport's result is forwarded unchanged.
+
+        """
+        result = await self._wrapped_transport.aclose()
+        return self._forward_lifecycle_result(result)
 
     async def __aenter__(self) -> AsyncCorrelationIDTransport:
         """Enter the async transport context (required by httpx.AsyncClient).
@@ -257,7 +275,7 @@ class AsyncCorrelationIDTransport(
     ) -> None:
         """Exit the async transport context (required by httpx.AsyncClient)."""
         wrapped = typ.cast("_SupportsAsyncExit", self._wrapped_transport)
-        return self._cast_to_none(
+        return self._forward_lifecycle_result(
             await wrapped.__aexit__(exc_type, exc_value, traceback)
         )
 

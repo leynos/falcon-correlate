@@ -804,6 +804,10 @@ async with httpx.AsyncClient(
     response = await client.get("https://api.example.com/data")
 ```
 
+Calling `AsyncCorrelationIDTransport.aclose()` delegates shutdown to the
+wrapped transport and forwards its runtime return value, although its declared
+return type remains `None` to match the HTTPX transport interface.
+
 The transport classes preserve an explicitly supplied correlation header on the
 outgoing request. If the caller already set `X-Correlation-ID`,
 `falcon-correlate` leaves that value unchanged.
