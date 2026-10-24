@@ -53,9 +53,6 @@ class CorrelationIDMiddlewareASGI(_CorrelationIDMiddlewareBase):
         Optional validator for incoming correlation IDs.
     echo_header_in_response : bool
         Whether to echo middleware-owned correlation IDs in response headers.
-    metrics_recorder : MetricsRecorder | None
-        Synchronous callback for selection events. It must be quick and
-        non-blocking because it runs on the event loop.
 
     Raises
     ------
