@@ -313,9 +313,11 @@ def test_child_timeout_includes_phase_command_and_partial_output(
 ) -> None:
     """Timeout failures should preserve the phase and captured child output."""
     command = ["python", "-c", "print('partial')"]
+    recorded_kwargs: dict[str, object] = {}
 
     def timeout(*args: object, **kwargs: object) -> None:
-        """Raise the mocked child-process timeout."""
+        """Record subprocess options before raising the mocked timeout."""
+        recorded_kwargs.update(kwargs)
         raise celery_helpers.subprocess.TimeoutExpired(
             cmd=command,
             timeout=120,
@@ -334,6 +336,9 @@ def test_child_timeout_includes_phase_command_and_partial_output(
             phase="import probe",
         )
 
+    assert recorded_kwargs.get("timeout") == _CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS, (
+        "The helper should forward the shared child timeout to subprocess.run."
+    )
     assert str(error.value) == snapshot, (
         "Timeout diagnostics should include the phase, command, timeout, "
         "stdout and stderr."
