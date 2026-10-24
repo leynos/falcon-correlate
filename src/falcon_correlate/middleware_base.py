@@ -27,7 +27,7 @@ import ipaddress
 import logging
 import typing as typ
 
-from .middleware_config import VALID_CONFIG_KWARGS, CorrelationIDConfig
+from .middleware_config import CorrelationIDConfig
 from .middleware_utils import (
     CORRELATION_ID_RESET_TOKEN_ATTR as _CORRELATION_ID_RESET_TOKEN_ATTR,
 )
@@ -66,7 +66,7 @@ class _CorrelationIDMiddlewareBase:
         TypeError
             If an unknown individual option is supplied.
 
-        """
+        """  # ruff: ignore[docstring-extraneous-exception] - from_kwargs raises it.
         self._correlation_id_var = correlation_id_context_var
         if config is not None and kwargs:
             msg = "Cannot specify both 'config' and individual parameters"
@@ -75,11 +75,7 @@ class _CorrelationIDMiddlewareBase:
             self._config = config
             return
 
-        unknown_keys = set(kwargs.keys()) - VALID_CONFIG_KWARGS
-        if unknown_keys:
-            msg = f"Unknown keyword arguments: {', '.join(sorted(unknown_keys))}"
-            raise TypeError(msg)
-        # Cast to TypedDict after validating keys - runtime will verify values
+        # The factory owns runtime key validation; the cast carries its typing.
         typed_kwargs = typ.cast("CorrelationIDConfigKwargs", kwargs)
         self._config = CorrelationIDConfig.from_kwargs(**typed_kwargs)
 

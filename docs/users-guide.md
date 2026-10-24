@@ -107,7 +107,9 @@ app = falcon.App(middleware=[middleware])
 The `CorrelationIDConfig.from_kwargs()` classmethod mirrors the middleware's
 keyword arguments and returns a validated config object. When `trusted_sources`
 is omitted or `None`, it defaults to an empty `frozenset`. When `generator` is
-omitted or `None`, it defaults to `default_uuid7_generator`.
+omitted or `None`, it defaults to `default_uuid7_generator`. Unknown keyword
+arguments raise `TypeError("Unknown keyword arguments: …")`, with the unknown
+names sorted in the message.
 
 ```python
 from falcon_correlate import CorrelationIDConfig, CorrelationIDMiddleware
