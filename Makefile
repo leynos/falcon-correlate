@@ -237,7 +237,9 @@ test: build uv $(VENV_TOOLS) doctest makeutil ## Run tests
 
 test-mutmut-sandbox: build ## Exercise mutmut's configured sandbox on a small module
 	$(UV_ENV) $(UV) run --with mutmut==$(MUTMUT_VERSION) \
-		mutmut run falcon_correlate.pure.*
+		mutmut run \
+		'falcon_correlate.middleware_utils.x_default_uuid_validator__mutmut_*' \
+		'falcon_correlate.middleware_utils.x__has_valid_hyphen_placement__mutmut_*'
 
 test-optional-celery: build uv $(VENV_TOOLS) ## Validate missing-Celery support
 	$(UV_ENV) $(UV) run pytest -v $(OPTIONAL_CELERY_TEST)

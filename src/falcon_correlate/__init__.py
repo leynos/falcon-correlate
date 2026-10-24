@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from ._hello import hello
 from .celery import (
     clear_correlation_id_in_worker,
     configure_celery_correlation,
@@ -49,7 +48,6 @@ __all__ = [
     "correlation_id_var",
     "default_uuid7_generator",
     "default_uuid_validator",
-    "hello",
     "propagate_correlation_id_to_celery",
     "request_with_correlation_id",
     "setup_correlation_id_in_worker",
