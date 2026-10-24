@@ -951,10 +951,11 @@ ASGI hooks share this lifecycle. The request-local token rationale appears in
 
 **Screen reader caption:** Sequence diagram showing Falcon invoking the shared
 middleware's request hook, which sets `correlation_id_var` and stores its token
-on `req.context`. During response processing, the middleware echoes the
-resolved ID only when its token matches and echo is enabled; absent or
-mismatched tokens skip echo. A `finally` path clears the request token and
-resets the context variable before any header error propagates to Falcon.
+on `req.context`. During response processing, a middleware-owned token enables
+the echo helper; it writes the resolved ID only when echo is enabled and the ID
+is not `None`. The `finally` path clears the request token and resets the
+context variable only for a token owned by this middleware before any header
+error propagates to Falcon.
 
 ```mermaid
 sequenceDiagram
@@ -970,16 +971,38 @@ sequenceDiagram
     Middleware->>Request: store correlation_id and token
     Falcon->>Middleware: _process_response(req, resp)
     Middleware->>Request: read middleware-owned token
-    alt token belongs to middleware
+    alt token is an owned contextvars.Token
         Middleware->>Middleware: _echo_correlation_id_header(req, resp)
-        Middleware->>Response: set_header(header_name, correlation_id)
-    else token absent or mismatched
+        alt echo is enabled
+            alt req.context.correlation_id is not None
+                Middleware->>Response: set_header(header_name, correlation_id)
+                opt header write fails
+                    Middleware->>Middleware: log warning and re-raise
+                end
+            else request ID is None
+                Middleware->>Middleware: skip response-header echo
+            end
+        else echo is disabled
+            Middleware->>Middleware: skip response-header echo
+        end
+    else token is absent, not a Token, or foreign
         Middleware->>Middleware: skip response-header echo
     end
-    Note over Middleware: finally
+    Note over Middleware: finally always runs
     Middleware->>Middleware: _reset_correlation_id_context(req, token)
-    Middleware->>Request: clear token attribute
-    Middleware->>Context: reset(token)
+    Middleware->>Request: clear token attribute first
+    alt token is a contextvars.Token
+        alt token.var is correlation_id_var
+            Middleware->>Context: reset(token)
+            opt reset raises ValueError
+                Middleware->>Middleware: log at DEBUG and swallow ValueError
+            end
+        else token.var is foreign
+            Middleware->>Middleware: skip context reset
+        end
+    else token is absent or not a Token
+        Middleware->>Middleware: skip context reset
+    end
     Middleware-->>Falcon: propagate header error if echo failed
 ```
 
