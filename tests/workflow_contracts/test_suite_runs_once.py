@@ -36,7 +36,7 @@ if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
 INTERPRETERS = ("3.12", "3.13", "3.14")
-PLAIN_SUITE = "uv run pytest -v -n auto --ignore=tests/workflows"
+PLAIN_SUITE = "uv run pytest -v -n auto --dist=loadgroup --ignore=tests/workflows"
 PLAIN_SUITE_WITH_OPTIONAL_CELERY_EXCLUDED = (
     f"{PLAIN_SUITE} "
     "--ignore=src/falcon_correlate/unittests/test_optional_celery_dependency.py"
@@ -355,7 +355,7 @@ jobs:
         exclude:
           - python-version: ${{ github.ref == 'refs/heads/main' && '3.13' || '' }}
     steps:
-      - run: uv run pytest -v -n auto --ignore=tests/workflows
+      - run: uv run pytest -v -n auto --dist=loadgroup --ignore=tests/workflows
 """
     with pytest.raises(WorkflowReadError, match="cannot evaluate the exclusion"):
         suite_runs({"ci.yml": text}, "push")
@@ -382,7 +382,7 @@ jobs:
       matrix:
         python-version: {versions}
     steps:
-      - run: uv run pytest -v -n auto --ignore=tests/workflows
+      - run: uv run pytest -v -n auto --dist=loadgroup --ignore=tests/workflows
 """
     with pytest.raises(WorkflowReadError, match="must be a list of quoted versions"):
         suite_runs({"ci.yml": text}, "push")

@@ -441,6 +441,13 @@ each event, which interpreter the suite runs on and how often: every
 interpreter exactly once. It fails on a duplicate as well as on an interpreter
 that stops being tested.
 
+Both coverage lanes pass `pytest-workers: ''` to the shared action and run the
+suite serially. The action exposes the xdist worker count, but not the
+`--dist=loadgroup` strategy required for `pytest.mark.xdist_group` to keep a
+group on one worker. Serial coverage runs keep tests that provision shared
+toolchains from racing. The direct pytest commands use `--dist=loadgroup`, so
+those lanes retain bounded parallelism while keeping each group together.
+
 No checksum input is passed. The pinned action carries a CLI manifest naming
 `cs-coverage` 1.0.101, so the installation is deterministic without one;
 `installer-checksum` is deprecated and rejected when non-empty at that pin, and
@@ -768,6 +775,28 @@ is excluded from the xdist run. CI applies the same split; use
 
 `make typecheck` runs `ty` through the project `uv` environment. This ensures
 the type checker can resolve project dependencies such as `pathspec`.
+
+### Optional-Celery subprocess contract
+
+The optional-Celery checks in
+`src/falcon_correlate/unittests/test_optional_celery_dependency.py` launch
+Python children through the helpers in
+`src/falcon_correlate/unittests/optional_celery_dependency_helpers.py`. Callers
+pass the child's environment explicitly. Blocked-Celery callers add the import
+blocker to that mapping, and the runner removes inherited `PYTEST_` controls.
+
+`_run_python(..., phase=...)` uses a 120-second child timeout. On timeout it
+raises an `AssertionError` containing the phase, command, timeout and captured
+partial stdout and stderr. Callers label import checks `import probe`, test
+execution `blocked execution`, and pytest collection `collection`. Collection
+also fails when pytest exits non-zero or collects no items; its assertion
+includes the exit code, stdout and stderr. The enclosing serial test retains a
+270-second timeout.
+
+The rationale and evidence are in the
+[issue #34 investigation record][issue-34-investigation].
+
+[issue-34-investigation]: debugging/issue-34-inconclusive-testing-compile-time-ui-pr-33.md
 
 ## Spelling policy
 

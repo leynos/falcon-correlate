@@ -8,10 +8,13 @@ import subprocess  # ruff: ignore[suspicious-subprocess-import] - fixed local pa
 import typing as typ
 from pathlib import Path
 
+import pytest
 import yaml
 
 _MAKEUTIL_COMMAND: typ.Final = ("makeutil", "parse", "Makefile")
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_CI_WORKFLOW_PATH = _PROJECT_ROOT / ".github/workflows/ci.yml"
+_COVERAGE_MAIN_WORKFLOW_PATH = _PROJECT_ROOT / ".github/workflows/coverage-main.yml"
 _OPTIONAL_CELERY_TEST_TOKENS: typ.Final = (
     "src/falcon_correlate/unittests/test_optional_celery_dependency.py",
 )
@@ -83,7 +86,7 @@ _OPTIONAL_CELERY_RECIPE_TOKENS: typ.Final = (
     ("$(UV_ENV)", "$(UV)", "run", "pytest", "-v", "$(OPTIONAL_CELERY_TEST)"),
 )
 _CI_PARALLEL_TEST_COMMAND: typ.Final = (
-    "uv run pytest -v -n auto --ignore=tests/workflows "
+    "uv run pytest -v -n auto --dist=loadgroup --ignore=tests/workflows "
     "--ignore=src/falcon_correlate/unittests/test_optional_celery_dependency.py"
 )
 _CI_SERIAL_OPTIONAL_CELERY_COMMAND: typ.Final = "make test-optional-celery"
@@ -181,9 +184,13 @@ def _rule_prerequisites(target: str) -> tuple[str, ...]:
     return typ.cast("tuple[str, ...]", tuple(prerequisites))
 
 
-def _workflow_step(job_name: str, step_name: str) -> dict[str, object]:
-    """Return the sole named step from the CI workflow job."""
-    workflow = yaml.safe_load((_PROJECT_ROOT / ".github/workflows/ci.yml").read_text())
+def _workflow_step(
+    workflow_path: Path,
+    job_name: str,
+    step_name: str,
+) -> dict[str, object]:
+    """Return the sole named step from a workflow job."""
+    workflow = yaml.safe_load(workflow_path.read_text())
     assert isinstance(workflow, dict), "CI workflow document must be a mapping"
     jobs = workflow.get("jobs")
     assert isinstance(jobs, dict), "CI workflow jobs must be a mapping"
@@ -257,14 +264,46 @@ def test_pylint_targets_share_the_project_target_list() -> None:
 
 def test_ci_runs_the_optional_celery_test_serially() -> None:
     """CI must exclude Celery subprocess work from xdist and run it serially."""
-    parallel_test_step = _workflow_step("test", "Run tests")
+    parallel_test_step = _workflow_step(_CI_WORKFLOW_PATH, "test", "Run tests")
     assert parallel_test_step.get("run") == _CI_PARALLEL_TEST_COMMAND, (
         "CI xdist test command must exclude the isolated optional-Celery module"
     )
-    serial_test_step = _workflow_step("test", "Run optional-Celery tests serially")
+    serial_test_step = _workflow_step(
+        _CI_WORKFLOW_PATH,
+        "test",
+        "Run optional-Celery tests serially",
+    )
     assert serial_test_step.get("run") == _CI_SERIAL_OPTIONAL_CELERY_COMMAND, (
         "CI must run optional-Celery tests through the serial Make target"
     )
     assert serial_test_step.get("if") is None, (
         "CI serial optional-Celery target must run on every test matrix leg"
+    )
+
+
+@pytest.mark.parametrize(
+    ("workflow_path", "job_name"),
+    [
+        (_CI_WORKFLOW_PATH, "test"),
+        (_COVERAGE_MAIN_WORKFLOW_PATH, "coverage-upload"),
+    ],
+    ids=["pull-request", "main"],
+)
+def test_coverage_lanes_run_the_pytest_suite_serially(
+    workflow_path: Path,
+    job_name: str,
+) -> None:
+    """Coverage jobs must avoid xdist races in grouped toolchain fixtures."""
+    coverage_step = _workflow_step(workflow_path, job_name, "Generate coverage")
+    coverage_inputs = coverage_step.get("with")
+    assert isinstance(coverage_inputs, dict), (
+        f"{workflow_path.name} coverage inputs must be a mapping"
+    )
+    pytest_workers = coverage_inputs.get("pytest-workers")
+    assert isinstance(pytest_workers, str), (
+        f"{workflow_path.name} coverage pytest-workers input must be a string"
+    )
+    assert not pytest_workers, (
+        f"{workflow_path.name} coverage must disable xdist because the shared "
+        "action does not expose `--dist=loadgroup`"
     )

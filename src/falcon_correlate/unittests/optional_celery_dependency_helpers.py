@@ -187,29 +187,45 @@ def _child_environment(environ: cabc.Mapping[str, str]) -> dict[str, str]:
     }
 
 
+def _partial_output_text(output: str | bytes | None) -> str:
+    """Decode any partial output captured before a child timeout."""
+    match output:
+        case None:
+            return ""
+        case bytes():
+            return output.decode(errors="replace")
+        case str():
+            return output
+
+
 def _run_python(
     environ: cabc.Mapping[str, str],
     cwd: Path,
     *args: str,
-    sitecustomize_dir: Path | None = None,
+    phase: str,
 ) -> subprocess.CompletedProcess[str]:
     """Run a fresh Python child with captured output and the shared timeout."""
     child_environment = _child_environment(environ)
-    if sitecustomize_dir is not None:
-        child_environment["PYTHONPATH"] = _pythonpath_with_import_blocker(
-            sitecustomize_dir,
-            environ,
+    command = [sys.executable, *args]
+    try:
+        return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- fixed child interpreter and arguments.
+            command,
+            check=False,
+            cwd=cwd,
+            env=child_environment,
+            text=True,
+            capture_output=True,
+            timeout=_CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS,
         )
-
-    return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- fixed child interpreter and arguments.
-        [sys.executable, *args],
-        check=False,
-        cwd=cwd,
-        env=child_environment,
-        text=True,
-        capture_output=True,
-        timeout=_CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS,
-    )
+    except subprocess.TimeoutExpired as exc:
+        msg = (
+            f"{phase} child process timed out.\n"
+            f"Command: {exc.cmd!r}\n"
+            f"Timeout: {exc.timeout} seconds\n"
+            f"stdout:\n{_partial_output_text(exc.stdout)}\n"
+            f"stderr:\n{_partial_output_text(exc.stderr)}"
+        )
+        raise AssertionError(msg) from exc
 
 
 def _relative_paths(paths: cabc.Iterable[Path], project_root: Path) -> tuple[str, ...]:
@@ -233,7 +249,7 @@ def _count_collected_test_items(
 ) -> int:
     """Return how many test items the blocked child collects from ``paths``."""
     result = _run_python(
-        os.environ,
+        _blocked_celery_environment(sitecustomize_dir, os.environ),
         project_root,
         "-m",
         "pytest",
@@ -242,9 +258,26 @@ def _count_collected_test_items(
         "-n=0",
         "--color=no",
         *_relative_paths(paths, project_root),
-        sitecustomize_dir=sitecustomize_dir,
+        phase="collection",
     )
-    return sum(1 for line in result.stdout.splitlines() if "::" in line)
+    collected_count = 0
+    failure_reason = ""
+    if result.returncode != 0:
+        failure_reason = "child command failed"
+    else:
+        collected_count = sum(1 for line in result.stdout.splitlines() if "::" in line)
+        if collected_count == 0:
+            failure_reason = "no test items were collected"
+
+    if failure_reason:
+        msg = (
+            f"Pytest collection failed: {failure_reason}.\n"
+            f"Exit code: {result.returncode}\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
+        raise AssertionError(msg)
+    return collected_count
 
 
 def _run_celery_tests_with_celery_blocked(
@@ -258,7 +291,7 @@ def _run_celery_tests_with_celery_blocked(
     # of an ambient ``FORCE_COLOR``/``PY_COLORS`` that would otherwise make the
     # child emit ANSI escapes the normaliser cannot strip.
     result = _run_python(
-        os.environ,
+        _blocked_celery_environment(sitecustomize_dir, os.environ),
         project_root,
         "-m",
         "pytest",
@@ -269,7 +302,7 @@ def _run_celery_tests_with_celery_blocked(
         "--color=no",
         *_relative_paths((sentinel_test,), project_root),
         *_relative_paths(celery_test_paths, project_root),
-        sitecustomize_dir=sitecustomize_dir,
+        phase="blocked execution",
     )
     # Build the expected snapshot from the child's own collection rather than a
     # bare literal. Each Celery module imports cleanly but marks itself

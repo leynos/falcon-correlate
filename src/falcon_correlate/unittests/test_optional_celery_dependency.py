@@ -36,11 +36,13 @@ import typing as typ
 
 import pytest
 
+import falcon_correlate.unittests.optional_celery_dependency_helpers as celery_helpers
 from falcon_correlate.unittests.optional_celery_dependency_helpers import (
     _CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS,
     _MINIMUM_CELERY_TEST_MODULE_COUNT,
     _PROJECT_ROOT,
     _blocked_celery_environment,
+    _count_collected_test_items,
     _discover_celery_test_paths,
     _PytestRun,
     _run_celery_tests_with_celery_blocked,
@@ -51,6 +53,8 @@ from falcon_correlate.unittests.optional_celery_dependency_helpers import (
 
 if typ.TYPE_CHECKING:
     from pathlib import Path
+
+    from syrupy.assertion import SnapshotAssertion
 
 # The fixture runs two bounded child processes sequentially. The parent budget
 # covers both child timeouts plus time to reap them and finish fixture cleanup.
@@ -172,11 +176,11 @@ def test_package_and_celery_module_import_without_celery(
     """Package modules should import independently when Celery is unavailable."""
     _write_celery_import_blocker(tmp_path)
     result = _run_python(
-        os.environ,
+        _blocked_celery_environment(tmp_path, os.environ),
         _PROJECT_ROOT,
         "-c",
         f"import importlib; importlib.import_module({module_name!r})",
-        sitecustomize_dir=tmp_path,
+        phase="import probe",
     )
 
     assert result.returncode == 0, (
@@ -198,11 +202,11 @@ def test_celery_import_blocker_rejects_celery_modules(
     """The subprocess hook should block top-level and nested Celery imports."""
     _write_celery_import_blocker(tmp_path)
     result = _run_python(
-        os.environ,
+        _blocked_celery_environment(tmp_path, os.environ),
         _PROJECT_ROOT,
         "-c",
         f"import importlib; importlib.import_module({module_name!r})",
-        sitecustomize_dir=tmp_path,
+        phase="import probe",
     )
 
     blocked_name = module_name.split(".", maxsplit=1)[0]
@@ -211,6 +215,133 @@ def test_celery_import_blocker_rejects_celery_modules(
     )
     assert f"No module named '{blocked_name}'" in result.stderr, (
         f"{module_name} should fail with a missing-Celery import error."
+    )
+
+
+@pytest.mark.timeout(30)
+@pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
+def test_python_child_uses_the_supplied_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Child environment values should come from the supplied mapping."""
+    captured_environments: list[object] = []
+
+    def completed_process(
+        *_args: object,
+        **kwargs: object,
+    ) -> celery_helpers.subprocess.CompletedProcess[str]:
+        """Capture the child environment without launching an interpreter."""
+        captured_environments.append(kwargs["env"])
+        return celery_helpers.subprocess.CompletedProcess(
+            args=["python", "-c", "pass"], returncode=0, stdout="", stderr=""
+        )
+
+    monkeypatch.setenv("KEEP", "ambient")
+    monkeypatch.setenv("PYTHONPATH", "/ambient")
+    monkeypatch.setattr(celery_helpers.subprocess, "run", completed_process)
+    _run_python(
+        {
+            "KEEP": "supplied",
+            "PYTHONPATH": f"{tmp_path}{os.pathsep}/supplied",
+            "PYTEST_ADDOPTS": "-n auto",
+            "PYTEST_XDIST_WORKER": "gw0",
+        },
+        _PROJECT_ROOT,
+        "-c",
+        "pass",
+        phase="import probe",
+    )
+
+    assert captured_environments == [
+        {"KEEP": "supplied", "PYTHONPATH": f"{tmp_path}{os.pathsep}/supplied"}
+    ], "Child environment should use supplied values and remove pytest controls."
+
+
+@pytest.mark.parametrize(
+    "child_result",
+    [
+        pytest.param(
+            (2, "collection failed", "import error"),
+            id="non-zero-exit",
+        ),
+        pytest.param(
+            (0, "no tests collected", "collection warning"),
+            id="empty",
+        ),
+    ],
+)
+@pytest.mark.timeout(30)
+@pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
+def test_collection_rejects_incomplete_child_results(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    child_result: tuple[int, str, str],
+    snapshot: SnapshotAssertion,
+) -> None:
+    """Collection failures and empty results should include child diagnostics."""
+    returncode, stdout, stderr = child_result
+
+    def completed_process(
+        *_args: object,
+        **_kwargs: object,
+    ) -> celery_helpers.subprocess.CompletedProcess[str]:
+        """Return the mocked collection result."""
+        return celery_helpers.subprocess.CompletedProcess(
+            args=["python", "-m", "pytest"],
+            returncode=returncode,
+            stdout=stdout,
+            stderr=stderr,
+        )
+
+    monkeypatch.setattr(celery_helpers.subprocess, "run", completed_process)
+
+    with pytest.raises(AssertionError) as error:
+        _count_collected_test_items(tmp_path, (), _PROJECT_ROOT)
+
+    assert str(error.value) == snapshot, (
+        "Collection failure diagnostics should include the phase, exit code, "
+        "stdout and stderr."
+    )
+
+
+@pytest.mark.timeout(30)
+@pytest.mark.xdist_group(name=_CELERY_BLOCKED_PYTEST_RUN_GROUP)
+def test_child_timeout_includes_phase_command_and_partial_output(
+    monkeypatch: pytest.MonkeyPatch,
+    snapshot: SnapshotAssertion,
+) -> None:
+    """Timeout failures should preserve the phase and captured child output."""
+    command = ["python", "-c", "print('partial')"]
+    recorded_kwargs: dict[str, object] = {}
+
+    def timeout(*args: object, **kwargs: object) -> None:
+        """Record subprocess options before raising the mocked timeout."""
+        recorded_kwargs.update(kwargs)
+        raise celery_helpers.subprocess.TimeoutExpired(
+            cmd=command,
+            timeout=120,
+            output=b"partial stdout",
+            stderr=b"partial stderr",
+        )
+
+    monkeypatch.setattr(celery_helpers.subprocess, "run", timeout)
+
+    with pytest.raises(AssertionError) as error:
+        _run_python(
+            os.environ,
+            _PROJECT_ROOT,
+            "-c",
+            "print('partial')",
+            phase="import probe",
+        )
+
+    assert recorded_kwargs.get("timeout") == _CELERY_BLOCKED_PYTEST_TIMEOUT_SECONDS, (
+        "The helper should forward the shared child timeout to subprocess.run."
+    )
+    assert str(error.value) == snapshot, (
+        "Timeout diagnostics should include the phase, command, timeout, "
+        "stdout and stderr."
     )
 
 
