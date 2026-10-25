@@ -19,6 +19,10 @@ if typ.TYPE_CHECKING:
 WORKFLOW_PATH = WORKFLOWS_DIR / "ci.yml"
 WORKFLOW = parse_workflow(WORKFLOW_PATH.read_text(encoding="utf-8"), "ci.yml")
 BUILD_JOB = WORKFLOW["jobs"]["build"]
+ACTION_PATH = WORKFLOW_PATH.parents[1] / "actions" / "pure-python-wheel" / "action.yml"
+ACTION = parse_workflow(
+    ACTION_PATH.read_text(encoding="utf-8"), "pure-python-wheel/action.yml"
+)
 
 
 def _run_step(name: str) -> dict[str, object]:
@@ -90,3 +94,25 @@ def test_build_job_is_a_read_only_pull_request_lane() -> None:
         "the build lane must declare an integer timeout"
     )
     assert "if" not in BUILD_JOB, "the build lane must not use a job-level condition"
+
+
+def test_build_action_uses_one_static_distribution_directory() -> None:
+    """Keep the build destination and upload allowlist aligned at ``dist``."""
+    steps = ACTION["runs"]["steps"]
+    build_step = next(
+        step for step in steps if step.get("name") == "Build sdist and wheel"
+    )
+    upload_step = next(
+        step for step in steps if step.get("name") == "Upload sdist and wheel artefact"
+    )
+
+    assert build_step["env"] == {"OUT_DIR": "dist"}, (
+        "the build action must use its statically checked artifact directory"
+    )
+    assert upload_step["with"]["path"].splitlines() == [
+        "dist/*.whl",
+        "dist/*.tar.gz",
+    ], "the artifact upload must include both distributions from the build directory"
+    assert "out-dir" not in ACTION["inputs"], (
+        "the build action must not expose an output directory it cannot upload"
+    )

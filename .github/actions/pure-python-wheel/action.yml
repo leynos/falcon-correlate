@@ -1,15 +1,11 @@
 name: Build Pure Python Wheel and Sdist
 description: >-
-  Builds the source distribution and, from it, the pure Python wheel using uv,
-  then uploads both as one artefact.
+  Builds the source distribution and, from it, the pure Python wheel in dist
+  using uv, then uploads both as one artefact.
 inputs:
   python-version:
     description: Python version to set up
     required: true
-  out-dir:
-    description: Directory to place built distributions
-    required: false
-    default: dist
   artifact-name:
     description: Name of the uploaded artefact
     required: true
@@ -29,7 +25,7 @@ runs:
     - name: Build sdist and wheel
       shell: bash
       env:
-        OUT_DIR: ${{ inputs.out-dir }}
+        OUT_DIR: dist
       run: |
         set -euo pipefail
         uv build --out-dir "$OUT_DIR"
