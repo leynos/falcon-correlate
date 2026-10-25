@@ -830,106 +830,180 @@ regions by an AST-based drift guard, as recorded in
 
 ### 4.1. Core middleware code snippet (Falcon WSGI)
 
-```python
-import falcon
-import uuid  # Standard library for UUID, specific v7 generator needed
-import contextvars
-from typing import Callable, List, Optional
+The following illustrative pseudocode expands the request and response
+lifecycle for clarity. The implementation places these operations in
+`_CorrelationIDMiddlewareBase` helpers; both WSGI and ASGI middleware use that
+shared lifecycle. Logging context details are abbreviated here.
 
-# --- Context Variables (defined globally or in an appropriate module) ---
+```python
+import contextvars
+import logging
+import uuid
+
+from .middleware_utils import CORRELATION_ID_RESET_TOKEN_ATTR
+
+logger = logging.getLogger("falcon_correlate.middleware")
+
+# These variables are defined globally or in an appropriate module.
 correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "correlation_id", default=None
 )
+# Authentication middleware or application code owns this variable and its
+# lifecycle. This middleware does not set or reset it.
 user_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "user_id", default=None
 )
 
 
-# Placeholder for a chosen UUIDv7 generator function
-# For example, from the 'uuid_v7' package: from uuid_v7 import generate as uuid7_generate
-# Or from 'uuid6' package: from uuid6 import uuid7 as uuid7_generate
-# Or copied CPython source
 def default_uuid7_generator() -> str:
-    # Replace with actual UUIDv7 generation logic
-    # This is a placeholder using uuid.uuid4 for concept illustration
-    # In a real scenario, use a proper UUIDv7 generator.
-    # For example: return uuid7_generate().hex if using a library that returns UUID object
+    # Replace this UUIDv4 placeholder with the configured UUIDv7 generator.
     return uuid.uuid4().hex
 
 
-class CorrelationIDMiddleware:
-    def __init__(
-        self,
-        header_name: str = "X-Correlation-ID",
-        trusted_sources: Iterable[str] | None = None,
-        generator: Callable[[], str] = default_uuid7_generator,
-        validator: Callable[[str], bool] | None = None,
-        echo_header_in_response: bool = True,
-    ):
-        self.header_name = header_name
-        self.trusted_sources = (
-            frozenset(trusted_sources) if trusted_sources else frozenset()
-        )
-        self.generator = generator
-        self.validator = validator
-        self.echo_header_in_response = echo_header_in_response
-        self._correlation_id_set_token = None  # For resetting contextvar
-
-    def _is_trusted_source(self, remote_addr: Optional[str]) -> bool:
-        if not remote_addr:
+class _CorrelationIDMiddlewareBase:
+    def _is_valid_id(self, value: str) -> bool:
+        if self._config.validator is None:
+            return True
+        try:
+            return self._config.validator(value)
+        except Exception:
+            logger.warning(
+                "Validator raised an exception for correlation ID, treating as invalid",
+                exc_info=True,
+            )
             return False
-        return remote_addr in self.trusted_sources
 
-    def process_request(self, req: falcon.Request, resp: falcon.Response):
-        incoming_cid = req.get_header(self.header_name)
-        final_cid = None
+    def _process_request(self, req) -> None:
+        raw_header = req.get_header(self._config.header_name)
+        incoming = raw_header.strip() if raw_header is not None else ""
+        incoming = incoming or None
 
-        if incoming_cid:
-            is_valid = True
-            if self.validator:
-                is_valid = self.validator(incoming_cid)
-
-            if is_valid and self._is_trusted_source(req.remote_addr):
-                final_cid = incoming_cid
-            elif not is_valid:
-                # Log invalid incoming CID attempt if desired
-                final_cid = self.generator()
-            else:  # Valid format, but not trusted source
-                final_cid = self.generator()
+        if incoming is not None and self._is_trusted_source(req.remote_addr):
+            if self._is_valid_id(incoming):
+                correlation_id = incoming
+            else:
+                logger.debug("Correlation ID failed validation; generating new ID")
+                correlation_id = self._config.generator()
         else:
-            final_cid = self.generator()
+            correlation_id = self._config.generator()
 
-        # Store in contextvar
-        self._correlation_id_set_token = correlation_id_var.set(final_cid)
+        req.context.correlation_id = correlation_id
+        token = self._correlation_id_var.set(correlation_id)
+        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, token)
 
-        # Optionally store in req.context for Falcon-specific access
-        if not hasattr(req.context, "correlation_id"):
-            req.context.correlation_id = final_cid
+        # Authentication middleware or application code owns user_id_var.
+        # This middleware does not set it or reset it during response cleanup.
 
-        # User ID would typically be set by an authentication middleware
-        # For demonstration, if auth middleware ran and set req.context.user:
-        # if hasattr(req.context, 'user') and req.context.user:
-        #     user_id_var.set(str(req.context.user.get('id')))
+    def _echo_correlation_id_header(self, req, resp) -> None:
+        if not self._config.echo_header_in_response:
+            logger.debug("Correlation ID response header echo disabled")
+            return
 
-    def process_response(
-        self,
-        req: falcon.Request,
-        resp: falcon.Response,
-        resource,
-        req_succeeded: bool,
-    ):
-        cid = correlation_id_var.get()
-        if cid and self.echo_header_in_response:
-            resp.set_header(self.header_name, cid)
+        correlation_id = getattr(req.context, "correlation_id", None)
+        if correlation_id is None:
+            logger.debug("Correlation ID response header echo skipped; ID absent")
+            return
 
-        # Reset context variables
-        if self._correlation_id_set_token:
-            correlation_id_var.reset(self._correlation_id_set_token)
-            self._correlation_id_set_token = None
-        # user_id_var should also be reset if set by this middleware
-        # current_user_token = getattr(self, '_user_id_set_token', None)
-        # if current_user_token:
-        #     user_id_var.reset(current_user_token)
+        try:
+            resp.set_header(self._config.header_name, correlation_id)
+        except Exception:
+            logger.warning(
+                "Failed to echo correlation ID response header",
+                exc_info=True,
+            )
+            raise
+
+    def _reset_correlation_id_context(self, req, token: object) -> None:
+        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
+
+        if not isinstance(token, contextvars.Token):
+            return
+        if token.var is not self._correlation_id_var:
+            logger.debug("Ignoring mismatched correlation ID reset token")
+            return
+
+        try:
+            self._correlation_id_var.reset(token)
+        except ValueError:
+            logger.debug("Ignoring invalid correlation ID reset token", exc_info=True)
+
+    def _process_response(self, req, resp) -> None:
+        token = getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
+        try:
+            if (
+                isinstance(token, contextvars.Token)
+                and token.var is self._correlation_id_var
+            ):
+                self._echo_correlation_id_header(req, resp)
+            else:
+                logger.debug(
+                    "Correlation ID response header echo skipped; "
+                    "middleware token absent"
+                )
+        finally:
+            self._reset_correlation_id_context(req, token)
+```
+
+The response-header echo precedes cleanup, and resetting with its saved token
+restores the previous ambient value, which need not be `None`. Both WSGI and
+ASGI hooks share this lifecycle. The request-local token rationale appears in
+[Appendix A.3](#a3-context-variable-lifecycle-management-task-242).
+
+**Screen reader caption:** Sequence diagram showing Falcon invoking the shared
+middleware's request hook, which sets `correlation_id_var` and stores its token
+on `req.context`. During response processing, a middleware-owned token enables
+the echo helper; it writes the resolved ID only when echo is enabled and the ID
+is not `None`. The `finally` path clears the request token and resets the
+context variable only for a token owned by this middleware before any header
+error propagates to Falcon.
+
+```mermaid
+sequenceDiagram
+    participant Falcon
+    participant Middleware as _CorrelationIDMiddlewareBase
+    participant Request as req.context
+    participant Context as correlation_id_var
+    participant Response as resp
+
+    Falcon->>Middleware: _process_request(req)
+    Middleware->>Context: set(correlation_id)
+    Context-->>Middleware: token
+    Middleware->>Request: store correlation_id and token
+    Falcon->>Middleware: _process_response(req, resp)
+    Middleware->>Request: read middleware-owned token
+    alt token is an owned contextvars.Token
+        Middleware->>Middleware: _echo_correlation_id_header(req, resp)
+        alt echo is enabled
+            alt req.context.correlation_id is not None
+                Middleware->>Response: set_header(header_name, correlation_id)
+                opt header write fails
+                    Middleware->>Middleware: log warning and re-raise
+                end
+            else request ID is None
+                Middleware->>Middleware: skip response-header echo
+            end
+        else echo is disabled
+            Middleware->>Middleware: skip response-header echo
+        end
+    else token is absent, not a Token, or foreign
+        Middleware->>Middleware: skip response-header echo
+    end
+    Note over Middleware: finally always runs
+    Middleware->>Middleware: _reset_correlation_id_context(req, token)
+    Middleware->>Request: clear token attribute first
+    alt token is a contextvars.Token
+        alt token.var is correlation_id_var
+            Middleware->>Context: reset(token)
+            opt reset raises ValueError
+                Middleware->>Middleware: log at DEBUG and swallow ValueError
+            end
+        else token.var is foreign
+            Middleware->>Middleware: skip context reset
+        end
+    else token is absent or not a Token
+        Middleware->>Middleware: skip context reset
+    end
+    Middleware-->>Falcon: propagate header error if echo failed
 ```
 
 ### 4.2. `logging.Filter` implementation
