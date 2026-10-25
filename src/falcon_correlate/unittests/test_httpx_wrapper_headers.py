@@ -101,17 +101,18 @@ class TestPrepareHeaders:
         failure_message = "expected request_kwargs to be a new mapping"
         assert request_kwargs is not kwargs, failure_message
 
-    def test_returns_empty_dict_when_no_headers(
+    def test_returns_empty_dict_when_headers_and_context_are_empty(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
-        """Verify an empty ``httpx.Headers`` is returned without headers."""
+        """Verify empty sources produce an empty ``httpx.Headers`` object."""
         kwargs: dict[str, typ.Any] = {"timeout": EXPECTED_TIMEOUT}
         headers, _request_kwargs = run_prepare_headers(isolated_context, kwargs)
 
         failure_message = "expected an httpx.Headers object"
         assert isinstance(headers, httpx.Headers), failure_message
-        assert headers == {}, "expected headers to equal {}"
+        failure_message = "expected headers to be empty when no sources provide them"
+        assert headers == {}, failure_message
 
     def test_injects_correlation_id(
         self,
@@ -137,17 +138,6 @@ class TestPrepareHeaders:
 
         failure_message = "expected the caller-supplied header dict to be unchanged"
         assert caller_headers == caller_headers_before, failure_message
-
-    def test_does_not_inject_when_no_correlation_id(
-        self,
-        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-    ) -> None:
-        """Verify no header is added when the context variable is unset."""
-        kwargs: dict[str, typ.Any] = {}
-        headers, _request_kwargs = run_prepare_headers(isolated_context, kwargs)
-
-        failure_message = "expected DEFAULT_HEADER_NAME not to be present in headers"
-        assert DEFAULT_HEADER_NAME not in headers, failure_message
 
     def test_accepts_read_only_kwargs_mapping(
         self,

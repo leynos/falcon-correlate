@@ -9,6 +9,8 @@ import pytest
 
 httpx = pytest.importorskip("httpx")
 
+pytest_plugins = ("falcon_correlate.unittests.httpx_wrapper_helpers",)
+
 from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     correlation_id_var,
 )
@@ -22,30 +24,6 @@ from falcon_correlate.unittests.httpx_wrapper_helpers import (  # ruff: ignore[m
     EXPECTED_TIMEOUT,
     run_async,
 )
-
-if typ.TYPE_CHECKING:
-    import collections.abc as cabc
-
-
-@pytest.fixture
-def mock_async_client() -> cabc.Generator[mock.AsyncMock, None, None]:
-    """Provide a pre-configured httpx.AsyncClient mock.
-
-    Yields
-    ------
-    AsyncMock
-        The patched ``httpx.AsyncClient`` instance used by the test.
-
-    """
-    with mock.patch("httpx.AsyncClient") as mock_client_cls:
-        mock_client = mock.AsyncMock()
-        mock_client.request.return_value = httpx.Response(200)
-        mock_client_cls.return_value.__aenter__ = mock.AsyncMock(
-            return_value=mock_client
-        )
-        mock_client_cls.return_value.__aexit__ = mock.AsyncMock(return_value=False)
-        yield mock_client
-
 
 class TestAsyncRequestWithCorrelationId:
     """Tests for the async ``async_request_with_correlation_id`` wrapper."""
