@@ -242,6 +242,7 @@ class AsyncCorrelationIDTransport(
         self._prepare_request(request)
         return await self._wrapped_transport.handle_async_request(request)
 
+    # @codescene(disable:"Code Duplication") Explicit protocol methods (2026-10-25).
     async def aclose(self) -> None:
         """Delegate shutdown to the wrapped transport.
 

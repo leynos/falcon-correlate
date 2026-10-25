@@ -252,6 +252,7 @@ async def test_async_transport_delegates_aclose() -> None:
 
 
 @pytest.mark.asyncio
+# @codescene(disable:"Code Duplication") Separate async contract test (2026-10-25).
 async def test_async_transport_preserves_aclose_return_value() -> None:
     """Async transport should preserve the wrapped aclose result."""
     transport = mock.AsyncMock(spec=httpx.AsyncBaseTransport)
