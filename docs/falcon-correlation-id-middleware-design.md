@@ -1920,6 +1920,14 @@ The BDD scenarios own middleware-to-outbound workflows; the unit modules own
 transport mechanics. See the
 [test suite ownership policy](developers-guide.md#test-suite-ownership).
 
+The package-wide public API contract is owned by
+`src/falcon_correlate/unittests/test_public_exports.py`, which asserts the
+exact root `__all__` set, including HTTPX wrappers and transports. The
+HTTPX-specific export assertions remain in `test_httpx_wrapper_exports.py` and
+`test_httpx_transport.py`; the optional import boundary remains in
+`test_optional_httpx_dependency.py`. See the
+[test suite ownership policy](developers-guide.md#test-suite-ownership).
+
 ### A.8. Celery task publish signal handler (Task 4.2.1)
 
 **Superseded by issue #48:** The import-time registration decision below is

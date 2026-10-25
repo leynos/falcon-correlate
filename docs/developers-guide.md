@@ -308,14 +308,14 @@ distinction beside the test, so future changes do not restore duplicate cases.
 
 HTTPX propagation illustrates the ownership boundary:
 
-| Contract                                                                                                              | Primary owner                                                                 |
-| --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| A trusted inbound Falcon request carries its ID through the sync or async wrapper to the outbound call.               | BDD: `tests/bdd/httpx_propagation.feature`                                    |
-| A generated ID reaches the outbound wrapper call and is echoed in the Falcon response.                                | BDD: `tests/bdd/httpx_propagation.feature`                                    |
-| Wrapper header extraction, copying, precedence, keyword forwarding, and async-client use.                             | Unit: `test_httpx_wrapper*.py`                                                |
-| Sync and async transport injection, caller-header precedence, request delegation, lifecycle, and custom header names. | Unit: `test_httpx_transport.py`                                               |
-| Header injection and caller-header preservation over generated header inputs.                                         | Property: `tests/property/test_header_injection.py`                           |
-| Public exports and import behaviour when HTTPX is optional.                                                           | Unit: `test_httpx_wrapper_exports.py` and `test_optional_httpx_dependency.py` |
+| Contract                                                                                                              | Primary owner                                                                                                                       |
+| --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| A trusted inbound Falcon request carries its ID through the sync or async wrapper to the outbound call.               | BDD: `tests/bdd/httpx_propagation.feature`                                                                                          |
+| A generated ID reaches the outbound wrapper call and is echoed in the Falcon response.                                | BDD: `tests/bdd/httpx_propagation.feature`                                                                                          |
+| Wrapper header extraction, copying, precedence, keyword forwarding, and async-client use.                             | Unit: `test_httpx_wrapper*.py`                                                                                                      |
+| Sync and async transport injection, caller-header precedence, request delegation, lifecycle, and custom header names. | Unit: `test_httpx_transport.py`                                                                                                     |
+| Header injection and caller-header preservation over generated header inputs.                                         | Property: `tests/property/test_header_injection.py`                                                                                 |
+| Public exports and import behaviour when HTTPX is optional.                                                           | Unit: `test_public_exports.py`, `test_httpx_wrapper_exports.py`, `test_httpx_transport.py`, and `test_optional_httpx_dependency.py` |
 
 Table: HTTPX propagation contracts and their primary test owners.
 
