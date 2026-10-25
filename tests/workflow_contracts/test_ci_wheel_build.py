@@ -1,0 +1,92 @@
+"""Contracts for the pull-request build and import check."""
+
+from __future__ import annotations
+
+import os
+import subprocess  # ruff: ignore[suspicious-subprocess-import] - executes a checked-in workflow step.
+import typing as typ
+
+import pytest
+
+from tests.workflow_contracts.workflow_documents import (
+    WORKFLOWS_DIR,
+    parse_workflow,
+)
+
+if typ.TYPE_CHECKING:
+    from pathlib import Path
+
+WORKFLOW_PATH = WORKFLOWS_DIR / "ci.yml"
+WORKFLOW = parse_workflow(WORKFLOW_PATH.read_text(encoding="utf-8"), "ci.yml")
+BUILD_JOB = WORKFLOW["jobs"]["build"]
+
+
+def _run_step(name: str) -> dict[str, object]:
+    """Return a named run step from the CI build job."""
+    return next(step for step in BUILD_JOB["steps"] if step.get("name") == name)
+
+
+@pytest.mark.parametrize(
+    ("sdist_count", "expected_returncode"),
+    [(0, 1), (1, 0), (2, 1)],
+    ids=["missing", "exactly-one", "duplicate"],
+)
+def test_build_check_requires_exactly_one_sdist(
+    tmp_path: Path, sdist_count: int, expected_returncode: int
+) -> None:
+    """The PR build refuses a missing or duplicated source distribution."""
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "falcon_correlate-0.2.0-py3-none-any.whl").touch()
+    for index in range(sdist_count):
+        (dist / f"falcon_correlate-0.2.0-{index}.tar.gz").touch()
+
+    step = _run_step("Require exactly one sdist and one wheel")
+    environment = os.environ.copy()
+    environment["DIST_DIR"] = str(dist)
+    result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - workflow run body is checked in.
+        ["/usr/bin/bash", "-c", str(step["run"])],
+        capture_output=True,
+        check=False,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode == expected_returncode, (
+        f"expected exit {expected_returncode}, got {result.returncode}: {result.stderr}"
+    )
+    if expected_returncode != 0:
+        assert "Expected exactly one source distribution." in result.stderr, (
+            "a rejected build must explain that the source distribution count was wrong"
+        )
+
+
+def test_import_check_excludes_optional_dependencies() -> None:
+    """The clean wheel check imports the base package without either extra."""
+    step = _run_step("Check the wheel imports without extras")
+    script = str(step["run"])
+
+    required_checks = (
+        "import falcon_correlate",
+        '"celery" not in sys.modules',
+        '"httpx" not in sys.modules',
+        "uv venv --clear",
+    )
+    missing_checks = [check for check in required_checks if check not in script]
+    assert not missing_checks, (
+        f"the clean import check is missing required statements: {missing_checks}"
+    )
+
+
+def test_build_job_is_a_read_only_pull_request_lane() -> None:
+    """The build job runs on PRs with a bounded, least-privilege scope."""
+    triggers = WORKFLOW.get("on", WORKFLOW.get(True))
+    assert isinstance(triggers, dict), "CI must declare its trigger mapping"
+    assert "pull_request" in triggers, "the build lane must run on pull requests"
+    assert BUILD_JOB["permissions"] == {"contents": "read"}, (
+        "the build lane must have read-only contents access"
+    )
+    assert type(BUILD_JOB["timeout-minutes"]) is int, (
+        "the build lane must declare an integer timeout"
+    )
+    assert "if" not in BUILD_JOB, "the build lane must not use a job-level condition"
