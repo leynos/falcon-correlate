@@ -152,3 +152,57 @@ class TestAsyncRequestWithCorrelationId:
         assert call_kwargs["headers"].get_list(DEFAULT_HEADER_NAME) == ["caller-cid"], (
             failure_message
         )
+
+    @pytest.mark.asyncio
+    async def test_sends_prepared_headers_through_httpx_transport(self) -> None:
+        """Verify repeated headers reach an in-process HTTPX transport."""
+        received: dict[str, httpx.Request] = {}
+        json_payload = {"key": "value"}
+        caller_headers = [
+            ("X-Repeated", "first"),
+            ("x-repeated", "second"),
+        ]
+        actual_async_client = httpx.AsyncClient
+
+        def receive_request(request: httpx.Request) -> httpx.Response:
+            """Capture the request at the HTTPX transport boundary."""
+            received["request"] = request
+            return httpx.Response(200, request=request)
+
+        def make_async_client() -> httpx.AsyncClient:
+            """Build a real async client with an in-process transport."""
+            transport = httpx.MockTransport(receive_request)
+            return actual_async_client(transport=transport)
+
+        token = correlation_id_var.set("async-transport-cid")
+        try:
+            with mock.patch("httpx.AsyncClient", side_effect=make_async_client):
+                response = await async_request_with_correlation_id(
+                    "POST",
+                    "https://example.com/headers",
+                    headers=caller_headers,
+                    json=json_payload,
+                    timeout=EXPECTED_TIMEOUT,
+                )
+        finally:
+            correlation_id_var.reset(token)
+
+        request = received["request"]
+        failure_message = "expected the in-process HTTPX response to succeed"
+        assert response.status_code == 200, failure_message
+        failure_message = "expected both repeated headers to reach the transport"
+        assert request.headers.get_list("X-Repeated", split_commas=False) == [
+            "first",
+            "second",
+        ], failure_message
+        failure_message = "expected the context correlation ID to reach the transport"
+        assert request.headers.get_list(DEFAULT_HEADER_NAME, split_commas=False) == [
+            "async-transport-cid"
+        ], failure_message
+        failure_message = "expected the caller header list to remain unchanged"
+        assert caller_headers == [
+            ("X-Repeated", "first"),
+            ("x-repeated", "second"),
+        ], failure_message
+        failure_message = "expected the JSON payload to reach the transport"
+        assert request.content == b'{"key":"value"}', failure_message
