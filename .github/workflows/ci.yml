@@ -159,6 +159,11 @@ jobs:
             ls -al "${DIST_DIR}" >&2
             exit 1
           fi
+          if [[ "${wheels[0]}" != *-none-any.whl ]]; then
+            echo "Expected a platform-independent wheel with a none-any tag." >&2
+            echo "Matched: ${wheels[0]}" >&2
+            exit 1
+          fi
 
       - name: Check the wheel imports without extras
         shell: bash

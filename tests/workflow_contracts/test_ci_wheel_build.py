@@ -30,6 +30,20 @@ def _run_step(name: str) -> dict[str, object]:
     return next(step for step in BUILD_JOB["steps"] if step.get("name") == name)
 
 
+def _run_build_verification(dist: Path) -> subprocess.CompletedProcess[str]:
+    """Execute the checked-in distribution verification step."""
+    step = _run_step("Require exactly one sdist and one wheel")
+    environment = os.environ.copy()
+    environment["DIST_DIR"] = str(dist)
+    return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - workflow run body is checked in.
+        ["/usr/bin/bash", "-c", str(step["run"])],
+        capture_output=True,
+        check=False,
+        env=environment,
+        text=True,
+    )
+
+
 @pytest.mark.parametrize(
     ("sdist_count", "wheel_count", "expected_returncode"),
     [(0, 1, 1), (1, 1, 0), (2, 1, 1), (1, 0, 1), (1, 2, 1)],
@@ -50,21 +64,16 @@ def test_build_check_requires_exactly_one_sdist(
     """The PR build refuses missing or duplicated distributions."""
     dist = tmp_path / "dist"
     dist.mkdir()
-    for index in range(wheel_count):
-        (dist / f"falcon_correlate-0.2.0-{index}.whl").touch()
+    wheel_names = (
+        "falcon_correlate-0.2.0-py3-none-any.whl",
+        "falcon_correlate-0.2.0-cp313-cp313-manylinux_2_28_x86_64.whl",
+    )
+    for name in wheel_names[:wheel_count]:
+        (dist / name).touch()
     for index in range(sdist_count):
         (dist / f"falcon_correlate-0.2.0-{index}.tar.gz").touch()
 
-    step = _run_step("Require exactly one sdist and one wheel")
-    environment = os.environ.copy()
-    environment["DIST_DIR"] = str(dist)
-    result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - workflow run body is checked in.
-        ["/usr/bin/bash", "-c", str(step["run"])],
-        capture_output=True,
-        check=False,
-        env=environment,
-        text=True,
-    )
+    result = _run_build_verification(dist)
 
     assert result.returncode == expected_returncode, (
         f"expected exit {expected_returncode}, got {result.returncode}: {result.stderr}"
@@ -78,6 +87,21 @@ def test_build_check_requires_exactly_one_sdist(
         assert expected_message in result.stderr, (
             "a rejected build must explain which distribution count was wrong"
         )
+
+
+def test_build_check_rejects_platform_specific_wheels(tmp_path: Path) -> None:
+    """The pure-Python lane refuses a wheel tied to one operating system."""
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "falcon_correlate-0.2.0.tar.gz").touch()
+    (dist / "falcon_correlate-0.2.0-cp313-cp313-manylinux_2_28_x86_64.whl").touch()
+
+    result = _run_build_verification(dist)
+
+    assert result.returncode == 1, "a platform-specific wheel must be rejected"
+    assert (
+        "Expected a platform-independent wheel with a none-any tag." in result.stderr
+    ), "the rejection must identify the missing pure-Python compatibility tag"
 
 
 def test_import_check_excludes_optional_dependencies() -> None:
