@@ -31,17 +31,27 @@ def _run_step(name: str) -> dict[str, object]:
 
 
 @pytest.mark.parametrize(
-    ("sdist_count", "expected_returncode"),
-    [(0, 1), (1, 0), (2, 1)],
-    ids=["missing", "exactly-one", "duplicate"],
+    ("sdist_count", "wheel_count", "expected_returncode"),
+    [(0, 1, 1), (1, 1, 0), (2, 1, 1), (1, 0, 1), (1, 2, 1)],
+    ids=[
+        "missing-sdist",
+        "exactly-one-of-each",
+        "duplicate-sdist",
+        "missing-wheel",
+        "duplicate-wheel",
+    ],
 )
 def test_build_check_requires_exactly_one_sdist(
-    tmp_path: Path, sdist_count: int, expected_returncode: int
+    tmp_path: Path,
+    sdist_count: int,
+    wheel_count: int,
+    expected_returncode: int,
 ) -> None:
-    """The PR build refuses a missing or duplicated source distribution."""
+    """The PR build refuses missing or duplicated distributions."""
     dist = tmp_path / "dist"
     dist.mkdir()
-    (dist / "falcon_correlate-0.2.0-py3-none-any.whl").touch()
+    for index in range(wheel_count):
+        (dist / f"falcon_correlate-0.2.0-{index}.whl").touch()
     for index in range(sdist_count):
         (dist / f"falcon_correlate-0.2.0-{index}.tar.gz").touch()
 
@@ -60,8 +70,13 @@ def test_build_check_requires_exactly_one_sdist(
         f"expected exit {expected_returncode}, got {result.returncode}: {result.stderr}"
     )
     if expected_returncode != 0:
-        assert "Expected exactly one source distribution." in result.stderr, (
-            "a rejected build must explain that the source distribution count was wrong"
+        expected_message = (
+            "Expected exactly one source distribution."
+            if sdist_count != 1
+            else "Expected exactly one pure Python wheel."
+        )
+        assert expected_message in result.stderr, (
+            "a rejected build must explain which distribution count was wrong"
         )
 
 
