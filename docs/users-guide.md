@@ -306,15 +306,29 @@ The trust value records whether the source was checked:
 *Table 3: Source trust values in selection events.*
 
 A backend can use the enum outcomes and trust values as stable counter labels,
-along with the configured header name. For example, a counter-backed recorder
-can increment with stable event labels:
+along with the configured header name. Assuming `counter` is a counter supplied
+by the backend, a recorder can increment it with stable event labels and be
+passed directly to middleware or through a pre-built configuration:
 
 ```python
-counter.labels(
-    outcome=event.outcome.value,
-    trust=event.trust.value,
-    header_name=event.header_name,
-).inc()
+from falcon_correlate import (
+    CorrelationIDConfig,
+    CorrelationIDMiddleware,
+    CorrelationIDSelectionEvent,
+)
+
+
+def record_selection(event: CorrelationIDSelectionEvent) -> None:
+    counter.labels(
+        outcome=event.outcome.value,
+        trust=event.trust.value,
+        header_name=event.header_name,
+    ).inc()
+
+
+middleware = CorrelationIDMiddleware(metrics_recorder=record_selection)
+config = CorrelationIDConfig(metrics_recorder=record_selection)
+configured_middleware = CorrelationIDMiddleware(config=config)
 ```
 
 The event omits request-specific values, so do not derive labels from incoming
