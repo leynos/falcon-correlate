@@ -276,7 +276,9 @@ the incoming ID has been classified and before any fallback ID is generated.
 One event is sent for every request outcome, including missing and untrusted
 headers, so the selection result remains available even if fallback generation
 later fails. Its fields are `outcome`, `trust`, and the configured
-`header_name`. It does not contain the incoming ID or `remote_addr`.
+`header_name` mapped to a finite label. `X-Correlation-ID` and `X-Request-ID`
+retain their canonical names; every other configured header maps to `other`.
+The event does not contain the incoming ID or `remote_addr`.
 
 The callback runs synchronously for both WSGI and ASGI middleware. Keep it
 quick and non-blocking: an ASGI callback runs on the event loop. If a recorder
@@ -305,9 +307,9 @@ The trust value records whether the source was checked:
 
 *Table 3: Source trust values in selection events.*
 
-A backend can use the enum outcomes and trust values as stable counter labels,
-along with the configured header name. Assuming `counter` is a counter supplied
-by the backend, a recorder can increment it with stable event labels and be
+A backend can use the enum outcomes, trust values, and allowlisted header
+labels as stable counter labels. Assuming `counter` is a counter supplied by
+the backend, a recorder can increment it with bounded event labels and be
 passed directly to middleware or through a pre-built configuration:
 
 ```python
@@ -331,8 +333,8 @@ config = CorrelationIDConfig(metrics_recorder=record_selection)
 configured_middleware = CorrelationIDMiddleware(config=config)
 ```
 
-The event omits request-specific values, so do not derive labels from incoming
-IDs or client addresses.
+The event omits request-specific values, and its header label comes from a
+finite allowlist. Do not derive labels from incoming IDs or client addresses.
 
 ## Context Variables
 

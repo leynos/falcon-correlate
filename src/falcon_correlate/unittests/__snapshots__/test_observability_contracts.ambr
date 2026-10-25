@@ -1,0 +1,74 @@
+# serializer version: 1
+# name: test_canonical_observability_logs_match_redacted_snapshot
+  list([
+    dict({
+      'config_field': 'header_name',
+      'config_rejected_value': '<redacted>',
+      'exception_type': None,
+      'has_correlation_id': False,
+      'header_name': None,
+      'level': 'DEBUG',
+      'logger': 'falcon_correlate.middleware_config',
+      'message': 'Correlation ID configuration validation failed for header_name: rejected value <redacted>',
+    }),
+    dict({
+      'config_field': None,
+      'config_rejected_value': None,
+      'exception_type': 'RuntimeError',
+      'has_correlation_id': False,
+      'header_name': 'X-Correlation-ID',
+      'level': 'WARNING',
+      'logger': 'falcon_correlate.middleware',
+      'message': 'Validator raised an exception for correlation ID, treating as invalid',
+    }),
+    dict({
+      'config_field': None,
+      'config_rejected_value': None,
+      'exception_type': 'RuntimeError',
+      'has_correlation_id': False,
+      'header_name': 'X-Correlation-ID',
+      'level': 'ERROR',
+      'logger': 'falcon_correlate.middleware',
+      'message': 'Correlation ID generator raised an exception',
+    }),
+    dict({
+      'config_field': None,
+      'config_rejected_value': None,
+      'exception_type': 'RuntimeError',
+      'has_correlation_id': False,
+      'header_name': 'X-Correlation-ID',
+      'level': 'WARNING',
+      'logger': 'falcon_correlate.middleware',
+      'message': 'Metrics recorder raised an exception, ignoring',
+    }),
+  ])
+# ---
+# name: test_selection_event_matrix_matches_snapshot
+  list([
+    dict({
+      'header_name': 'X-Correlation-ID',
+      'outcome': 'missing',
+      'trust': 'not_evaluated',
+    }),
+    dict({
+      'header_name': 'X-Correlation-ID',
+      'outcome': 'untrusted',
+      'trust': 'untrusted',
+    }),
+    dict({
+      'header_name': 'X-Correlation-ID',
+      'outcome': 'accepted',
+      'trust': 'trusted',
+    }),
+    dict({
+      'header_name': 'X-Request-ID',
+      'outcome': 'rejected_invalid',
+      'trust': 'trusted',
+    }),
+    dict({
+      'header_name': 'other',
+      'outcome': 'rejected_validator_error',
+      'trust': 'trusted',
+    }),
+  ])
+# ---

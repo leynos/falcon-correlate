@@ -32,6 +32,7 @@ from .middleware_metrics import (
     CorrelationIDSelectionEvent,
     IncomingIDOutcome,
     SourceTrust,
+    _bounded_header_name,
 )
 from .middleware_utils import (
     CORRELATION_ID_RESET_TOKEN_ATTR as _CORRELATION_ID_RESET_TOKEN_ATTR,
@@ -237,7 +238,7 @@ class _CorrelationIDMiddlewareBase:
             CorrelationIDSelectionEvent(
                 outcome=outcome,
                 trust=trust,
-                header_name=self._config.header_name,
+                header_name=_bounded_header_name(self._config.header_name),
             ),
         )
         correlation_id = (

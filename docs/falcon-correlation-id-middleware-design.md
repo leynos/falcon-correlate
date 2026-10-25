@@ -1377,13 +1377,14 @@ emits one immutable `CorrelationIDSelectionEvent` before invoking the fallback
 generator. This keeps the selection event available if generation fails and
 does not require the middleware to know which metrics backend is in use.
 
-The event exposes the finite `IncomingIDOutcome` and `SourceTrust` enums plus
-the configured `header_name`. It omits the incoming ID and `remote_addr`, which
-prevents request data from becoming high-cardinality metric labels. A recorder
-can use `event.outcome.value`, `event.trust.value`, and a stable
-`event.header_name` label with its own counter implementation. Since the
-callback is synchronous and ASGI calls it on the event loop, it must remain
-quick and non-blocking.
+The event exposes the finite `IncomingIDOutcome` and `SourceTrust` enums plus a
+bounded `header_name` label. The two allowlisted names are `X-Correlation-ID`
+and `X-Request-ID`; every other configured header maps to `other`. It omits the
+incoming ID and `remote_addr`, which prevents request data or arbitrary
+configuration values from becoming high-cardinality metric labels. A recorder
+can use `event.outcome.value`, `event.trust.value`, and `event.header_name`
+with its own counter implementation. Since the callback is synchronous and ASGI
+calls it on the event loop, it must remain quick and non-blocking.
 
 The package root and `middleware.py` re-export the four public metrics symbols
 for stable user imports. Internal modules and adapters should import metrics
@@ -1407,6 +1408,24 @@ middleware uses only `req` and `resp`. Keep the argument-count suppressions
 local to the framework hook and retain their rationale and Issue #38 reference
 beside the method. Main clarified this framework constraint; the observability
 changes do not alter the callback contract.
+
+#### 4.6.12. Bound metric header labels
+
+**Decision:** Keep `header_name` on `CorrelationIDSelectionEvent`, but
+canonicalize it to `X-Correlation-ID` or `X-Request-ID`; map every other
+configured value to `other`. The header is configuration rather than
+request-controlled data, but user-defined configuration can still create
+unbounded labels across deployments. This finite mapping preserves the two
+common header distinctions without allowing arbitrary configuration to expand
+metric cardinality. The outcome and trust enums remain the other event labels.
+
+#### 4.6.13. Preserve concurrent response lifecycle coverage
+
+**Decision:** Keep main's concurrent response-header isolation example and
+property test. They exercise the shared middleware's response echo and
+request-local context cleanup under concurrent requests, which this
+observability change must leave intact. The existing tests cover that
+lifecycle, so this change does not duplicate their concurrency scenarios.
 
 ## 5. Conclusion and recommendations
 

@@ -1,8 +1,8 @@
 """Bounded selection events for pluggable correlation ID metrics.
 
 The middleware reports the outcome and source trust classification to a
-caller-provided recorder. The event deliberately excludes request values so
-recorder implementations can use its fields as stable metric labels.
+caller-provided recorder. Event fields are bounded labels and exclude request
+values.
 """
 
 from __future__ import annotations
@@ -10,6 +10,17 @@ from __future__ import annotations
 import collections.abc as cabc
 import dataclasses
 import enum
+
+
+def _bounded_header_name(header_name: str) -> str:
+    """Map configured headers into a finite label set."""
+    match header_name.casefold():
+        case "x-correlation-id":
+            return "X-Correlation-ID"
+        case "x-request-id":
+            return "X-Request-ID"
+        case _:
+            return "other"
 
 
 class IncomingIDOutcome(enum.StrEnum):
@@ -55,13 +66,15 @@ class CorrelationIDSelectionEvent:
     trust : SourceTrust
         The request source's trust classification.
     header_name : str
-        The configured header name associated with the selection.
+        The configured header name mapped to an allowlisted label. Unlisted
+        names map to ``"other"``.
 
     Notes
     -----
-    The event omits the incoming ID and remote address. Recorder implementations
-    should use configured header names as stable labels rather than deriving
-    labels from request data.
+    The event omits the incoming ID and remote address. ``header_name`` is
+    canonicalized to ``"X-Correlation-ID"`` or ``"X-Request-ID"``; all other
+    configured names map to ``"other"``. Together with the enums, the event
+    therefore provides finite metric labels.
     """
 
     outcome: IncomingIDOutcome

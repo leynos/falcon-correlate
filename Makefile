@@ -56,7 +56,9 @@ PYLINT_CLASSIC_MESSAGES = logging-format-interpolation,logging-format-truncated,
 PYLINT = PYLINTHOME=$(PYLINT_HOME) $(PYLINT_TOOL) pylint --jobs=1 --disable=all \
 	--enable=$(PYLINT_CLASSIC_MESSAGES),$(PYLINT_ANALYSIS_MESSAGES)
 OPTIONAL_CELERY_TEST := src/falcon_correlate/unittests/test_optional_celery_dependency.py
-PROJECT_PYTEST_EXCLUDES := --ignore=$(OPTIONAL_CELERY_TEST)
+OBSERVABILITY_SNAPSHOT_TEST := src/falcon_correlate/unittests/test_observability_contracts.py
+PROJECT_PYTEST_EXCLUDES := --ignore=$(OPTIONAL_CELERY_TEST) \
+	--ignore=$(OBSERVABILITY_SNAPSHOT_TEST)
 SKYLOS_VERSION ?= 4.33.2
 # Skylos parses source with its own runtime AST; pin Python 3.14 so newer
 # project syntax does not produce phantom findings.
@@ -224,8 +226,9 @@ doctest: build uv $(VENV_TOOLS) ## Run docstring examples
 makeutil: ## Verify the Makefile parser used by contract tests
 	$(call ensure_tool,$@)
 
-# These tests spawn pytest subprocesses and must run outside the xdist worker pool.
-SERIAL_PY_TESTS := $(OPTIONAL_CELERY_TEST)
+# These tests spawn subprocesses or use Syrupy snapshots, whose unused-snapshot
+# tracking is session-local, and must run outside the xdist worker pool.
+SERIAL_PY_TESTS := $(OPTIONAL_CELERY_TEST) $(OBSERVABILITY_SNAPSHOT_TEST)
 SERIAL_PY_TEST_EXCLUDES := $(PROJECT_PYTEST_EXCLUDES)
 
 test: build uv $(VENV_TOOLS) doctest makeutil ## Run tests
@@ -238,6 +241,9 @@ test-mutmut-sandbox: build ## Exercise mutmut's configured sandbox on a small mo
 
 test-optional-celery: build uv $(VENV_TOOLS) ## Validate missing-Celery support
 	$(UV_ENV) $(UV) run pytest -v $(OPTIONAL_CELERY_TEST)
+
+test-observability-contracts: build uv $(VENV_TOOLS) ## Run snapshot contracts serially
+	$(UV_ENV) $(UV) run pytest -v $(OBSERVABILITY_SNAPSHOT_TEST)
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \
