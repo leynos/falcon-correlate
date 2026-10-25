@@ -21,6 +21,22 @@ if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
 
+def _assert_prepared_correlation_id_header(
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    kwargs: dict[str, typ.Any],
+    expected_value: str,
+) -> None:
+    """Share assertions for injected and caller-supplied header values."""
+    headers, _request_kwargs = run_prepare_headers(
+        isolated_context, kwargs, correlation_id="prep-cid-001"
+    )
+
+    failure_message = (
+        f"expected headers[{DEFAULT_HEADER_NAME!r}] to equal {expected_value!r}"
+    )
+    assert headers[DEFAULT_HEADER_NAME] == expected_value, failure_message
+
+
 class TestPrepareHeaders:
     """Tests for the private ``_prepare_headers`` helper."""
 
@@ -66,32 +82,25 @@ class TestPrepareHeaders:
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify the correlation ID is injected into headers."""
-        kwargs: dict[str, typ.Any] = {}
-        headers, _request_kwargs = run_prepare_headers(
-            isolated_context, kwargs, correlation_id="prep-cid-001"
+        _assert_prepared_correlation_id_header(
+            isolated_context, {}, expected_value="prep-cid-001"
         )
-
-        failure_message = (
-            "expected headers[DEFAULT_HEADER_NAME] to equal 'prep-cid-001'"
-        )
-        assert headers[DEFAULT_HEADER_NAME] == "prep-cid-001", failure_message
 
     def test_preserves_caller_supplied_correlation_id_header(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
         """Verify caller-supplied correlation ID header is preserved."""
-        kwargs: dict[str, typ.Any] = {
-            "headers": {DEFAULT_HEADER_NAME: "caller-cid-123"},
-        }
-        headers, _request_kwargs = run_prepare_headers(
-            isolated_context, kwargs, correlation_id="prep-cid-001"
+        caller_headers = {DEFAULT_HEADER_NAME: "caller-cid-123"}
+        kwargs = {"headers": caller_headers}
+        caller_headers_before = caller_headers.copy()
+
+        _assert_prepared_correlation_id_header(
+            isolated_context, kwargs, expected_value="caller-cid-123"
         )
 
-        failure_message = (
-            "expected headers[DEFAULT_HEADER_NAME] to equal 'caller-cid-123'"
-        )
-        assert headers[DEFAULT_HEADER_NAME] == "caller-cid-123", failure_message
+        failure_message = "expected the caller-supplied header dict to be unchanged"
+        assert caller_headers == caller_headers_before, failure_message
 
     def test_does_not_inject_when_no_correlation_id(
         self,
