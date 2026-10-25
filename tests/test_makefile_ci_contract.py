@@ -30,7 +30,14 @@ _PROJECT_PYTEST_EXCLUDE_TOKENS: typ.Final = (
 _TYPECHECK_PREREQUISITES: typ.Final = ("build",)
 _TYPECHECK_RECIPE_TOKENS: typ.Final = (
     ("$(TY)", "--version"),
-    ("$(TY)", "check"),
+    (
+        "$(TY)",
+        "check",
+        "--extra-search-path",
+        ".",
+        "--extra-search-path",
+        "scripts",
+    ),
 )
 _LINT_RECIPE_TOKENS: typ.Final = (
     ("$(RUFF)", "check"),

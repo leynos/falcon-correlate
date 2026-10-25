@@ -53,6 +53,11 @@ def _required(name: str) -> str:
     return value
 
 
+def _escape_workflow_command_data(value: str) -> str:
+    """Escape untrusted text before placing it in a workflow command."""
+    return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
 def _run(arguments: list[str]) -> subprocess.CompletedProcess[str]:
     """Run one external command without a shell and capture both streams."""
     return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - fixed argv keeps PATH stand-ins interceptable without a shell.
@@ -130,11 +135,12 @@ def _fetch_index_once(url: str) -> tuple[int, str]:
 def _read_index(url: str, expected: cabc.Collection[str] = ()) -> dict[str, PypiFile]:
     """Read PyPI's index, polling briefly when a just-uploaded file is absent."""
     expected_names = set(expected)
+    index: dict[str, PypiFile] = {}
     for attempt in range(_INDEX_ATTEMPTS):
         status, body = _fetch_index_once(url)
         match status:
             case 404:
-                index: dict[str, PypiFile] = {}
+                index = {}
             case 200:
                 index = parse_pep691_index(body, url)
             case _:
@@ -336,7 +342,7 @@ def _publish_release() -> None:
 
 def _parser() -> argparse.ArgumentParser:
     """Create the small command selector used by the workflow steps."""
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "command",
         choices=("collect", "stage-pypi", "ensure-draft", "publish-release"),
@@ -358,7 +364,8 @@ def _main(argv: cabc.Sequence[str] | None = None) -> int:
             case "publish-release":
                 _publish_release()
     except (OSError, ReleaseAssetError, ValueError) as error:
-        print(f"::error title=release-assets::{error}", file=sys.stderr)
+        message = _escape_workflow_command_data(str(error))
+        print(f"::error title=release-assets::{message}", file=sys.stderr)
         return 1
     return 0
 

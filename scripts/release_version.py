@@ -67,7 +67,7 @@ def validate_tag_version(tag: str, version: str) -> None:
     Examples
     --------
     >>> validate_tag_version("v1.2.0", "1.2.0")
-    >>> validate_tag_version("1.2.0", "1.2.0")
+    >>> validate_tag_version("1.2.0", "1.2.0")  # doctest: +IGNORE_EXCEPTION_DETAIL
     Traceback (most recent call last):
         ...
     ValueError
@@ -94,7 +94,22 @@ def _project_version(root: Path) -> str:
 def main(
     environ: cabc.Mapping[str, str] | None = None, root: Path | None = None
 ) -> int:
-    """Check the tag and append version outputs for the workflow."""
+    """Check the tag and append version outputs for the workflow.
+
+    Parameters
+    ----------
+    environ : collections.abc.Mapping[str, str] or None
+        Environment to read ``RELEASE_TAG`` and ``GITHUB_OUTPUT`` from. Use
+        ``os.environ`` when ``None``.
+    root : pathlib.Path or None
+        Directory that holds ``pyproject.toml``. Use the current working
+        directory when ``None``.
+
+    Returns
+    -------
+    int
+        ``0`` when the tag matches the version, otherwise ``1``.
+    """
     environment = os.environ if environ is None else environ
     project_root = Path.cwd() if root is None else root
     try:

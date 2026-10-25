@@ -216,7 +216,18 @@ def _parse_github_digest(digest: object) -> str | None:
 
 
 def sha256_file(path: Path) -> str:
-    """Return the SHA-256 hex digest of a file without loading it all at once."""
+    """Return a file's SHA-256 hex digest without loading it all at once.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        File to hash.
+
+    Returns
+    -------
+    str
+        Lowercase hexadecimal SHA-256 digest.
+    """
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
@@ -224,7 +235,20 @@ def sha256_file(path: Path) -> str:
 def missing_names(
     expected: cabc.Iterable[str], present: cabc.Collection[str]
 ) -> list[str]:
-    """Return expected filenames absent from a destination, in sorted order."""
+    """Return expected filenames absent from a destination, in sorted order.
+
+    Parameters
+    ----------
+    expected : collections.abc.Iterable[str]
+        Filenames that the destination should contain.
+    present : collections.abc.Collection[str]
+        Filenames already held by the destination.
+
+    Returns
+    -------
+    list[str]
+        Expected filenames absent from the destination, sorted by name.
+    """
     return sorted(set(expected) - set(present))
 
 
