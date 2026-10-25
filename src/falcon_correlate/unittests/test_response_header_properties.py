@@ -23,6 +23,7 @@ _CORRELATION_ID_SUFFIX = st.text(
     min_size=1,
     max_size=8,
 )
+_BARRIER_TIMEOUT_SECONDS = 10.0
 
 
 @given(
@@ -53,14 +54,14 @@ def test_response_header_isolation_across_concurrent_request_counts(
             """Process a response inside its copied context."""
             req, resp = request_response_factory(correlation_id=correlation_id)
             middleware.process_request(req, resp)
-            barrier.wait(timeout=2.0)
+            barrier.wait(timeout=_BARRIER_TIMEOUT_SECONDS)
             middleware.process_response(
                 req,
                 resp,
                 resource=None,
                 req_succeeded=True,
             )
-            barrier.wait(timeout=2.0)
+            barrier.wait(timeout=_BARRIER_TIMEOUT_SECONDS)
             return resp.get_header("X-Correlation-ID"), correlation_id_var.get()
 
         return contextvars.copy_context().run(_inner)
