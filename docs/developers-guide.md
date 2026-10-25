@@ -322,6 +322,9 @@ Table: HTTPX propagation contracts and their primary test owners.
 The BDD wrapper scenarios begin with real WSGI or ASGI Falcon requests. Unit
 tests retain ownership of wrapper and transport mechanics at their patched
 boundaries; the property tests retain ownership of generated header invariants.
+The shared app and inbound-dispatch helper in `tests/bdd/httpx_test_helpers.py`
+is scoped to the HTTPX wrapper and transport features; keep it test-only and do
+not reuse it for unrelated workflows.
 
 Consolidate one behaviour area at a time. First record a contract-to-owner map
 and the current test IDs, then remove only cases with the same owner and
