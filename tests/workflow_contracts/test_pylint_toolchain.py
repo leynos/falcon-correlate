@@ -32,10 +32,8 @@ PYLINT_ANALYSIS_MESSAGES = (
     "syntax-error,astroid-error,parse-error,config-parse-error,method-check-failed,"
     "raw-checker-failed,bad-plugin-value"
 )
-# Keep the extended timeout on test bodies; fixture setup has its own subprocess
-# bound.
 pytestmark = [
-    pytest.mark.timeout(TEST_TIMEOUT_SECONDS, func_only=True),
+    pytest.mark.timeout(TEST_TIMEOUT_SECONDS),
     pytest.mark.xdist_group(name=_PYLINT_TOOLCHAIN_PYTEST_GROUP),
 ]
 
