@@ -1,4 +1,4 @@
-name: Release Wheels
+name: Release
 
 on:
   push:
@@ -7,49 +7,184 @@ on:
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
+  check-version:
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the tag against pyproject.toml
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release_version.py
 
   pure-wheel:
-    # Literal, as for coverage-main: this workflow triggers only on a tag
-    # push, which cannot come from a fork's pull request.
     runs-on: ubicloud-standard-2
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          fetch-depth: 0
+          persist-credentials: false
       - uses: ./.github/actions/pure-python-wheel
         with:
           python-version: '3.13'
           artifact-name: wheels-pure
 
-  release:
-    # This project has no C or Rust extensions, so cross-platform
-    # builds are unnecessary. Only the pure Python wheel is published.
+  attest:
     needs:
+      - check-version
       - pure-wheel
     runs-on: ubicloud-standard-2
     timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          fetch-depth: 0
-      - uses: softprops/action-gh-release@v3
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
-          generate_release_notes: true
-      - uses: actions/download-artifact@v8
-        with:
-          path: dist
-      - name: Upload wheels to release
-        run: |
-          set -eu
-          find dist/wheels-* -type f -name "*.whl" -print0 | \
-            xargs -0 -r gh release upload "${{ github.ref_name }}"
+          name: wheels-pure
+          path: dist/download
+      - name: Collect and validate release distributions
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_DIR: dist/download
+          DIST_DIR: dist/release
+        run: |
+          set -euo pipefail
+          python3 scripts/release_assets_cli.py collect
+      - name: Attest release distributions
+        id: provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: dist/release/*
+      - name: Name the provenance bundle after the tag
+        env:
+          BUNDLE_PATH: ${{ steps.provenance.outputs.bundle-path }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist/attestations
+          cp "${BUNDLE_PATH}" "dist/attestations/${RELEASE_TAG}.sigstore.json"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: release-dist
+          path: |
+            dist/release/
+            dist/attestations/
+          if-no-files-found: error
+
+  publish-pypi:
+    needs:
+      - check-version
+      - attest
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 20
+    environment:
+      name: pypi
+      url: https://pypi.org/project/falcon-correlate/
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: release-dist
+          path: dist
+      - name: Stage distributions not already on PyPI
+        id: stage
+        env:
+          DIST_DIR: dist/release
+          SIMPLE_INDEX_URL: https://pypi.org/simple/falcon-correlate/
+          STAGING_DIR: dist/pypi-staging
+        run: |
+          set -euo pipefail
+          python3 scripts/release_assets_cli.py stage-pypi
+      - name: Publish to PyPI with Trusted Publishing
+        if: steps.stage.outputs.has-uploads == 'true'
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
+        with:
+          packages-dir: dist/pypi-staging
+          skip-existing: true
+
+  draft-release:
+    needs:
+      - check-version
+      - attest
+      - publish-pypi
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: release-dist
+          path: dist
+      - name: Create or reuse the tag's release
+        env:
+          DIST_DIR: dist/release
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release_assets_cli.py ensure-draft
+
+  publish-release:
+    needs:
+      - check-version
+      - attest
+      - publish-pypi
+      - draft-release
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: release-dist
+          path: dist
+      - name: Reconcile and publish the GitHub Release
+        env:
+          DIST_DIR: dist/release
+          RELEASE_TAG: ${{ github.ref_name }}
+          SIMPLE_INDEX_URL: https://pypi.org/simple/falcon-correlate/
+          BUNDLE_DIR: dist/attestations
+          STAGING_DIR: dist/github-upload
+          PRERELEASE: ${{ needs.check-version.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release_assets_cli.py publish-release

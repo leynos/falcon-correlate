@@ -69,8 +69,12 @@ PAID_LANES = frozenset({
     "ci.yml:test",
     "ci.yml:build",
     "coverage-main.yml:coverage-upload",
+    "release.yml:attest",
+    "release.yml:check-version",
+    "release.yml:draft-release",
+    "release.yml:publish-pypi",
+    "release.yml:publish-release",
     "release.yml:pure-wheel",
-    "release.yml:release",
 })
 
 #: Lanes that stay GitHub-hosted, with the reason each one stays. A
