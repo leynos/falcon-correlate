@@ -1399,6 +1399,15 @@ Recorder exceptions are isolated from request processing. The middleware logs a
 and continuing to fallback generation or acceptance. This keeps metrics
 optional and prevents backend failures from changing request behaviour.
 
+#### 4.6.11. Falcon's fixed WSGI response-hook signature
+
+**Decision:** Preserve Falcon's four-parameter `process_response` callback
+signature, including `resource` and `req_succeeded`, even though this
+middleware uses only `req` and `resp`. Keep the argument-count suppressions
+local to the framework hook and retain their rationale and Issue #38 reference
+beside the method. Main clarified this framework constraint; the observability
+changes do not alter the callback contract.
+
 ## 5. Conclusion and recommendations
 
 This report has detailed the design for a comprehensive correlation ID
