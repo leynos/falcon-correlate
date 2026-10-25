@@ -171,7 +171,7 @@ class _CorrelationIDMiddlewareBase:
         except Exception:
             logger.warning(
                 "Validator raised an exception for correlation ID, treating as invalid",
-                extra=self._log_context(value),
+                extra={"header_name": self._config.header_name},
                 exc_info=True,
             )
             return IncomingIDOutcome.rejected_validator_error
@@ -230,7 +230,7 @@ class _CorrelationIDMiddlewareBase:
         }:
             logger.debug(
                 "Correlation ID failed validation, generating new ID",
-                extra=self._log_context(incoming),
+                extra={"header_name": self._config.header_name},
             )
 
         self._record_selection(

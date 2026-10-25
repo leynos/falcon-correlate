@@ -2,8 +2,8 @@
 
 These Falcon client tests cover accepted, rejected, and missing validation
 results, including warning diagnostics when a user-supplied validator raises.
-They also verify that validation logs keep their correlation ID and header
-context.
+They also verify that validation logs retain header context without including a
+rejected incoming ID.
 """
 
 from __future__ import annotations
@@ -94,11 +94,24 @@ def assert_validation_logged(
     expected_substring: str,
 ) -> None:
     """Assert that a falcon_correlate.middleware DEBUG log contains the expected substring."""  # ruff: ignore[line-too-long] -- descriptive BDD assertion wording.
+    validation_records = [
+        record for record in caplog.records if _is_validation_failure_debug_log(record)
+    ]
     assert any(
-        _is_debug_log_containing(r, expected_substring) for r in caplog.records
+        _is_debug_log_containing(record, expected_substring)
+        for record in validation_records
     ), (
         f"Expected DEBUG log from 'falcon_correlate.middleware' "
         f"containing '{expected_substring}'"
+    )
+    assert len(validation_records) == 1, (
+        f"Expected one validation failure log, got {validation_records!r}"
+    )
+    assert "correlation_id" not in validation_records[0].__dict__, (
+        "validation logs must not include the rejected incoming ID"
+    )
+    assert getattr(validation_records[0], "header_name", None) == "X-Correlation-ID", (
+        "validation logs must identify the configured header"
     )
 
 
@@ -261,10 +274,9 @@ class TestValidatorExceptionHandling:
             f"{captured_messages!r}"
         )
 
-        correlation_id = getattr(warning_record, "correlation_id", None)
         header_name = getattr(warning_record, "header_name", None)
-        assert correlation_id == "crash-value", (
-            f"expected correlation_id 'crash-value', got {correlation_id!r}"
+        assert "correlation_id" not in warning_record.__dict__, (
+            "validator warning must not include the rejected incoming ID"
         )
         assert header_name == "X-Correlation-ID", (
             f"expected header_name 'X-Correlation-ID', got {header_name!r}"
