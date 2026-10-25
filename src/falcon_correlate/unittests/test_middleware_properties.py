@@ -180,6 +180,53 @@ def test_process_request_selection_property(
     )
 
 
+@given(scenario=_request_selection_scenarios())
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
+def test_resolve_correlation_id_matches_oracle_without_mutation(
+    request_response_factory: cabc.Callable[..., tuple[typ.Any, typ.Any]],
+    scenario: _RequestSelectionScenario,
+) -> None:
+    """Verify query selection matches the oracle and preserves state sentinels."""
+
+    def _inner() -> None:
+        """Resolve one generated scenario in an isolated context."""
+        middleware = CorrelationIDMiddleware(
+            trusted_sources=["127.0.0.1"],
+            generator=lambda: scenario.generated_id,
+            validator=_validator_for(scenario.validator_mode),
+        )
+        req, _resp = request_response_factory(
+            correlation_id=scenario.incoming,
+            remote_addr="127.0.0.1" if scenario.is_trusted else "203.0.113.5",
+        )
+        req.context.correlation_id = "request-context-sentinel"
+        reset_token_sentinel = object()
+        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, reset_token_sentinel)
+        correlation_id_var.set("contextvar-sentinel")
+
+        actual = middleware._resolve_correlation_id(req)
+        expected = _expected_correlation_id(
+            incoming=scenario.incoming,
+            is_trusted=scenario.is_trusted,
+            validator_mode=scenario.validator_mode,
+            generated_id=scenario.generated_id,
+        )
+
+        assert actual == expected, f"expected resolved ID {expected!r}, got {actual!r}"
+        assert req.context.correlation_id == "request-context-sentinel", (
+            "expected the request correlation ID sentinel to remain unchanged"
+        )
+        assert (
+            getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR)
+            is reset_token_sentinel
+        ), "expected the reset-token sentinel to remain unchanged"
+        assert correlation_id_var.get() == "contextvar-sentinel", (
+            "expected the ContextVar sentinel to remain unchanged"
+        )
+
+    contextvars.copy_context().run(_inner)
+
+
 @given(
     should_fail=st.booleans(),
     correlation_id=_ID_TEXT,
