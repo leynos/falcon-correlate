@@ -117,15 +117,18 @@ def parse_pep691_index(body: str, index_url: str) -> dict[str, PypiFile]:
     except json.JSONDecodeError as error:
         msg = f"PyPI Simple index is not valid JSON: {error}"
         raise ReleaseAssetError(msg) from error
-    if not isinstance(document, dict):
-        msg = "PyPI Simple index must be a JSON object"
-        raise ReleaseAssetError(msg)
-    if not isinstance(document.get("files"), list):
-        msg = "PyPI Simple index must contain a files array"
-        raise ReleaseAssetError(msg)
+    match document:
+        case {"files": list() as entries}:
+            pass
+        case dict():
+            msg = "PyPI Simple index must contain a files array"
+            raise ReleaseAssetError(msg)
+        case _:
+            msg = "PyPI Simple index must be a JSON object"
+            raise ReleaseAssetError(msg)
 
     files: dict[str, PypiFile] = {}
-    for entry in document["files"]:
+    for entry in entries:
         filename, file = _parse_pep691_file(entry, index_url)
         if filename in files:
             msg = f"PyPI Simple index repeats filename {filename!r}"
@@ -136,22 +139,40 @@ def parse_pep691_index(body: str, index_url: str) -> dict[str, PypiFile]:
 
 def _parse_pep691_file(entry: object, index_url: str) -> tuple[str, PypiFile]:
     """Validate and normalize one PEP 691 file entry."""
-    if not isinstance(entry, dict):
-        msg = "PyPI Simple index file entries must be objects"
-        raise ReleaseAssetError(msg)
-    filename = entry.get("filename")
-    hashes = entry.get("hashes")
-    relative_url = entry.get("url")
-    digest = hashes.get("sha256") if isinstance(hashes, dict) else None
-    if not isinstance(filename, str) or not _SAFE_FILENAME.fullmatch(filename):
+    match entry:
+        case {
+            "filename": str() as filename,
+            "hashes": {"sha256": str() as digest},
+            "url": str() as relative_url,
+        }:
+            pass
+        case {
+            "filename": str() as filename,
+            "hashes": dict() as hashes,
+            "url": str() as relative_url,
+        }:
+            digest = hashes.get("sha256")
+        case {
+            "filename": str() as filename,
+            "url": str() as relative_url,
+        }:
+            digest = None
+        case dict():
+            msg = "PyPI Simple index file entry is missing required fields"
+            raise ReleaseAssetError(msg)
+        case _:
+            msg = "PyPI Simple index file entries must be objects"
+            raise ReleaseAssetError(msg)
+
+    if not _SAFE_FILENAME.fullmatch(filename):
         msg = "PyPI Simple index has an unsafe filename"
         raise ReleaseAssetError(msg)
-    if not isinstance(digest, str) or not _SHA256.fullmatch(digest):
-        msg = f"PyPI Simple index has an invalid SHA-256 digest for {filename}"
-        raise ReleaseAssetError(msg)
-    if not isinstance(relative_url, str):
-        msg = f"PyPI Simple index has no download URL for {filename}"
-        raise ReleaseAssetError(msg)
+    match digest:
+        case str() if _SHA256.fullmatch(digest):
+            pass
+        case _:
+            msg = f"PyPI Simple index has an invalid SHA-256 digest for {filename}"
+            raise ReleaseAssetError(msg)
     url = urlparse.urljoin(index_url, relative_url)
     if not url.startswith("https://"):
         msg = f"PyPI file URL must use HTTPS: {url!r}"
@@ -183,36 +204,53 @@ def parse_github_asset_digests(body: str) -> dict[str, str | None]:
     except json.JSONDecodeError as error:
         msg = f"GitHub release assets are not valid JSON: {error}"
         raise ReleaseAssetError(msg) from error
-    if not isinstance(document, dict):
-        msg = "GitHub release response must be a JSON object"
-        raise ReleaseAssetError(msg)
-    if not isinstance(document.get("assets"), list):
-        msg = "GitHub release response must contain an assets array"
-        raise ReleaseAssetError(msg)
+    match document:
+        case {"assets": list() as entries}:
+            pass
+        case dict():
+            msg = "GitHub release response must contain an assets array"
+            raise ReleaseAssetError(msg)
+        case _:
+            msg = "GitHub release response must be a JSON object"
+            raise ReleaseAssetError(msg)
 
     assets: dict[str, str | None] = {}
-    for asset in document["assets"]:
-        if not isinstance(asset, dict):
-            msg = "GitHub release asset entries must be objects"
-            raise ReleaseAssetError(msg)
-        name = asset.get("name")
-        if not isinstance(name, str) or not _SAFE_FILENAME.fullmatch(name):
-            msg = "GitHub release has an unsafe asset name"
-            raise ReleaseAssetError(msg)
+    for asset in entries:
+        name, digest = _parse_github_asset(asset)
         if name in assets:
             msg = f"GitHub release repeats asset name {name!r}"
             raise ReleaseAssetError(msg)
-        digest = asset.get("digest")
-        assets[name] = _parse_github_digest(digest)
+        assets[name] = digest
     return assets
+
+
+def _parse_github_asset(asset: object) -> tuple[str, str | None]:
+    """Validate one GitHub asset and normalize its optional digest."""
+    match asset:
+        case {"name": str() as name, "digest": digest}:
+            pass
+        case {"name": str() as name}:
+            digest = None
+        case dict():
+            msg = "GitHub release asset is missing a valid name"
+            raise ReleaseAssetError(msg)
+        case _:
+            msg = "GitHub release asset entries must be objects"
+            raise ReleaseAssetError(msg)
+    if not _SAFE_FILENAME.fullmatch(name):
+        msg = "GitHub release has an unsafe asset name"
+        raise ReleaseAssetError(msg)
+    return name, _parse_github_digest(digest)
 
 
 def _parse_github_digest(digest: object) -> str | None:
     """Return a valid SHA-256 hex digest from GitHub's ``sha256:`` form."""
-    if not isinstance(digest, str) or not digest.startswith(_DIGEST_PREFIX):
-        return None
-    value = digest.removeprefix(_DIGEST_PREFIX)
-    return value.lower() if _SHA256.fullmatch(value) else None
+    match digest:
+        case str() as value if value.startswith(_DIGEST_PREFIX):
+            value = value.removeprefix(_DIGEST_PREFIX)
+            return value.lower() if _SHA256.fullmatch(value) else None
+        case _:
+            return None
 
 
 def sha256_file(path: Path) -> str:

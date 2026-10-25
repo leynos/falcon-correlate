@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess  # ruff: ignore[suspicious-subprocess-import] - executes a checked-in workflow step.
 import typing as typ
 
@@ -32,11 +33,14 @@ def _run_step(name: str) -> dict[str, object]:
 
 def _run_build_verification(dist: Path) -> subprocess.CompletedProcess[str]:
     """Execute the checked-in distribution verification step."""
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("the checked-in workflow step requires Bash")
     step = _run_step("Require exactly one sdist and one wheel")
     environment = os.environ.copy()
     environment["DIST_DIR"] = str(dist)
     return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - workflow run body is checked in.
-        ["/usr/bin/bash", "-c", str(step["run"])],
+        [bash, "-c", str(step["run"])],
         capture_output=True,
         check=False,
         env=environment,

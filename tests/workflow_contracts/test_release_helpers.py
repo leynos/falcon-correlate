@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import doctest
 import json
-import os
-import stat
 import typing as typ
 
 import pytest
@@ -21,6 +19,10 @@ _EXPECTED_INDEX_CURL_ARGUMENTS = [
     "--silent",
     "--show-error",
     "--location",
+    "--proto",
+    "=https",
+    "--proto-redir",
+    "=https",
     "--retry",
     "5",
     "--retry-all-errors",
@@ -55,74 +57,6 @@ _SIMPLE_BODY = json.dumps({
 })
 
 
-@pytest.fixture
-def curl_argv_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Install a recording curl stand-in at the front of PATH."""
-    bin_directory = tmp_path / "bin"
-    bin_directory.mkdir()
-    curl = bin_directory / "curl"
-    curl.write_text(
-        "#!/usr/bin/env python3\n"
-        "import json\n"
-        "import os\n"
-        "import sys\n"
-        "from pathlib import Path\n\n"
-        "record = Path(os.environ['CURL_ARGV_PATH'])\n"
-        "with record.open('a', encoding='utf-8') as stream:\n"
-        "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n"
-        "sys.stdout.write(os.environ.get('CURL_BODY', ''))\n"
-        "sys.stdout.write('\\n' + os.environ.get('CURL_STATUS', '200'))\n"
-        "sys.stderr.write(os.environ.get('CURL_STDERR', ''))\n"
-        "raise SystemExit(int(os.environ.get('CURL_EXIT', '0')))\n",
-        encoding="utf-8",
-    )
-    curl.chmod(curl.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    record = tmp_path / "curl-argv.jsonl"
-    monkeypatch.setenv("CURL_ARGV_PATH", str(record))
-    monkeypatch.setenv("PATH", f"{bin_directory}{os.pathsep}{os.environ['PATH']}")
-    return record
-
-
-@pytest.fixture
-def gh_argv_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Install a recording gh stand-in with scripted release-view responses."""
-    bin_directory = tmp_path / "gh-bin"
-    bin_directory.mkdir()
-    gh = bin_directory / "gh"
-    gh.write_text(
-        "#!/usr/bin/env python3\n"
-        "import json\n"
-        "import os\n"
-        "import sys\n"
-        "from pathlib import Path\n\n"
-        "record = Path(os.environ['GH_ARGV_PATH'])\n"
-        "calls = (\n"
-        "    [json.loads(line) for line in record.read_text().splitlines()]\n"
-        "    if record.exists() else []\n"
-        ")\n"
-        "arguments = sys.argv[1:]\n"
-        "calls.append(arguments)\n"
-        "record.write_text(\n"
-        "    ''.join(json.dumps(call) + '\\n' for call in calls),\n"
-        "    encoding='utf-8',\n"
-        ")\n"
-        "if arguments[:2] != ['release', 'view']:\n"
-        "    raise SystemExit('unexpected gh command: ' + repr(arguments))\n"
-        "view_count = sum(call[:2] == ['release', 'view'] for call in calls)\n"
-        "responses = json.loads(os.environ['GH_VIEW_RESPONSES'])\n"
-        "response = responses[min(view_count - 1, len(responses) - 1)]\n"
-        "sys.stdout.write(response.get('stdout', ''))\n"
-        "sys.stderr.write(response.get('stderr', ''))\n"
-        "raise SystemExit(int(response.get('exit_code', 0)))\n",
-        encoding="utf-8",
-    )
-    gh.chmod(gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    record = tmp_path / "gh-argv.jsonl"
-    monkeypatch.setenv("GH_ARGV_PATH", str(record))
-    monkeypatch.setenv("PATH", f"{bin_directory}{os.pathsep}{os.environ['PATH']}")
-    return record
-
-
 def _configure_curl(
     monkeypatch: pytest.MonkeyPatch,
     response: dict[str, str | int],
@@ -134,22 +68,54 @@ def _configure_curl(
 
 def test_required_environment_value_names_missing_variable(
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """A missing workflow setting fails with its name in the diagnostic."""
-    monkeypatch.delenv("RELEASE_TAG", raising=False)
+    """The public CLI reports a missing workflow setting by name."""
+    monkeypatch.delenv("SOURCE_DIR", raising=False)
 
-    with pytest.raises(release_assets.ReleaseAssetError, match="RELEASE_TAG"):
-        release_assets_cli._required("RELEASE_TAG")
+    result = release_assets_cli.main(["collect"])
+
+    assert result == 1, "a missing workflow setting must fail the command"
+    assert "SOURCE_DIR" in capsys.readouterr().err, (
+        "the failure annotation must identify the missing setting"
+    )
+
+
+def _make_distributions(directory: Path) -> tuple[str, str]:
+    """Create a wheel and source archive for CLI contract tests."""
+    directory.mkdir(parents=True, exist_ok=True)
+    wheel_name = "falcon_correlate-1.2.0-py3-none-any.whl"
+    sdist_name = "falcon_correlate-1.2.0.tar.gz"
+    (directory / wheel_name).write_bytes(b"wheel bytes")
+    (directory / sdist_name).write_bytes(b"sdist bytes")
+    return wheel_name, sdist_name
 
 
 def test_read_index_treats_project_404_as_unpublished(
-    curl_argv_log: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    curl_argv_log: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A project without a Simple index has no published filenames to skip."""
+    """The public CLI stages every file when the project index is absent."""
+    distributions = tmp_path / "dist"
+    wheel_name, sdist_name = _make_distributions(distributions)
+    staging = tmp_path / "staging"
+    output = tmp_path / "github-output"
+    monkeypatch.setenv("DIST_DIR", str(distributions))
+    monkeypatch.setenv("STAGING_DIR", str(staging))
+    monkeypatch.setenv("SIMPLE_INDEX_URL", _SIMPLE_URL)
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
     _configure_curl(monkeypatch, {"status": "404"})
 
-    assert release_assets_cli._read_index(_SIMPLE_URL) == {}, (
-        "an unpublished project must have no filenames to skip"
+    result = release_assets_cli.main(["stage-pypi"])
+
+    assert result == 0, "a missing project index means no upload is already published"
+    assert sorted(path.name for path in staging.iterdir()) == [
+        wheel_name,
+        sdist_name,
+    ], "a 404 must leave every distribution staged for its first upload"
+    assert output.read_text(encoding="utf-8") == "has-uploads=true\n", (
+        "a first upload must expose the conditional publish output"
     )
     assert curl_argv_log.is_file(), "the unpublished project lookup must call curl"
     arguments = json.loads(curl_argv_log.read_text(encoding="utf-8").splitlines()[0])
@@ -159,29 +125,58 @@ def test_read_index_treats_project_404_as_unpublished(
 
 
 def test_read_index_parses_pep691_filename_digests(
-    curl_argv_log: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    curl_argv_log: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A successful PEP 691 response maps filenames to digest and URL."""
+    """The public PyPI staging step drops names already listed by PEP 691."""
+    distributions = tmp_path / "dist"
+    wheel_name, sdist_name = _make_distributions(distributions)
+    staging = tmp_path / "staging"
+    output = tmp_path / "github-output"
+    monkeypatch.setenv("DIST_DIR", str(distributions))
+    monkeypatch.setenv("STAGING_DIR", str(staging))
+    monkeypatch.setenv("SIMPLE_INDEX_URL", _SIMPLE_URL)
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
     _configure_curl(monkeypatch, {"status": "200", "body": _SIMPLE_BODY})
 
-    files = release_assets_cli._read_index(_SIMPLE_URL)
+    result = release_assets_cli.main(["stage-pypi"])
 
+    assert result == 0, "a valid Simple index must be accepted"
     assert curl_argv_log.is_file(), "the PEP 691 request must reach curl"
-    assert files == {
-        "falcon_correlate-1.2.0-py3-none-any.whl": release_assets.PypiFile(
-            _FILE_DIGEST, "https://files.pythonhosted.org/packages/falcon.whl"
-        )
-    }, "the Simple index entry must retain its digest and download URL"
+    assert [path.name for path in staging.iterdir()] == [sdist_name], (
+        "only the distribution name absent from PyPI should remain staged"
+    )
+    assert output.read_text(encoding="utf-8") == "has-uploads=true\n", (
+        "the remaining sdist must enable the PyPI upload step"
+    )
+    parsed = release_assets.parse_pep691_index(_SIMPLE_BODY, _SIMPLE_URL)
+    assert parsed[wheel_name] == release_assets.PypiFile(
+        _FILE_DIGEST, "https://files.pythonhosted.org/packages/falcon.whl"
+    ), "PEP 691 parsing must retain the digest and canonical download URL"
 
 
 def test_read_index_fails_on_non_success_http_status(
-    curl_argv_log: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    curl_argv_log: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """An HTTP error other than the absent-project 404 fails the step."""
+    """An HTTP error other than 404 fails the public PyPI staging step."""
+    distributions = tmp_path / "dist"
+    _make_distributions(distributions)
+    monkeypatch.setenv("DIST_DIR", str(distributions))
+    monkeypatch.setenv("STAGING_DIR", str(tmp_path / "staging"))
+    monkeypatch.setenv("SIMPLE_INDEX_URL", _SIMPLE_URL)
+    monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "github-output"))
     _configure_curl(monkeypatch, {"status": "500", "body": "server error"})
 
-    with pytest.raises(release_assets.ReleaseAssetError, match="HTTP 500"):
-        release_assets_cli._read_index(_SIMPLE_URL)
+    result = release_assets_cli.main(["stage-pypi"])
+
+    assert result == 1, "a PyPI server error must fail the release step"
+    assert "HTTP 500" in capsys.readouterr().err, (
+        "the failure annotation must identify the HTTP status"
+    )
     assert curl_argv_log.is_file(), "the non-success response must reach curl"
 
 
@@ -207,7 +202,7 @@ def test_cli_escapes_remote_error_text_in_workflow_annotation(
         },
     )
 
-    result = release_assets_cli._main(["stage-pypi"])
+    result = release_assets_cli.main(["stage-pypi"])
 
     error_line = capsys.readouterr().err.rstrip("\n")
     assert result == 1, "a failed curl request must fail the release step"
@@ -232,7 +227,7 @@ def test_ensure_draft_retries_before_creating_a_release(
     monkeypatch.setenv("DIST_DIR", str(distributions))
     monkeypatch.setenv("RELEASE_TAG", "v1.2.0")
     monkeypatch.setenv(
-        "GH_VIEW_RESPONSES",
+        "GH_RESPONSES",
         json.dumps([
             {"exit_code": 1, "stderr": "release not found"},
             {"exit_code": 0, "stdout": '{"tagName":"v1.2.0"}'},
@@ -240,7 +235,7 @@ def test_ensure_draft_retries_before_creating_a_release(
     )
     monkeypatch.setattr(release_assets_cli.time, "sleep", lambda _seconds: None)
 
-    result = release_assets_cli._main(["ensure-draft"])
+    result = release_assets_cli.main(["ensure-draft"])
 
     calls = tuple(
         tuple(json.loads(line)) for line in gh_argv_log.read_text().splitlines()
@@ -249,13 +244,6 @@ def test_ensure_draft_retries_before_creating_a_release(
     assert calls == _EXPECTED_REUSED_RELEASE_LOOKUPS, (
         "a transient not-found response must not create a duplicate draft"
     )
-
-
-def test_workflow_command_data_escapes_percent_and_carriage_return() -> None:
-    """Percent and CR are encoded before workflow command interpolation."""
-    escaped = release_assets_cli._escape_workflow_command_data("100%\rwarning")
-
-    assert escaped == "100%25%0Dwarning", "percent and CR must be encoded"
 
 
 def test_release_version_requires_exact_v_prefixed_tag() -> None:

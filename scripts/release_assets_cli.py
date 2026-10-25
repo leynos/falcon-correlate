@@ -5,7 +5,31 @@
 # requires-python = ">=3.12"
 # dependencies = []
 # ///
-"""Run the release workflow's distribution checks and reconciliation steps."""
+r"""Run the release workflow's distribution checks and reconciliation steps.
+
+Commands and required environment variables:
+- ``collect``: ``SOURCE_DIR``, ``DIST_DIR``
+- ``stage-pypi``: ``DIST_DIR``, ``SIMPLE_INDEX_URL``, ``STAGING_DIR``,
+  ``GITHUB_OUTPUT``
+- ``ensure-draft``: ``DIST_DIR``, ``RELEASE_TAG``
+- ``publish-release``: ``DIST_DIR``, ``RELEASE_TAG``, ``SIMPLE_INDEX_URL``,
+  ``BUNDLE_DIR``, ``STAGING_DIR``, ``PRERELEASE``
+
+Set only the variables listed for the selected command. Example invocations:
+
+.. code-block:: shell
+
+   CLI=scripts/release_assets_cli.py
+   SOURCE_DIR=build DIST_DIR=dist uv run --script "$CLI" collect
+   DIST_DIR=dist SIMPLE_INDEX_URL=https://pypi.org/simple/pkg/ \
+      STAGING_DIR=stage GITHUB_OUTPUT=output \
+      uv run --script "$CLI" stage-pypi
+   DIST_DIR=dist RELEASE_TAG=v1.2.0 uv run --script "$CLI" ensure-draft
+   DIST_DIR=dist RELEASE_TAG=v1.2.0 PRERELEASE=false \
+      SIMPLE_INDEX_URL=https://pypi.org/simple/pkg/ \
+      BUNDLE_DIR=bundle STAGING_DIR=stage \
+      uv run --script "$CLI" publish-release
+"""
 
 from __future__ import annotations
 
@@ -24,9 +48,14 @@ if __package__:
         ReleaseAssetError,
         collect_distributions,
         digest_mismatches,
+        missing_names,
         parse_github_asset_digests,
         parse_pep691_index,
         sha256_file,
+    )
+    from scripts.release_curl import (
+        PYPI_DOWNLOAD_CURL_ARGUMENTS,
+        SIMPLE_INDEX_CURL_ARGUMENTS,
     )
 else:
     from release_assets import (
@@ -34,10 +63,12 @@ else:
         ReleaseAssetError,
         collect_distributions,
         digest_mismatches,
+        missing_names,
         parse_github_asset_digests,
         parse_pep691_index,
         sha256_file,
     )
+    from release_curl import PYPI_DOWNLOAD_CURL_ARGUMENTS, SIMPLE_INDEX_CURL_ARGUMENTS
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -84,10 +115,12 @@ def _require_success(result: subprocess.CompletedProcess[str], command: str) -> 
 def _clear_directory(directory: Path) -> None:
     """Create an empty staging directory, refusing nested stale entries."""
     directory.mkdir(parents=True, exist_ok=True)
-    for entry in directory.iterdir():
-        if entry.is_dir():
-            msg = f"staging directory contains a nested entry: {entry}"
-            raise ReleaseAssetError(msg)
+    entries = list(directory.iterdir())
+    nested = next((entry for entry in entries if entry.is_dir()), None)
+    if nested is not None:
+        msg = f"staging directory contains a nested entry: {nested}"
+        raise ReleaseAssetError(msg)
+    for entry in entries:
         entry.unlink()
 
 
@@ -104,23 +137,7 @@ def _copy_distributions(source: Path, destination: Path) -> None:
 def _fetch_index_once(url: str) -> tuple[int, str]:
     """Fetch one PEP 691 index response and return its status and body."""
     result = _run([
-        "curl",
-        "--silent",
-        "--show-error",
-        "--location",
-        "--retry",
-        "5",
-        "--retry-all-errors",
-        "--retry-delay",
-        "2",
-        "--retry-max-time",
-        "90",
-        "--connect-timeout",
-        "10",
-        "--max-time",
-        "30",
-        "--write-out",
-        "\\n%{http_code}",
+        *SIMPLE_INDEX_CURL_ARGUMENTS,
         "--header",
         f"Accept: {_SIMPLE_ACCEPT}",
         url,
@@ -179,7 +196,10 @@ def _stage_pypi() -> None:
     index = _read_index(_required("SIMPLE_INDEX_URL"))
     destination = Path(_required("STAGING_DIR"))
     _clear_directory(destination)
-    remaining = [path for path in distributions if path.name not in index]
+    remaining_names = set(
+        missing_names((path.name for path in distributions), index.keys())
+    )
+    remaining = [path for path in distributions if path.name in remaining_names]
     for path in remaining:
         shutil.copyfile(path, destination / path.name)
     _write_output("has-uploads", str(bool(remaining)).lower())
@@ -229,21 +249,7 @@ def _release_assets(tag: str) -> dict[str, str | None]:
 def _download_pypi_file(file: PypiFile, destination: Path) -> None:
     """Download one canonical PyPI file and verify its advertised digest."""
     result = _run([
-        "curl",
-        "--silent",
-        "--show-error",
-        "--location",
-        "--fail",
-        "--retry",
-        "5",
-        "--retry-all-errors",
-        "--retry-delay",
-        "2",
-        "--connect-timeout",
-        "10",
-        "--max-time",
-        "300",
-        "--output",
+        *PYPI_DOWNLOAD_CURL_ARGUMENTS,
         str(destination),
         file.url,
     ])
@@ -282,8 +288,9 @@ def _stage_release_gaps(
     upload_dir = Path(_required("STAGING_DIR"))
     _clear_directory(upload_dir)
     upload_paths: list[Path] = []
+    missing = set(missing_names(names, assets))
     for name in names:
-        if name not in assets:
+        if name in missing:
             downloaded = upload_dir / name
             _download_pypi_file(index[name], downloaded)
             upload_paths.append(downloaded)
@@ -358,8 +365,19 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _main(argv: cabc.Sequence[str] | None = None) -> int:
-    """Run a release helper command and report failures as workflow annotations."""
+def main(argv: cabc.Sequence[str] | None = None) -> int:
+    """Run a release command and report failures as workflow annotations.
+
+    Parameters
+    ----------
+    argv : collections.abc.Sequence[str] or None, optional
+        Command arguments, or ``None`` to use process arguments.
+
+    Returns
+    -------
+    int
+        Process exit code: zero on success, one for a release validation error.
+    """
     args = _parser().parse_args(argv)
     try:
         match args.command:
@@ -379,4 +397,4 @@ def _main(argv: cabc.Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(_main())
+    raise SystemExit(main())
