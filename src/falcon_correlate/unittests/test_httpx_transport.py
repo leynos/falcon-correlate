@@ -25,8 +25,7 @@ from falcon_correlate.unittests.test_httpx_transport_helpers import (
     _RecordingTransport,
 )
 
-# falcon_correlate.httpx is import-safe without optional httpx installed;
-# importorskip only guards direct use of the optional httpx package below.
+# Import is safe without HTTPX; importorskip guards its optional use below.
 httpx = pytest.importorskip("httpx")
 
 
@@ -125,6 +124,7 @@ def test_sync_transport_delegates_same_request_object() -> None:
     assert request.headers[DEFAULT_HEADER_NAME] == cid, failure_message
 
 
+# @codescene(disable:"Code Duplication") Explicit sync contract test (2026-10-25).
 def test_sync_transport_delegates_close() -> None:
     """Sync transport should preserve the wrapped close result."""
     transport = mock.Mock(spec=httpx.BaseTransport)
@@ -252,7 +252,7 @@ async def test_async_transport_delegates_aclose() -> None:
 
 
 @pytest.mark.asyncio
-# @codescene(disable:"Code Duplication") Separate async contract test (2026-10-25).
+# @codescene(disable:"Code Duplication") Explicit async contract test (2026-10-25).
 async def test_async_transport_preserves_aclose_return_value() -> None:
     """Async transport should preserve the wrapped aclose result."""
     transport = mock.AsyncMock(spec=httpx.AsyncBaseTransport)

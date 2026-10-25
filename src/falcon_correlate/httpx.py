@@ -182,6 +182,7 @@ class CorrelationIDTransport(
         self._prepare_request(request)
         return self._wrapped_transport.handle_request(request)
 
+    # @codescene(disable:"Code Duplication") Explicit protocol methods (2026-10-25).
     def close(self) -> None:
         """Delegate shutdown to the wrapped transport.
 
