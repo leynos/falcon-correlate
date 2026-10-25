@@ -1,4 +1,6 @@
 #!/usr/bin/env -S uv run python
+# Python 3.12 is the project support floor. Keep this CLI stdlib-only and use
+# argv-based subprocess calls so recording PATH stand-ins can test gh and curl.
 # /// script
 # requires-python = ">=3.12"
 # dependencies = []

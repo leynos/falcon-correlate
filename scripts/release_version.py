@@ -1,4 +1,5 @@
 #!/usr/bin/env -S uv run python
+# Python 3.12 is the minimum supported version declared by pyproject.toml.
 # /// script
 # requires-python = ">=3.12"
 # dependencies = []
