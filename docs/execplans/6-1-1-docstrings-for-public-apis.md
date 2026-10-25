@@ -265,6 +265,14 @@ Stop and escalate when any of these is reached:
   typed variadic signature. Keep the issue #38 suppression scoped to
   `middleware.py`. Date/Author: 2026-10-25, implementation agent.
 
+- Decision: Retain issue #44's concurrent response-header tests without
+  duplicating them in issue #36's factory tests. Rationale: issue #44 verifies
+  request-scoped header and context isolation across concurrent middleware
+  calls, while issue #36 covers factory defaults, normalization, unknown-key
+  rejection, subclass construction, and middleware equivalence. The full test
+  suite exercises both boundaries. Date/Author: 2026-10-25, implementation
+  agent.
+
 - Decision: Stop before enabling repo-wide `DOC` because the measured baseline
   exceeds the plan's exception threshold. Rationale: the plan permits
   autonomous implementation only while the `DOC` scope stays below roughly 60
