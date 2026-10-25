@@ -1400,16 +1400,16 @@ Recorder exceptions are isolated from request processing. The middleware logs a
 and continuing to fallback generation or acceptance. This keeps metrics
 optional and prevents backend failures from changing request behaviour.
 
-#### 4.6.11. Falcon's fixed WSGI response-hook signature
+#### 4.6.12. Falcon's fixed WSGI response-hook signature
 
 **Decision:** Preserve Falcon's four-parameter `process_response` callback
 signature, including `resource` and `req_succeeded`, even though this
 middleware uses only `req` and `resp`. Keep the argument-count suppressions
 local to the framework hook and retain their rationale and Issue #38 reference
-beside the method. Main clarified this framework constraint; the observability
-changes do not alter the callback contract.
+beside the method. Falcon requires the full callback signature; observability
+does not change it.
 
-#### 4.6.12. Bound metric header labels
+#### 4.6.13. Bound metric header labels
 
 **Decision:** Keep `header_name` on `CorrelationIDSelectionEvent`, but
 canonicalize it to `X-Correlation-ID` or `X-Request-ID`; map every other
@@ -1419,9 +1419,9 @@ unbounded labels across deployments. This finite mapping preserves the two
 common header distinctions without allowing arbitrary configuration to expand
 metric cardinality. The outcome and trust enums remain the other event labels.
 
-#### 4.6.13. Preserve concurrent response lifecycle coverage
+#### 4.6.14. Preserve concurrent response lifecycle coverage
 
-**Decision:** Keep main's concurrent response-header isolation example and
+**Decision:** Retain the concurrent response-header isolation example and
 property test. They exercise the shared middleware's response echo and
 request-local context cleanup under concurrent requests, which this
 observability change must leave intact. The existing tests cover that
