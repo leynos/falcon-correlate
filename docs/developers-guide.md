@@ -304,7 +304,7 @@ Give each behaviour one primary test-suite owner:
 Do not repeat the same case matrix across suites. Overlap is justified only
 when each test proves a distinct public interface, integration boundary,
 lifecycle, import boundary, or generated-input invariant. State that
-distinction beside the test so future changes do not restore duplicate cases.
+distinction beside the test, so future changes do not restore duplicate cases.
 
 HTTPX propagation illustrates the ownership boundary:
 
