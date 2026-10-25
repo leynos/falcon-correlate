@@ -287,6 +287,9 @@ In process_request:
    `req.context.correlation_id`, sets the configured `ContextVar`, and stores
    the returned reset token on the request context.
 
+These helpers are private shared-base implementation details and do not add to
+the package's public exports.
+
 Falcon middleware components are executed hierarchically. If multiple
 middleware components are registered, their `process_request` methods are
 called in order, followed by `process_resource` methods in the same order, then
