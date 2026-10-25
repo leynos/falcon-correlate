@@ -695,27 +695,13 @@ signal. Inside the handler:
    `headers`, and `properties`. The `properties` dictionary can be modified to
    set `properties['correlation_id'] = cid`.[^25]
 
-```python
-from celery.signals import before_task_publish
-
-
-@before_task_publish.connect
-def propagate_correlation_id_to_celery(
-    sender=None, headers=None, body=None, properties=None, **kwargs
-):
-    cid = correlation_id_var.get()
-    if cid:
-        if properties is None:  # Should not happen with recent Celery
-            properties = {}
-        properties["correlation_id"] = cid
-        # Celery task headers can also be used, though properties is standard
-        if headers is None:
-            headers = {}
-        # headers["X-Correlation-ID"] = cid  # If custom header propagation needed
-```
-
-This approach is generally clean and idiomatic for Celery, as it directly hooks
-into the task publishing mechanism.
+The package provides a publish receiver for this signal. Call
+`configure_celery_correlation(app)` in each publisher and worker process to
+connect it with the worker receivers. This is the recommended activation path;
+the supported lower-level receiver remains available for custom signal wiring.
+See
+[the Celery configuration helper](#a10-celery-configuration-helper-task-423)
+for the registration contract.
 
 ##### 3.5.2.3. Method 2: Custom Celery `Task` base class
 
@@ -1162,58 +1148,22 @@ async def async_client_request_with_correlation_id(
 # )
 ```
 
-### 4.4. Example: Celery signal handler for propagation
+### 4.4. Example: Celery signal integration setup
 
 ```python
-import contextvars
-from celery.signals import before_task_publish, task_prerun, task_postrun
+from celery import Celery
+from falcon_correlate import configure_celery_correlation
 
-from falcon_correlate.middleware import correlation_id_var
-
-_celery_context_tokens = contextvars.ContextVar("celery_context_tokens", default=None)
-
-
-@before_task_publish.connect
-def propagate_correlation_id_to_celery(
-    sender=None, headers=None, body=None, properties=None, **kwargs
-):
-    cid = correlation_id_var.get()
-    if cid and properties is not None:
-        properties["correlation_id"] = cid
-
-
-@task_prerun.connect
-def setup_correlation_id_in_worker(sender=None, task=None, **kwargs):
-    request = getattr(task, "request", None)
-    cid = getattr(request, "correlation_id", None)
-    if not cid:
-        return
-
-    tokens = dict(_celery_context_tokens.get() or {})
-    correlation_tokens = list(tokens.get("correlation_id", []))
-    correlation_tokens.append(correlation_id_var.set(cid))
-    tokens["correlation_id"] = correlation_tokens
-    _celery_context_tokens.set(tokens)
-
-
-@task_postrun.connect
-def clear_correlation_id_in_worker(sender=None, **kwargs):
-    tokens = _celery_context_tokens.get()
-    if not tokens:
-        return
-
-    correlation_tokens = list(tokens.get("correlation_id", []))
-    if not correlation_tokens:
-        return
-
-    correlation_id_var.reset(correlation_tokens.pop())
-    if correlation_tokens:
-        tokens["correlation_id"] = correlation_tokens
-    else:
-        tokens.pop("correlation_id", None)
-
-    _celery_context_tokens.set(tokens or None)
+celery_app = configure_celery_correlation(
+    Celery("myapp", broker="redis://localhost:6379/0")
+)
 ```
+
+This is the recommended setup for standard publisher and worker processes. For
+custom signal wiring, `propagate_correlation_id_to_celery`,
+`setup_correlation_id_in_worker`, and `clear_correlation_id_in_worker` remain
+supported lower-level callbacks; see the
+[advanced worker lifecycle documentation](users-guide.md#advanced-direct-worker-lifecycle-helpers).
 
 ### 4.5. Middleware configuration
 
@@ -1995,10 +1945,23 @@ historical. See A.10 for the current explicit-activation contract.
 **Superseded by issue #48:** The import-time registration decision below is
 historical. See A.10 for the current explicit-activation contract.
 
-**Decision:** Extend `src/falcon_correlate/celery.py` with
-`setup_correlation_id_in_worker` and `clear_correlation_id_in_worker`, and
-register them through `configure_celery_correlation(app)` with Celery's
-`task_prerun` and `task_postrun` signals.
+**Decision:** Define `setup_correlation_id_in_worker` and
+`clear_correlation_id_in_worker` in the internal
+`src/falcon_correlate/_celery_worker_signals.py` module, re-export them from
+`src/falcon_correlate/celery.py`, and register them through
+`configure_celery_correlation(app)` with Celery's `task_prerun` and
+`task_postrun` signals.
+
+Both worker helpers remain public package-root exports and supported
+lower-level callbacks. `configure_celery_correlation(app)` is the recommended
+activation API for standard setup; direct connection is available when a
+consumer manages custom signal wiring.
+
+The internal worker module owns the receiver implementations and context-local
+token stack. It imports no Celery symbols and connects no signals; `celery.py`
+owns activation and public adapter exports. The token stack remains private to
+the worker module, while consumers import the supported helpers from the
+package root.
 
 **Rationale:**
 
@@ -2032,8 +1995,10 @@ register them through `configure_celery_correlation(app)` with Celery's
 
 **Files created/modified:**
 
-- `src/falcon_correlate/celery.py` — Added worker setup and cleanup handlers,
-  the internal token store, and worker signal registration.
+- `src/falcon_correlate/_celery_worker_signals.py` — Holds the worker setup and
+  cleanup receivers and their private context-local token stack.
+- `src/falcon_correlate/celery.py` — Re-exports the worker receivers and owns
+  worker signal registration.
 - `src/falcon_correlate/__init__.py` — Re-exported
   `setup_correlation_id_in_worker` and `clear_correlation_id_in_worker`.
 - `src/falcon_correlate/unittests/test_celery_worker_signal.py` — Added unit
@@ -2049,7 +2014,9 @@ register them through `configure_celery_correlation(app)` with Celery's
 
 **Decision:** Add `configure_celery_correlation(app)` to
 `src/falcon_correlate/celery.py`, re-export it from `falcon_correlate`, and
-make it the sole entry point for Celery signal registration.
+make it the recommended entry point for package-managed Celery signal
+registration. The public receiver functions remain supported lower-level
+callbacks for consumers who manage custom signal wiring.
 
 **Rationale:**
 
@@ -2065,8 +2032,9 @@ make it the sole entry point for Celery signal registration.
    0.2.0. This breaking change avoids Celery's import cost and implicit
    mutation of its process-global signal registry in processes that never use
    Celery. Importing `falcon_correlate` leaves Celery signals untouched; each
-   publisher and worker process must call `configure_celery_correlation(app)`
-   to activate propagation.
+   publisher and worker process using the standard integration must call
+   `configure_celery_correlation(app)` to activate propagation. Consumers who
+   manually connect the public receivers manage that activation themselves.
 
 3. **Correct and efficient publisher resolution:** `before_task_publish` carries
    a task name as `sender`, not the publishing app. Registry membership is not

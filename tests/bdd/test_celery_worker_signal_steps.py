@@ -32,8 +32,10 @@ from pytest_bdd import (  # ruff: ignore[module-import-not-at-top-of-file] -- de
 from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     correlation_id_var,
 )
-from falcon_correlate.celery import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+from falcon_correlate._celery_worker_signals import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     _celery_context_tokens,
+)
+from falcon_correlate.celery import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     _maybe_connect_celery_worker_signals,
 )
 

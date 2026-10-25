@@ -1,11 +1,14 @@
 """Celery signal integration for correlation ID propagation.
 
-This module is import-safe when the optional ``celery`` dependency is not
-installed. Importing this module defines integration names only: it neither
-imports Celery nor connects its process-global signals. Call
-:func:`configure_celery_correlation` explicitly in every publisher and worker
-process that needs correlation ID propagation; it registers the publish and
-worker task handlers. Stable dispatch UIDs keep activation idempotent.
+Use :func:`configure_celery_correlation` as the recommended activation API in
+each publisher and worker process. It connects the publish and worker receivers
+with stable dispatch UIDs, so repeated calls are idempotent. The public
+receivers :func:`propagate_correlation_id_to_celery`,
+:func:`setup_correlation_id_in_worker`, and
+:func:`clear_correlation_id_in_worker` are lower-level callbacks for custom
+signal wiring. Do not connect them manually when configuration already manages
+the same signals. Importing this module neither imports Celery nor connects its
+process-global signals.
 """
 
 from __future__ import annotations
@@ -18,6 +21,10 @@ import types
 import typing as typ
 import weakref
 
+from ._celery_worker_signals import (
+    clear_correlation_id_in_worker,
+    setup_correlation_id_in_worker,
+)
 from .celery_diagnostics import (
     _report_configuration_outcome,
     _safe_connect_signal,
@@ -56,15 +63,9 @@ _BEFORE_TASK_PUBLISH_DISPATCH_UID = (
 )
 _TASK_PRERUN_DISPATCH_UID = "falcon_correlate.celery.setup_correlation_id_in_worker"
 _TASK_POSTRUN_DISPATCH_UID = "falcon_correlate.celery.clear_correlation_id_in_worker"
-_CORRELATION_ID_CONTEXT_KEY = "correlation_id"
 _logger = logging.getLogger(__name__)
 
 
-_ContextToken = contextvars.Token[str | None]
-type _CeleryContextTokens = dict[str, list[_ContextToken]]
-_celery_context_tokens: contextvars.ContextVar[_CeleryContextTokens | None] = (
-    contextvars.ContextVar("celery_context_tokens", default=None)
-)
 _celery_publishing_app: contextvars.ContextVar[_CeleryAppLike | None] = (
     contextvars.ContextVar("celery_publishing_app", default=None)
 )
@@ -219,46 +220,6 @@ def _current_result_backend_uses_rpc() -> bool | None:
         return False
 
     return _app_backend_uses_rpc(typ.cast("_CeleryAppLike", current_app))
-
-
-def setup_correlation_id_in_worker(*, task: object | None = None, **_: object) -> None:
-    """Expose the task request correlation ID during worker execution."""
-    correlation_id = _get_task_request_correlation_id(task)
-    if not correlation_id:
-        return
-
-    token = correlation_id_var.set(correlation_id)
-    stored_tokens = dict(_celery_context_tokens.get() or {})
-    correlation_id_tokens = list(stored_tokens.get(_CORRELATION_ID_CONTEXT_KEY, []))
-    correlation_id_tokens.append(token)
-    stored_tokens[_CORRELATION_ID_CONTEXT_KEY] = correlation_id_tokens
-    _celery_context_tokens.set(stored_tokens)
-
-
-def clear_correlation_id_in_worker(**_: object) -> None:
-    """Restore the pre-task correlation ID context after worker execution."""
-    stored_tokens = _celery_context_tokens.get(None)
-    if not stored_tokens:
-        return
-
-    correlation_id_tokens = list(stored_tokens.get(_CORRELATION_ID_CONTEXT_KEY, []))
-    if not correlation_id_tokens:
-        return
-
-    correlation_id_var.reset(correlation_id_tokens.pop())
-    if correlation_id_tokens:
-        stored_tokens[_CORRELATION_ID_CONTEXT_KEY] = correlation_id_tokens
-    else:
-        stored_tokens.pop(_CORRELATION_ID_CONTEXT_KEY, None)
-
-    _celery_context_tokens.set(stored_tokens or None)
-
-
-def _get_task_request_correlation_id(task: object | None) -> str | None:
-    """Return a Celery task request correlation ID when it is a string."""
-    request = getattr(task, "request", None)
-    correlation_id = getattr(request, "correlation_id", None)
-    return correlation_id if isinstance(correlation_id, str) else None
 
 
 def _maybe_connect_celery_publish_signal() -> _SignalState:

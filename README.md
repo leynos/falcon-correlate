@@ -220,6 +220,10 @@ Call `configure_celery_correlation(app)` in each publisher and worker process
 to activate propagation. The worker context is reset after each task, so the
 next task never inherits a stale ID.
 
+For custom signal wiring, see the
+[advanced direct worker lifecycle helpers](docs/users-guide.md#advanced-direct-worker-lifecycle-helpers)
+in the user's guide.
+
 ______________________________________________________________________
 
 ## Learn more
