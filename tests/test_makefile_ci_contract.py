@@ -18,7 +18,13 @@ _COVERAGE_MAIN_WORKFLOW_PATH = _PROJECT_ROOT / ".github/workflows/coverage-main.
 _OPTIONAL_CELERY_TEST_TOKENS: typ.Final = (
     "src/falcon_correlate/unittests/test_optional_celery_dependency.py",
 )
-_PROJECT_PYTEST_EXCLUDE_TOKENS: typ.Final = ("--ignore=$(OPTIONAL_CELERY_TEST)",)
+_OBSERVABILITY_SNAPSHOT_TEST_TOKENS: typ.Final = (
+    "src/falcon_correlate/unittests/test_observability_contracts.py",
+)
+_PROJECT_PYTEST_EXCLUDE_TOKENS: typ.Final = (
+    "--ignore=$(OPTIONAL_CELERY_TEST)",
+    "--ignore=$(OBSERVABILITY_SNAPSHOT_TEST)",
+)
 _TYPECHECK_PREREQUISITES: typ.Final = ("build",)
 _TYPECHECK_RECIPE_TOKENS: typ.Final = (
     ("$(TY)", "--version"),
@@ -79,17 +85,32 @@ _PROJECT_TEST_RECIPE_TOKENS: typ.Final = (
         "$(SERIAL_PY_TEST_EXCLUDES)",
     ),
 )
-_SERIAL_PY_TESTS_TOKENS: typ.Final = ("$(OPTIONAL_CELERY_TEST)",)
+_SERIAL_PY_TESTS_TOKENS: typ.Final = (
+    "$(OPTIONAL_CELERY_TEST)",
+    "$(OBSERVABILITY_SNAPSHOT_TEST)",
+)
 _SERIAL_PY_TEST_EXCLUDES_TOKENS: typ.Final = ("$(PROJECT_PYTEST_EXCLUDES)",)
 _PYTEST_WORKERS_TOKENS: typ.Final = ("6",)
 _OPTIONAL_CELERY_RECIPE_TOKENS: typ.Final = (
     ("$(UV_ENV)", "$(UV)", "run", "pytest", "-v", "$(OPTIONAL_CELERY_TEST)"),
 )
+_OBSERVABILITY_RECIPE_TOKENS: typ.Final = (
+    (
+        "$(UV_ENV)",
+        "$(UV)",
+        "run",
+        "pytest",
+        "-v",
+        "$(OBSERVABILITY_SNAPSHOT_TEST)",
+    ),
+)
 _CI_PARALLEL_TEST_COMMAND: typ.Final = (
     "uv run pytest -v -n auto --dist=loadgroup --ignore=tests/workflows "
-    "--ignore=src/falcon_correlate/unittests/test_optional_celery_dependency.py"
+    "--ignore=src/falcon_correlate/unittests/test_optional_celery_dependency.py "
+    "--ignore=src/falcon_correlate/unittests/test_observability_contracts.py"
 )
 _CI_SERIAL_OPTIONAL_CELERY_COMMAND: typ.Final = "make test-optional-celery"
+_CI_SERIAL_OBSERVABILITY_COMMAND: typ.Final = "make test-observability-contracts"
 
 
 def _makefile_report() -> dict[str, object]:
@@ -219,6 +240,10 @@ def test_typecheck_and_pytest_targets_use_project_commands() -> None:
         "optional-Celery exclusion must name the isolated unit-test module"
     )
     assert (
+        _variable_tokens("OBSERVABILITY_SNAPSHOT_TEST")
+        == _OBSERVABILITY_SNAPSHOT_TEST_TOKENS
+    ), "snapshot test exclusion must name the observability contract module"
+    assert (
         _variable_tokens("PROJECT_PYTEST_EXCLUDES") == _PROJECT_PYTEST_EXCLUDE_TOKENS
     ), "project pytest exclusions must omit the optional-Celery module"
     assert _variable_tokens("PYTEST_WORKERS") == _PYTEST_WORKERS_TOKENS, (
@@ -236,6 +261,9 @@ def test_typecheck_and_pytest_targets_use_project_commands() -> None:
     assert _recipe_tokens("test-optional-celery") == _OPTIONAL_CELERY_RECIPE_TOKENS, (
         "optional-Celery target must run its module serially without xdist"
     )
+    assert (
+        _recipe_tokens("test-observability-contracts") == _OBSERVABILITY_RECIPE_TOKENS
+    ), "observability snapshots must run serially outside the xdist session"
 
 
 def test_lint_target_runs_all_six_stages_in_order() -> None:
@@ -278,6 +306,17 @@ def test_ci_runs_the_optional_celery_test_serially() -> None:
     )
     assert serial_test_step.get("if") is None, (
         "CI serial optional-Celery target must run on every test matrix leg"
+    )
+    serial_snapshot_step = _workflow_step(
+        _CI_WORKFLOW_PATH,
+        "test",
+        "Run observability snapshot tests serially",
+    )
+    assert serial_snapshot_step.get("run") == _CI_SERIAL_OBSERVABILITY_COMMAND, (
+        "CI must run observability snapshots through the serial Make target"
+    )
+    assert serial_snapshot_step.get("if") is None, (
+        "CI serial snapshot target must run on every test matrix leg"
     )
 
 

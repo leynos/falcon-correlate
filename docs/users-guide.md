@@ -81,13 +81,16 @@ The middleware accepts several configuration options as keyword-only arguments:
 `CorrelationIDMiddleware`. It is a frozen dataclass, so configuration state is
 validated and copied during construction, then exposed as read-only fields.
 
-| Field                     | Type                | Default                   | Description                                                                         |
-| ------------------------- | ------------------- | ------------------------- | ----------------------------------------------------------------------------------- |
-| `header_name`             | `str`               | `"X-Correlation-ID"`      | Header used for incoming and outgoing IDs.                                          |
-| `trusted_sources`         | `Iterable[str]`     | `frozenset()`             | Trusted IP addresses or CIDR ranges.                                                |
-| `generator`               | `Callable[[], str]` | `default_uuid7_generator` | Callable used when the middleware creates a new ID.                                 |
-| `validator`               | callable or `None`  | `None`                    | Optional validator for incoming trusted IDs.                                        |
-| `echo_header_in_response` | `bool`              | `True`                    | Whether to copy the resolved ID into the response header during `process_response`. |
+| Field                     | Type                        | Default                   | Description                                                                         |
+| ------------------------- | --------------------------- | ------------------------- | ----------------------------------------------------------------------------------- |
+| `header_name`             | `str`                       | `"X-Correlation-ID"`      | Header used for incoming and outgoing IDs.                                          |
+| `trusted_sources`         | `Iterable[str]`             | `frozenset()`             | Trusted IP addresses or CIDR ranges.                                                |
+| `generator`               | `Callable[[], str]`         | `default_uuid7_generator` | Callable used when the middleware creates a new ID.                                 |
+| `validator`               | callable or `None`          | `None`                    | Optional validator for incoming trusted IDs.                                        |
+| `echo_header_in_response` | `bool`                      | `True`                    | Whether to copy the resolved ID into the response header during `process_response`. |
+| `metrics_recorder`        | `MetricsRecorder` or `None` | `None`                    | Optional synchronous callback for one selection event per request.                  |
+
+*Table 1: `CorrelationIDConfig` fields and defaults.*
 
 Pass a config object directly to build or share middleware configuration
 explicitly:
@@ -250,6 +253,88 @@ middleware = CorrelationIDMiddleware(validator=uuid_validator)
 `DEBUG`-level message. The rejected value is not included in the log to avoid
 log injection and privacy risks. To see these messages, configure logging to
 capture `DEBUG` output from the `falcon_correlate.middleware` logger.
+
+### Configuration and generator errors
+
+Configuration validation failures are logged at `DEBUG` by the
+`falcon_correlate.middleware_config` logger. Each record has the structured
+fields `config_field` and `config_rejected_value`. Rejected strings are
+rendered with `repr()`, which escapes carriage returns and newlines. Other
+rejected values are rendered by qualified type name. Non-callable `generator`
+and `validator` values, and non-callable or asynchronous `metrics_recorder`
+values, are reported by type name only.
+
+If the configured generator raises during a request, the
+`falcon_correlate.middleware` logger emits an `ERROR` record with
+`exc_info=True` and the configured `header_name`. It does not attach the
+incoming ID. The middleware then propagates the original exception.
+
+### `metrics_recorder`
+
+`metrics_recorder` receives one immutable `CorrelationIDSelectionEvent` after
+the incoming ID has been classified and before any fallback ID is generated.
+One event is sent for every request outcome, including missing and untrusted
+headers, so the selection result remains available even if fallback generation
+later fails. Its fields are `outcome`, `trust`, and the configured
+`header_name` mapped to a finite label. `X-Correlation-ID` and `X-Request-ID`
+retain their canonical names; every other configured header maps to `other`.
+The event does not contain the incoming ID or `remote_addr`.
+
+The callback runs synchronously for both WSGI and ASGI middleware. Keep it
+quick and non-blocking: an ASGI callback runs on the event loop. If a recorder
+raises an exception, the middleware logs a `WARNING`, ignores the recorder
+failure, and continues processing the request.
+
+The possible selection outcomes are:
+
+| Outcome                    | Meaning                                                     |
+| -------------------------- | ----------------------------------------------------------- |
+| `missing`                  | No non-blank incoming ID was supplied.                      |
+| `untrusted`                | An incoming ID came from a source outside configured trust. |
+| `accepted`                 | A trusted incoming ID passed validation.                    |
+| `rejected_invalid`         | A trusted incoming ID failed validation.                    |
+| `rejected_validator_error` | The validator or its result raised during validation.       |
+
+*Table 2: Incoming correlation ID selection outcomes.*
+
+The trust value records whether the source was checked:
+
+| Trust           | Meaning                                                        |
+| --------------- | -------------------------------------------------------------- |
+| `trusted`       | The request source matched a configured trusted network.       |
+| `untrusted`     | The request source did not match a configured trusted network. |
+| `not_evaluated` | No non-blank incoming ID was present.                          |
+
+*Table 3: Source trust values in selection events.*
+
+A backend can use the enum outcomes, trust values, and allowlisted header
+labels as stable counter labels. Assuming `counter` is a counter supplied by
+the backend, a recorder can increment it with bounded event labels and be
+passed directly to middleware or through a pre-built configuration:
+
+```python
+from falcon_correlate import (
+    CorrelationIDConfig,
+    CorrelationIDMiddleware,
+    CorrelationIDSelectionEvent,
+)
+
+
+def record_selection(event: CorrelationIDSelectionEvent) -> None:
+    counter.labels(
+        outcome=event.outcome.value,
+        trust=event.trust.value,
+        header_name=event.header_name,
+    ).inc()
+
+
+middleware = CorrelationIDMiddleware(metrics_recorder=record_selection)
+config = CorrelationIDConfig(metrics_recorder=record_selection)
+configured_middleware = CorrelationIDMiddleware(config=config)
+```
+
+The event omits request-specific values, and its header label comes from a
+finite allowlist. Do not derive labels from incoming IDs or client addresses.
 
 ## Context Variables
 

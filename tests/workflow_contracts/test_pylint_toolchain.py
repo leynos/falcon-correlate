@@ -26,12 +26,16 @@ MAKEFILE_PATH = REPOSITORY_ROOT / "Makefile"
 WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
 PEP_695_FIXTURE = REPOSITORY_ROOT / "testdata" / "pylint_toolchain" / "valid_pep695.py"
 TOOL_TIMEOUT_SECONDS = 180
+TEST_TIMEOUT_SECONDS = TOOL_TIMEOUT_SECONDS * 4
 _PYLINT_TOOLCHAIN_PYTEST_GROUP = "pylint-toolchain-provisioning"
 PYLINT_ANALYSIS_MESSAGES = (
     "syntax-error,astroid-error,parse-error,config-parse-error,method-check-failed,"
     "raw-checker-failed,bad-plugin-value"
 )
-pytestmark = pytest.mark.xdist_group(name=_PYLINT_TOOLCHAIN_PYTEST_GROUP)
+pytestmark = [
+    pytest.mark.timeout(TEST_TIMEOUT_SECONDS),
+    pytest.mark.xdist_group(name=_PYLINT_TOOLCHAIN_PYTEST_GROUP),
+]
 
 
 @dc.dataclass(frozen=True, slots=True)

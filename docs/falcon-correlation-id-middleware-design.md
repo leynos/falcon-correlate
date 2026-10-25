@@ -1208,6 +1208,7 @@ correlation_middleware = CorrelationIDMiddleware(
 | `generator`               | `Callable[[], str]`               | `default_uuid7_generator` | A callable that returns a new string-based correlation ID (e.g., a UUIDv7).                                        |
 | `validator`               | `Callable[[str], bool]`, optional | `None`                    | An optional callable that takes the incoming ID string and returns `True` if valid, `False` otherwise.             |
 | `echo_header_in_response` | `bool`                            | `True`                    | If `True`, the determined correlation ID will be added to the specified header in the outgoing response.           |
+| `metrics_recorder`        | `MetricsRecorder`, optional       | `None`                    | A synchronous callback that records bounded selection outcomes and source trust.                                   |
 
 *Table 3: Middleware configuration options.*
 
@@ -1367,6 +1368,64 @@ variadic signature `**kwargs: typ.Unpack[CorrelationIDConfigKwargs]`, validates
 unknown keys, normalizes the values, and returns a validated configuration.
 This keeps runtime keyword validation with the configuration factory while
 preserving the middleware call interface.
+
+#### 4.6.11. Pluggable selection metrics
+
+`metrics_recorder` is an optional keyword-only configuration field that accepts
+a synchronous callback. The shared request path classifies the incoming ID and
+emits one immutable `CorrelationIDSelectionEvent` before invoking the fallback
+generator. This keeps the selection event available if generation fails and
+does not require the middleware to know which metrics backend is in use.
+
+The event exposes the finite `IncomingIDOutcome` and `SourceTrust` enums plus a
+bounded `header_name` label. The two allowlisted names are `X-Correlation-ID`
+and `X-Request-ID`; every other configured header maps to `other`. It omits the
+incoming ID and `remote_addr`, which prevents request data or arbitrary
+configuration values from becoming high-cardinality metric labels. A recorder
+can use `event.outcome.value`, `event.trust.value`, and `event.header_name`
+with its own counter implementation. Since the callback is synchronous and ASGI
+calls it on the event loop, it must remain quick and non-blocking.
+
+The package root and `middleware.py` re-export the four public metrics symbols
+for stable user imports. Internal modules and adapters should import metrics
+symbols directly from `middleware_metrics.py`, so public re-exports do not
+change module ownership or dependency direction.
+
+Falsey validator results map to `rejected_invalid`. Exceptions from the
+validator or from checking its result's truth value map to
+`rejected_validator_error` and still produce one selection event.
+
+Recorder exceptions are isolated from request processing. The middleware logs a
+`WARNING` and ignores recorder failures, while preserving the selection result
+and continuing to fallback generation or acceptance. This keeps metrics
+optional and prevents backend failures from changing request behaviour.
+
+#### 4.6.12. Falcon's fixed WSGI response-hook signature
+
+**Decision:** Preserve Falcon's four-parameter `process_response` callback
+signature, including `resource` and `req_succeeded`, even though this
+middleware uses only `req` and `resp`. Keep the argument-count suppressions
+local to the framework hook and retain their rationale and Issue #38 reference
+beside the method. Falcon requires the full callback signature; observability
+does not change it.
+
+#### 4.6.13. Bound metric header labels
+
+**Decision:** Keep `header_name` on `CorrelationIDSelectionEvent`, but
+canonicalize it to `X-Correlation-ID` or `X-Request-ID`; map every other
+configured value to `other`. The header is configuration rather than
+request-controlled data, but user-defined configuration can still create
+unbounded labels across deployments. This finite mapping preserves the two
+common header distinctions without allowing arbitrary configuration to expand
+metric cardinality. The outcome and trust enums remain the other event labels.
+
+#### 4.6.14. Preserve concurrent response lifecycle coverage
+
+**Decision:** Retain the concurrent response-header isolation example and
+property test. They exercise the shared middleware's response echo and
+request-local context cleanup under concurrent requests, which this
+observability change must leave intact. The existing tests cover that
+lifecycle, so this change does not duplicate their concurrency scenarios.
 
 ## 5. Conclusion and recommendations
 
@@ -2240,8 +2299,10 @@ the Falcon middleware orchestration and compatibility re-export layer.
    `middleware_config.py` and `correlation_id_var` from `middleware_utils.py`.
    `celery.py` imports `correlation_id_var` from `middleware_utils.py`.
 2. **Compatibility:** `middleware.py` continues to re-export
-   `DEFAULT_HEADER_NAME`, `correlation_id_var`, and `user_id_var`. Package-root
-   exports remain unchanged.
+   `DEFAULT_HEADER_NAME`, `correlation_id_var`, and `user_id_var`. Issue #40
+   adds the public metrics symbols to the `middleware.py` and package-root
+   exports; internal adapters continue importing from each symbol's owning
+   module.
 3. **Optional dependency safety:** HTTPX and Celery remain lazily imported, so
    importing the package or adapter module does not require the corresponding
    optional dependency.

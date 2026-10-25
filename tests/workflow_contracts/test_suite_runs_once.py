@@ -37,9 +37,10 @@ if typ.TYPE_CHECKING:
 
 INTERPRETERS = ("3.12", "3.13", "3.14")
 PLAIN_SUITE = "uv run pytest -v -n auto --dist=loadgroup --ignore=tests/workflows"
-PLAIN_SUITE_WITH_OPTIONAL_CELERY_EXCLUDED = (
+PLAIN_SUITE_WITH_SERIAL_TESTS_EXCLUDED = (
     f"{PLAIN_SUITE} "
-    "--ignore=src/falcon_correlate/unittests/test_optional_celery_dependency.py"
+    "--ignore=src/falcon_correlate/unittests/test_optional_celery_dependency.py "
+    "--ignore=src/falcon_correlate/unittests/test_observability_contracts.py"
 )
 COVERAGE_ACTION = "leynos/shared-actions/.github/actions/generate-coverage@"
 MATRIX_KEY = "python-version"
@@ -150,7 +151,7 @@ def _runs_suite(step: dict[str, typ.Any], where: str) -> bool:
     command = str(step.get("run", "")).strip()
     if not SUITE_HINT.search(command):
         return False
-    if command in {PLAIN_SUITE, PLAIN_SUITE_WITH_OPTIONAL_CELERY_EXCLUDED}:
+    if command in {PLAIN_SUITE, PLAIN_SUITE_WITH_SERIAL_TESTS_EXCLUDED}:
         return True
     message = f"{where}: cannot tell whether {command!r} runs the suite"
     raise WorkflowReadError(message)

@@ -12,6 +12,7 @@ import pytest
 from falcon_correlate.unittests.uuid7_helpers import assert_uuid7_hex
 
 ATTRIBUTE_DOCSTRING_EXPORT_MODULES = {
+    "MetricsRecorder": "falcon_correlate.middleware_metrics",
     "RECOMMENDED_LOG_FORMAT": "falcon_correlate.middleware_utils",
     "correlation_id_var": "falcon_correlate.middleware_utils",
     "user_id_var": "falcon_correlate.middleware_utils",
@@ -54,6 +55,8 @@ def _assigns_name(node: ast.stmt, name: str) -> bool:
 
     """
     match node:
+        case ast.TypeAlias(name=ast.Name(id=target_name)):
+            return target_name == name
         case ast.AnnAssign(target=ast.Name(id=target_name)):
             return target_name == name
         case ast.Assign(targets=targets):
@@ -128,8 +131,12 @@ class TestPublicExports:
 
         expected_exports = {
             "CorrelationIDConfig",
+            "CorrelationIDSelectionEvent",
             "CorrelationIDMiddleware",
             "CorrelationIDMiddlewareASGI",
+            "IncomingIDOutcome",
+            "MetricsRecorder",
+            "SourceTrust",
             "default_uuid7_generator",
         }
         missing_exports = expected_exports.difference(falcon_correlate.__all__)
@@ -148,6 +155,20 @@ class TestPublicExports:
 
         value = gen()
         assert_uuid7_hex(value)
+
+    def test_metrics_symbols_importable_from_middleware(self) -> None:
+        """Verify metrics API symbols are also exposed from middleware."""
+        from falcon_correlate import middleware
+
+        expected = {
+            "CorrelationIDSelectionEvent",
+            "IncomingIDOutcome",
+            "MetricsRecorder",
+            "SourceTrust",
+        }
+        assert expected.issubset(middleware.__all__), (
+            f"expected middleware exports {expected!r}"
+        )
 
     def test_public_exports_are_documented(self) -> None:
         """Verify every public export has user-facing documentation."""
