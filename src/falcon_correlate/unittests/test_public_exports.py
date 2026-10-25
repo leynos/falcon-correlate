@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import ast
 import importlib
+import importlib.util
 import inspect
+import os
+import subprocess  # ruff: ignore[suspicious-subprocess-import] -- child isolates module state.
+import sys
 from pathlib import Path
 
 import pytest
@@ -17,6 +21,8 @@ ATTRIBUTE_DOCSTRING_EXPORT_MODULES = {
     "correlation_id_var": "falcon_correlate.middleware_utils",
     "user_id_var": "falcon_correlate.middleware_utils",
 }
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_NATIVE_MODULE_IMPORT_TIMEOUT_SECONDS = 120
 
 
 def _module_syntax_tree(module_name: str) -> ast.Module:
@@ -125,29 +131,105 @@ class TestPublicExports:
     """Tests for package public exports."""
 
     def test_public_exports_in_all(self) -> None:
-        """Verify expected names are present in __all__."""
+        """Verify __all__ contains exactly the intended package API names."""
         import falcon_correlate
         from falcon_correlate import CorrelationIDMiddlewareASGI
 
         expected_exports = {
+            "RECOMMENDED_LOG_FORMAT",
+            "AsyncCorrelationIDTransport",
+            "ContextualLogFilter",
             "CorrelationIDConfig",
-            "CorrelationIDSelectionEvent",
             "CorrelationIDMiddleware",
             "CorrelationIDMiddlewareASGI",
+            "CorrelationIDSelectionEvent",
+            "CorrelationIDTransport",
             "IncomingIDOutcome",
             "MetricsRecorder",
             "SourceTrust",
+            "async_request_with_correlation_id",
+            "clear_correlation_id_in_worker",
+            "configure_celery_correlation",
+            "correlation_id_var",
             "default_uuid7_generator",
+            "default_uuid_validator",
+            "propagate_correlation_id_to_celery",
+            "request_with_correlation_id",
+            "setup_correlation_id_in_worker",
+            "user_id_var",
         }
-        missing_exports = expected_exports.difference(falcon_correlate.__all__)
-        failure_message = f"expected exports missing from __all__: {missing_exports}"
-        assert not missing_exports, failure_message
+        actual_exports = set(falcon_correlate.__all__)
+        missing_exports = expected_exports.difference(actual_exports)
+        unexpected_exports = actual_exports.difference(expected_exports)
+        assert not missing_exports, (
+            f"expected exports missing from __all__: {sorted(missing_exports)}"
+        )
+        assert not unexpected_exports, (
+            f"unexpected exports in __all__: {sorted(unexpected_exports)}"
+        )
         failure_message = (
             "expected condition: CorrelationIDMiddlewareASGI is falcon_cor..."
         )
         assert (
             CorrelationIDMiddlewareASGI is falcon_correlate.CorrelationIDMiddlewareASGI
         ), failure_message
+
+    def test_removed_hello_api_and_modules_are_absent(self) -> None:
+        """Verify the removed template API has no importable remnants.
+
+        Notes
+        -----
+        The root package must not expose the function, and import resolution
+        must not find either deleted implementation module.
+        """
+        import falcon_correlate
+
+        assert not hasattr(falcon_correlate, "hello"), (
+            "package root must not expose the removed hello function"
+        )
+        assert importlib.util.find_spec("falcon_correlate.pure") is None, (
+            "removed pure module must not be importable"
+        )
+        assert importlib.util.find_spec("falcon_correlate._hello") is None, (
+            "removed hello shim must not be importable"
+        )
+
+    def test_package_import_does_not_load_optional_native_module(self) -> None:
+        """Verify package import does not load the optional native module.
+
+        Notes
+        -----
+        A child interpreter starts with an empty module cache, so this check
+        observes the package import boundary directly.
+        """
+        script = """
+import sys
+
+import falcon_correlate
+
+if "falcon_correlate._falcon_correlate_rs" in sys.modules:
+    raise RuntimeError("Package import loaded the optional native module")
+"""
+        environment = {
+            key: value
+            for key, value in os.environ.items()
+            if not key.startswith("PYTEST_")
+        }
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- fixed child interpreter and script.
+            [sys.executable, "-c", script],
+            check=False,
+            cwd=_PROJECT_ROOT,
+            env=environment,
+            text=True,
+            capture_output=True,
+            timeout=_NATIVE_MODULE_IMPORT_TIMEOUT_SECONDS,
+        )
+
+        assert result.returncode == 0, (
+            "Package import should not load the optional native module.\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
 
     def test_default_uuid7_generator_importable_from_root(self) -> None:
         """Verify default_uuid7_generator can be imported from package root."""
