@@ -943,7 +943,7 @@ class _CorrelationIDMiddlewareBase:
             raise
 
     def _reset_correlation_id_context(self, req, token: object) -> None:
-        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
+        setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
 
         if not isinstance(token, contextvars.Token):
             return
@@ -957,7 +957,7 @@ class _CorrelationIDMiddlewareBase:
             logger.debug("Ignoring invalid correlation ID reset token", exc_info=True)
 
     def _process_response(self, req, resp) -> None:
-        token = getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, None)
+        token = getattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, None)
         try:
             if (
                 isinstance(token, contextvars.Token)
