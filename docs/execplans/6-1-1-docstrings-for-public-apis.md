@@ -244,6 +244,35 @@ Stop and escalate when any of these is reached:
 
 ## Decision log
 
+- Decision: Preserve the upstream issue #37 configuration-test split when
+  rebasing issue #36. Keep direct `from_kwargs` behaviour cases in
+  `test_config_validation.py` and the middleware-construction equivalence test
+  in `TestConfigConstruction`, including generator and validator identity.
+  Rationale: the upstream split gives each test class a clear responsibility;
+  issue #36's coverage fits those boundaries without restoring the old
+  monolithic class. Date/Author: 2026-10-23, implementation agent.
+
+- Decision: Retain issue #49's adapter-boundary guidance in
+  `developers-guide.md` alongside issue #36's factory-delegation guidance.
+  Rationale: these describe separate module boundaries and both apply after the
+  rebase. Date/Author: 2026-10-23, implementation agent.
+
+- Decision: Preserve upstream issue #43's request-lifecycle documentation and
+  issue #38's `process_response` argument-count suppression while rebasing
+  issue #36. Rationale: the lifecycle material describes a separate shared
+  middleware boundary, and Falcon fixes the WSGI callback signature; unlike
+  that callback, `from_kwargs` can preserve keyword compatibility with the
+  typed variadic signature. Keep the issue #38 suppression scoped to
+  `middleware.py`. Date/Author: 2026-10-25, implementation agent.
+
+- Decision: Retain issue #44's concurrent response-header tests without
+  duplicating them in issue #36's factory tests. Rationale: issue #44 verifies
+  request-scoped header and context isolation across concurrent middleware
+  calls, while issue #36 covers factory defaults, normalization, unknown-key
+  rejection, subclass construction, and middleware equivalence. The full test
+  suite exercises both boundaries. Date/Author: 2026-10-25, implementation
+  agent.
+
 - Decision: Stop before enabling repo-wide `DOC` because the measured baseline
   exceeds the plan's exception threshold. Rationale: the plan permits
   autonomous implementation only while the `DOC` scope stays below roughly 60
@@ -365,9 +394,12 @@ Public docstrings that are single-line and need sections:
   (`celery.py`) — need `Parameters`/`Notes`.
 - `hello` (`pure.py`) — needs `Returns`.
 
+Since this plan was drafted, `CorrelationIDConfig.from_kwargs` has gained
+documentation for its accepted keys, defaults, `Raises`, and `Examples` in
+[issue #36].
+
 Existing docstrings missing some sections:
 
-- `CorrelationIDConfig.from_kwargs` — needs `Raises` and `Examples`.
 - `CorrelationIDConfig.__post_init__` — needs `Raises`.
 - `CorrelationIDConfig`, `CorrelationIDMiddleware` — would benefit from
   `Examples`/`Attributes`.
@@ -528,8 +560,9 @@ Milestone 3 — public API:
    and `clear_correlation_id_in_worker` (explain the LIFO reset-token stack);
    add non-executed `Examples` to `propagate_correlation_id_to_celery` and
    `configure_celery_correlation`.
-5. `middleware_config.py`: add `Raises` to `from_kwargs` and `__post_init__`;
-   add `Examples`/`Attributes` to `CorrelationIDConfig` where helpful.
+5. `middleware_config.py`: add `Raises` to `__post_init__` and
+   `Examples`/`Attributes` to `CorrelationIDConfig` where helpful. The
+   `from_kwargs` `Raises` and `Examples` sections were added in [issue #36].
 6. `middleware.py`: add `Examples`/`Attributes` to `CorrelationIDMiddleware`
    only as far as the 400-line limit allows; if the limit binds, prefer a
    concise `Examples` block and escalate before splitting.
@@ -723,3 +756,4 @@ Signposted skills:
   `ContextualLogFilter` description.
 - `en-gb-oxendict` — en-GB Oxford spelling in prose and docstrings.
 - `changelog` — only if a CHANGELOG is introduced (it is not; roadmap 6.3.1).
+[issue #36]: <https://github.com/leynos/falcon-correlate/issues/36>

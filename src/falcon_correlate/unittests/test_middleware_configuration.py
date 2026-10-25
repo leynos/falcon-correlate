@@ -6,6 +6,7 @@ import pytest
 
 from falcon_correlate import CorrelationIDConfig, CorrelationIDMiddleware
 from falcon_correlate.middleware import default_uuid7_generator
+from falcon_correlate.middleware_utils import default_uuid_validator
 
 
 class TestDefaultValues:
@@ -294,15 +295,21 @@ class TestConfigConstruction:
         header_name = "X-Request-ID"
         trusted_sources_list = ["127.0.0.1", "10.0.0.1"]
         echo_header_in_response = False
+        generator = default_uuid7_generator
+        validator = default_uuid_validator
 
         cfg_direct = CorrelationIDConfig(
             header_name=header_name,
             trusted_sources=frozenset(trusted_sources_list),
+            generator=generator,
+            validator=validator,
             echo_header_in_response=echo_header_in_response,
         )
         cfg_from_kwargs = CorrelationIDConfig.from_kwargs(
             header_name=header_name,
             trusted_sources=trusted_sources_list,
+            generator=generator,
+            validator=validator,
             echo_header_in_response=echo_header_in_response,
         )
 
@@ -323,4 +330,10 @@ class TestConfigConstruction:
         )
         assert cfg_from_kwargs.trusted_sources == cfg_direct.trusted_sources, (
             failure_message
+        )
+        assert cfg_from_kwargs.generator is cfg_direct.generator, (
+            "expected the factory to preserve the supplied generator"
+        )
+        assert cfg_from_kwargs.validator is cfg_direct.validator, (
+            "expected the factory to preserve the supplied validator"
         )

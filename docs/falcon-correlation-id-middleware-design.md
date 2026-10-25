@@ -200,8 +200,11 @@ The implementation exposes WSGI and ASGI as separate public classes:
 `CorrelationIDMiddleware` for `falcon.App` and `CorrelationIDMiddlewareASGI` for
 `falcon.asgi.App`. Both classes delegate to the private
 `_CorrelationIDMiddlewareBase` in `falcon_correlate.middleware_base`, where
-configuration resolution, incoming ID selection, response-header echoing, and
-`ContextVar` cleanup are shared. The ASGI class adapts Falcon's hook shape with
+incoming ID selection, response-header echoing, and `ContextVar` cleanup are
+shared. Public middleware keyword calls remain available: the base checks for a
+conflict between `config` and individual options, then delegates those options
+to `CorrelationIDConfig.from_kwargs` for validation and configuration
+resolution. The ASGI class adapts Falcon's hook shape with
 `async process_request(self, req, resp)` and
 `async process_response(self, req, resp, resource, req_succeeded)` methods.
 
@@ -1354,6 +1357,17 @@ The `ContextualLogFilter` class docstring includes both a handler-level example
 using the constant and a complete `dictConfig` example, providing
 copy-pasteable configurations for the two most common logging setup patterns.
 
+#### 4.6.10. Configuration factory ownership
+
+The WSGI and ASGI middleware constructors retain their public individual
+keyword options. `_CorrelationIDMiddlewareBase` first rejects a call that
+supplies both `config` and individual options, then delegates individual
+options to `CorrelationIDConfig.from_kwargs`. The factory accepts the typed
+variadic signature `**kwargs: typ.Unpack[CorrelationIDConfigKwargs]`, validates
+unknown keys, normalizes the values, and returns a validated configuration.
+This keeps runtime keyword validation with the configuration factory while
+preserving the middleware call interface.
+
 ## 5. Conclusion and recommendations
 
 This report has detailed the design for a comprehensive correlation ID
@@ -2234,3 +2248,21 @@ the Falcon middleware orchestration and compatibility re-export layer.
 4. **Boundary validation:** Static AST tests reject adapter imports from
    `middleware.py` and verify public primitive identity. Blocked-HTTPX
    subprocess tests check package and adapter imports without HTTPX installed.
+
+### A.15. Configuration factory ownership (Issue #36, 2026-10-25)
+
+**Decision:** The middleware base preserves the public individual keyword
+interface and checks the conflict between `config` and individual options
+before delegating those options to `CorrelationIDConfig.from_kwargs`. The
+factory owns unknown-key validation and normalization, using the typed
+`**kwargs: typ.Unpack[CorrelationIDConfigKwargs]` signature to return a
+validated configuration.
+
+**Rationale:**
+
+1. **Compatibility:** Existing keyword calls to the middleware constructors
+   remain available.
+2. **Single validation owner:** Unknown-key checks and option normalization
+   belong to the factory that constructs the validated configuration.
+3. **Conflict precedence:** The middleware base rejects simultaneous `config`
+   and individual options before factory delegation.
