@@ -901,7 +901,7 @@ class _CorrelationIDMiddlewareBase:
             return True
         logger.debug(
             "Correlation ID failed validation, generating new ID",
-            extra=self._log_context(incoming),
+            extra={"header_name": self._config.header_name},
         )
         return False
 
