@@ -293,9 +293,10 @@ def missing_names(
 def digest_mismatches(
     expected: cabc.Iterable[str],
     pypi_files: cabc.Mapping[str, PypiFile],
-    github_assets: cabc.Mapping[str, str | None],
+    candidate_assets: cabc.Mapping[str, str | None],
+    candidate_name: str = "GitHub Release",
 ) -> list[str]:
-    """Describe missing or differing distribution digests across destinations.
+    """Describe missing or differing candidate digests against PyPI.
 
     Parameters
     ----------
@@ -303,8 +304,10 @@ def digest_mismatches(
         Distribution filenames that the release must contain.
     pypi_files : collections.abc.Mapping[str, PypiFile]
         PyPI Simple index entries.
-    github_assets : collections.abc.Mapping[str, str or None]
-        GitHub release asset digests.
+    candidate_assets : collections.abc.Mapping[str, str or None]
+        Candidate destination digests, or ``None`` when absent.
+    candidate_name : str, default ``"GitHub Release"``
+        Destination label used in diagnostics.
 
     Returns
     -------
@@ -317,14 +320,14 @@ def digest_mismatches(
         if pypi_file is None:
             problems.append(f"{name} is missing from PyPI")
             continue
-        github_digest = github_assets.get(name)
-        if name not in github_assets:
-            problems.append(f"{name} is missing from the GitHub Release")
-        elif github_digest is None:
-            problems.append(f"{name} has no GitHub SHA-256 digest")
-        elif github_digest != pypi_file.sha256:
+        candidate_digest = candidate_assets.get(name)
+        if name not in candidate_assets:
+            problems.append(f"{name} is missing from {candidate_name}")
+        elif candidate_digest is None:
+            problems.append(f"{name} has no {candidate_name} SHA-256 digest")
+        elif candidate_digest != pypi_file.sha256:
             problems.append(
                 f"{name} differs: PyPI sha256 {pypi_file.sha256}, "
-                f"GitHub sha256 {github_digest}"
+                f"{candidate_name} sha256 {candidate_digest}"
             )
     return problems

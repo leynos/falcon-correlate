@@ -50,12 +50,17 @@ def _configure_publish(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     pypi_files: dict[str, bytes],
+    local_files: dict[str, bytes] | None = None,
 ) -> None:
     """Set release inputs and provide a tag-named bundle."""
     distributions = tmp_path / "dist"
     distributions.mkdir()
-    (distributions / _WHEEL).write_bytes(b"local wheel")
-    (distributions / _SDIST).write_bytes(b"local sdist")
+    local_files = local_files or {
+        _WHEEL: b"local wheel",
+        _SDIST: b"local sdist",
+    }
+    for name, content in local_files.items():
+        (distributions / name).write_bytes(content)
     bundle_dir = tmp_path / "bundle"
     bundle_dir.mkdir()
     bundle = bundle_dir / _BUNDLE
@@ -75,10 +80,11 @@ def _set_gh_responses(
     first_view: str,
     second_view: str,
 ) -> None:
-    """Script the before/after views, upload and edit calls."""
+    """Script the preflight and reconciliation views, upload and edit calls."""
     monkeypatch.setenv(
         "GH_RESPONSES",
         json.dumps([
+            {"stdout": first_view},
             {"stdout": first_view},
             {},
             {"stdout": second_view},
@@ -93,7 +99,7 @@ def test_publish_downloads_pypi_bytes_for_missing_release_assets(
     curl_argv_log: Path,
     gh_argv_log: Path,
 ) -> None:
-    """Missing distribution assets come from PyPI and are verified before upload."""
+    """Missing files use PyPI bytes while an existing bundle is preserved."""
     pypi_bytes = {
         _WHEEL: b"canonical wheel",
         _SDIST: b"canonical sdist",
@@ -103,7 +109,7 @@ def test_publish_downloads_pypi_bytes_for_missing_release_assets(
     assets = {**pypi_bytes, _BUNDLE: _BUNDLE_BYTES}
     _set_gh_responses(
         monkeypatch,
-        _release_view(assets, (_WHEEL,)),
+        _release_view(assets, (_WHEEL, _BUNDLE)),
         _release_view(assets, (_WHEEL, _SDIST, _BUNDLE)),
     )
     monkeypatch.setenv(
@@ -123,8 +129,8 @@ def test_publish_downloads_pypi_bytes_for_missing_release_assets(
     assert staged_sdist.read_bytes() == pypi_bytes[_SDIST], (
         "the uploaded source archive must use PyPI's canonical bytes"
     )
-    assert any(path.name == _BUNDLE for path in uploaded_paths), (
-        "the tag-named attestation bundle must be attached when absent"
+    assert not any(path.name == _BUNDLE for path in uploaded_paths), (
+        "an existing tag-named attestation bundle must not be replaced"
     )
     assert "--clobber" not in upload, (
         "release reconciliation must never overwrite assets"
@@ -167,7 +173,8 @@ def test_noop_rerun_still_un_drafts_the_fully_reconciled_release(
         {**pypi_bytes, _BUNDLE: _BUNDLE_BYTES}, (_WHEEL, _SDIST, _BUNDLE)
     )
     monkeypatch.setenv(
-        "GH_RESPONSES", json.dumps([{"stdout": view}, {"stdout": view}, {}])
+        "GH_RESPONSES",
+        json.dumps([{"stdout": view}, {"stdout": view}, {"stdout": view}, {}]),
     )
 
     result = release_assets_cli.main(["publish-release"])
@@ -197,9 +204,15 @@ def test_existing_github_digest_mismatch_fails_before_upload(
     pypi_bytes = {_WHEEL: b"canonical wheel", _SDIST: b"canonical sdist"}
     _configure_publish(tmp_path, monkeypatch, pypi_bytes)
     wrong_assets = json.dumps({
-        "assets": [{"name": _WHEEL, "digest": f"sha256:{_sha256(b'wrong wheel')}"}]
+        "assets": [
+            {"name": _WHEEL, "digest": f"sha256:{_sha256(b'wrong wheel')}"},
+            {"name": _BUNDLE, "digest": f"sha256:{_sha256(_BUNDLE_BYTES)}"},
+        ]
     })
-    monkeypatch.setenv("GH_RESPONSES", json.dumps([{"stdout": wrong_assets}]))
+    monkeypatch.setenv(
+        "GH_RESPONSES",
+        json.dumps([{"stdout": wrong_assets}, {"stdout": wrong_assets}]),
+    )
 
     result = release_assets_cli.main(["publish-release"])
 
@@ -210,6 +223,67 @@ def test_existing_github_digest_mismatch_fails_before_upload(
     )
     assert not any(call[:2] == ["release", "upload"] for call in calls), (
         "mismatched pre-existing bytes must not be overwritten"
+    )
+
+
+@pytest.mark.usefixtures("curl_argv_log")
+def test_new_bundle_is_uploaded_when_local_bytes_match_pypi(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    gh_argv_log: Path,
+) -> None:
+    """A first-run bundle is attached when it attests PyPI's exact bytes."""
+    pypi_bytes = {_WHEEL: b"canonical wheel", _SDIST: b"canonical sdist"}
+    _configure_publish(tmp_path, monkeypatch, pypi_bytes, local_files=pypi_bytes)
+    _set_gh_responses(
+        monkeypatch,
+        _release_view(pypi_bytes, (_WHEEL, _SDIST)),
+        _release_view(
+            {**pypi_bytes, _BUNDLE: _BUNDLE_BYTES}, (_WHEEL, _SDIST, _BUNDLE)
+        ),
+    )
+
+    result = release_assets_cli.main(["publish-release"])
+
+    calls = [json.loads(line) for line in gh_argv_log.read_text().splitlines()]
+    upload = next(call for call in calls if call[:2] == ["release", "upload"])
+    assert result == 0, "matching distributions must allow bundle publication"
+    assert [Path(path).name for path in upload[3:]] == [_BUNDLE], (
+        "only the missing tag-named bundle must be uploaded"
+    )
+
+
+@pytest.mark.usefixtures("curl_argv_log")
+def test_new_bundle_requires_local_bytes_to_match_pypi(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    gh_argv_log: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A new bundle cannot attest bytes that differ from PyPI's files."""
+    _configure_publish(
+        tmp_path,
+        monkeypatch,
+        {_WHEEL: b"canonical wheel", _SDIST: b"canonical sdist"},
+    )
+    monkeypatch.setenv("GH_RESPONSES", json.dumps([{"stdout": '{"assets": []}'}]))
+
+    result = release_assets_cli.main(["publish-release"])
+
+    calls = [json.loads(line) for line in gh_argv_log.read_text().splitlines()]
+    curl_calls = [
+        json.loads(line)
+        for line in (tmp_path / "curl-argv.jsonl").read_text().splitlines()
+    ]
+    assert result == 1, "a new bundle cannot attest non-canonical local bytes"
+    assert "local release distributions differ from PyPI" in capsys.readouterr().err, (
+        "the failure must explain the provenance mismatch"
+    )
+    assert not any(call[:2] == ["release", "upload"] for call in calls), (
+        "mismatched distributions must fail before release uploads"
+    )
+    assert not any("--output" in call for call in curl_calls), (
+        "mismatched distributions must fail before downloading release files"
     )
 
 

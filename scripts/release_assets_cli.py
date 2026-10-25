@@ -1,8 +1,6 @@
 #!/usr/bin/env -S uv run python
-# Python 3.12 is the project support floor. Keep this CLI stdlib-only and use
-# argv-based subprocess calls so recording PATH stand-ins can test gh and curl.
-# This intentionally bypasses Cyclopts and plumbum: workflow tests need to
-# intercept exact external argv through PATH without extra runtime packages.
+# Python 3.12 is the support floor. This CLI is stdlib-only so PATH stand-ins
+# can intercept argv-based subprocess calls without Cyclopts or plumbum.
 # /// script
 # requires-python = ">=3.12"
 # dependencies = []
@@ -24,13 +22,11 @@ Set only the variables listed for the selected command. Example invocations:
    CLI=scripts/release_assets_cli.py
    SOURCE_DIR=build DIST_DIR=dist uv run --script "$CLI" collect
    DIST_DIR=dist SIMPLE_INDEX_URL=https://pypi.org/simple/pkg/ \
-      STAGING_DIR=stage GITHUB_OUTPUT=output \
-      uv run --script "$CLI" stage-pypi
+      STAGING_DIR=stage GITHUB_OUTPUT=output uv run --script "$CLI" stage-pypi
    DIST_DIR=dist RELEASE_TAG=v1.2.0 uv run --script "$CLI" ensure-draft
    DIST_DIR=dist RELEASE_TAG=v1.2.0 PRERELEASE=false \
       SIMPLE_INDEX_URL=https://pypi.org/simple/pkg/ \
-      BUNDLE_DIR=bundle STAGING_DIR=stage \
-      uv run --script "$CLI" publish-release
+      BUNDLE_DIR=bundle STAGING_DIR=stage uv run --script "$CLI" publish-release
 """
 
 from __future__ import annotations
@@ -320,6 +316,18 @@ def _publish_release() -> None:
 
     index = _read_index(_required("SIMPLE_INDEX_URL"), names)
     index = {name: index[name] for name in names}
+    if bundle.name not in _release_assets(tag):
+        problems = digest_mismatches(
+            names,
+            index,
+            {path.name: sha256_file(path) for path in distributions},
+            "local build",
+        )
+        if problems:
+            raise ReleaseAssetError(
+                "local release distributions differ from PyPI: " + "; ".join(problems)
+            )
+
     verified_assets = _reconcile_release_assets(
         tag, index, bundle, Path(_required("STAGING_DIR"))
     )
