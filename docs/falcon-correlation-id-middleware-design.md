@@ -280,7 +280,9 @@ In process_request:
 
 1. `_resolve_correlation_id` reads the incoming header and selects it only
    when the source is trusted and validation succeeds; otherwise, it generates
-   a new ID. This query does not write request or `ContextVar` state.
+   a new ID. `_can_accept_incoming_id` checks trust before validation and logs
+   a DEBUG rejection for an invalid ID from a trusted source. This query does
+   not write request or `ContextVar` state.
 2. `_store_request_correlation_id` stores the selected ID on
    `req.context.correlation_id`, sets the configured `ContextVar`, and stores
    the returned reset token on the request context.
@@ -844,10 +846,13 @@ shared lifecycle. Logging context details are abbreviated here.
 
 ```python
 import contextvars
+import ipaddress
 import logging
 import uuid
 
-from .middleware_utils import CORRELATION_ID_RESET_TOKEN_ATTR
+from .middleware_utils import (
+    CORRELATION_ID_RESET_TOKEN_ATTR as _CORRELATION_ID_RESET_TOKEN_ATTR,
+)
 
 logger = logging.getLogger("falcon_correlate.middleware")
 
@@ -868,6 +873,15 @@ def default_uuid7_generator() -> str:
 
 
 class _CorrelationIDMiddlewareBase:
+    def _is_trusted_source(self, remote_addr: str | None) -> bool:
+        if not remote_addr:
+            return False
+        try:
+            address = ipaddress.ip_address(remote_addr)
+        except ValueError:
+            return False
+        return any(address in network for network in self._config._parsed_networks)
+
     def _is_valid_id(self, value: str) -> bool:
         if self._config.validator is None:
             return True
@@ -880,23 +894,31 @@ class _CorrelationIDMiddlewareBase:
             )
             return False
 
-    def _process_request(self, req) -> None:
-        raw_header = req.get_header(self._config.header_name)
-        incoming = raw_header.strip() if raw_header is not None else ""
-        incoming = incoming or None
+    def _can_accept_incoming_id(self, req, incoming: str) -> bool:
+        if not self._is_trusted_source(req.remote_addr):
+            return False
+        if self._is_valid_id(incoming):
+            return True
+        logger.debug(
+            "Correlation ID failed validation, generating new ID",
+            extra=self._log_context(incoming),
+        )
+        return False
 
-        if incoming is not None and self._is_trusted_source(req.remote_addr):
-            if self._is_valid_id(incoming):
-                correlation_id = incoming
-            else:
-                logger.debug("Correlation ID failed validation; generating new ID")
-                correlation_id = self._config.generator()
-        else:
-            correlation_id = self._config.generator()
+    def _resolve_correlation_id(self, req) -> str:
+        incoming = self._get_incoming_header_value(req)
+        if incoming is not None and self._can_accept_incoming_id(req, incoming):
+            return incoming
+        return self._config.generator()
 
+    def _store_request_correlation_id(self, req, correlation_id: str) -> None:
         req.context.correlation_id = correlation_id
-        token = self._correlation_id_var.set(correlation_id)
-        setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, token)
+        reset_token = self._correlation_id_var.set(correlation_id)
+        setattr(req.context, _CORRELATION_ID_RESET_TOKEN_ATTR, reset_token)
+
+    def _process_request(self, req) -> None:
+        correlation_id = self._resolve_correlation_id(req)
+        self._store_request_correlation_id(req, correlation_id)
 
         # Authentication middleware or application code owns user_id_var.
         # This middleware does not set it or reset it during response cleanup.
@@ -957,12 +979,13 @@ ASGI hooks share this lifecycle. The request-local token rationale appears in
 [Appendix A.3](#a3-context-variable-lifecycle-management-task-242).
 
 **Screen reader caption:** Sequence diagram showing Falcon invoking the shared
-middleware's request hook, which sets `correlation_id_var` and stores its token
-on `req.context`. During response processing, a middleware-owned token enables
-the echo helper; it writes the resolved ID only when echo is enabled and the ID
-is not `None`. The `finally` path clears the request token and resets the
-context variable only for a token owned by this middleware before any header
-error propagates to Falcon.
+middleware's request hook, which resolves an ID without writing request or
+`ContextVar` state, then stores the ID on `req.context`, sets
+`correlation_id_var`, and saves its token on `req.context`. During response
+processing, a middleware-owned token enables the echo helper; it writes the
+resolved ID only when echo is enabled and the ID is not `None`. The `finally`
+path clears the request token and resets the context variable only for a token
+owned by this middleware before any header error propagates to Falcon.
 
 ```mermaid
 sequenceDiagram
@@ -973,9 +996,27 @@ sequenceDiagram
     participant Response as resp
 
     Falcon->>Middleware: _process_request(req)
+    Middleware->>Middleware: _resolve_correlation_id(req)
+    Middleware->>Request: read and strip incoming header
+    alt incoming header is present
+        Middleware->>Middleware: _can_accept_incoming_id(req, incoming)
+        Middleware->>Middleware: check trust before validation
+        alt source is trusted and validation succeeds
+            Middleware->>Middleware: select incoming ID
+        else source is untrusted or validation fails
+            opt trusted source with invalid ID
+                Middleware->>Middleware: log DEBUG rejection
+            end
+            Middleware->>Middleware: generate a new ID
+        end
+    else incoming header is missing or blank
+        Middleware->>Middleware: generate a new ID
+    end
+    Note over Middleware: resolution makes no request or ContextVar writes
+    Middleware->>Request: write context.correlation_id
     Middleware->>Context: set(correlation_id)
     Context-->>Middleware: token
-    Middleware->>Request: store correlation_id and token
+    Middleware->>Request: store reset-token attribute
     Falcon->>Middleware: _process_response(req, resp)
     Middleware->>Request: read middleware-owned token
     alt token is an owned contextvars.Token
