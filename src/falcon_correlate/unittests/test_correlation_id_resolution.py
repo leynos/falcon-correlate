@@ -278,32 +278,6 @@ def test_store_request_correlation_id_writes_all_request_state(
     _run_in_isolated_context(exercise)
 
 
-def _process_public_request_hook(
-    middleware: _CorrelationIDMiddlewareBase,
-    middleware_type: type[_CorrelationIDMiddlewareBase],
-    req: _RequestStub,
-) -> None:
-    """Invoke the adapter's public hook, awaiting the ASGI implementation."""
-    if middleware_type is CorrelationIDMiddlewareASGI:
-
-        async def invoke_asgi() -> None:
-            """Invoke the ASGI request hook with the minimal request double."""
-            asgi_middleware = typ.cast("CorrelationIDMiddlewareASGI", middleware)
-            await asgi_middleware.process_request(
-                typ.cast("falcon.asgi.Request", req),
-                typ.cast("falcon.asgi.Response", object()),
-            )
-
-        asyncio.run(invoke_asgi())
-        return
-
-    wsgi_middleware = typ.cast("CorrelationIDMiddleware", middleware)
-    wsgi_middleware.process_request(
-        typ.cast("falcon.Request", req),
-        typ.cast("falcon.Response", object()),
-    )
-
-
 @pytest.mark.parametrize(
     "middleware_type",
     _MIDDLEWARE_TYPES,
@@ -328,10 +302,40 @@ def test_public_process_request_leaves_state_unchanged_when_generator_raises(
         req.context.correlation_id = "request-context-sentinel"
         reset_token_sentinel = object()
         setattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR, reset_token_sentinel)
-        context_var.set("contextvar-sentinel")
+        context_var_sentinel = "contextvar-sentinel"
+        context_var.set(context_var_sentinel)
 
-        with pytest.raises(RuntimeError, match="generator failed"):
-            _process_public_request_hook(middleware, middleware_type, req)
+        if middleware_type is CorrelationIDMiddlewareASGI:
+
+            async def invoke_asgi() -> None:
+                """Check ContextVar state in the ASGI task's copied context."""
+                asgi_middleware = typ.cast(
+                    "CorrelationIDMiddlewareASGI",
+                    middleware,
+                )
+                try:
+                    await asgi_middleware.process_request(
+                        typ.cast("falcon.asgi.Request", req),
+                        typ.cast("falcon.asgi.Response", object()),
+                    )
+                except RuntimeError:
+                    assert context_var.get() == context_var_sentinel, (
+                        "expected the ASGI task's ContextVar to remain unchanged"
+                    )
+                    raise
+
+            with pytest.raises(RuntimeError, match="generator failed"):
+                asyncio.run(invoke_asgi())
+        else:
+            wsgi_middleware = typ.cast("CorrelationIDMiddleware", middleware)
+            with pytest.raises(RuntimeError, match="generator failed"):
+                wsgi_middleware.process_request(
+                    typ.cast("falcon.Request", req),
+                    typ.cast("falcon.Response", object()),
+                )
+            assert context_var.get() == context_var_sentinel, (
+                "expected the configured ContextVar to remain unchanged"
+            )
 
         assert generator.call_count == 1, (
             f"expected generator called once, got {generator.call_count}"
@@ -343,8 +347,5 @@ def test_public_process_request_leaves_state_unchanged_when_generator_raises(
             getattr(req.context, CORRELATION_ID_RESET_TOKEN_ATTR)
             is reset_token_sentinel
         ), "expected the reset-token attribute to remain unchanged"
-        assert context_var.get() == "contextvar-sentinel", (
-            "expected the configured ContextVar to remain unchanged"
-        )
 
     _run_in_isolated_context(exercise)
