@@ -319,6 +319,7 @@ def _publish_release() -> None:
         raise ReleaseAssetError(msg)
 
     index = _read_index(_required("SIMPLE_INDEX_URL"), names)
+    index = {name: index[name] for name in names}
     verified_assets = _reconcile_release_assets(
         tag, index, bundle, Path(_required("STAGING_DIR"))
     )

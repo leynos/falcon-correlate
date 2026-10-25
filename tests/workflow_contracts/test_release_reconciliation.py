@@ -97,6 +97,7 @@ def test_publish_downloads_pypi_bytes_for_missing_release_assets(
     pypi_bytes = {
         _WHEEL: b"canonical wheel",
         _SDIST: b"canonical sdist",
+        "falcon_correlate-1.1.0.tar.gz": b"older release sdist",
     }
     _configure_publish(tmp_path, monkeypatch, pypi_bytes)
     assets = {**pypi_bytes, _BUNDLE: _BUNDLE_BYTES}
@@ -130,6 +131,12 @@ def test_publish_downloads_pypi_bytes_for_missing_release_assets(
     )
     curl_calls = [json.loads(line) for line in curl_argv_log.read_text().splitlines()]
     download = next(call for call in curl_calls if "--output" in call)
+    assert (
+        "https://files.pythonhosted.org/falcon_correlate-1.1.0.tar.gz" not in download
+    ), "reconciliation must not download assets from earlier versions"
+    assert not any(
+        Path(path).name == "falcon_correlate-1.1.0.tar.gz" for path in upload[3:]
+    ), "a release must not attach assets from earlier versions"
     assert download[download.index("--proto") + 1] == "=https", (
         "PyPI downloads must restrict their initial protocol to HTTPS"
     )
