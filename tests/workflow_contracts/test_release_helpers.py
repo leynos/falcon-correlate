@@ -278,6 +278,25 @@ def test_release_version_main_writes_workflow_outputs(
     ), "the version script must expose both outputs exactly once"
 
 
+def test_release_version_reports_missing_workflow_key(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A missing workflow value is named in the annotation."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nversion = "1.2.0"\n', encoding="utf-8"
+    )
+
+    result = release_version.main(
+        {"GITHUB_OUTPUT": str(tmp_path / "github-output")},
+        root=tmp_path,
+    )
+
+    assert result == 1, "a missing release tag must fail version validation"
+    assert "required value 'RELEASE_TAG' is missing" in capsys.readouterr().err, (
+        "the workflow annotation must name the missing value"
+    )
+
+
 @pytest.mark.parametrize(
     ("version", "expected_status"),
     [("1.2.0", "final"), ("1.2.0rc1", "pre-release"), ("1.2.0.dev2", "pre-release")],

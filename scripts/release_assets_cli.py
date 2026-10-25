@@ -1,6 +1,8 @@
 #!/usr/bin/env -S uv run python
 # Python 3.12 is the project support floor. Keep this CLI stdlib-only and use
 # argv-based subprocess calls so recording PATH stand-ins can test gh and curl.
+# This intentionally bypasses Cyclopts and plumbum: workflow tests need to
+# intercept exact external argv through PATH without extra runtime packages.
 # /// script
 # requires-python = ">=3.12"
 # dependencies = []
@@ -264,12 +266,11 @@ def _download_pypi_file(file: PypiFile, destination: Path) -> None:
 
 
 def _check_existing_asset_digests(
-    names: cabc.Iterable[str],
     index: cabc.Mapping[str, PypiFile],
     assets: cabc.Mapping[str, str | None],
 ) -> None:
     """Refuse existing GitHub bytes that disagree with PyPI's canonical files."""
-    for name in names:
+    for name in index:
         if name in assets and assets[name] != index[name].sha256:
             msg = (
                 f"{name} already exists on GitHub with a digest that differs from PyPI"
@@ -277,22 +278,22 @@ def _check_existing_asset_digests(
             raise ReleaseAssetError(msg)
 
 
-def _stage_release_gaps(
-    names: cabc.Iterable[str],
+def _reconcile_release_assets(
+    tag: str,
     index: cabc.Mapping[str, PypiFile],
-    assets: cabc.Mapping[str, str | None],
     bundle: Path,
-) -> None:
-    """Download PyPI's missing release bytes and stage the tag bundle if absent."""
-    tag = _required("RELEASE_TAG")
-    upload_dir = Path(_required("STAGING_DIR"))
+    upload_dir: Path,
+) -> dict[str, str | None]:
+    """Refuse conflicting bytes, upload missing assets, and refresh the release."""
+    assets = _release_assets(tag)
+    _check_existing_asset_digests(index, assets)
     _clear_directory(upload_dir)
     upload_paths: list[Path] = []
-    missing = set(missing_names(names, assets))
-    for name in names:
+    missing = set(missing_names(index, assets))
+    for name, file in index.items():
         if name in missing:
             downloaded = upload_dir / name
-            _download_pypi_file(index[name], downloaded)
+            _download_pypi_file(file, downloaded)
             upload_paths.append(downloaded)
     if bundle.name not in assets:
         staged_bundle = upload_dir / bundle.name
@@ -304,18 +305,6 @@ def _stage_release_gaps(
         _require_success(upload, "gh release upload")
     else:
         print("The release already holds every distribution and its bundle.")
-
-
-def _reconcile_release_assets(
-    tag: str,
-    names: cabc.Iterable[str],
-    index: cabc.Mapping[str, PypiFile],
-    bundle: Path,
-) -> dict[str, str | None]:
-    """Upload only missing names and return the release's refreshed asset map."""
-    assets = _release_assets(tag)
-    _check_existing_asset_digests(names, index, assets)
-    _stage_release_gaps(names, index, assets, bundle)
     return _release_assets(tag)
 
 
@@ -330,7 +319,9 @@ def _publish_release() -> None:
         raise ReleaseAssetError(msg)
 
     index = _read_index(_required("SIMPLE_INDEX_URL"), names)
-    verified_assets = _reconcile_release_assets(tag, names, index, bundle)
+    verified_assets = _reconcile_release_assets(
+        tag, index, bundle, Path(_required("STAGING_DIR"))
+    )
     problems = digest_mismatches(names, index, verified_assets)
     if problems:
         msg = "; ".join(problems)

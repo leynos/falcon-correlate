@@ -119,7 +119,13 @@ def main(
         version = _project_version(project_root)
         validate_tag_version(tag, version)
     except (KeyError, OSError, TypeError, ValueError) as error:
-        message = str(error)
+        match error:
+            case KeyError(args=(key, *_)):
+                message = f"required value {key!r} is missing"
+            case KeyError():
+                message = "a required value is missing"
+            case _:
+                message = str(error)
         print(
             f"::error file=pyproject.toml,title=Version check::{message}",
             file=sys.stderr,
