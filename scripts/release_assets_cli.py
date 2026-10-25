@@ -42,6 +42,8 @@ if typ.TYPE_CHECKING:
 
 _SIMPLE_ACCEPT = "application/vnd.pypi.simple.v1+json"
 _INDEX_ATTEMPTS = 6
+_DRAFT_LOOKUP_ATTEMPTS = 3
+_DRAFT_LOOKUP_DELAY_SECONDS = 2
 
 
 def _required(name: str) -> str:
@@ -189,13 +191,17 @@ def _ensure_draft() -> None:
     """Create a draft release only when the tag has no release yet."""
     collect_distributions(Path(_required("DIST_DIR")))
     tag = _required("RELEASE_TAG")
-    view = _run(["gh", "release", "view", tag, "--json", "tagName"])
-    if view.returncode == 0:
-        print(f"Reusing the existing release for {tag}.")
-        return
-    diagnostic = f"{view.stdout}\n{view.stderr}".casefold()
-    if "not found" not in diagnostic and "404" not in diagnostic:
-        _require_success(view, "gh release view")
+    for attempt in range(_DRAFT_LOOKUP_ATTEMPTS):
+        view = _run(["gh", "release", "view", tag, "--json", "tagName"])
+        if view.returncode == 0:
+            print(f"Reusing the existing release for {tag}.")
+            return
+        diagnostic = f"{view.stdout}\n{view.stderr}".casefold()
+        if "not found" not in diagnostic and "404" not in diagnostic:
+            _require_success(view, "gh release view")
+        if attempt + 1 < _DRAFT_LOOKUP_ATTEMPTS:
+            time.sleep(_DRAFT_LOOKUP_DELAY_SECONDS)
+
     create = _run([
         "gh",
         "release",

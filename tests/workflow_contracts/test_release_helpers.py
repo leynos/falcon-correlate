@@ -38,6 +38,10 @@ _EXPECTED_INDEX_CURL_ARGUMENTS = [
     "Accept: application/vnd.pypi.simple.v1+json",
     _SIMPLE_URL,
 ]
+_EXPECTED_REUSED_RELEASE_LOOKUPS = (
+    ("release", "view", "v1.2.0", "--json", "tagName"),
+    ("release", "view", "v1.2.0", "--json", "tagName"),
+)
 _SIMPLE_BODY = json.dumps({
     "meta": {"api-version": "1.0"},
     "name": "falcon-correlate",
@@ -75,6 +79,46 @@ def curl_argv_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     curl.chmod(curl.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     record = tmp_path / "curl-argv.jsonl"
     monkeypatch.setenv("CURL_ARGV_PATH", str(record))
+    monkeypatch.setenv("PATH", f"{bin_directory}{os.pathsep}{os.environ['PATH']}")
+    return record
+
+
+@pytest.fixture
+def gh_argv_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Install a recording gh stand-in with scripted release-view responses."""
+    bin_directory = tmp_path / "gh-bin"
+    bin_directory.mkdir()
+    gh = bin_directory / "gh"
+    gh.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json\n"
+        "import os\n"
+        "import sys\n"
+        "from pathlib import Path\n\n"
+        "record = Path(os.environ['GH_ARGV_PATH'])\n"
+        "calls = (\n"
+        "    [json.loads(line) for line in record.read_text().splitlines()]\n"
+        "    if record.exists() else []\n"
+        ")\n"
+        "arguments = sys.argv[1:]\n"
+        "calls.append(arguments)\n"
+        "record.write_text(\n"
+        "    ''.join(json.dumps(call) + '\\n' for call in calls),\n"
+        "    encoding='utf-8',\n"
+        ")\n"
+        "if arguments[:2] != ['release', 'view']:\n"
+        "    raise SystemExit('unexpected gh command: ' + repr(arguments))\n"
+        "view_count = sum(call[:2] == ['release', 'view'] for call in calls)\n"
+        "responses = json.loads(os.environ['GH_VIEW_RESPONSES'])\n"
+        "response = responses[min(view_count - 1, len(responses) - 1)]\n"
+        "sys.stdout.write(response.get('stdout', ''))\n"
+        "sys.stderr.write(response.get('stderr', ''))\n"
+        "raise SystemExit(int(response.get('exit_code', 0)))\n",
+        encoding="utf-8",
+    )
+    gh.chmod(gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    record = tmp_path / "gh-argv.jsonl"
+    monkeypatch.setenv("GH_ARGV_PATH", str(record))
     monkeypatch.setenv("PATH", f"{bin_directory}{os.pathsep}{os.environ['PATH']}")
     return record
 
@@ -173,6 +217,38 @@ def test_cli_escapes_remote_error_text_in_workflow_annotation(
     )
     assert "\r" not in error_line, "remote CR characters must be escaped"
     assert "\n" not in error_line, "remote LF characters must be escaped"
+
+
+def test_ensure_draft_retries_before_creating_a_release(
+    tmp_path: Path,
+    gh_argv_log: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A transient not-found response reuses a draft instead of duplicating it."""
+    distributions = tmp_path / "dist"
+    distributions.mkdir()
+    (distributions / "falcon_correlate-1.2.0-py3-none-any.whl").touch()
+    (distributions / "falcon_correlate-1.2.0.tar.gz").touch()
+    monkeypatch.setenv("DIST_DIR", str(distributions))
+    monkeypatch.setenv("RELEASE_TAG", "v1.2.0")
+    monkeypatch.setenv(
+        "GH_VIEW_RESPONSES",
+        json.dumps([
+            {"exit_code": 1, "stderr": "release not found"},
+            {"exit_code": 0, "stdout": '{"tagName":"v1.2.0"}'},
+        ]),
+    )
+    monkeypatch.setattr(release_assets_cli.time, "sleep", lambda _seconds: None)
+
+    result = release_assets_cli._main(["ensure-draft"])
+
+    calls = tuple(
+        tuple(json.loads(line)) for line in gh_argv_log.read_text().splitlines()
+    )
+    assert result == 0, "a visible existing release must be reused"
+    assert calls == _EXPECTED_REUSED_RELEASE_LOOKUPS, (
+        "a transient not-found response must not create a duplicate draft"
+    )
 
 
 def test_workflow_command_data_escapes_percent_and_carriage_return() -> None:
