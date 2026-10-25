@@ -9,6 +9,9 @@ import pytest
 
 httpx = pytest.importorskip("httpx")
 
+from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    correlation_id_var,
+)
 from falcon_correlate.httpx import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     async_request_with_correlation_id,
 )
@@ -104,15 +107,48 @@ class TestAsyncRequestWithCorrelationId:
         mock_async_client: mock.AsyncMock,
     ) -> None:
         """Verify extra keyword arguments are forwarded to httpx."""
-        await async_request_with_correlation_id(
-            "POST",
-            "http://example.com",
-            json={"key": "val"},
-            timeout=EXPECTED_TIMEOUT,
-        )
+        token = correlation_id_var.set("async-cid-004")
+        try:
+            await async_request_with_correlation_id(
+                "POST",
+                "http://example.com",
+                headers={"X-Request-ID": "caller-request-id"},
+                json={"key": "val"},
+                timeout=EXPECTED_TIMEOUT,
+            )
+        finally:
+            correlation_id_var.reset(token)
 
         call_kwargs = mock_async_client.request.call_args.kwargs
+        headers = call_kwargs["headers"]
+        failure_message = "expected forwarded headers to be an httpx.Headers object"
+        assert isinstance(headers, httpx.Headers), failure_message
+        failure_message = "expected the caller header to be preserved"
+        assert headers["X-Request-ID"] == "caller-request-id", failure_message
+        failure_message = "expected the correlation ID header to be injected"
+        assert headers[DEFAULT_HEADER_NAME] == "async-cid-004", failure_message
+        failure_message = "expected only headers, json and timeout to be forwarded"
+        assert call_kwargs.keys() == {"headers", "json", "timeout"}, failure_message
         failure_message = "expected call_kwargs['json'] to equal {'key': 'val'}"
         assert call_kwargs["json"] == {"key": "val"}, failure_message
         failure_message = "expected call_kwargs['timeout'] to equal EXPECTED_TIMEOUT"
         assert call_kwargs["timeout"] == EXPECTED_TIMEOUT, failure_message
+        failure_message = "expected the async request method to be 'POST'"
+        assert mock_async_client.request.call_args.args[0] == "POST", failure_message
+
+    @pytest.mark.asyncio
+    async def test_preserves_case_variant_correlation_header(
+        self,
+        mock_async_client: mock.AsyncMock,
+    ) -> None:
+        """Verify the async wrapper preserves a lowercase caller header."""
+        call_kwargs = await run_async(
+            mock_async_client,
+            correlation_id="async-cid-005",
+            headers=[("x-correlation-id", "caller-cid")],
+        )
+
+        failure_message = "expected only the caller correlation ID to remain"
+        assert call_kwargs["headers"].get_list(DEFAULT_HEADER_NAME) == ["caller-cid"], (
+            failure_message
+        )

@@ -107,27 +107,26 @@ async def run_async(
 
 def run_prepare_headers(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-    kwargs: dict[str, typ.Any],
+    kwargs: cabc.Mapping[str, typ.Any],
     correlation_id: str | None = None,
-) -> tuple[dict[str, typ.Any], dict[str, typ.Any]]:
+) -> tuple[httpx.Headers, dict[str, typ.Any]]:
     """Run ``_prepare_headers`` in an isolated context.
 
-    Returns ``(headers, remaining_kwargs)`` where *remaining_kwargs*
-    is the mutated input dict after ``headers`` has been popped.
+    Returns ``(headers, request_kwargs)`` containing prepared headers and a
+    new request-argument mapping.
 
     Returns
     -------
-    tuple[dict[str, typ.Any], dict[str, typ.Any]]
-        A pair containing the prepared headers and the mutated keyword-argument
-        mapping after ``headers`` has been removed.
+    tuple[httpx.Headers, dict[str, typ.Any]]
+        Prepared headers and a copy of the request arguments without ``headers``.
     """
-    result: dict[str, typ.Any] = {}
+    result: dict[str, tuple[httpx.Headers, dict[str, typ.Any]]] = {}
 
     def _logic() -> None:
         """Exercise the isolated test scenario."""
         if correlation_id is not None:
             correlation_id_var.set(correlation_id)
-        result["headers"] = _prepare_headers(kwargs)
+        result["prepared"] = _prepare_headers(kwargs)
 
     isolated_context(_logic)
-    return result.get("headers", {}), kwargs
+    return result["prepared"]

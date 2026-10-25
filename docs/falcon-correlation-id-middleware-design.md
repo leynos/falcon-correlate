@@ -1822,11 +1822,13 @@ imported lazily at call time.
    This mirrors the structlog pattern where the library provides documentation
    and test validation, but defers the actual import to the consumer.
 
-3. **`_prepare_headers` helper:** The header preparation logic (pop
-   headers from `kwargs`, convert to mutable dict, inject correlation ID) is
-   identical between the sync and async variants. Extracting it into a private
-   `_prepare_headers` function eliminates duplication and keeps both public
-   functions focused on their `httpx` call semantics.
+3. **`_prepare_headers` helper:** The header preparation logic is identical
+   between the sync and async variants. It accepts a read-only keyword-argument
+   mapping and returns new `httpx.Headers` plus a shallow copy of the request
+   arguments without `headers`. It preserves repeated header entries and does
+   not mutate the input mapping or caller-supplied header object. Extracting it
+   into a private `_prepare_headers` function eliminates duplication and keeps
+   both public functions focused on their `httpx` call semantics.
 
 4. **`DEFAULT_HEADER_NAME` constant:** The wrapper imports
    `DEFAULT_HEADER_NAME` from `middleware_config.py` rather than hardcoding

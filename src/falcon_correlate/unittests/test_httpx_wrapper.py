@@ -174,3 +174,19 @@ class TestRequestWithCorrelationId:
             "expected DEFAULT_HEADER_NAME not to be present in shared_headers"
         )
         assert DEFAULT_HEADER_NAME not in shared_headers, failure_message
+
+    def test_preserves_case_variant_correlation_header(
+        self,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    ) -> None:
+        """Verify the sync wrapper preserves a lowercase caller header."""
+        captured = run_sync(
+            isolated_context,
+            correlation_id="sync-cid-008",
+            headers=[("x-correlation-id", "caller-cid")],
+        )
+
+        failure_message = "expected only the caller correlation ID to remain"
+        assert captured["headers"].get_list(DEFAULT_HEADER_NAME) == ["caller-cid"], (
+            failure_message
+        )
