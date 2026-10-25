@@ -41,8 +41,9 @@ def test_unknown_keyword_names_are_reported_in_sorted_order(
     expected_message = (
         f"Unknown keyword arguments: {', '.join(sorted(unknown_keywords))}"
     )
-    assert str(exc_info.value) == expected_message, (
+    failure_message = (
         "CorrelationIDConfig.from_kwargs must report every unknown keyword "
         "in sorted order; "
         f"expected {expected_message!r}, got {str(exc_info.value)!r}"
     )
+    assert str(exc_info.value) == expected_message, failure_message
