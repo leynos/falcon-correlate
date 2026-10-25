@@ -257,6 +257,14 @@ Stop and escalate when any of these is reached:
   Rationale: these describe separate module boundaries and both apply after the
   rebase. Date/Author: 2026-10-23, implementation agent.
 
+- Decision: Preserve upstream issue #43's request-lifecycle documentation and
+  issue #38's `process_response` argument-count suppression while rebasing
+  issue #36. Rationale: the lifecycle material describes a separate shared
+  middleware boundary, and Falcon fixes the WSGI callback signature; unlike
+  that callback, `from_kwargs` can preserve keyword compatibility with the
+  typed variadic signature. Keep the issue #38 suppression scoped to
+  `middleware.py`. Date/Author: 2026-10-25, implementation agent.
+
 - Decision: Stop before enabling repo-wide `DOC` because the measured baseline
   exceeds the plan's exception threshold. Rationale: the plan permits
   autonomous implementation only while the `DOC` scope stays below roughly 60
