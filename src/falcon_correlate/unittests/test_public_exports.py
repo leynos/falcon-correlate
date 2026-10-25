@@ -207,7 +207,7 @@ import sys
 
 import falcon_correlate
 
-if "_falcon_correlate_rs" in sys.modules:
+if "falcon_correlate._falcon_correlate_rs" in sys.modules:
     raise RuntimeError("Package import loaded the optional native module")
 """
         environment = {
