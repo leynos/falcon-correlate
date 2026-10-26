@@ -816,8 +816,8 @@ the wrong directory. Its wheel will not be back-filled manually.
 
 Before pushing the first release tag, configure both destinations:
 
-- In GitHub repository settings, create the `pypi` environment and restrict
-  deployments to tags matching `v*.*.*`.
+- In GitHub repository settings, ensure the `pypi` environment has a custom
+  deployment branch policy allowing only tags matching `v*.*.*`.
 - In PyPI's account-level Publishing page, add a pending GitHub Trusted
   Publisher with project `falcon-correlate`, owner `leynos`, repository
   `falcon-correlate`, workflow `release.yml`, and environment `pypi`. The PyPI
