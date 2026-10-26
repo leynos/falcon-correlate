@@ -19,6 +19,7 @@ from .middleware_config import DEFAULT_HEADER_NAME
 from .middleware_utils import correlation_id_var
 
 if typ.TYPE_CHECKING:
+    import collections.abc as cabc
     from types import TracebackType
 
     import httpx
@@ -292,8 +293,8 @@ def request_with_correlation_id(
     _require_httpx()
     import httpx
 
-    headers = _prepare_headers(kwargs)
-    return httpx.request(method, url, headers=headers, **kwargs)
+    headers, request_kwargs = _prepare_headers(kwargs)
+    return httpx.request(method, url, headers=headers, **request_kwargs)
 
 
 async def async_request_with_correlation_id(
@@ -325,38 +326,40 @@ async def async_request_with_correlation_id(
     _require_httpx()
     import httpx
 
-    headers = _prepare_headers(kwargs)
+    headers, request_kwargs = _prepare_headers(kwargs)
     async with httpx.AsyncClient() as client:
-        return await client.request(method, url, headers=headers, **kwargs)
+        return await client.request(method, url, headers=headers, **request_kwargs)
 
 
 def _prepare_headers(
-    kwargs: dict[str, typ.Any],
-) -> httpx.Headers:
-    """Extract and enrich headers with the correlation ID.
-
-    Pops ``headers`` from *kwargs*, converts to a mutable structure,
-    and injects the correlation ID when the context variable is set.
-    Preserves duplicate header entries when present.
+    kwargs: cabc.Mapping[str, typ.Any],
+) -> tuple[httpx.Headers, dict[str, typ.Any]]:
+    """Prepare headers and request arguments without mutating the input.
 
     Parameters
     ----------
-    kwargs : dict[str, Any]
-        The keyword arguments dict (mutated in place to remove
-        ``headers``).
+    kwargs : Mapping[str, Any]
+        A read-only mapping of request keyword arguments.
 
     Returns
     -------
-    httpx.Headers
-        The enriched headers.
+    tuple[httpx.Headers, dict[str, Any]]
+        New headers and a shallow copy of the request arguments without
+        ``headers``. Neither the input mapping nor a caller-supplied header
+        object is mutated.
+
+    Notes
+    -----
+    Repeated header entries are preserved. Header names are case-insensitive,
+    so any caller-supplied correlation ID header prevents injection.
 
     """
     _require_httpx()
     import httpx
 
-    raw_headers = kwargs.pop("headers", None)
-    # Use httpx.Headers to preserve duplicate entries
+    raw_headers = kwargs.get("headers")
+    request_kwargs = {key: value for key, value in kwargs.items() if key != "headers"}
     headers = httpx.Headers(raw_headers) if raw_headers is not None else httpx.Headers()
 
     _inject_correlation_id_header(headers)
-    return headers
+    return headers, request_kwargs
