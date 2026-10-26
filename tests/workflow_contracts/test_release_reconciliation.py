@@ -226,6 +226,73 @@ def test_existing_github_digest_mismatch_fails_before_upload(
     )
 
 
+@pytest.mark.usefixtures("curl_argv_log", "gh_argv_log")
+@pytest.mark.parametrize(
+    "invalid_setting",
+    [
+        ("STAGING_DIR", None, "STAGING_DIR is missing"),
+        ("PRERELEASE", "sometimes", "PRERELEASE must be either true or false"),
+    ],
+)
+def test_publish_release_validates_inputs_before_external_commands(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    invalid_setting: tuple[str, str | None, str],
+) -> None:
+    """Invalid workflow inputs fail before contacting either destination."""
+    variable, value, message = invalid_setting
+    _configure_publish(tmp_path, monkeypatch, {_WHEEL: b"wheel", _SDIST: b"sdist"})
+    if value is None:
+        monkeypatch.delenv(variable)
+    else:
+        monkeypatch.setenv(variable, value)
+
+    result = release_assets_cli.main(["publish-release"])
+
+    assert result == 1, "invalid workflow input must prevent publication"
+    assert message in capsys.readouterr().err, "the failure should identify the input"
+    assert not (tmp_path / "curl-argv.jsonl").exists(), (
+        "invalid configuration must fail before querying PyPI"
+    )
+    assert not (tmp_path / "gh-argv.jsonl").exists(), (
+        "invalid configuration must fail before querying GitHub"
+    )
+
+
+@pytest.mark.usefixtures("curl_argv_log")
+def test_existing_github_asset_without_digest_fails_before_upload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    gh_argv_log: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """An existing asset without a GitHub digest is reported distinctly."""
+    pypi_bytes = {_WHEEL: b"canonical wheel", _SDIST: b"canonical sdist"}
+    _configure_publish(tmp_path, monkeypatch, pypi_bytes)
+    missing_digest_view = json.dumps({
+        "assets": [
+            {"name": _WHEEL, "digest": None},
+            {"name": _BUNDLE, "digest": f"sha256:{_sha256(_BUNDLE_BYTES)}"},
+        ]
+    })
+    monkeypatch.setenv(
+        "GH_RESPONSES",
+        json.dumps([{"stdout": missing_digest_view}, {"stdout": missing_digest_view}]),
+    )
+
+    result = release_assets_cli.main(["publish-release"])
+
+    calls = [json.loads(line) for line in gh_argv_log.read_text().splitlines()]
+    assert result == 1, "an existing asset without a digest must fail closed"
+    assert (
+        "already exists on GitHub without a SHA-256 digest" in capsys.readouterr().err
+    ), "the error should distinguish a missing digest from different bytes"
+    assert not any(call[:2] == ["release", "upload"] for call in calls), (
+        "an asset with unknown bytes must not be overwritten"
+    )
+
+
 @pytest.mark.usefixtures("curl_argv_log")
 def test_new_bundle_is_uploaded_when_local_bytes_match_pypi(
     tmp_path: Path,

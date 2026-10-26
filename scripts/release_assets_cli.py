@@ -7,26 +7,16 @@
 # ///
 r"""Run the release workflow's distribution checks and reconciliation steps.
 
-Commands and required environment variables:
+Commands and required variables:
 - ``collect``: ``SOURCE_DIR``, ``DIST_DIR``
-- ``stage-pypi``: ``DIST_DIR``, ``SIMPLE_INDEX_URL``, ``STAGING_DIR``,
-  ``GITHUB_OUTPUT``
+- ``stage-pypi``: ``DIST_DIR``, ``SIMPLE_INDEX_URL``, ``STAGING_DIR``, ``GITHUB_OUTPUT``
 - ``ensure-draft``: ``DIST_DIR``, ``RELEASE_TAG``
 - ``publish-release``: ``DIST_DIR``, ``RELEASE_TAG``, ``SIMPLE_INDEX_URL``,
   ``BUNDLE_DIR``, ``STAGING_DIR``, ``PRERELEASE``
 
-Set only the variables listed for the selected command. Example invocations:
+After exporting the listed variables, invoke:
 
-.. code-block:: shell
-
-   CLI=scripts/release_assets_cli.py
-   SOURCE_DIR=build DIST_DIR=dist uv run --script "$CLI" collect
-   DIST_DIR=dist SIMPLE_INDEX_URL=https://pypi.org/simple/pkg/ \
-      STAGING_DIR=stage GITHUB_OUTPUT=output uv run --script "$CLI" stage-pypi
-   DIST_DIR=dist RELEASE_TAG=v1.2.0 uv run --script "$CLI" ensure-draft
-   DIST_DIR=dist RELEASE_TAG=v1.2.0 PRERELEASE=false \
-      SIMPLE_INDEX_URL=https://pypi.org/simple/pkg/ \
-      BUNDLE_DIR=bundle STAGING_DIR=stage uv run --script "$CLI" publish-release
+   uv run --script scripts/release_assets_cli.py publish-release
 """
 
 from __future__ import annotations
@@ -267,7 +257,13 @@ def _check_existing_asset_digests(
 ) -> None:
     """Refuse existing GitHub bytes that disagree with PyPI's canonical files."""
     for name in index:
-        if name in assets and assets[name] != index[name].sha256:
+        if name not in assets:
+            continue
+        digest = assets[name]
+        if digest is None:
+            msg = f"{name} already exists on GitHub without a SHA-256 digest"
+            raise ReleaseAssetError(msg)
+        if digest != index[name].sha256:
             msg = (
                 f"{name} already exists on GitHub with a digest that differs from PyPI"
             )
@@ -308,6 +304,12 @@ def _publish_release() -> None:
     """Reconcile GitHub assets with PyPI bytes, verify digests, then publish."""
     distributions = collect_distributions(Path(_required("DIST_DIR")))
     tag = _required("RELEASE_TAG")
+    upload_dir = Path(_required("STAGING_DIR"))
+    prerelease = _required("PRERELEASE").lower()
+    if prerelease not in {"true", "false"}:
+        msg = "PRERELEASE must be either true or false"
+        raise ReleaseAssetError(msg)
+
     names = [path.name for path in distributions]
     bundle = Path(_required("BUNDLE_DIR")) / f"{tag}.sigstore.json"
     if not bundle.is_file():
@@ -328,9 +330,7 @@ def _publish_release() -> None:
                 "local release distributions differ from PyPI: " + "; ".join(problems)
             )
 
-    verified_assets = _reconcile_release_assets(
-        tag, index, bundle, Path(_required("STAGING_DIR"))
-    )
+    verified_assets = _reconcile_release_assets(tag, index, bundle, upload_dir)
     problems = digest_mismatches(names, index, verified_assets)
     if problems:
         msg = "; ".join(problems)
@@ -339,19 +339,17 @@ def _publish_release() -> None:
         msg = f"the GitHub Release is missing {bundle.name}"
         raise ReleaseAssetError(msg)
 
-    prerelease = _required("PRERELEASE").lower()
-    if prerelease not in {"true", "false"}:
-        msg = "PRERELEASE must be either true or false"
-        raise ReleaseAssetError(msg)
-    publish = _run([
-        "gh",
-        "release",
-        "edit",
-        tag,
-        "--draft=false",
-        f"--prerelease={prerelease}",
-    ])
-    _require_success(publish, "gh release edit")
+    _require_success(
+        _run([
+            "gh",
+            "release",
+            "edit",
+            tag,
+            "--draft=false",
+            f"--prerelease={prerelease}",
+        ]),
+        "gh release edit",
+    )
     print(f"Published release {tag} with PyPI's distribution bytes.")
 
 
