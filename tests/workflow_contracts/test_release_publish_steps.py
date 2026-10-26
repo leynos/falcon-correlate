@@ -5,14 +5,13 @@ from __future__ import annotations
 import json
 import typing as typ
 
-from scripts import release_assets_cli
+from tests.workflow_contracts.workflow_step_runner import run_named_workflow_step
 
 if typ.TYPE_CHECKING:
     from pathlib import Path
 
     import pytest
 
-_SIMPLE_URL = "https://pypi.org/simple/falcon-correlate/"
 _WHEEL = "falcon_correlate-1.2.0-py3-none-any.whl"
 _SDIST = "falcon_correlate-1.2.0.tar.gz"
 
@@ -32,37 +31,35 @@ def _index_body(*filenames: str) -> str:
 
 
 def _configure_stage(
-    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     body: str,
+    pypi_stage_paths: tuple[Path, Path, Path],
 ) -> tuple[Path, Path]:
     """Prepare the CLI environment and scripted published-name index."""
-    distributions = tmp_path / "dist"
+    distributions, staging, output = pypi_stage_paths
     distributions.mkdir()
     (distributions / _WHEEL).write_bytes(b"wheel")
     (distributions / _SDIST).write_bytes(b"sdist")
-    staging = tmp_path / "staging"
-    output = tmp_path / "github-output"
-    monkeypatch.setenv("DIST_DIR", str(distributions))
-    monkeypatch.setenv("STAGING_DIR", str(staging))
-    monkeypatch.setenv("SIMPLE_INDEX_URL", _SIMPLE_URL)
-    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
     monkeypatch.setenv("CURL_BODY", body)
     monkeypatch.setenv("CURL_STATUS", "200")
     return staging, output
 
 
 def test_stage_pypi_keeps_only_distribution_names_absent_from_index(
-    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     curl_argv_log: Path,
+    pypi_stage_paths: tuple[Path, Path, Path],
 ) -> None:
     """The upload directory contains only files not already published."""
-    staging, output = _configure_stage(tmp_path, monkeypatch, _index_body(_WHEEL))
+    staging, output = _configure_stage(
+        monkeypatch, _index_body(_WHEEL), pypi_stage_paths
+    )
 
-    result = release_assets_cli.main(["stage-pypi"])
+    result = run_named_workflow_step(
+        "release.yml", "publish-pypi", "Stage distributions not already on PyPI"
+    )
 
-    assert result == 0, "an index with a valid existing file must succeed"
+    assert result.returncode == 0, "an index with a valid existing file must succeed"
     assert [path.name for path in staging.iterdir()] == [_SDIST], (
         "the existing wheel must be skipped and only the missing sdist staged"
     )
@@ -73,18 +70,22 @@ def test_stage_pypi_keeps_only_distribution_names_absent_from_index(
 
 
 def test_stage_pypi_succeeds_without_upload_when_all_names_exist(
-    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     curl_argv_log: Path,
+    pypi_stage_paths: tuple[Path, Path, Path],
 ) -> None:
     """A replay with every filename published yields an empty upload set."""
     staging, output = _configure_stage(
-        tmp_path, monkeypatch, _index_body(_WHEEL, _SDIST)
+        monkeypatch,
+        _index_body(_WHEEL, _SDIST),
+        pypi_stage_paths,
     )
 
-    result = release_assets_cli.main(["stage-pypi"])
+    result = run_named_workflow_step(
+        "release.yml", "publish-pypi", "Stage distributions not already on PyPI"
+    )
 
-    assert result == 0, "a no-op publication re-run must succeed"
+    assert result.returncode == 0, "a no-op publication re-run must succeed"
     assert not list(staging.iterdir()), "already published files must not be staged"
     assert output.read_text(encoding="utf-8") == "has-uploads=false\n", (
         "an empty remainder must disable the upload action"

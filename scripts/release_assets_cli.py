@@ -39,6 +39,7 @@ if __package__:
         missing_names,
         parse_github_asset_digests,
         parse_pep691_index,
+        require_local_distribution_digests,
         sha256_file,
     )
     from scripts.release_curl import (
@@ -54,6 +55,7 @@ else:
         missing_names,
         parse_github_asset_digests,
         parse_pep691_index,
+        require_local_distribution_digests,
         sha256_file,
     )
     from release_curl import PYPI_DOWNLOAD_CURL_ARGUMENTS, SIMPLE_INDEX_CURL_ARGUMENTS
@@ -62,7 +64,9 @@ if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
 _SIMPLE_ACCEPT = "application/vnd.pypi.simple.v1+json"
-_INDEX_ATTEMPTS = 6
+# PyPI's index may lag after upload; allow a bounded window for its files to appear.
+_INDEX_ATTEMPTS = 12
+_INDEX_RETRY_DELAY_SECONDS = 5
 _DRAFT_LOOKUP_ATTEMPTS = 3
 _DRAFT_LOOKUP_DELAY_SECONDS = 2
 
@@ -158,7 +162,7 @@ def _read_index(url: str, expected: cabc.Collection[str] = ()) -> dict[str, Pypi
         if not expected_names or expected_names <= index.keys():
             return index
         if attempt + 1 < _INDEX_ATTEMPTS:
-            time.sleep(2)
+            time.sleep(_INDEX_RETRY_DELAY_SECONDS)
     absent = sorted(expected_names - index.keys())
     msg = f"PyPI Simple index did not list expected release files: {absent}"
     raise ReleaseAssetError(msg)
@@ -270,6 +274,15 @@ def _check_existing_asset_digests(
             raise ReleaseAssetError(msg)
 
 
+def _prerelease_flag() -> str:
+    """Return the validated ``PRERELEASE`` workflow value."""
+    prerelease = _required("PRERELEASE").lower()
+    if prerelease not in {"true", "false"}:
+        msg = "PRERELEASE must be either true or false"
+        raise ReleaseAssetError(msg)
+    return prerelease
+
+
 def _reconcile_release_assets(
     tag: str,
     index: cabc.Mapping[str, PypiFile],
@@ -305,10 +318,7 @@ def _publish_release() -> None:
     distributions = collect_distributions(Path(_required("DIST_DIR")))
     tag = _required("RELEASE_TAG")
     upload_dir = Path(_required("STAGING_DIR"))
-    prerelease = _required("PRERELEASE").lower()
-    if prerelease not in {"true", "false"}:
-        msg = "PRERELEASE must be either true or false"
-        raise ReleaseAssetError(msg)
+    prerelease = _prerelease_flag()
 
     names = [path.name for path in distributions]
     bundle = Path(_required("BUNDLE_DIR")) / f"{tag}.sigstore.json"
@@ -319,16 +329,7 @@ def _publish_release() -> None:
     index = _read_index(_required("SIMPLE_INDEX_URL"), names)
     index = {name: index[name] for name in names}
     if bundle.name not in _release_assets(tag):
-        problems = digest_mismatches(
-            names,
-            index,
-            {path.name: sha256_file(path) for path in distributions},
-            "local build",
-        )
-        if problems:
-            raise ReleaseAssetError(
-                "local release distributions differ from PyPI: " + "; ".join(problems)
-            )
+        require_local_distribution_digests(distributions, index)
 
     verified_assets = _reconcile_release_assets(tag, index, bundle, upload_dir)
     problems = digest_mismatches(names, index, verified_assets)

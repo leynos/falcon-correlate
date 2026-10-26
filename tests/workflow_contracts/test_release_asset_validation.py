@@ -7,7 +7,8 @@ import typing as typ
 
 import pytest
 
-from scripts import release_assets, release_assets_cli
+from scripts import release_assets
+from tests.workflow_contracts.workflow_step_runner import run_named_workflow_step
 
 if typ.TYPE_CHECKING:
     from pathlib import Path
@@ -30,7 +31,6 @@ _SDIST = "falcon_correlate-1.2.0.tar.gz"
 def test_collect_command_rejects_invalid_distribution_sets(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
     invalid_set: tuple[tuple[str, ...], str],
 ) -> None:
     """The workflow entry point rejects an empty, incomplete or unknown set."""
@@ -42,10 +42,12 @@ def test_collect_command_rejects_invalid_distribution_sets(
     monkeypatch.setenv("SOURCE_DIR", str(source))
     monkeypatch.setenv("DIST_DIR", str(tmp_path / "dist"))
 
-    result = release_assets_cli.main(["collect"])
+    result = run_named_workflow_step(
+        "release.yml", "attest", "Collect and validate release distributions"
+    )
 
-    assert result == 1, "invalid distribution sets must fail collection"
-    assert expected_message in capsys.readouterr().err, (
+    assert result.returncode == 1, "invalid distribution sets must fail collection"
+    assert expected_message in result.stderr, (
         "the failure annotation must explain the rejected distribution set"
     )
 
@@ -63,9 +65,11 @@ def test_collect_command_copies_every_wheel_and_one_sdist(
     monkeypatch.setenv("SOURCE_DIR", str(source))
     monkeypatch.setenv("DIST_DIR", str(destination))
 
-    result = release_assets_cli.main(["collect"])
+    result = run_named_workflow_step(
+        "release.yml", "attest", "Collect and validate release distributions"
+    )
 
-    assert result == 0, "a complete distribution set must be collected"
+    assert result.returncode == 0, "a complete distribution set must be collected"
     assert sorted(path.name for path in destination.iterdir()) == sorted(names), (
         "collection must preserve every wheel and the source archive"
     )

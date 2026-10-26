@@ -54,8 +54,8 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-      id-token: write
-      attestations: write
+      id-token: write  # Authenticate with Sigstore for provenance signing.
+      attestations: write  # Store the build provenance in GitHub.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -103,7 +103,7 @@ jobs:
       url: https://pypi.org/project/falcon-correlate/
     permissions:
       contents: read
-      id-token: write
+      id-token: write  # Authenticate PyPI Trusted Publishing with OIDC.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -132,11 +132,10 @@ jobs:
     needs:
       - check-version
       - attest
-      - publish-pypi
     runs-on: ubicloud-standard-2
     timeout-minutes: 10
     permissions:
-      contents: write
+      contents: write  # Create or reuse the tag's GitHub Release.
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -165,7 +164,7 @@ jobs:
     runs-on: ubicloud-standard-2
     timeout-minutes: 20
     permissions:
-      contents: write
+      contents: write  # Upload assets and publish the reconciled release.
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}

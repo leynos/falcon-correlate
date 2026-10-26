@@ -1,0 +1,101 @@
+"""Contracts for PyPI index propagation during release publication."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import typing as typ
+
+if typ.TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
+
+from tests.workflow_contracts.workflow_step_runner import run_named_workflow_step
+
+_TAG = "v1.2.0"
+_WHEEL = "falcon_correlate-1.2.0-py3-none-any.whl"
+_SDIST = "falcon_correlate-1.2.0.tar.gz"
+_BUNDLE = f"{_TAG}.sigstore.json"
+_SIMPLE_URL = "https://pypi.org/simple/falcon-correlate/"
+_BUNDLE_BYTES = b"attestation bundle"
+
+
+def _digest(content: bytes) -> str:
+    """Return the lowercase SHA-256 used by both release destinations."""
+    return hashlib.sha256(content).hexdigest()
+
+
+def _index_body(files: dict[str, bytes]) -> str:
+    """Build the PEP 691 response for a staged artifact set."""
+    return json.dumps({
+        "files": [
+            {
+                "filename": name,
+                "hashes": {"sha256": _digest(content)},
+                "url": f"https://files.pythonhosted.org/{name}",
+            }
+            for name, content in files.items()
+        ]
+    })
+
+
+def _release_view(files: dict[str, bytes]) -> str:
+    """Build the gh response for an already reconciled release."""
+    return json.dumps({
+        "assets": [
+            {"name": name, "digest": f"sha256:{_digest(content)}"}
+            for name, content in files.items()
+        ]
+    })
+
+
+def test_publish_retries_until_pypi_indexes_newly_uploaded_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    curl_argv_log: Path,
+    gh_argv_log: Path,
+) -> None:
+    """The release step waits briefly when PyPI's index initially lags."""
+    distributions = tmp_path / "dist"
+    distributions.mkdir()
+    pypi_files = {_WHEEL: b"wheel", _SDIST: b"sdist"}
+    for name, contents in pypi_files.items():
+        (distributions / name).write_bytes(contents)
+
+    bundle_directory = tmp_path / "bundle"
+    bundle_directory.mkdir()
+    (bundle_directory / _BUNDLE).write_bytes(_BUNDLE_BYTES)
+
+    monkeypatch.setenv("DIST_DIR", str(distributions))
+    monkeypatch.setenv("RELEASE_TAG", _TAG)
+    monkeypatch.setenv("SIMPLE_INDEX_URL", _SIMPLE_URL)
+    monkeypatch.setenv("BUNDLE_DIR", str(bundle_directory))
+    monkeypatch.setenv("STAGING_DIR", str(tmp_path / "staging"))
+    monkeypatch.setenv("PRERELEASE", "false")
+    monkeypatch.setenv(
+        "CURL_RESPONSES",
+        json.dumps([
+            {"status": "404"},
+            {"status": "200", "body": _index_body(pypi_files)},
+        ]),
+    )
+    assets = {**pypi_files, _BUNDLE: _BUNDLE_BYTES}
+    view = _release_view(assets)
+    monkeypatch.setenv(
+        "GH_RESPONSES",
+        json.dumps([{"stdout": view}, {"stdout": view}, {"stdout": view}, {}]),
+    )
+
+    result = run_named_workflow_step(
+        "release.yml", "publish-release", "Reconcile and publish the GitHub Release"
+    )
+
+    assert result.returncode == 0, (
+        f"a delayed Simple-index update must still publish: {result.stderr}"
+    )
+    curl_calls = [json.loads(line) for line in curl_argv_log.read_text().splitlines()]
+    assert len(curl_calls) == 2, (
+        "the release step must retry a missing index before accepting its files"
+    )
+    assert gh_argv_log.is_file(), "reconciliation must continue after the index updates"

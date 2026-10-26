@@ -331,3 +331,28 @@ def digest_mismatches(
                 f"{candidate_name} sha256 {candidate_digest}"
             )
     return problems
+
+
+def require_local_distribution_digests(
+    distributions: cabc.Sequence[Path], index: cabc.Mapping[str, PypiFile]
+) -> None:
+    """Require local distributions to match the digests advertised by PyPI.
+
+    Parameters
+    ----------
+    distributions : collections.abc.Sequence[pathlib.Path]
+        The local wheel and source archive that would be released.
+    index : collections.abc.Mapping[str, PypiFile]
+        PyPI Simple-index entries for those distribution filenames.
+
+    Raises
+    ------
+    ReleaseAssetError
+        If any local distribution is absent from PyPI or has different bytes.
+    """
+    names = [path.name for path in distributions]
+    local_digests = {path.name: sha256_file(path) for path in distributions}
+    problems = digest_mismatches(names, index, local_digests, "local build")
+    if problems:
+        msg = "local release distributions differ from PyPI: " + "; ".join(problems)
+        raise ReleaseAssetError(msg)

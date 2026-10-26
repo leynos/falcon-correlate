@@ -9,6 +9,7 @@ import typing as typ
 import pytest
 
 from scripts import release_assets, release_assets_cli, release_version
+from tests.workflow_contracts.workflow_step_runner import run_named_workflow_step
 
 if typ.TYPE_CHECKING:
     from pathlib import Path
@@ -92,24 +93,22 @@ def _make_distributions(directory: Path) -> tuple[str, str]:
 
 
 def test_read_index_treats_project_404_as_unpublished(
-    tmp_path: Path,
     curl_argv_log: Path,
     monkeypatch: pytest.MonkeyPatch,
+    pypi_stage_paths: tuple[Path, Path, Path],
 ) -> None:
     """The public CLI stages every file when the project index is absent."""
-    distributions = tmp_path / "dist"
+    distributions, staging, output = pypi_stage_paths
     wheel_name, sdist_name = _make_distributions(distributions)
-    staging = tmp_path / "staging"
-    output = tmp_path / "github-output"
-    monkeypatch.setenv("DIST_DIR", str(distributions))
-    monkeypatch.setenv("STAGING_DIR", str(staging))
-    monkeypatch.setenv("SIMPLE_INDEX_URL", _SIMPLE_URL)
-    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
     _configure_curl(monkeypatch, {"status": "404"})
 
-    result = release_assets_cli.main(["stage-pypi"])
+    result = run_named_workflow_step(
+        "release.yml", "publish-pypi", "Stage distributions not already on PyPI"
+    )
 
-    assert result == 0, "a missing project index means no upload is already published"
+    assert result.returncode == 0, (
+        "a missing project index means no upload is already published"
+    )
     assert sorted(path.name for path in staging.iterdir()) == [
         wheel_name,
         sdist_name,
@@ -125,24 +124,20 @@ def test_read_index_treats_project_404_as_unpublished(
 
 
 def test_read_index_parses_pep691_filename_digests(
-    tmp_path: Path,
     curl_argv_log: Path,
     monkeypatch: pytest.MonkeyPatch,
+    pypi_stage_paths: tuple[Path, Path, Path],
 ) -> None:
     """The public PyPI staging step drops names already listed by PEP 691."""
-    distributions = tmp_path / "dist"
+    distributions, staging, output = pypi_stage_paths
     wheel_name, sdist_name = _make_distributions(distributions)
-    staging = tmp_path / "staging"
-    output = tmp_path / "github-output"
-    monkeypatch.setenv("DIST_DIR", str(distributions))
-    monkeypatch.setenv("STAGING_DIR", str(staging))
-    monkeypatch.setenv("SIMPLE_INDEX_URL", _SIMPLE_URL)
-    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
     _configure_curl(monkeypatch, {"status": "200", "body": _SIMPLE_BODY})
 
-    result = release_assets_cli.main(["stage-pypi"])
+    result = run_named_workflow_step(
+        "release.yml", "publish-pypi", "Stage distributions not already on PyPI"
+    )
 
-    assert result == 0, "a valid Simple index must be accepted"
+    assert result.returncode == 0, "a valid Simple index must be accepted"
     assert curl_argv_log.is_file(), "the PEP 691 request must reach curl"
     assert [path.name for path in staging.iterdir()] == [sdist_name], (
         "only the distribution name absent from PyPI should remain staged"
@@ -157,42 +152,34 @@ def test_read_index_parses_pep691_filename_digests(
 
 
 def test_read_index_fails_on_non_success_http_status(
-    tmp_path: Path,
     curl_argv_log: Path,
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+    pypi_stage_paths: tuple[Path, Path, Path],
 ) -> None:
     """An HTTP error other than 404 fails the public PyPI staging step."""
-    distributions = tmp_path / "dist"
+    distributions, _, _ = pypi_stage_paths
     _make_distributions(distributions)
-    monkeypatch.setenv("DIST_DIR", str(distributions))
-    monkeypatch.setenv("STAGING_DIR", str(tmp_path / "staging"))
-    monkeypatch.setenv("SIMPLE_INDEX_URL", _SIMPLE_URL)
-    monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "github-output"))
     _configure_curl(monkeypatch, {"status": "500", "body": "server error"})
 
-    result = release_assets_cli.main(["stage-pypi"])
+    result = run_named_workflow_step(
+        "release.yml", "publish-pypi", "Stage distributions not already on PyPI"
+    )
 
-    assert result == 1, "a PyPI server error must fail the release step"
-    assert "HTTP 500" in capsys.readouterr().err, (
+    assert result.returncode == 1, "a PyPI server error must fail the release step"
+    assert "HTTP 500" in result.stderr, (
         "the failure annotation must identify the HTTP status"
     )
     assert curl_argv_log.is_file(), "the non-success response must reach curl"
 
 
 def test_cli_escapes_remote_error_text_in_workflow_annotation(
-    tmp_path: Path,
     curl_argv_log: Path,
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+    pypi_stage_paths: tuple[Path, Path, Path],
 ) -> None:
     """Remote diagnostics cannot inject additional GitHub workflow commands."""
-    distributions = tmp_path / "dist"
-    distributions.mkdir()
-    (distributions / "falcon_correlate-1.2.0-py3-none-any.whl").touch()
-    (distributions / "falcon_correlate-1.2.0.tar.gz").touch()
-    monkeypatch.setenv("DIST_DIR", str(distributions))
-    monkeypatch.setenv("SIMPLE_INDEX_URL", _SIMPLE_URL)
+    distributions, _, _ = pypi_stage_paths
+    _make_distributions(distributions)
     _configure_curl(
         monkeypatch,
         {
@@ -202,10 +189,12 @@ def test_cli_escapes_remote_error_text_in_workflow_annotation(
         },
     )
 
-    result = release_assets_cli.main(["stage-pypi"])
+    result = run_named_workflow_step(
+        "release.yml", "publish-pypi", "Stage distributions not already on PyPI"
+    )
 
-    error_line = capsys.readouterr().err.rstrip("\n")
-    assert result == 1, "a failed curl request must fail the release step"
+    error_line = result.stderr.rstrip("\n")
+    assert result.returncode == 1, "a failed curl request must fail the release step"
     assert curl_argv_log.is_file(), "the release step must call curl"
     assert "failure%25%0Aforged%0A::warning::forged" in error_line, (
         "remote newlines must be escaped before becoming a workflow command"
@@ -233,7 +222,7 @@ def test_ensure_draft_retries_before_creating_a_release(
             {"exit_code": 0, "stdout": '{"tagName":"v1.2.0"}'},
         ]),
     )
-    monkeypatch.setattr(release_assets_cli.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(release_assets_cli, "_DRAFT_LOOKUP_DELAY_SECONDS", 0)
 
     result = release_assets_cli.main(["ensure-draft"])
 

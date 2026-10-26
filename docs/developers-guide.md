@@ -445,22 +445,27 @@ as a test assertion on the SHA string.
 
 ## Which runner each lane bills for
 
-Five jobs run on `ubicloud-standard-2`, a per-minute runner. The rest stay on
-GitHub-hosted runners, where minutes are free for a public repository.
+Seven jobs are fixed to `ubicloud-standard-2`, a per-minute runner. The three
+CI jobs also select it for same-repository work, but fall back to GitHub-hosted
+runners for fork and Dependabot pull requests.
 
 Table: every lane that bills for a paid runner, the runner it resolves to, and
 the ceiling it declares.
 
 | Lane                                  | Runner                | Ceiling |
 | ------------------------------------- | --------------------- | ------- |
+| `ci.yml` `build`                      | fork fallback         | 10 min  |
 | `ci.yml` `lint`                       | fork fallback         | 20 min  |
 | `ci.yml` `test`                       | fork fallback         | 10 min  |
 | `coverage-main.yml` `coverage-upload` | `ubicloud-standard-2` | 10 min  |
+| `release.yml` `check-version`         | `ubicloud-standard-2` | 10 min  |
 | `release.yml` `pure-wheel`            | `ubicloud-standard-2` | 15 min  |
-| `release.yml` `release`               | `ubicloud-standard-2` | 15 min  |
+| `release.yml` `attest`                | `ubicloud-standard-2` | 15 min  |
+| `release.yml` `publish-pypi`          | `ubicloud-standard-2` | 20 min  |
+| `release.yml` `draft-release`         | `ubicloud-standard-2` | 10 min  |
+| `release.yml` `publish-release`       | `ubicloud-standard-2` | 20 min  |
 
-`get-codescene-sha.yml` is dispatch-only and `build-wheels.yml` is a
-`workflow_call` whose matrix is not Linux-only, so both stay hosted. The
+`get-codescene-sha.yml` is dispatch-only and stays hosted. The
 `mutation-testing` and `dependabot-automerge` jobs call reusable workflows and
 declare no runner at all: the called workflow places its own jobs.
 
@@ -750,17 +755,14 @@ locally, not about what a lane bills for.
 
 `tests/workflow_contracts/test_act_platform_mapping.py` runs in CI and derives
 the required labels from `ci.yml`, the workflow the act harness is pointed at,
-rather than naming them. The domain is that one workflow and not the repository:
-`build-wheels.yml` matrixes over Windows and macOS, which `act` cannot host at
-any mapping. Those are different problems and the contract says which it found,
-so an unmapped Linux label reads as a mapping to add and a Windows or macOS
-lane in `ci.yml` reads as a lane act no longer covers. `run_act` also refuses
-the skip message outright, so a skipped job fails its test rather than passing
-it vacuously. It lives in `tests/workflows/act_runner.py`, apart from the
-integration tests so it can be exercised independently, and takes an optional
-`act_executable`, so `tests/workflow_contracts/test_act_runner.py` proves the
-refusal in CI with a stand-in `act` that prints the skip message and exits
-zero, alongside a job that ran and failed, which it must return untouched.
+rather than naming them. The contract covers that workflow's Linux-only build,
+lint, and test lanes. An unmapped label reads as a mapping to add. `run_act`
+also refuses the skip message outright, so a skipped job fails its test rather
+than passing it vacuously. It lives in `tests/workflows/act_runner.py`, apart
+from the integration tests so it can be exercised independently, and takes an
+optional `act_executable`, so `tests/workflow_contracts/test_act_runner.py`
+proves the refusal in CI with a stand-in `act` that prints the skip message and
+exits zero, alongside a job that ran and failed, which it must return untouched.
 
 ### What the contracts assert
 
@@ -800,6 +802,85 @@ check. `bool` subclasses `int`, so `timeout-minutes: true` would satisfy
 `isinstance(value, int)` and then satisfy the range check as the value one,
 leaving a lane with no reviewed ceiling past a contract about ceilings. GitHub
 does not accept a Boolean there at all.
+
+## Publishing a release
+
+The release workflow publishes one source distribution and one pure-Python
+wheel to PyPI, then reconciles the tag's GitHub Release with the files PyPI
+holds. The accepted first PyPI release is version `0.2.0`, unchanged from
+`pyproject.toml`; its changelog date is the release date. The old `v0.1.0`
+GitHub Release remains without assets because its workflow downloaded them to
+the wrong directory. Its wheel will not be back-filled manually.
+
+### Configure publishing settings
+
+Before pushing the first release tag, configure both destinations:
+
+- In GitHub repository settings, create the `pypi` environment and restrict
+  deployments to tags matching `v*.*.*`.
+- In PyPI's account-level Publishing page, add a pending GitHub Trusted
+  Publisher with project `falcon-correlate`, owner `leynos`, repository
+  `falcon-correlate`, workflow `release.yml`, and environment `pypi`. The PyPI
+  project endpoint currently returns 404. A pending publisher creates the
+  project on its first successful publish but does not reserve the name before
+  then, so configure it immediately before the release.
+- Do not store a PyPI API token. The `publish-pypi` job receives an OIDC
+  identity through the `pypi` environment and holds only `contents: read` and
+  `id-token: write`.
+
+If `falcon-correlate` cannot be registered, choose an available distribution
+name while retaining the `falcon_correlate` import package. Change
+`[project].name` in `pyproject.toml`, the project URL and Simple-index URLs in
+`.github/workflows/release.yml`, the pending publisher's project name, and all
+eight install commands in `README.md`, `docs/quickstart.md`, and
+`docs/users-guide.md`.
+
+### Prepare and publish
+
+Set the version in `pyproject.toml`, update `CHANGELOG.md` with the release
+date, and review the complete release entry. Push a `v`-prefixed tag whose
+version matches the project version exactly; for the first release, use
+`v0.2.0`.
+
+The workflow checks the tag and builds in parallel. The version check reports
+whether the version is a pre-release. The build uses `uv build --out-dir dist`
+to produce the sdist first and then a wheel from that sdist. CI applies the
+same build on pull requests, checks that exactly one sdist and one wheel exist,
+and imports the installed wheel without the optional Celery or HTTPX extras.
+
+The `attest` job collects every wheel and exactly one sdist, creates a Sigstore
+build-provenance attestation, and passes the distributions and tag-named bundle
+onward as `release-dist`. After attestation, `publish-pypi` and `draft-release`
+run independently: the former uploads only distribution names missing from
+PyPI's Simple index, while the latter creates or reuses a draft release.
+`publish-release` waits for both. It fills missing GitHub assets with the bytes
+PyPI lists, compares the destination digests, and publishes the release only
+after they agree. The version check marks pre-releases on GitHub.
+
+The release helper commands receive their workflow settings through these
+environment variables:
+
+- `release_version.py`: `RELEASE_TAG`, `GITHUB_OUTPUT`.
+- `release_assets_cli.py collect`: `SOURCE_DIR`, `DIST_DIR`.
+- `release_assets_cli.py stage-pypi`: `DIST_DIR`, `SIMPLE_INDEX_URL`,
+  `STAGING_DIR`, `GITHUB_OUTPUT`.
+- `release_assets_cli.py ensure-draft`: `DIST_DIR`, `RELEASE_TAG`.
+- `release_assets_cli.py publish-release`: `DIST_DIR`, `RELEASE_TAG`,
+  `SIMPLE_INDEX_URL`, `BUNDLE_DIR`, `STAGING_DIR`, `PRERELEASE`.
+
+### Re-run and recovery behaviour
+
+Re-running a tag is safe. Published PyPI filenames are not uploaded again; if
+none remain, the upload step is skipped and the job succeeds. The GitHub
+Release is reused, and only missing assets are added. The release helper takes
+PyPI's bytes for missing GitHub assets, so a rebuilt wheel cannot replace a
+published file under the same name.
+
+A missing PyPI project (HTTP 404) is treated as an empty index on the first
+release. Other non-success HTTP responses, an empty or malformed distribution
+set, or a digest disagreement fail the run. A digest disagreement leaves the
+GitHub Release as a draft for manual recovery; do not delete or overwrite
+published PyPI files.
 
 ## Roadmap notes
 
@@ -968,7 +1049,7 @@ matching version pins and runs the same `make lint` entry point.
 | `PYLINT_PYTHON`                | `$(PYLINT_PYPY_ROOT)/bin/pypy3.12`                                                   | Selects the executable checked before linting.               |
 | `PYLINT_VERSION`               | `4.1.1`                                                                              | Pins vanilla Pylint for the classic pass.                    |
 | `ASTROID_VERSION`              | `4.3.3`                                                                              | Pins the compatible Astroid release.                         |
-| `PYLINT_TARGETS`               | `src tests examples`                                                                 | Defines the source trees checked by both Pylint passes.      |
+| `PYLINT_TARGETS`               | `src tests examples scripts`                                                         | Defines the source trees checked by both Pylint passes.      |
 | `PYLINT_HOME`                  | `.pylint_cache/pypy-3.12-8.0.0-pylint-4.1.1-astroid-4.3.3`                           | Separates classic Pylint state.                              |
 | `PYLINT`                       | Isolated `uv tool run`, one worker, focused built-in messages and fatal diagnostics. | Runs classic Pylint directly under PyPy.                     |
 | `DF12_PYTHON_LINTS_REF`        | `v0.3.0`                                                                             | Pins the df12 plug-in and `ambrleaks` source.                |
@@ -1007,9 +1088,9 @@ directories; neither replaces or changes the project's `.venv`.
 Pylint's `py-version` remains `3.12` for both passes. It describes the source
 baseline, not the interpreter running the tool: DF12 runs on CPython 3.14 but
 does not move baseline code to Python 3.14. Classic Pylint and DF12 both check
-`src tests examples`; this checkout has no separately versioned `scripts/`
-tree. Any future tooling that requires newer Python syntax must also receive
-the focused built-in Pylint checks in a separate host-appropriate pass.
+`src tests examples scripts`. Any future tooling that requires newer Python
+syntax must also receive the focused built-in Pylint checks in a separate
+host-appropriate pass.
 
 Do not change the runtime, Pylint, or Astroid pins casually; review them as a
 tooling change. Update the `df12-python-lints` dependency and
