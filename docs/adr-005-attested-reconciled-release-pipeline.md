@@ -13,7 +13,7 @@ GitHub Release is its reconciled second destination.
 ## Context and problem statement
 
 The earlier `release.yml` published a GitHub Release before uploading any
-assets. Its artifact download path no longer matched the artifact names, and
+assets. Its artefact download path no longer matched the artefact names, and
 the empty upload was silently accepted. The `v0.1.0` release consequently has
 no assets. The project has no PyPI release, although its installation guides
 already direct users to install `falcon-correlate`.
@@ -90,7 +90,7 @@ and the tag's GitHub Release as the second, reconciled destination.
   release can be published. The release job uses pinned actions, disabled
   checkout credentials, top-level `permissions: {}`, least-privilege job
   grants, and `cancel-in-progress: false`.
-- Release telemetry is omitted. The Actions run history and artifact
+- Release telemetry is omitted. The Actions run history and artefact
   attestations provide the required record without adding an unneeded sink.
 
 ## Goals and non-goals
@@ -110,7 +110,7 @@ and the tag's GitHub Release as the second, reconciled destination.
 
 The untagged `0.2.0` changelog entry is re-dated to 2026-10-26 and will be
 published unchanged as the first PyPI release with distributions. The `v0.1.0`
-GitHub Release remains asset-less; the artifact download-path defect is
+GitHub Release remains asset-less; the artefact download-path defect is
 recorded in `CHANGELOG.md` rather than repaired with unaudited manual uploads.
 
 The PyPI project endpoint currently returns 404. Before the first release,
