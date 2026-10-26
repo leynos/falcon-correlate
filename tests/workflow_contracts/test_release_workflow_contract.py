@@ -50,6 +50,7 @@ _EXPECTED_PERMISSIONS = {
     "publish-release": {"contents": "write"},
 }
 _PINNED_ACTION = re.compile(r"^.+@[0-9a-f]{40}$")
+_SETUP_PYTHON_ACTION = "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97"
 _USES_WITH_VERSION = re.compile(
     r"^\s*(?:-\s+)?uses:\s*(?P<reference>\S+)\s+#\s+(?P<version>v\S+)\s*$",
     re.MULTILINE,
@@ -259,6 +260,38 @@ def test_external_actions_are_pinned_and_checkouts_drop_credentials(
                     f"{label} checkout must not persist credentials"
                 )
         assert checkouts > 0, f"{label} must include its expected checkout step"
+
+
+def test_release_helper_jobs_pin_supported_python(
+    release_workflow: dict[str, typ.Any],
+) -> None:
+    """Release helpers run on the project's supported Python version."""
+    helper_jobs = (
+        "check-version",
+        "attest",
+        "publish-pypi",
+        "draft-release",
+        "publish-release",
+    )
+    for job_name in helper_jobs:
+        steps = _steps(release_workflow["jobs"][job_name])
+        checkout_index = next(
+            index
+            for index, step in enumerate(steps)
+            if step.get("uses", "").startswith("actions/checkout@")
+        )
+        setup_python_index = next(
+            index
+            for index, step in enumerate(steps)
+            if step.get("uses") == _SETUP_PYTHON_ACTION
+        )
+        setup_python = steps[setup_python_index]
+        assert setup_python_index == checkout_index + 1, (
+            f"{job_name} must set up Python immediately after checkout"
+        )
+        assert setup_python.get("with", {}).get("python-version") == "3.13", (
+            f"{job_name} release helpers require pinned Python 3.13"
+        )
 
 
 def test_run_scripts_are_strict_and_do_not_interpolate_expressions(

@@ -1514,6 +1514,8 @@ duplicate or replacement assets. The decision and required manual settings are
 recorded in
 [ADR-005: attested, reconciled release pipeline](adr-005-attested-reconciled-release-pipeline.md).
 
+### 5.5. Closing remarks
+
 By implementing a robust correlation ID mechanism as outlined, developers can
 significantly improve the observability, debuggability, and operational
 manageability of Falcon-based applications, especially within complex,

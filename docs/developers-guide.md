@@ -809,8 +809,9 @@ The release workflow publishes one source distribution and one pure-Python
 wheel to PyPI, then reconciles the tag's GitHub Release with the files PyPI
 holds. The accepted first PyPI release is version `0.2.0`, unchanged from
 `pyproject.toml`; its changelog date is the release date. The old `v0.1.0`
-GitHub Release remains without assets because its workflow downloaded them to
-the wrong directory. Its wheel will not be back-filled manually.
+GitHub Release remains without assets because its workflow download path did
+not match the uploaded artefact name. Its wheel will not be back-filled
+manually.
 
 ### Configure publishing settings
 
@@ -850,13 +851,13 @@ and imports the installed wheel without the optional Celery or HTTPX extras.
 
 The `attest` job collects every wheel and exactly one sdist, creates a Sigstore
 build-provenance attestation, and passes the distributions and tag-named bundle
-onward as `release-dist`. `draft-release` depends only on the version check and
-can prepare or reuse the draft while the build and attestation proceed.
-`publish-pypi` waits for attestation and uploads only distribution names
-missing from PyPI's Simple index. `publish-release` waits for attestation, PyPI
-publication, and draft preparation. It fills missing GitHub assets with the
-bytes PyPI lists, compares the destination digests, and publishes the release
-only after they agree. The version check marks pre-releases on GitHub.
+onward as `release-dist`. `draft-release` waits for the version check and
+attestation, then prepares or reuses the draft while `publish-pypi` runs.
+`publish-pypi` uploads only distribution names missing from PyPI's Simple index.
+`publish-release` waits for attestation, PyPI publication, and draft
+preparation. It fills missing GitHub assets with the bytes PyPI lists, compares
+the destination digests, and publishes the release only after they agree. The
+version check marks pre-releases on GitHub.
 
 The release helper commands receive their workflow settings through these
 environment variables:
