@@ -850,12 +850,13 @@ and imports the installed wheel without the optional Celery or HTTPX extras.
 
 The `attest` job collects every wheel and exactly one sdist, creates a Sigstore
 build-provenance attestation, and passes the distributions and tag-named bundle
-onward as `release-dist`. After attestation, `publish-pypi` and `draft-release`
-run independently: the former uploads only distribution names missing from
-PyPI's Simple index, while the latter creates or reuses a draft release.
-`publish-release` waits for both. It fills missing GitHub assets with the bytes
-PyPI lists, compares the destination digests, and publishes the release only
-after they agree. The version check marks pre-releases on GitHub.
+onward as `release-dist`. `draft-release` depends only on the version check and
+can prepare or reuse the draft while the build and attestation proceed.
+`publish-pypi` waits for attestation and uploads only distribution names
+missing from PyPI's Simple index. `publish-release` waits for attestation, PyPI
+publication, and draft preparation. It fills missing GitHub assets with the
+bytes PyPI lists, compares the destination digests, and publishes the release
+only after they agree. The version check marks pre-releases on GitHub.
 
 The release helper commands receive their workflow settings through these
 environment variables:
