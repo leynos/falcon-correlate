@@ -101,7 +101,7 @@ class TestPrepareHeaders:
         failure_message = "expected request_kwargs to be a new mapping"
         assert request_kwargs is not kwargs, failure_message
 
-    def test_returns_empty_dict_when_headers_and_context_are_empty(
+    def test_returns_empty_headers_when_headers_and_context_are_empty(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:

@@ -25,6 +25,7 @@ from falcon_correlate.unittests.httpx_wrapper_helpers import (  # ruff: ignore[m
     run_async,
 )
 
+
 class TestAsyncRequestWithCorrelationId:
     """Tests for the async ``async_request_with_correlation_id`` wrapper."""
 

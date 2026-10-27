@@ -1858,7 +1858,9 @@ imported lazily at call time.
 - `pyproject.toml` — Added `httpx` to dev dependency group.
 
 The BDD scenarios own middleware-to-outbound workflows; the unit modules own
-wrapper mechanics. See the
+wrapper mechanics, including in-process HTTPX transport boundaries. The
+generated header-pair property in the wrapper header unit module checks
+duplicate preservation and caller ownership during preparation. See the
 [test suite ownership policy](developers-guide.md#test-suite-ownership).
 
 ### A.7. httpx custom transport classes (Task 4.1.2)

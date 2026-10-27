@@ -315,16 +315,19 @@ HTTPX propagation illustrates the ownership boundary:
 | Wrapper header extraction, copying, precedence, keyword forwarding, and async-client use.                             | Unit: `test_httpx_wrapper*.py`                                                                                                      |
 | Sync and async transport injection, caller-header precedence, request delegation, lifecycle, and custom header names. | Unit: `test_httpx_transport.py`                                                                                                     |
 | Header injection and caller-header preservation over generated header inputs.                                         | Property: `tests/property/test_header_injection.py`                                                                                 |
+| Generated header-pair order, duplicate preservation, and caller ownership during wrapper preparation.                 | Property: `test_httpx_wrapper_headers.py`                                                                                           |
 | Public exports and import behaviour when HTTPX is optional.                                                           | Unit: `test_public_exports.py`, `test_httpx_wrapper_exports.py`, `test_httpx_transport.py`, and `test_optional_httpx_dependency.py` |
 
 Table: HTTPX propagation contracts and their primary test owners.
 
 The BDD wrapper scenarios begin with real WSGI or ASGI Falcon requests. Unit
-tests retain ownership of wrapper and transport mechanics at their patched
-boundaries; the property tests retain ownership of generated header invariants.
-The shared app and inbound-dispatch helper in `tests/bdd/httpx_test_helpers.py`
-is scoped to the HTTPX wrapper and transport features; keep it test-only and do
-not reuse it for unrelated workflows.
+tests retain ownership of wrapper and transport mechanics, including real HTTPX
+clients with in-process transports. The property in the wrapper header unit
+module covers generated header pairs and caller ownership; the separate
+property suite covers injection and caller-header preservation. The shared app
+and inbound-dispatch helper in `tests/bdd/httpx_test_helpers.py` is scoped to
+the HTTPX wrapper and transport features; keep it test-only and do not reuse it
+for unrelated workflows.
 
 Consolidate one behaviour area at a time. First record a contract-to-owner map
 and the current test IDs, then remove only cases with the same owner and
