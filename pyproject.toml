@@ -229,6 +229,7 @@ max-positional-arguments = 4
 timeout = 30
 pythonpath = ["."]
 markers = [
+    "integration: expensive tests requiring Docker and act",
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
 

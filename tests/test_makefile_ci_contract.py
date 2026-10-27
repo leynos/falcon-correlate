@@ -24,6 +24,8 @@ _OBSERVABILITY_SNAPSHOT_TEST_TOKENS: typ.Final = (
 _PROJECT_PYTEST_EXCLUDE_TOKENS: typ.Final = (
     "--ignore=$(OPTIONAL_CELERY_TEST)",
     "--ignore=$(OBSERVABILITY_SNAPSHOT_TEST)",
+    "-m",
+    "not integration",
 )
 _TYPECHECK_PREREQUISITES: typ.Final = ("build",)
 _TYPECHECK_RECIPE_TOKENS: typ.Final = (
@@ -264,6 +266,20 @@ def test_typecheck_and_pytest_targets_use_project_commands() -> None:
     assert (
         _recipe_tokens("test-observability-contracts") == _OBSERVABILITY_RECIPE_TOKENS
     ), "observability snapshots must run serially outside the xdist session"
+
+
+def test_parallel_test_deselects_integration() -> None:
+    """The parallel test recipe excludes expensive integration tests."""
+    assert "$(SERIAL_PY_TEST_EXCLUDES)" in _recipe_tokens("test")[1], (
+        "make test parallel recipe must use SERIAL_PY_TEST_EXCLUDES"
+    )
+    assert _variable_tokens("SERIAL_PY_TEST_EXCLUDES") == (
+        "$(PROJECT_PYTEST_EXCLUDES)",
+    ), "SERIAL_PY_TEST_EXCLUDES must reuse PROJECT_PYTEST_EXCLUDES"
+    assert _variable_tokens("PROJECT_PYTEST_EXCLUDES")[-2:] == (
+        "-m",
+        "not integration",
+    ), "PROJECT_PYTEST_EXCLUDES must deselect integration"
 
 
 def test_lint_target_runs_all_six_stages_in_order() -> None:

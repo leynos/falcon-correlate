@@ -58,7 +58,7 @@ PYLINT = PYLINTHOME=$(PYLINT_HOME) $(PYLINT_TOOL) pylint --jobs=1 --disable=all 
 OPTIONAL_CELERY_TEST := src/falcon_correlate/unittests/test_optional_celery_dependency.py
 OBSERVABILITY_SNAPSHOT_TEST := src/falcon_correlate/unittests/test_observability_contracts.py
 PROJECT_PYTEST_EXCLUDES := --ignore=$(OPTIONAL_CELERY_TEST) \
-	--ignore=$(OBSERVABILITY_SNAPSHOT_TEST)
+	--ignore=$(OBSERVABILITY_SNAPSHOT_TEST) -m "not integration"
 SKYLOS_VERSION ?= 4.33.2
 # Skylos parses source with its own runtime AST; pin Python 3.14 so newer
 # project syntax does not produce phantom findings.
@@ -234,6 +234,10 @@ SERIAL_PY_TEST_EXCLUDES := $(PROJECT_PYTEST_EXCLUDES)
 test: build uv $(VENV_TOOLS) doctest makeutil ## Run tests
 	$(UV_ENV) $(UV) run pytest -v $(SERIAL_PY_TESTS)
 	$(UV_ENV) $(UV) run pytest -v -n $(PYTEST_WORKERS) --dist=loadgroup $(SERIAL_PY_TEST_EXCLUDES)
+
+.PHONY: test-integration
+test-integration: ## Run opt-in workflow integration tests
+	uv run pytest tests/workflows/ -v -m integration
 
 test-mutmut-sandbox: build ## Exercise mutmut's configured sandbox on a small module
 	$(UV_ENV) $(UV) run --with mutmut==$(MUTMUT_VERSION) \
