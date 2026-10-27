@@ -208,7 +208,7 @@ jobs:
           language: python
           output-path: coverage.xml
           format: cobertura
-          # Compare changed-line coverage against the baseline written by
+          # Compare aggregate Python coverage against the baseline written by
           # coverage-main.yml: caches saved on main are readable by every
           # pull-request run.
           with-ratchet: 'true'

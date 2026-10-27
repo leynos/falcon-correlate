@@ -333,9 +333,11 @@ Consolidate one behaviour area at a time. First record a contract-to-owner map
 and the current test IDs, then remove only cases with the same owner and
 assertion boundary. Keep defensive cases and concurrency tests that strengthen
 an independent invariant. Validate the mapping with the required repository
-gates and the Continuous Integration (CI) changed-line coverage ratchet. Treat
-coverage reports, mutation results, and clone counts as diagnostic evidence;
-they are not branch-coverage claims or an enforced coverage floor.
+gates and the Continuous Integration (CI) repository-wide coverage ratchet. The
+ratchet compares aggregate coverage with a stored baseline; passing it does not
+establish coverage of changed lines. Treat coverage reports, mutation results,
+and clone counts as diagnostic evidence; they are not branch-coverage claims or
+a fixed coverage floor.
 
 Test-file placement follows the
 [repository layout](repository-layout.md#path-responsibilities). Potential
