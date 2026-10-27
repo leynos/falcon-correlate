@@ -276,7 +276,7 @@ generation and repeated execution. Keep this suite focused on behavioural
 properties that benefit from broad input coverage rather than example-specific
 cases.
 
-Shared fixtures for the property suite live in `tests/property/conftest.py`. The
+Shared fixtures for the property suite live in `tests/conftest.py`. The
 `isolated_context` fixture runs each generated example inside
 `contextvars.copy_context().run()` so `ContextVar` state does not leak between
 examples. Use it whenever a property test mutates request-scoped context.
@@ -289,6 +289,61 @@ Follow the existing pattern in `tests/property/test_header_injection.py`:
   per example; and
 - assert on the external behaviour of the property rather than the generated
   example itself.
+
+## Test suite ownership
+
+Give each behaviour one primary test-suite owner:
+
+- BDD tests own user-visible workflows and public behavioural contracts that
+  pass through real framework dispatch.
+- Unit tests own edge cases, implementation boundaries, defensive paths,
+  lifecycle behaviour, public exports, and optional-import boundaries.
+- Property tests own generated-input invariants that a small set of examples
+  cannot cover well.
+
+Do not repeat the same case matrix across suites. Overlap is justified only
+when each test proves a distinct public interface, integration boundary,
+lifecycle, import boundary, or generated-input invariant. State that
+distinction beside the test, so future changes do not restore duplicate cases.
+
+HTTPX propagation illustrates the ownership boundary:
+
+| Contract                                                                                                              | Primary owner                                                                                                                       |
+| --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| A trusted inbound Falcon request carries its ID through the sync or async wrapper to the outbound call.               | BDD: `tests/bdd/httpx_propagation.feature`                                                                                          |
+| A generated ID reaches the outbound wrapper call and is echoed in the Falcon response.                                | BDD: `tests/bdd/httpx_propagation.feature`                                                                                          |
+| Wrapper header extraction, copying, precedence, keyword forwarding, and async-client use.                             | Unit: `test_httpx_wrapper*.py`                                                                                                      |
+| Sync and async transport injection, caller-header precedence, request delegation, lifecycle, and custom header names. | Unit: `test_httpx_transport.py`                                                                                                     |
+| Header injection and caller-header preservation over generated header inputs.                                         | Property: `tests/property/test_header_injection.py`                                                                                 |
+| Generated header-pair order, duplicate preservation, and caller ownership during wrapper preparation.                 | Property: `test_httpx_wrapper_headers.py`                                                                                           |
+| Public exports and import behaviour when HTTPX is optional.                                                           | Unit: `test_public_exports.py`, `test_httpx_wrapper_exports.py`, `test_httpx_transport.py`, and `test_optional_httpx_dependency.py` |
+
+Table: HTTPX propagation contracts and their primary test owners.
+
+The BDD wrapper scenarios begin with real WSGI or ASGI Falcon requests. Unit
+tests retain ownership of wrapper and transport mechanics, including real HTTPX
+clients with in-process transports. The property in the wrapper header unit
+module covers generated header pairs and caller ownership; the separate
+property suite covers injection and caller-header preservation. The shared app
+and inbound-dispatch helper in `tests/bdd/httpx_test_helpers.py` is scoped to
+the HTTPX wrapper and transport features; keep it test-only and do not reuse it
+for unrelated workflows.
+
+Consolidate one behaviour area at a time. First record a contract-to-owner map
+and the current test IDs, then remove only cases with the same owner and
+assertion boundary. Keep defensive cases and concurrency tests that strengthen
+an independent invariant. Validate the mapping with the required repository
+gates and the Continuous Integration (CI) repository-wide coverage ratchet. The
+ratchet compares aggregate coverage with a stored baseline; passing it does not
+establish coverage of changed lines. Treat coverage reports, mutation results,
+and clone counts as diagnostic evidence; they are not branch-coverage claims or
+a fixed coverage floor.
+
+Test-file placement follows the
+[repository layout](repository-layout.md#path-responsibilities). Potential
+future consolidation candidates are real-ASGI integration versus ASGI BDD
+coverage, Celery publish and worker tests, and the finite UUID `sampled_from`
+property. They are not part of the HTTPX consolidation.
 
 ## Mutation testing
 

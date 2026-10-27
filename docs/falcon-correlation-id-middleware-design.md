@@ -1847,15 +1847,21 @@ imported lazily at call time.
   `_prepare_headers` helper.
 - `src/falcon_correlate/__init__.py` — Added imports and `__all__` entries
   for both wrapper functions.
-- `src/falcon_correlate/unittests/test_httpx_wrapper.py` — Unit tests
-  covering header injection, preservation, async behaviour, kwargs
-  pass-through, and public API exports.
-- `tests/bdd/httpx_propagation.feature` — BDD scenarios for httpx
-  propagation.
+- `src/falcon_correlate/unittests/test_httpx_wrapper*.py` — Unit tests
+  covering wrapper header preparation, sync and async calls, keyword
+  forwarding, and exports.
+- `tests/bdd/httpx_propagation.feature` — BDD workflows from inbound Falcon
+  middleware dispatch to the outbound wrapper call.
 - `tests/bdd/test_httpx_propagation_steps.py` — BDD step definitions.
 - `docs/users-guide.md` — Added "httpx propagation" section and updated
   current status.
 - `pyproject.toml` — Added `httpx` to dev dependency group.
+
+The BDD scenarios own middleware-to-outbound workflows; the unit modules own
+wrapper mechanics, including in-process HTTPX transport boundaries. The
+generated header-pair property in the wrapper header unit module checks
+duplicate preservation and caller ownership during preparation. See the
+[test suite ownership policy](developers-guide.md#test-suite-ownership).
 
 ### A.7. httpx custom transport classes (Task 4.1.2)
 
@@ -1903,15 +1909,26 @@ before delegation.
   the shared header-injection helper, and optional-dependency runtime checks.
 - `src/falcon_correlate/__init__.py` — Re-exported the transport classes from
   the package root.
-- `src/falcon_correlate/unittests/test_httpx_transport.py` — Added unit tests
-  for sync and async transport behaviour, request delegation, lifecycle
-  delegation, and public exports.
-- `tests/bdd/httpx_transport.feature` — Added transport-focused behavioural
-  scenarios.
-- `tests/bdd/test_httpx_transport_steps.py` — Added BDD step definitions for
-  configured sync and async `httpx` clients.
+- `src/falcon_correlate/unittests/test_httpx_transport.py` — Unit tests for
+  sync and async transport mechanics, request delegation, and lifecycle.
+- `tests/bdd/httpx_transport.feature` — BDD workflows from inbound Falcon
+  middleware dispatch through configured sync and async HTTPX clients.
+- `tests/bdd/test_httpx_transport_steps.py` — BDD step definitions using
+  recording transports without real networking.
 - `docs/users-guide.md` — Documented when to choose wrapper functions versus
   transports and added sync and async transport configuration examples.
+
+The BDD scenarios own middleware-to-outbound workflows; the unit modules own
+transport mechanics. See the
+[test suite ownership policy](developers-guide.md#test-suite-ownership).
+
+The package-wide public API contract is owned by
+`src/falcon_correlate/unittests/test_public_exports.py`, which asserts the
+exact root `__all__` set, including HTTPX wrappers and transports. The
+HTTPX-specific export assertions remain in `test_httpx_wrapper_exports.py` and
+`test_httpx_transport.py`; the optional import boundary remains in
+`test_optional_httpx_dependency.py`. See the
+[test suite ownership policy](developers-guide.md#test-suite-ownership).
 
 ### A.8. Celery task publish signal handler (Task 4.2.1)
 

@@ -1,13 +1,20 @@
-"""Step definitions for httpx_propagation.feature."""
+"""Step definitions for HTTPX wrapper propagation through Falcon middleware."""
 
 from __future__ import annotations
 
 import typing as typ
+from http import HTTPStatus
 from unittest import mock
 
+import falcon
 import pytest
 
 httpx = pytest.importorskip("httpx")
+
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
+
+    import falcon.testing
 
 from pytest_bdd import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     given,
@@ -24,203 +31,150 @@ from falcon_correlate.httpx import (  # ruff: ignore[module-import-not-at-top-of
     async_request_with_correlation_id,
     request_with_correlation_id,
 )
-
-if typ.TYPE_CHECKING:
-    import collections.abc as cabc
+from falcon_correlate.middleware import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    DEFAULT_HEADER_NAME,
+)
+from tests.bdd.httpx_test_helpers import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    build_test_client,
+    dispatch_inbound_request,
+)
 
 scenarios("httpx_propagation.feature")
 
 
-def _run_async_request(**kwargs: typ.Any) -> dict[str, str]:  # ruff: ignore[any-type] -- mirrors httpx kwargs.
-    """Run ``async_request_with_correlation_id`` with a mocked AsyncClient.
-
-    Returns the headers dict captured from the mocked request call.
-
-    Returns
-    -------
-    dict[str, str]
-        The value produced for the test scenario.
-    """
-    import asyncio
-
-    async def _run() -> dict[str, str]:
-        """Mock the async client, call the wrapper, and return its captured headers."""
-        mock_response = httpx.Response(200)
-        with mock.patch("httpx.AsyncClient") as mock_cls:
-            mock_client = mock.AsyncMock()
-            mock_client.request.return_value = mock_response
-            mock_cls.return_value.__aenter__ = mock.AsyncMock(return_value=mock_client)
-            mock_cls.return_value.__aexit__ = mock.AsyncMock(return_value=False)
-            await async_request_with_correlation_id(
-                "GET", "http://example.com", **kwargs
-            )
-            return dict(mock_client.request.call_args.kwargs["headers"])
-
-    return asyncio.run(_run())
-
-
-def _run_sync_request(**kwargs: typ.Any) -> dict[str, str]:  # ruff: ignore[any-type] -- mirrors httpx kwargs.
-    """Run ``request_with_correlation_id`` with a mocked HTTPX request.
-
-    Returns
-    -------
-    dict[str, str]
-        The headers captured from the mocked request call.
-
-    """
-    with mock.patch("httpx.request") as mock_request:
-        mock_request.return_value = httpx.Response(200)
-        request_with_correlation_id("GET", "http://example.com", **kwargs)
-        return dict(mock_request.call_args.kwargs["headers"])
-
-
 class Context(typ.TypedDict, total=False):
-    """Type definition for test context."""
+    """State shared by the HTTPX wrapper steps."""
 
+    mode: typ.Literal["sync", "async"]
+    client: falcon.testing.TestClient
+    response: falcon.testing.Result
     captured_headers: dict[str, str]
+
+
+class _SyncWrapperResource:
+    """Call the synchronous correlation wrapper from a Falcon request."""
+
+    def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
+        """Make one outbound request through the synchronous wrapper."""
+        request_with_correlation_id("GET", "http://example.com")
+
+
+class _AsyncWrapperResource:
+    """Call the asynchronous correlation wrapper from a Falcon request."""
+
+    async def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
+        """Make one outbound request through the asynchronous wrapper."""
+        await async_request_with_correlation_id("GET", "http://example.com")
+
+
+def _build_wrapper_context(
+    mode: typ.Literal["sync", "async"],
+    generated_id: str | None = None,
+) -> Context:
+    """Build the real Falcon request boundary for one wrapper mode."""
+    match mode:
+        case "sync":
+            resource = _SyncWrapperResource()
+        case "async":
+            resource = _AsyncWrapperResource()
+
+    return {
+        "mode": mode,
+        "client": build_test_client(mode, resource, generated_id=generated_id),
+    }
+
+
+def _dispatch_with_httpx_patches(
+    context: Context,
+    correlation_id: str | None,
+) -> Context:
+    """Hold HTTPX patches through real Falcon test-client dispatch."""
+    sync_response = httpx.Response(200)
+    async_response = httpx.Response(200)
+    async_client = mock.AsyncMock()
+    async_client.request.return_value = async_response
+
+    with (
+        mock.patch("httpx.request", return_value=sync_response) as sync_request,
+        mock.patch("httpx.AsyncClient") as async_client_class,
+    ):
+        async_client_class.return_value.__aenter__ = mock.AsyncMock(
+            return_value=async_client
+        )
+        async_client_class.return_value.__aexit__ = mock.AsyncMock(return_value=False)
+        response = dispatch_inbound_request(
+            context["client"],
+            correlation_id,
+        )
+        context["response"] = response
+        failure_message = (
+            f"expected Falcon status {HTTPStatus.OK}, got {response.status_code}"
+        )
+        assert response.status_code == HTTPStatus.OK, failure_message
+
+        match context["mode"]:
+            case "sync":
+                request_call = sync_request.call_args
+            case "async":
+                request_call = async_client.request.call_args
+
+        failure_message = "expected the wrapper to call HTTPX during Falcon dispatch"
+        assert request_call is not None, failure_message
+        context["captured_headers"] = dict(request_call.kwargs.get("headers", {}))
+
+    return context
 
 
 @pytest.fixture(autouse=True)
 def _reset_context_variables() -> cabc.Generator[None, None, None]:
-    """Reset context variables after each scenario."""
+    """Reset request context after each Falcon scenario."""
     yield
     correlation_id_var.set(None)
 
 
 @given(
-    parsers.parse('the correlation ID is set to "{value}"'),
+    parsers.parse("a {mode} Falcon app with a trusted source and HTTPX wrapper"),
     target_fixture="context",
 )
-def given_correlation_id_set(value: str) -> Context:
-    """Set the correlation ID context variable.
-
-    Parameters
-    ----------
-    value : str
-        Correlation ID to store in the context variable.
-
-    Returns
-    -------
-    Context
-        The value produced for the test scenario.
-
-    """
-    correlation_id_var.set(value)
-    return {}
+def given_trusted_source_wrapper_app(
+    mode: typ.Literal["sync", "async"],
+) -> Context:
+    """Build a WSGI or ASGI app for trusted inbound wrapper propagation."""
+    return _build_wrapper_context(mode)
 
 
-@given("no correlation ID is set", target_fixture="context")
-def given_no_correlation_id() -> Context:
-    """Ensure no correlation ID is set (default state).
-
-    Returns
-    -------
-    Context
-        The value produced for the test scenario.
-
-    """
-    correlation_id_var.set(None)
-    return {}
-
-
-@when(
-    "I send a request using the correlation ID wrapper",
+@given(
+    parsers.parse(
+        'a {mode} Falcon app with a generated ID "{generated_id}" and HTTPX wrapper'
+    ),
     target_fixture="context",
 )
-def when_send_request(context: Context) -> Context:
-    """Send a sync request using the wrapper and capture headers.
-
-    Parameters
-    ----------
-    context : Context
-        Scenario state passed through the step chain.
-
-    Returns
-    -------
-    Context
-        The value produced for the test scenario.
-
-    """
-    context["captured_headers"] = _run_sync_request()
-    return context
-
-
-@when(
-    parsers.parse('I send a request with existing header "{name}" set to "{value}"'),
-    target_fixture="context",
-)
-def when_send_request_with_header(context: Context, name: str, value: str) -> Context:
-    """Send a sync request with an existing header.
-
-    Parameters
-    ----------
-    context : Context
-        Scenario state passed through the step chain.
-    name : str
-        Name of the pre-existing request header.
-    value : str
-        Value to use for the pre-existing request header.
-
-    Returns
-    -------
-    Context
-        The value produced for the test scenario.
-
-    """
-    context["captured_headers"] = _run_sync_request(headers={name: value})
-    return context
-
-
-@when(
-    "I send an async request using the correlation ID wrapper",
-    target_fixture="context",
-)
-def when_send_async_request(context: Context) -> Context:
-    """Send an async request using the wrapper and capture headers.
-
-    Parameters
-    ----------
-    context : Context
-        Scenario state passed through the step chain.
-
-    Returns
-    -------
-    Context
-        The value produced for the test scenario.
-
-    """
-    context["captured_headers"] = _run_async_request()
-    return context
+def given_generated_id_wrapper_app(
+    mode: typ.Literal["sync", "async"],
+    generated_id: str,
+) -> Context:
+    """Build a WSGI or ASGI app with a deterministic generated correlation ID."""
+    return _build_wrapper_context(mode, generated_id)
 
 
 @when(
     parsers.parse(
-        'I send an async request with existing header "{name}" set to "{value}"'
+        'I dispatch an inbound Falcon request with correlation ID "{correlation_id}"'
     ),
     target_fixture="context",
 )
-def when_send_async_request_with_header(
-    context: Context, name: str, value: str
-) -> Context:
-    """Send an async request with an existing header.
+def when_dispatch_with_trusted_id(context: Context, correlation_id: str) -> Context:
+    """Dispatch a trusted inbound request while HTTPX calls are patched."""
+    return _dispatch_with_httpx_patches(context, correlation_id)
 
-    Parameters
-    ----------
-    context : Context
-        Scenario state passed through the step chain.
-    name : str
-        Name of the pre-existing request header.
-    value : str
-        Value to use for the pre-existing request header.
 
-    Returns
-    -------
-    Context
-        The value produced for the test scenario.
-
-    """
-    context["captured_headers"] = _run_async_request(headers={name: value})
-    return context
+@when(
+    "I dispatch an inbound Falcon request without a correlation ID",
+    target_fixture="context",
+)
+def when_dispatch_without_correlation_id(context: Context) -> Context:
+    """Dispatch a request that makes middleware generate its correlation ID."""
+    return _dispatch_with_httpx_patches(context, None)
 
 
 @then(
@@ -229,22 +183,30 @@ def when_send_async_request_with_header(
     ),
 )
 def then_header_present(context: Context, name: str, value: str) -> None:
-    """Verify the outgoing request contains the expected header."""
+    """Verify the outbound wrapper call contains the expected header."""
     headers = context["captured_headers"]
-    # HTTP headers are case-insensitive; httpx.Headers normalizes to lowercase
-    header_key = next((k for k in headers if k.lower() == name.lower()), None)
+    header_key = next((key for key in headers if key.lower() == name.lower()), None)
     assert header_key is not None, f"header {name!r} not found in {headers!r}"
-    assert headers[header_key] == value, (
-        f"expected {name}={value!r}, got {headers[header_key]!r}"
+    actual = headers[header_key]
+    assert actual == value, (
+        f"expected header {header_key!r} to be {value!r} but was {actual!r}"
     )
 
 
-@then(
-    parsers.parse('the outgoing request should not contain header "{name}"'),
-)
-def then_header_absent(context: Context, name: str) -> None:
-    """Verify the outgoing request does not contain the header."""
-    headers = context["captured_headers"]
-    # HTTP headers are case-insensitive
-    header_key = next((k for k in headers if k.lower() == name.lower()), None)
-    assert header_key is None, f"header {name!r} unexpectedly found in {headers!r}"
+@then("the outbound correlation ID should match the echoed response header")
+def then_outbound_id_matches_echoed_response_header(context: Context) -> None:
+    """Verify the generated outbound ID equals the middleware response echo."""
+    outbound_id = next(
+        (
+            value
+            for name, value in context["captured_headers"].items()
+            if name.lower() == DEFAULT_HEADER_NAME.lower()
+        ),
+        None,
+    )
+    response_id = context["response"].headers.get(DEFAULT_HEADER_NAME)
+    assert outbound_id is not None, "expected the outbound correlation header"
+    failure_message = (
+        f"expected response ID {response_id!r} to equal outbound ID {outbound_id!r}"
+    )
+    assert response_id == outbound_id, failure_message
