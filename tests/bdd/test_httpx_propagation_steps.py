@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import typing as typ
+from http import HTTPStatus
 from unittest import mock
 
 import falcon
@@ -101,10 +102,15 @@ def _dispatch_with_httpx_patches(
             return_value=async_client
         )
         async_client_class.return_value.__aexit__ = mock.AsyncMock(return_value=False)
-        context["response"] = dispatch_inbound_request(
+        response = dispatch_inbound_request(
             context["client"],
             correlation_id,
         )
+        context["response"] = response
+        failure_message = (
+            f"expected Falcon status {HTTPStatus.OK}, got {response.status_code}"
+        )
+        assert response.status_code == HTTPStatus.OK, failure_message
 
         match context["mode"]:
             case "sync":
