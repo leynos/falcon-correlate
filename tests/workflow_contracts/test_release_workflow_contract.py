@@ -50,7 +50,7 @@ _EXPECTED_PERMISSIONS = {
     "publish-release": {"contents": "write"},
 }
 _PINNED_ACTION = re.compile(r"^.+@[0-9a-f]{40}$")
-_SETUP_PYTHON_ACTION = "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97"
+_SETUP_PYTHON_PREFIX = "actions/setup-python@"
 _USES_WITH_VERSION = re.compile(
     r"^\s*(?:-\s+)?uses:\s*(?P<reference>\S+)\s+#\s+(?P<version>v\S+)\s*$",
     re.MULTILINE,
@@ -267,10 +267,25 @@ def test_external_actions_are_pinned_and_checkouts_drop_credentials(
         _check_action_pins(label, document, raw_text)
 
 
+@pytest.mark.parametrize(
+    "alternate_sha", [None, "a" * 40], ids=["checked-in", "updated"]
+)
 def test_release_helper_jobs_pin_supported_python(
     release_workflow: dict[str, typ.Any],
+    release_text: str,
+    alternate_sha: str | None,
 ) -> None:
     """Release helpers run on the project's supported Python version."""
+    if alternate_sha is not None:
+        updated = re.sub(
+            r"(actions/setup-python@)[0-9a-f]{40}",
+            rf"\g<1>{alternate_sha}",
+            release_text,
+        )
+        assert f"actions/setup-python@{alternate_sha}" in updated, (
+            "the regression case must exercise an updated action pin"
+        )
+        release_workflow = parse_workflow(updated, "release.yml")
     helper_jobs = (
         "check-version",
         "attest",
@@ -288,7 +303,7 @@ def test_release_helper_jobs_pin_supported_python(
         setup_python_index = next(
             index
             for index, step in enumerate(steps)
-            if step.get("uses") == _SETUP_PYTHON_ACTION
+            if step.get("uses", "").startswith(_SETUP_PYTHON_PREFIX)
         )
         setup_python = steps[setup_python_index]
         assert setup_python_index == checkout_index + 1, (
