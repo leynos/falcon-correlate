@@ -9,6 +9,9 @@ import pytest
 
 from scripts import release_assets
 from tests.workflow_contracts.release_payloads import (
+    BUNDLE as _BUNDLE,
+)
+from tests.workflow_contracts.release_payloads import (
     SDIST as _SDIST,
 )
 from tests.workflow_contracts.release_payloads import (
@@ -106,3 +109,32 @@ def test_parse_github_assets_rejects_malformed_responses(body: str) -> None:
     """Malformed release data cannot silently suppress an upload."""
     with pytest.raises(release_assets.ReleaseAssetError):
         release_assets.parse_github_asset_digests(body)
+
+
+@pytest.mark.parametrize(
+    ("missing_name", "message"),
+    [
+        (_SDIST, "missing from GitHub Release"),
+        (_BUNDLE, "GitHub Release is missing"),
+    ],
+    ids=["missing-distribution", "missing-bundle"],
+)
+def test_final_release_validation_rejects_missing_assets(
+    missing_name: str, message: str
+) -> None:
+    """A release cannot be finalized without both distributions and provenance."""
+    index = {
+        _WHEEL: release_assets.PypiFile("a" * 64, "https://example.org/wheel"),
+        _SDIST: release_assets.PypiFile("b" * 64, "https://example.org/sdist"),
+    }
+    assets: dict[str, str | None] = {
+        _WHEEL: "a" * 64,
+        _SDIST: "b" * 64,
+        _BUNDLE: None,
+    }
+    del assets[missing_name]
+
+    with pytest.raises(release_assets.ReleaseAssetError, match=message):
+        release_assets.require_github_release_digests(
+            (_WHEEL, _SDIST), index, assets, _BUNDLE
+        )

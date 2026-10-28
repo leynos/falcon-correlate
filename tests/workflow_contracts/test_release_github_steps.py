@@ -31,6 +31,13 @@ _EXPECTED_DRAFT_CREATE = [
     "--title",
     _TAG,
 ]
+_EXPECTED_DRAFT_LOG = (
+    "GitHub draft not found; retry 1/3",
+    "Retry delay: 2s",
+    "GitHub draft not found; retry 2/3",
+    "Retry delay: 2s",
+    f"Created a draft release for {_TAG}.",
+)
 
 
 def _configure_release(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -60,13 +67,13 @@ def test_ensure_draft_creates_only_after_repeated_not_found(
     )
 
     assert result.returncode == 0, f"the draft step failed: {result.stderr}"
+    assert tuple(result.stdout.splitlines()) == _EXPECTED_DRAFT_LOG, (
+        "the workflow log must report each lookup retry and draft creation"
+    )
     calls = [json.loads(line) for line in gh_argv_log.read_text().splitlines()]
     assert len(calls) == 4, "the helper must retry release lookup before creation"
     assert calls[-1] == _EXPECTED_DRAFT_CREATE, (
         "a missing release must be created as a verified draft"
-    )
-    assert "Created a draft" in result.stdout, (
-        "successful draft creation must be visible in workflow logs"
     )
 
 

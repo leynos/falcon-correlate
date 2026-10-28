@@ -162,6 +162,8 @@ def _read_index(url: str, expected: cabc.Collection[str] = ()) -> dict[str, Pypi
         if not expected_names or expected_names <= index.keys():
             return index
         if attempt + 1 < _INDEX_ATTEMPTS:
+            print(f"PyPI index HTTP {status}; retry {attempt + 1}/{_INDEX_ATTEMPTS}")
+            print(f"Retry delay: {_INDEX_RETRY_DELAY_SECONDS}s")
             time.sleep(_INDEX_RETRY_DELAY_SECONDS)
     absent = sorted(expected_names - index.keys())
     msg = f"PyPI Simple index did not list expected release files: {absent}"
@@ -214,6 +216,10 @@ def _ensure_draft() -> None:
         if "not found" not in diagnostic and "404" not in diagnostic:
             _require_success(view, "gh release view")
         if attempt + 1 < _DRAFT_LOOKUP_ATTEMPTS:
+            print(
+                f"GitHub draft not found; retry {attempt + 1}/{_DRAFT_LOOKUP_ATTEMPTS}"
+            )
+            print(f"Retry delay: {_DRAFT_LOOKUP_DELAY_SECONDS}s")
             time.sleep(_DRAFT_LOOKUP_DELAY_SECONDS)
 
     create = _run([

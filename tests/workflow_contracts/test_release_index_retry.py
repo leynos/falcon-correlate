@@ -81,6 +81,12 @@ def test_publish_retries_until_pypi_indexes_newly_uploaded_files(
     assert result.returncode == 0, (
         f"a delayed Simple-index update must still publish: {result.stderr}"
     )
+    assert "PyPI index HTTP 404; retry 1/12" in result.stdout, (
+        "the retry log must identify the index status and attempt"
+    )
+    assert "Retry delay: 5s" in result.stdout, (
+        "the retry log must show the configured delay"
+    )
     curl_calls = [json.loads(line) for line in curl_argv_log.read_text().splitlines()]
     assert len(curl_calls) == 2, (
         "the release step must retry a missing index before accepting its files"

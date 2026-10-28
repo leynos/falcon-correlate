@@ -360,3 +360,25 @@ def test_publish_release_refuses_an_empty_distribution_set(
         "the failure annotation must say why publication was refused"
     )
     assert not gh_argv_log.exists(), "empty artefacts must fail before GitHub access"
+
+
+def test_publish_release_refuses_a_missing_bundle_before_network_access(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    curl_argv_log: Path,
+    gh_argv_log: Path,
+) -> None:
+    """A missing provenance bundle stops publication before network calls."""
+    _configure_publish(tmp_path, monkeypatch, {_WHEEL: b"wheel", _SDIST: b"sdist"})
+    (tmp_path / "bundle" / _BUNDLE).unlink()
+
+    result = run_named_workflow_step(
+        "release.yml", "publish-release", "Reconcile and publish the GitHub Release"
+    )
+
+    assert result.returncode == 1, "a missing bundle must fail publication"
+    assert "Sigstore bundle is missing" in result.stderr, (
+        "the error must identify the missing provenance bundle"
+    )
+    assert not curl_argv_log.exists(), "a missing bundle must fail before PyPI access"
+    assert not gh_argv_log.exists(), "a missing bundle must fail before GitHub access"

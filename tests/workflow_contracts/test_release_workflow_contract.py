@@ -226,6 +226,44 @@ def test_pypi_environment_and_upload_are_narrow_and_idempotent(
     ), "the build artifact must fail when no distributions were produced"
 
 
+def test_attestation_hands_off_distributions_and_tag_bundle(
+    release_workflow: dict[str, typ.Any],
+) -> None:
+    """The release artefact carries the files attested by the workflow."""
+    job = release_workflow["jobs"]["attest"]
+    steps = _steps(job)
+    provenance = _named_step(job, "Attest release distributions")
+    bundle = _named_step(job, "Name the provenance bundle after the tag")
+    upload = _upload_action(steps)
+
+    assert provenance["id"] == "provenance", (
+        "the bundle step needs the attestation output"
+    )
+    assert provenance["uses"].startswith("actions/attest-build-provenance@"), (
+        "the release distributions must receive build provenance"
+    )
+    assert provenance["with"]["subject-path"] == "dist/release/*", (
+        "the attestation must cover the collected distributions"
+    )
+    expected_environment = {
+        "BUNDLE_PATH": "${{ steps.provenance.outputs.bundle-path }}",
+        "RELEASE_TAG": "${{ github.ref_name }}",
+    }
+    assert bundle["env"] == expected_environment, (
+        "the provenance bundle must be named using the release tag"
+    )
+    assert upload["with"]["name"] == "release-dist", (
+        "later jobs must receive the named release artefact"
+    )
+    assert upload["with"]["path"].splitlines() == [
+        "dist/release/",
+        "dist/attestations/",
+    ], "the hand-off must include both distributions and the provenance bundle"
+    assert steps.index(provenance) < steps.index(bundle) < steps.index(upload), (
+        "attestation and bundle naming must precede the artifact hand-off"
+    )
+
+
 def _check_action_pins(label: str, document: dict[str, typ.Any], raw_text: str) -> None:
     """Check external action pins and checkout credentials in one document."""
     comments = {

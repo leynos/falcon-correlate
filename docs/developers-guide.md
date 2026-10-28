@@ -886,10 +886,11 @@ PyPI's bytes for missing GitHub assets, so a rebuilt wheel cannot replace a
 published file under the same name.
 
 A missing PyPI project (HTTP 404) is treated as an empty index on the first
-release. Other non-success HTTP responses, an empty or malformed distribution
-set, or a digest disagreement fail the run. A digest disagreement leaves the
-GitHub Release as a draft for manual recovery; do not delete or overwrite
-published PyPI files.
+release. Index and draft lookup retries report their status, attempt, and delay
+in the workflow log. Other non-success HTTP responses, an empty or malformed
+distribution set, or a digest disagreement fail the run. A digest disagreement
+leaves the GitHub Release as a draft for manual recovery; do not delete or
+overwrite published PyPI files.
 
 ## Roadmap notes
 
