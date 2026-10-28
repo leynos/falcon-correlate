@@ -1503,7 +1503,9 @@ include:
 The package is built with `uv_build` as one source distribution and one
 platform-independent wheel. `uv build --out-dir dist` builds the sdist first
 and then builds the wheel from it; pull-request CI verifies both files and
-imports the wheel without optional Celery or HTTPX extras.
+imports the wheel without optional Celery or HTTPX extras. The composite build
+action follows the repository's `setup-uv` dependency updates and pins the
+selected action to its full commit SHA.
 
 The release workflow attests the distributions with Sigstore provenance and
 publishes them to PyPI through Trusted Publishing. PyPI is the source of truth
