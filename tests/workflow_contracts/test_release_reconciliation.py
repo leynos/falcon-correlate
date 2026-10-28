@@ -85,6 +85,24 @@ def _set_gh_responses(
     )
 
 
+def _assert_secure_pypi_download(curl_argv_log: Path, upload: list[str]) -> None:
+    """Check the recorded download uses HTTPS and the current release."""
+    curl_calls = [json.loads(line) for line in curl_argv_log.read_text().splitlines()]
+    download = next(call for call in curl_calls if "--output" in call)
+    assert (
+        "https://files.pythonhosted.org/falcon_correlate-1.1.0.tar.gz" not in download
+    ), "reconciliation must not download assets from earlier versions"
+    assert not any(
+        Path(path).name == "falcon_correlate-1.1.0.tar.gz" for path in upload[3:]
+    ), "a release must not attach assets from earlier versions"
+    assert download[download.index("--proto") + 1] == "=https", (
+        "PyPI downloads must restrict their initial protocol to HTTPS"
+    )
+    assert download[download.index("--proto-redir") + 1] == "=https", (
+        "PyPI downloads must prevent HTTPS redirects from downgrading"
+    )
+
+
 def test_publish_downloads_pypi_bytes_for_missing_release_assets(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -129,20 +147,7 @@ def test_publish_downloads_pypi_bytes_for_missing_release_assets(
     assert "--clobber" not in upload, (
         "release reconciliation must never overwrite assets"
     )
-    curl_calls = [json.loads(line) for line in curl_argv_log.read_text().splitlines()]
-    download = next(call for call in curl_calls if "--output" in call)
-    assert (
-        "https://files.pythonhosted.org/falcon_correlate-1.1.0.tar.gz" not in download
-    ), "reconciliation must not download assets from earlier versions"
-    assert not any(
-        Path(path).name == "falcon_correlate-1.1.0.tar.gz" for path in upload[3:]
-    ), "a release must not attach assets from earlier versions"
-    assert download[download.index("--proto") + 1] == "=https", (
-        "PyPI downloads must restrict their initial protocol to HTTPS"
-    )
-    assert download[download.index("--proto-redir") + 1] == "=https", (
-        "PyPI downloads must prevent HTTPS redirects from downgrading"
-    )
+    _assert_secure_pypi_download(curl_argv_log, upload)
     edit = next(call for call in gh_calls if call[:2] == ["release", "edit"])
     assert "--draft=false" in edit, "the reconciled release must be un-drafted"
     assert "--prerelease=true" in edit, (
@@ -190,36 +195,48 @@ def test_noop_rerun_still_un_drafts_the_fully_reconciled_release(
 
 
 @pytest.mark.usefixtures("curl_argv_log")
-def test_existing_github_digest_mismatch_fails_before_upload(
+@pytest.mark.parametrize(
+    "invalid_digest",
+    [
+        pytest.param(
+            (f"sha256:{_sha256(b'wrong wheel')}", "differs from PyPI"),
+            id="different-bytes",
+        ),
+        pytest.param(
+            (None, "already exists on GitHub without a SHA-256 digest"),
+            id="missing-digest",
+        ),
+    ],
+)
+def test_existing_github_asset_with_invalid_digest_fails_before_upload(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     gh_argv_log: Path,
+    invalid_digest: tuple[str | None, str],
 ) -> None:
-    """A pre-existing asset with non-PyPI bytes blocks publication."""
+    """Existing assets with different or unknown bytes block publication."""
+    digest, expected_error = invalid_digest
     pypi_bytes = {_WHEEL: b"canonical wheel", _SDIST: b"canonical sdist"}
     _configure_publish(tmp_path, monkeypatch, pypi_bytes)
-    wrong_assets = json.dumps({
+    assets = json.dumps({
         "assets": [
-            {"name": _WHEEL, "digest": f"sha256:{_sha256(b'wrong wheel')}"},
+            {"name": _WHEEL, "digest": digest},
             {"name": _BUNDLE, "digest": f"sha256:{_sha256(_BUNDLE_BYTES)}"},
         ]
     })
     monkeypatch.setenv(
-        "GH_RESPONSES",
-        json.dumps([{"stdout": wrong_assets}, {"stdout": wrong_assets}]),
+        "GH_RESPONSES", json.dumps([{"stdout": assets}, {"stdout": assets}])
     )
 
     result = run_named_workflow_step(
         "release.yml", "publish-release", "Reconcile and publish the GitHub Release"
     )
 
-    assert result.returncode == 1, f"a conflicting digest must fail: {result.stderr}"
+    assert result.returncode == 1, f"an invalid digest must fail: {result.stderr}"
     calls = [json.loads(line) for line in gh_argv_log.read_text().splitlines()]
-    assert "differs from PyPI" in result.stderr, (
-        "the failure annotation must identify the canonical destination"
-    )
+    assert expected_error in result.stderr, "the error must identify the digest problem"
     assert not any(call[:2] == ["release", "upload"] for call in calls), (
-        "mismatched pre-existing bytes must not be overwritten"
+        "existing assets with invalid digests must not be overwritten"
     )
 
 
@@ -254,40 +271,6 @@ def test_publish_release_validates_inputs_before_external_commands(
     )
     assert not (tmp_path / "gh-argv.jsonl").exists(), (
         "invalid configuration must fail before querying GitHub"
-    )
-
-
-@pytest.mark.usefixtures("curl_argv_log")
-def test_existing_github_asset_without_digest_fails_before_upload(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    gh_argv_log: Path,
-) -> None:
-    """An existing asset without a GitHub digest is reported distinctly."""
-    pypi_bytes = {_WHEEL: b"canonical wheel", _SDIST: b"canonical sdist"}
-    _configure_publish(tmp_path, monkeypatch, pypi_bytes)
-    missing_digest_view = json.dumps({
-        "assets": [
-            {"name": _WHEEL, "digest": None},
-            {"name": _BUNDLE, "digest": f"sha256:{_sha256(_BUNDLE_BYTES)}"},
-        ]
-    })
-    monkeypatch.setenv(
-        "GH_RESPONSES",
-        json.dumps([{"stdout": missing_digest_view}, {"stdout": missing_digest_view}]),
-    )
-
-    result = run_named_workflow_step(
-        "release.yml", "publish-release", "Reconcile and publish the GitHub Release"
-    )
-
-    assert result.returncode == 1, f"an unknown digest must fail: {result.stderr}"
-    calls = [json.loads(line) for line in gh_argv_log.read_text().splitlines()]
-    assert "already exists on GitHub without a SHA-256 digest" in result.stderr, (
-        "the error should distinguish a missing digest from different bytes"
-    )
-    assert not any(call[:2] == ["release", "upload"] for call in calls), (
-        "an asset with unknown bytes must not be overwritten"
     )
 
 

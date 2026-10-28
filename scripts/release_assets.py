@@ -38,6 +38,34 @@ class PypiFile:
     url: str
 
 
+def _is_distribution_entry(entry: Path) -> bool:
+    """Recognize safe regular distribution files in a build directory."""
+    return (
+        entry.is_file()
+        and bool(_SAFE_FILENAME.fullmatch(entry.name))
+        and entry.name.endswith((".whl", ".tar.gz"))
+    )
+
+
+def _distribution_entries(directory: Path) -> list[Path]:
+    """Read and validate the entries in a distribution directory."""
+    if not directory.is_dir():
+        msg = f"distribution directory does not exist: {directory}"
+        raise ReleaseAssetError(msg)
+
+    entries = sorted(directory.iterdir(), key=lambda entry: entry.name)
+    if not entries:
+        msg = "refusing an empty release artefact set"
+        raise ReleaseAssetError(msg)
+
+    unknown = [entry.name for entry in entries if not _is_distribution_entry(entry)]
+    if unknown:
+        msg = f"refusing unknown release entries: {unknown}"
+        raise ReleaseAssetError(msg)
+
+    return entries
+
+
 def collect_distributions(directory: Path) -> tuple[Path, ...]:
     """Collect every wheel and exactly one source archive from ``directory``.
 
@@ -60,26 +88,7 @@ def collect_distributions(directory: Path) -> tuple[Path, ...]:
         If the directory is empty, contains unknown entries, has no wheel, or
         does not contain exactly one source archive.
     """
-    if not directory.is_dir():
-        msg = f"distribution directory does not exist: {directory}"
-        raise ReleaseAssetError(msg)
-
-    entries = sorted(directory.iterdir(), key=lambda entry: entry.name)
-    if not entries:
-        msg = "refusing an empty release artefact set"
-        raise ReleaseAssetError(msg)
-
-    unknown = [
-        entry.name
-        for entry in entries
-        if not entry.is_file()
-        or not _SAFE_FILENAME.fullmatch(entry.name)
-        or not (entry.name.endswith(".whl") or entry.name.endswith(".tar.gz"))
-    ]
-    if unknown:
-        msg = f"refusing unknown release entries: {unknown}"
-        raise ReleaseAssetError(msg)
-
+    entries = _distribution_entries(directory)
     wheels = tuple(entry for entry in entries if entry.name.endswith(".whl"))
     sdists = tuple(entry for entry in entries if entry.name.endswith(".tar.gz"))
     if not wheels:
@@ -355,4 +364,37 @@ def require_local_distribution_digests(
     problems = digest_mismatches(names, index, local_digests, "local build")
     if problems:
         msg = "local release distributions differ from PyPI: " + "; ".join(problems)
+        raise ReleaseAssetError(msg)
+
+
+def require_github_release_digests(
+    names: cabc.Iterable[str],
+    index: cabc.Mapping[str, PypiFile],
+    assets: cabc.Mapping[str, str | None],
+    bundle_name: str,
+) -> None:
+    """Require release distributions to match PyPI and the bundle to exist.
+
+    Parameters
+    ----------
+    names : collections.abc.Iterable[str]
+        Distribution filenames expected on both destinations.
+    index : collections.abc.Mapping[str, PypiFile]
+        Canonical PyPI file metadata.
+    assets : collections.abc.Mapping[str, str or None]
+        GitHub Release asset digests.
+    bundle_name : str
+        Name of the required provenance bundle.
+
+    Raises
+    ------
+    ReleaseAssetError
+        If a distribution differs or the bundle is absent.
+    """
+    problems = digest_mismatches(names, index, assets)
+    if problems:
+        msg = "; ".join(problems)
+        raise ReleaseAssetError(msg)
+    if bundle_name not in assets:
+        msg = f"the GitHub Release is missing {bundle_name}"
         raise ReleaseAssetError(msg)

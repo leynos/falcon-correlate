@@ -653,7 +653,10 @@ and the suite-runs-once contract, which read the workflows through
 
 Release workflow tests share `release_payloads.py` for artefact names and
 recorded PyPI and GitHub response bodies. Parser tests retain fixed payloads as
-independent examples of the wire format.
+independent examples of the wire format. Secure-download and action-pin
+assertions remain local to their contract test modules.
+`scripts/release_assets.py` owns distribution entry validation and final GitHub
+digest and bundle checks for the release CLI.
 
 ### Errors the readers raise
 

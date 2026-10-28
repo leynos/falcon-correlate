@@ -35,10 +35,10 @@ if __package__:
         PypiFile,
         ReleaseAssetError,
         collect_distributions,
-        digest_mismatches,
         missing_names,
         parse_github_asset_digests,
         parse_pep691_index,
+        require_github_release_digests,
         require_local_distribution_digests,
         sha256_file,
     )
@@ -51,10 +51,10 @@ else:
         PypiFile,
         ReleaseAssetError,
         collect_distributions,
-        digest_mismatches,
         missing_names,
         parse_github_asset_digests,
         parse_pep691_index,
+        require_github_release_digests,
         require_local_distribution_digests,
         sha256_file,
     )
@@ -332,13 +332,7 @@ def _publish_release() -> None:
         require_local_distribution_digests(distributions, index)
 
     verified_assets = _reconcile_release_assets(tag, index, bundle, upload_dir)
-    problems = digest_mismatches(names, index, verified_assets)
-    if problems:
-        msg = "; ".join(problems)
-        raise ReleaseAssetError(msg)
-    if bundle.name not in verified_assets:
-        msg = f"the GitHub Release is missing {bundle.name}"
-        raise ReleaseAssetError(msg)
+    require_github_release_digests(names, index, verified_assets, bundle.name)
 
     _require_success(
         _run([

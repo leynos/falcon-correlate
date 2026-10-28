@@ -226,6 +226,33 @@ def test_pypi_environment_and_upload_are_narrow_and_idempotent(
     ), "the build artifact must fail when no distributions were produced"
 
 
+def _check_action_pins(label: str, document: dict[str, typ.Any], raw_text: str) -> None:
+    """Check external action pins and checkout credentials in one document."""
+    comments = {
+        match["reference"]: match["version"]
+        for match in _USES_WITH_VERSION.finditer(raw_text)
+    }
+    checkouts = 0
+    for step in _all_steps(document):
+        reference = step.get("uses")
+        if not isinstance(reference, str):
+            continue
+        if reference.startswith("./"):
+            continue
+        assert _PINNED_ACTION.fullmatch(reference), (
+            f"{label} action {reference!r} must use a full commit SHA"
+        )
+        assert comments.get(reference), (
+            f"{label} action {reference!r} must carry a trailing version comment"
+        )
+        if reference.startswith("actions/checkout@"):
+            checkouts += 1
+            assert step.get("with", {}).get("persist-credentials") is False, (
+                f"{label} checkout must not persist credentials"
+            )
+    assert checkouts > 0, f"{label} must include its expected checkout step"
+
+
 def test_external_actions_are_pinned_and_checkouts_drop_credentials(
     release_workflow: dict[str, typ.Any],
     release_text: str,
@@ -237,29 +264,7 @@ def test_external_actions_are_pinned_and_checkouts_drop_credentials(
         ("release.yml", release_workflow, release_text),
         ("pure-python-wheel/action.yml", action, action_text),
     ):
-        comments = {
-            match["reference"]: match["version"]
-            for match in _USES_WITH_VERSION.finditer(raw_text)
-        }
-        checkouts = 0
-        for step in _all_steps(document):
-            reference = step.get("uses")
-            if not isinstance(reference, str):
-                continue
-            if reference.startswith("./"):
-                continue
-            assert _PINNED_ACTION.fullmatch(reference), (
-                f"{label} action {reference!r} must use a full commit SHA"
-            )
-            assert comments.get(reference), (
-                f"{label} action {reference!r} must carry a trailing version comment"
-            )
-            if reference.startswith("actions/checkout@"):
-                checkouts += 1
-                assert step.get("with", {}).get("persist-credentials") is False, (
-                    f"{label} checkout must not persist credentials"
-                )
-        assert checkouts > 0, f"{label} must include its expected checkout step"
+        _check_action_pins(label, document, raw_text)
 
 
 def test_release_helper_jobs_pin_supported_python(
