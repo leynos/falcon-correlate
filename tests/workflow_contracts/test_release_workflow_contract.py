@@ -30,21 +30,12 @@ _EXPECTED_NEEDS = {
     "attest": {"check-version", "pure-wheel"},
     "publish-pypi": {"check-version", "attest"},
     "draft-release": {"check-version", "attest"},
-    "publish-release": {
-        "check-version",
-        "attest",
-        "publish-pypi",
-        "draft-release",
-    },
+    "publish-release": {"check-version", "attest", "publish-pypi", "draft-release"},
 }
 _EXPECTED_PERMISSIONS = {
     "check-version": {"contents": "read"},
     "pure-wheel": {"contents": "read"},
-    "attest": {
-        "contents": "read",
-        "id-token": "write",
-        "attestations": "write",
-    },
+    "attest": {"contents": "read", "id-token": "write", "attestations": "write"},
     "publish-pypi": {"contents": "read", "id-token": "write"},
     "draft-release": {"contents": "write"},
     "publish-release": {"contents": "write"},
@@ -137,131 +128,147 @@ def _upload_action(steps: list[dict[str, typ.Any]]) -> dict[str, typ.Any]:
     )
 
 
-def test_release_workflow_has_versioned_trigger_and_non_cancelling_lock(
-    release_workflow: dict[str, typ.Any],
-) -> None:
-    """A tag rerun must not cancel an upload already in progress."""
-    triggers = release_workflow.get("on", release_workflow.get(True))
-    concurrency = release_workflow.get("concurrency")
-    assert isinstance(triggers, dict), "the release workflow must declare triggers"
-    assert triggers["push"]["tags"] == ["v*.*.*"], (
-        "release publication must run only for version tags"
-    )
-    assert release_workflow["permissions"] == {}, (
-        "workflow-wide permissions must default to none"
-    )
-    assert concurrency == {
-        "group": "release-${{ github.ref }}",
-        "cancel-in-progress": False,
-    }, "a rerun must queue behind an upload instead of cancelling it"
+class TestJobTopology:
+    """Contracts for job topology."""
 
+    def test_release_workflow_has_versioned_trigger_and_non_cancelling_lock(
+        self,
+        release_workflow: dict[str, typ.Any],
+    ) -> None:
+        """A tag rerun must not cancel an upload already in progress."""
+        triggers = release_workflow.get("on", release_workflow.get(True))
+        concurrency = release_workflow.get("concurrency")
+        assert isinstance(triggers, dict), "the release workflow must declare triggers"
+        assert triggers["push"]["tags"] == ["v*.*.*"], (
+            "release publication must run only for version tags"
+        )
+        assert release_workflow["permissions"] == {}, (
+            "workflow-wide permissions must default to none"
+        )
+        assert concurrency == {
+            "group": "release-${{ github.ref }}",
+            "cancel-in-progress": False,
+        }, "a rerun must queue behind an upload instead of cancelling it"
 
-def test_release_jobs_have_least_privilege_and_ordered_dependencies(
-    release_workflow: dict[str, typ.Any],
-) -> None:
-    """Every publication job waits for version validation and its inputs."""
-    jobs = release_workflow["jobs"]
-    assert set(jobs) == _RELEASE_JOB_NAMES, (
-        "release jobs must match the reviewed pipeline"
-    )
-    for name, job in jobs.items():
-        assert "if" not in job, f"{name} must not hide behind a job condition"
-        assert "continue-on-error" not in job, f"{name} must not suppress failure"
-        assert job["runs-on"] == "ubicloud-standard-2", (
-            f"{name} must use the registered release runner"
+    def test_release_jobs_have_least_privilege_and_ordered_dependencies(
+        self,
+        release_workflow: dict[str, typ.Any],
+    ) -> None:
+        """Every publication job waits for version validation and its inputs."""
+        jobs = release_workflow["jobs"]
+        assert set(jobs) == _RELEASE_JOB_NAMES, (
+            "release jobs must match the reviewed pipeline"
         )
-        timeout = job.get("timeout-minutes")
-        assert type(timeout) is int, f"{name} must use an integer timeout"
-        assert 0 < timeout <= 60, (
-            f"{name} must have a timeout no greater than 60 minutes"
-        )
-        actual_needs = set(job.get("needs", []))
-        assert actual_needs == _EXPECTED_NEEDS[name], (
-            f"{name} dependencies must be {_EXPECTED_NEEDS[name]}, got {actual_needs}"
-        )
-        assert job.get("permissions") == _EXPECTED_PERMISSIONS[name], (
-            f"{name} must hold only its reviewed permissions"
-        )
-        for step in _steps(job):
-            assert "continue-on-error" not in step, (
-                f"{name}:{step.get('name', '<unnamed>')} must not suppress failure"
+        for name, job in jobs.items():
+            assert "if" not in job, f"{name} must not hide behind a job condition"
+            assert "continue-on-error" not in job, f"{name} must not suppress failure"
+            assert job["runs-on"] == "ubicloud-standard-2", (
+                f"{name} must use the registered release runner"
             )
+            timeout = job.get("timeout-minutes")
+            assert type(timeout) is int, f"{name} must use an integer timeout"
+            assert 0 < timeout <= 60, (
+                f"{name} must have a timeout no greater than 60 minutes"
+            )
+            actual_needs = set(job.get("needs", []))
+            assert actual_needs == _EXPECTED_NEEDS[name], (
+                f"{name} dependencies must be {_EXPECTED_NEEDS[name]}, "
+                f"got {actual_needs}"
+            )
+            assert job.get("permissions") == _EXPECTED_PERMISSIONS[name], (
+                f"{name} must hold only its reviewed permissions"
+            )
+            for step in _steps(job):
+                assert "continue-on-error" not in step, (
+                    f"{name}:{step.get('name', '<unnamed>')} must not suppress failure"
+                )
 
 
-def test_pypi_environment_and_upload_are_narrow_and_idempotent(
-    release_workflow: dict[str, typ.Any], action: dict[str, typ.Any]
-) -> None:
-    """Trusted Publishing runs in the restricted pypi environment."""
-    jobs = release_workflow["jobs"]
-    pypi_job = jobs["publish-pypi"]
-    assert pypi_job["environment"]["name"] == "pypi", (
-        "only the PyPI publisher must enter the Trusted Publishing environment"
-    )
-    assert all(
-        name == "publish-pypi" or "environment" not in job for name, job in jobs.items()
-    ), "GitHub Release jobs must not inherit the PyPI environment"
-    assert "GH_TOKEN" not in pypi_job.get("env", {}), (
-        "PyPI publication must use Trusted Publishing instead of a stored token"
-    )
+class TestPublishing:
+    """Contracts for publishing."""
 
-    stage = _named_step(pypi_job, "Stage distributions not already on PyPI")
-    publish = _named_step(pypi_job, "Publish to PyPI with Trusted Publishing")
-    assert (
-        stage["env"]["SIMPLE_INDEX_URL"] == "https://pypi.org/simple/falcon-correlate/"
-    ), "staging must query the published project name"
-    assert publish["if"] == "steps.stage.outputs.has-uploads == 'true'", (
-        "replays with no remaining files must skip the upload action"
-    )
-    assert publish["with"]["packages-dir"] == "dist/pypi-staging", (
-        "the upload action must consume only the filtered staging directory"
-    )
-    assert publish["with"]["skip-existing"] is True, (
-        "a publication race must remain idempotent"
-    )
-    assert (
-        _upload_action(_steps(jobs["attest"]))["with"]["if-no-files-found"] == "error"
-    ), "attestation artifacts must not silently upload an empty release"
-    assert (
-        _upload_action(_steps(action["runs"]))["with"]["if-no-files-found"] == "error"
-    ), "the build artifact must fail when no distributions were produced"
+    def test_pypi_environment_and_upload_are_narrow_and_idempotent(
+        self, release_workflow: dict[str, typ.Any], action: dict[str, typ.Any]
+    ) -> None:
+        """Trusted Publishing runs in the restricted pypi environment."""
+        jobs = release_workflow["jobs"]
+        pypi_job = jobs["publish-pypi"]
+        assert pypi_job["environment"]["name"] == "pypi", (
+            "only the PyPI publisher must enter the Trusted Publishing environment"
+        )
+        assert all(
+            name == "publish-pypi" or "environment" not in job
+            for name, job in jobs.items()
+        ), "GitHub Release jobs must not inherit the PyPI environment"
+        assert "GH_TOKEN" not in pypi_job.get("env", {}), (
+            "PyPI publication must use Trusted Publishing instead of a stored token"
+        )
+
+        stage = _named_step(pypi_job, "Stage distributions not already on PyPI")
+        publish = _named_step(pypi_job, "Publish to PyPI with Trusted Publishing")
+        assert (
+            stage["env"]["SIMPLE_INDEX_URL"]
+            == "https://pypi.org/simple/falcon-correlate/"
+        ), "staging must query the published project name"
+        assert publish["if"] == "steps.stage.outputs.has-uploads == 'true'", (
+            "replays with no remaining files must skip the upload action"
+        )
+        assert publish["with"]["packages-dir"] == "dist/pypi-staging", (
+            "the upload action must consume only the filtered staging directory"
+        )
+        assert publish["with"]["skip-existing"] is True, (
+            "a publication race must remain idempotent"
+        )
+        assert (
+            _upload_action(_steps(jobs["attest"]))["with"]["if-no-files-found"]
+            == "error"
+        ), "attestation artifacts must not silently upload an empty release"
+        assert (
+            _upload_action(_steps(action["runs"]))["with"]["if-no-files-found"]
+            == "error"
+        ), "the build artifact must fail when no distributions were produced"
 
 
-def test_attestation_hands_off_distributions_and_tag_bundle(
-    release_workflow: dict[str, typ.Any],
-) -> None:
-    """The release artefact carries the files attested by the workflow."""
-    job = release_workflow["jobs"]["attest"]
-    steps = _steps(job)
-    provenance = _named_step(job, "Attest release distributions")
-    bundle = _named_step(job, "Name the provenance bundle after the tag")
-    upload = _upload_action(steps)
+class TestAttestation:
+    """Contracts for attestation."""
 
-    assert provenance["id"] == "provenance", (
-        "the bundle step needs the attestation output"
-    )
-    assert provenance["uses"].startswith("actions/attest-build-provenance@"), (
-        "the release distributions must receive build provenance"
-    )
-    assert provenance["with"]["subject-path"] == "dist/release/*", (
-        "the attestation must cover the collected distributions"
-    )
-    expected_environment = {
-        "BUNDLE_PATH": "${{ steps.provenance.outputs.bundle-path }}",
-        "RELEASE_TAG": "${{ github.ref_name }}",
-    }
-    assert bundle["env"] == expected_environment, (
-        "the provenance bundle must be named using the release tag"
-    )
-    assert upload["with"]["name"] == "release-dist", (
-        "later jobs must receive the named release artefact"
-    )
-    assert upload["with"]["path"].splitlines() == [
-        "dist/release/",
-        "dist/attestations/",
-    ], "the hand-off must include both distributions and the provenance bundle"
-    assert steps.index(provenance) < steps.index(bundle) < steps.index(upload), (
-        "attestation and bundle naming must precede the artifact hand-off"
-    )
+    def test_attestation_hands_off_distributions_and_tag_bundle(
+        self,
+        release_workflow: dict[str, typ.Any],
+    ) -> None:
+        """The release artefact carries the files attested by the workflow."""
+        job = release_workflow["jobs"]["attest"]
+        steps = _steps(job)
+        provenance = _named_step(job, "Attest release distributions")
+        bundle = _named_step(job, "Name the provenance bundle after the tag")
+        upload = _upload_action(steps)
+
+        assert provenance["id"] == "provenance", (
+            "the bundle step needs the attestation output"
+        )
+        assert provenance["uses"].startswith("actions/attest-build-provenance@"), (
+            "the release distributions must receive build provenance"
+        )
+        assert provenance["with"]["subject-path"] == "dist/release/*", (
+            "the attestation must cover the collected distributions"
+        )
+        expected_environment = {
+            "BUNDLE_PATH": "${{ steps.provenance.outputs.bundle-path }}",
+            "RELEASE_TAG": "${{ github.ref_name }}",
+        }
+        assert bundle["env"] == expected_environment, (
+            "the provenance bundle must be named using the release tag"
+        )
+        assert upload["with"]["name"] == "release-dist", (
+            "later jobs must receive the named release artefact"
+        )
+        assert upload["with"]["path"].splitlines() == [
+            "dist/release/",
+            "dist/attestations/",
+        ], "the hand-off must include both distributions and the provenance bundle"
+        assert steps.index(provenance) < steps.index(bundle) < steps.index(upload), (
+            "attestation and bundle naming must precede the artifact hand-off"
+        )
 
 
 def _check_action_pins(label: str, document: dict[str, typ.Any], raw_text: str) -> None:
@@ -291,93 +298,103 @@ def _check_action_pins(label: str, document: dict[str, typ.Any], raw_text: str) 
     assert checkouts > 0, f"{label} must include its expected checkout step"
 
 
-def test_external_actions_are_pinned_and_checkouts_drop_credentials(
-    release_workflow: dict[str, typ.Any],
-    release_text: str,
-    action: dict[str, typ.Any],
-    action_text: str,
-) -> None:
-    """Release and composite-action dependencies cannot move by tag."""
-    for label, document, raw_text in (
-        ("release.yml", release_workflow, release_text),
-        ("pure-python-wheel/action.yml", action, action_text),
-    ):
-        _check_action_pins(label, document, raw_text)
+class TestActionPinning:
+    """Contracts for action pinning."""
 
+    def test_external_actions_are_pinned_and_checkouts_drop_credentials(
+        self,
+        release_workflow: dict[str, typ.Any],
+        release_text: str,
+        action: dict[str, typ.Any],
+        action_text: str,
+    ) -> None:
+        """Release and composite-action dependencies cannot move by tag."""
+        for label, document, raw_text in (
+            ("release.yml", release_workflow, release_text),
+            ("pure-python-wheel/action.yml", action, action_text),
+        ):
+            _check_action_pins(label, document, raw_text)
 
-@pytest.mark.parametrize(
-    "alternate_sha", [None, "a" * 40], ids=["checked-in", "updated"]
-)
-def test_release_helper_jobs_pin_supported_python(
-    release_workflow: dict[str, typ.Any],
-    release_text: str,
-    alternate_sha: str | None,
-) -> None:
-    """Release helpers run on the project's supported Python version."""
-    if alternate_sha is not None:
-        updated = re.sub(
-            r"(actions/setup-python@)[0-9a-f]{40}",
-            rf"\g<1>{alternate_sha}",
-            release_text,
-        )
-        assert f"actions/setup-python@{alternate_sha}" in updated, (
-            "the regression case must exercise an updated action pin"
-        )
-        release_workflow = parse_workflow(updated, "release.yml")
-    helper_jobs = (
-        "check-version",
-        "attest",
-        "publish-pypi",
-        "draft-release",
-        "publish-release",
+    @pytest.mark.parametrize(
+        "alternate_sha", [None, "a" * 40], ids=["checked-in", "updated"]
     )
-    for job_name in helper_jobs:
-        steps = _steps(release_workflow["jobs"][job_name])
-        checkout_index = next(
-            index
-            for index, step in enumerate(steps)
-            if step.get("uses", "").startswith("actions/checkout@")
+    def test_release_helper_jobs_pin_supported_python(
+        self,
+        release_workflow: dict[str, typ.Any],
+        release_text: str,
+        alternate_sha: str | None,
+    ) -> None:
+        """Release helpers run on the project's supported Python version."""
+        if alternate_sha is not None:
+            updated = re.sub(
+                r"(actions/setup-python@)[0-9a-f]{40}",
+                rf"\g<1>{alternate_sha}",
+                release_text,
+            )
+            assert f"actions/setup-python@{alternate_sha}" in updated, (
+                "the regression case must exercise an updated action pin"
+            )
+            release_workflow = parse_workflow(updated, "release.yml")
+        helper_jobs = (
+            "check-version",
+            "attest",
+            "publish-pypi",
+            "draft-release",
+            "publish-release",
         )
-        setup_python_index = next(
-            index
-            for index, step in enumerate(steps)
-            if step.get("uses", "").startswith(_SETUP_PYTHON_PREFIX)
-        )
-        setup_python = steps[setup_python_index]
-        assert setup_python_index == checkout_index + 1, (
-            f"{job_name} must set up Python immediately after checkout"
-        )
-        assert setup_python.get("with", {}).get("python-version") == "3.13", (
-            f"{job_name} release helpers require pinned Python 3.13"
-        )
+        for job_name in helper_jobs:
+            steps = _steps(release_workflow["jobs"][job_name])
+            checkout_index = next(
+                index
+                for index, step in enumerate(steps)
+                if step.get("uses", "").startswith("actions/checkout@")
+            )
+            setup_python_index = next(
+                index
+                for index, step in enumerate(steps)
+                if step.get("uses", "").startswith(_SETUP_PYTHON_PREFIX)
+            )
+            setup_python = steps[setup_python_index]
+            assert setup_python_index == checkout_index + 1, (
+                f"{job_name} must set up Python immediately after checkout"
+            )
+            assert setup_python.get("with", {}).get("python-version") == "3.13", (
+                f"{job_name} release helpers require pinned Python 3.13"
+            )
 
 
-def test_run_scripts_are_strict_and_do_not_interpolate_expressions(
-    release_workflow: dict[str, typ.Any],
-    release_text: str,
-    ci_workflow: dict[str, typ.Any],
-    action: dict[str, typ.Any],
-) -> None:
-    """Release scripts receive workflow values through environment variables."""
-    scripts = [
-        *_run_scripts(release_workflow, _RELEASE_JOB_NAMES),
-        *_run_scripts(ci_workflow, {"build"}),
-        *[
-            (str(step.get("name", "<unnamed>")), step["run"])
-            for step in _steps(action["runs"])
-            if "run" in step
-        ],
-    ]
-    for name, script in scripts:
-        assert isinstance(script, str), f"{name} run body must be a string"
-        assert "${{" not in script, f"{name} must not interpolate expressions into Bash"
-        assert script.lstrip().startswith("set -euo pipefail"), (
-            f"{name} must begin with strict shell options"
-        )
+class TestScriptHygiene:
+    """Contracts for script hygiene."""
 
-    assert "softprops/action-gh-release" not in release_text, (
-        "the release workflow must not publish before asset reconciliation"
-    )
-    assert "--clobber" not in release_text, (
-        "GitHub assets must never be overwritten during an idempotent rerun"
-    )
+    def test_run_scripts_are_strict_and_do_not_interpolate_expressions(
+        self,
+        release_workflow: dict[str, typ.Any],
+        release_text: str,
+        ci_workflow: dict[str, typ.Any],
+        action: dict[str, typ.Any],
+    ) -> None:
+        """Release scripts receive workflow values through environment variables."""
+        scripts = [
+            *_run_scripts(release_workflow, _RELEASE_JOB_NAMES),
+            *_run_scripts(ci_workflow, {"build"}),
+            *[
+                (str(step.get("name", "<unnamed>")), step["run"])
+                for step in _steps(action["runs"])
+                if "run" in step
+            ],
+        ]
+        for name, script in scripts:
+            assert isinstance(script, str), f"{name} run body must be a string"
+            assert "${{" not in script, (
+                f"{name} must not interpolate expressions into Bash"
+            )
+            assert script.lstrip().startswith("set -euo pipefail"), (
+                f"{name} must begin with strict shell options"
+            )
+
+        assert "softprops/action-gh-release" not in release_text, (
+            "the release workflow must not publish before asset reconciliation"
+        )
+        assert "--clobber" not in release_text, (
+            "GitHub assets must never be overwritten during an idempotent rerun"
+        )
