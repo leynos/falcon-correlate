@@ -68,7 +68,8 @@ class _SyncTransportResource:
         """Send the outbound request while Falcon middleware context is active."""
         with httpx.Client(
             transport=CorrelationIDTransport(
-                self.transport, **({"header_name": self.header_name} if self.header_name else {})
+                self.transport,
+                **({"header_name": self.header_name} if self.header_name else {}),
             ),
         ) as client:
             client.get("http://example.com", headers=self.headers)
@@ -90,7 +91,8 @@ class _AsyncTransportResource:
         """Send the outbound request while Falcon middleware context is active."""
         async with httpx.AsyncClient(
             transport=AsyncCorrelationIDTransport(
-                self.transport, **({"header_name": self.header_name} if self.header_name else {})
+                self.transport,
+                **({"header_name": self.header_name} if self.header_name else {}),
             ),
         ) as client:
             await client.get("http://example.com", headers=self.headers)
@@ -135,7 +137,7 @@ def given_recording_transport_app(mode: typ.Literal["sync", "async"]) -> Context
 
 @given(
     parsers.parse(
-        'a {mode} Falcon app with a trusted source and HTTPX recording transport '
+        "a {mode} Falcon app with a trusted source and HTTPX recording transport "
         'configured with header "{header_name}"'
     ),
     target_fixture="context",
@@ -149,7 +151,7 @@ def given_custom_transport_app(
 
 @given(
     parsers.parse(
-        'a {mode} Falcon app with a trusted source and HTTPX recording transport '
+        "a {mode} Falcon app with a trusted source and HTTPX recording transport "
         'configured with header "{header_name}" and existing header "{name}" '
         'set to "{value}"'
     ),
@@ -192,4 +194,5 @@ def then_recorded_request_has_header(context: Context, name: str, value: str) ->
 @then(parsers.parse('the recording transport should not receive header "{name}"'))
 def then_recorded_request_lacks_header(context: Context, name: str) -> None:
     """Verify the recorded request does not contain the header."""
-    assert name not in _recorded_request(context["transport"]).headers
+    headers = _recorded_request(context["transport"]).headers
+    assert name not in headers, f"Unexpected header {name!r} in {headers!r}"
