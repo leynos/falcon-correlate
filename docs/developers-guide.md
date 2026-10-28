@@ -651,6 +651,10 @@ What stays under `tests/workflow_contracts/` is the runner-placement contract
 and the suite-runs-once contract, which read the workflows through
 `lane_reading.py`, `triggers.py` and `runner_lanes.py`.
 
+Release workflow tests share `release_payloads.py` for artefact names and
+recorded PyPI and GitHub response bodies. Parser tests retain fixed payloads as
+independent examples of the wire format.
+
 ### Errors the readers raise
 
 `tests/workflow_contracts/errors.py` holds the hierarchy, and it holds it in

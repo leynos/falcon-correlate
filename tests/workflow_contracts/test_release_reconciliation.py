@@ -2,49 +2,40 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 
 import pytest
 
 from scripts import release_assets_cli
+from tests.workflow_contracts.release_payloads import (
+    BUNDLE as _BUNDLE,
+)
+from tests.workflow_contracts.release_payloads import (
+    BUNDLE_BYTES as _BUNDLE_BYTES,
+)
+from tests.workflow_contracts.release_payloads import (
+    SDIST as _SDIST,
+)
+from tests.workflow_contracts.release_payloads import (
+    SIMPLE_URL as _SIMPLE_URL,
+)
+from tests.workflow_contracts.release_payloads import (
+    TAG as _TAG,
+)
+from tests.workflow_contracts.release_payloads import (
+    WHEEL as _WHEEL,
+)
+from tests.workflow_contracts.release_payloads import (
+    release_view as _release_view,
+)
+from tests.workflow_contracts.release_payloads import (
+    sha256 as _sha256,
+)
+from tests.workflow_contracts.release_payloads import (
+    simple_body as _simple_body,
+)
 from tests.workflow_contracts.workflow_step_runner import run_named_workflow_step
-
-_SIMPLE_URL = "https://pypi.org/simple/falcon-correlate/"
-_TAG = "v1.2.0"
-_WHEEL = "falcon_correlate-1.2.0-py3-none-any.whl"
-_SDIST = "falcon_correlate-1.2.0.tar.gz"
-_BUNDLE = f"{_TAG}.sigstore.json"
-_BUNDLE_BYTES = b"attestation bundle"
-
-
-def _sha256(content: bytes) -> str:
-    """Return the digest format used by PyPI and GitHub release assets."""
-    return hashlib.sha256(content).hexdigest()
-
-
-def _simple_body(files: dict[str, bytes]) -> str:
-    """Build a PEP 691 index for the canonical bytes in the test."""
-    return json.dumps({
-        "files": [
-            {
-                "filename": name,
-                "hashes": {"sha256": _sha256(content)},
-                "url": f"https://files.pythonhosted.org/{name}",
-            }
-            for name, content in files.items()
-        ]
-    })
-
-
-def _release_view(files: dict[str, bytes], names: tuple[str, ...]) -> str:
-    """Build a gh release view response for a named subset of assets."""
-    return json.dumps({
-        "assets": [
-            {"name": name, "digest": f"sha256:{_sha256(files[name])}"} for name in names
-        ]
-    })
 
 
 def _configure_publish(

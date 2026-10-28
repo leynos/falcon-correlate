@@ -2,32 +2,23 @@
 
 from __future__ import annotations
 
-import json
 import typing as typ
 
+from tests.workflow_contracts.release_payloads import (
+    SDIST as _SDIST,
+)
+from tests.workflow_contracts.release_payloads import (
+    WHEEL as _WHEEL,
+)
+from tests.workflow_contracts.release_payloads import (
+    simple_body as _index_body,
+)
 from tests.workflow_contracts.workflow_step_runner import run_named_workflow_step
 
 if typ.TYPE_CHECKING:
     from pathlib import Path
 
     import pytest
-
-_WHEEL = "falcon_correlate-1.2.0-py3-none-any.whl"
-_SDIST = "falcon_correlate-1.2.0.tar.gz"
-
-
-def _index_body(*filenames: str) -> str:
-    """Create valid PEP 691 file entries for a scripted index response."""
-    return json.dumps({
-        "files": [
-            {
-                "filename": name,
-                "hashes": {"sha256": "a" * 64},
-                "url": f"https://files.pythonhosted.org/{name}",
-            }
-            for name in filenames
-        ]
-    })
 
 
 def _configure_stage(
@@ -52,7 +43,7 @@ def test_stage_pypi_keeps_only_distribution_names_absent_from_index(
 ) -> None:
     """The upload directory contains only files not already published."""
     staging, output = _configure_stage(
-        monkeypatch, _index_body(_WHEEL), pypi_stage_paths
+        monkeypatch, _index_body({_WHEEL: b"wheel"}), pypi_stage_paths
     )
 
     result = run_named_workflow_step(
@@ -77,7 +68,7 @@ def test_stage_pypi_succeeds_without_upload_when_all_names_exist(
     """A replay with every filename published yields an empty upload set."""
     staging, output = _configure_stage(
         monkeypatch,
-        _index_body(_WHEEL, _SDIST),
+        _index_body({_WHEEL: b"wheel", _SDIST: b"sdist"}),
         pypi_stage_paths,
     )
 

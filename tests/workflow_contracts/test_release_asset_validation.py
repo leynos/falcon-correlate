@@ -8,14 +8,16 @@ import typing as typ
 import pytest
 
 from scripts import release_assets
+from tests.workflow_contracts.release_payloads import (
+    SDIST as _SDIST,
+)
+from tests.workflow_contracts.release_payloads import (
+    WHEEL as _WHEEL,
+)
 from tests.workflow_contracts.workflow_step_runner import run_named_workflow_step
 
 if typ.TYPE_CHECKING:
     from pathlib import Path
-
-
-_WHEEL = "falcon_correlate-1.2.0-py3-none-any.whl"
-_SDIST = "falcon_correlate-1.2.0.tar.gz"
 
 
 @pytest.mark.parametrize(

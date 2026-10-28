@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import typing as typ
 
@@ -11,43 +10,31 @@ if typ.TYPE_CHECKING:
 
     import pytest
 
+from tests.workflow_contracts.release_payloads import (
+    BUNDLE as _BUNDLE,
+)
+from tests.workflow_contracts.release_payloads import (
+    BUNDLE_BYTES as _BUNDLE_BYTES,
+)
+from tests.workflow_contracts.release_payloads import (
+    SDIST as _SDIST,
+)
+from tests.workflow_contracts.release_payloads import (
+    SIMPLE_URL as _SIMPLE_URL,
+)
+from tests.workflow_contracts.release_payloads import (
+    TAG as _TAG,
+)
+from tests.workflow_contracts.release_payloads import (
+    WHEEL as _WHEEL,
+)
+from tests.workflow_contracts.release_payloads import (
+    release_view as _release_view,
+)
+from tests.workflow_contracts.release_payloads import (
+    simple_body as _index_body,
+)
 from tests.workflow_contracts.workflow_step_runner import run_named_workflow_step
-
-_TAG = "v1.2.0"
-_WHEEL = "falcon_correlate-1.2.0-py3-none-any.whl"
-_SDIST = "falcon_correlate-1.2.0.tar.gz"
-_BUNDLE = f"{_TAG}.sigstore.json"
-_SIMPLE_URL = "https://pypi.org/simple/falcon-correlate/"
-_BUNDLE_BYTES = b"attestation bundle"
-
-
-def _digest(content: bytes) -> str:
-    """Return the lowercase SHA-256 used by both release destinations."""
-    return hashlib.sha256(content).hexdigest()
-
-
-def _index_body(files: dict[str, bytes]) -> str:
-    """Build the PEP 691 response for a staged artifact set."""
-    return json.dumps({
-        "files": [
-            {
-                "filename": name,
-                "hashes": {"sha256": _digest(content)},
-                "url": f"https://files.pythonhosted.org/{name}",
-            }
-            for name, content in files.items()
-        ]
-    })
-
-
-def _release_view(files: dict[str, bytes]) -> str:
-    """Build the gh response for an already reconciled release."""
-    return json.dumps({
-        "assets": [
-            {"name": name, "digest": f"sha256:{_digest(content)}"}
-            for name, content in files.items()
-        ]
-    })
 
 
 def test_publish_retries_until_pypi_indexes_newly_uploaded_files(
