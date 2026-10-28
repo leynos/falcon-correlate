@@ -203,6 +203,24 @@ def test_cli_escapes_remote_error_text_in_workflow_annotation(
     assert "\n" not in error_line, "remote LF characters must be escaped"
 
 
+def test_cli_escapes_carriage_return_in_missing_distribution_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A raw carriage return in a path cannot inject a workflow command."""
+    missing = tmp_path / "missing\rrelease"
+    monkeypatch.setenv("DIST_DIR", str(missing))
+
+    result = release_assets_cli.main(["stage-pypi"])
+
+    error_line = capsys.readouterr().err.rstrip("\n")
+    escaped_path = str(missing).replace("\r", "%0D")
+    assert result == 1, "a missing distribution directory must fail the command"
+    assert escaped_path in error_line, "a carriage return must be escaped as %0D"
+    assert "\r" not in error_line, "the annotation must not contain a raw CR"
+
+
 def test_ensure_draft_retries_before_creating_a_release(
     tmp_path: Path,
     gh_argv_log: Path,
