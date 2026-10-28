@@ -237,7 +237,7 @@ test: build uv $(VENV_TOOLS) doctest makeutil ## Run tests
 
 .PHONY: test-integration
 test-integration: ## Run opt-in workflow integration tests
-	uv run pytest tests/workflows/ -v -m integration
+	$(UV_ENV) $(UV) run pytest tests/workflows/ -v -m integration
 
 test-mutmut-sandbox: build ## Exercise mutmut's configured sandbox on a small module
 	$(UV_ENV) $(UV) run --with mutmut==$(MUTMUT_VERSION) \

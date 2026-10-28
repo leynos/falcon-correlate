@@ -93,6 +93,18 @@ _SERIAL_PY_TESTS_TOKENS: typ.Final = (
 )
 _SERIAL_PY_TEST_EXCLUDES_TOKENS: typ.Final = ("$(PROJECT_PYTEST_EXCLUDES)",)
 _PYTEST_WORKERS_TOKENS: typ.Final = ("6",)
+_INTEGRATION_RECIPE_TOKENS: typ.Final = (
+    (
+        "$(UV_ENV)",
+        "$(UV)",
+        "run",
+        "pytest",
+        "tests/workflows/",
+        "-v",
+        "-m",
+        "integration",
+    ),
+)
 _OPTIONAL_CELERY_RECIPE_TOKENS: typ.Final = (
     ("$(UV_ENV)", "$(UV)", "run", "pytest", "-v", "$(OPTIONAL_CELERY_TEST)"),
 )
@@ -280,6 +292,13 @@ def test_parallel_test_deselects_integration() -> None:
         "-m",
         "not integration",
     ), "PROJECT_PYTEST_EXCLUDES must deselect integration"
+
+
+def test_integration_target_uses_project_uv() -> None:
+    """The opt-in target runs the integration suite through the uv wrapper."""
+    assert _recipe_tokens("test-integration") == _INTEGRATION_RECIPE_TOKENS, (
+        "test-integration must run the integration suite through the project uv wrapper"
+    )
 
 
 def test_lint_target_runs_all_six_stages_in_order() -> None:

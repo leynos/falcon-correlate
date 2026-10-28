@@ -22,6 +22,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 pytestmark = [
     pytest.mark.integration,
+    pytest.mark.timeout(600),
     pytest.mark.usefixtures("act_available", "docker_available"),
 ]
 

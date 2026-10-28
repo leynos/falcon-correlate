@@ -1,4 +1,9 @@
-"""Deterministic contracts for workflow topology and CI setup."""
+"""Check the reviewed GitHub workflow structure without Docker or act.
+
+The workflow document and trigger readers parse checked-in YAML to assert the
+inventory, topology, triggers, push filters and CI Python setup. These fast
+contracts complement the runtime integration tests in ``tests/workflows``.
+"""
 
 from __future__ import annotations
 
@@ -102,9 +107,9 @@ def test_ci_python_setup(job_name: str) -> None:
     """Both CI jobs install Python with uv, using the matrix for tests."""
     jobs = jobs_of(text_of(workflow_texts(), "ci.yml"), "ci.yml")
     run = _workflow_step(jobs[job_name], job_name, "Set up Python").get("run")
-    assert isinstance(run, str), "Python setup must contain a run command"
-    assert "uv python install" in run, "Python setup must install using uv"
-    if job_name == "test":
-        assert "${{ matrix.python-version }}" in run, (
-            "Test Python setup must use the matrix version"
-        )
+    expected_run = (
+        "uv python install 3.13 3.14"
+        if job_name == "lint"
+        else "uv python install ${{ matrix.python-version }}"
+    )
+    assert run == expected_run, f"{job_name} must execute {expected_run!r}"
