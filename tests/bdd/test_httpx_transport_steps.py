@@ -66,12 +66,11 @@ class _SyncTransportResource:
 
     def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
         """Send the outbound request while Falcon middleware context is active."""
-        with httpx.Client(
-            transport=CorrelationIDTransport(
-                self.transport,
-                **({"header_name": self.header_name} if self.header_name else {}),
-            ),
-        ) as client:
+        transport = CorrelationIDTransport(
+            self.transport,
+            **({"header_name": self.header_name} if self.header_name else {}),
+        )
+        with httpx.Client(transport=transport) as client:
             client.get("http://example.com", headers=self.headers)
         resp.status = HTTPStatus.OK
 
@@ -89,12 +88,11 @@ class _AsyncTransportResource:
 
     async def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
         """Send the outbound request while Falcon middleware context is active."""
-        async with httpx.AsyncClient(
-            transport=AsyncCorrelationIDTransport(
-                self.transport,
-                **({"header_name": self.header_name} if self.header_name else {}),
-            ),
-        ) as client:
+        transport = AsyncCorrelationIDTransport(
+            self.transport,
+            **({"header_name": self.header_name} if self.header_name else {}),
+        )
+        async with httpx.AsyncClient(transport=transport) as client:
             await client.get("http://example.com", headers=self.headers)
         resp.status = HTTPStatus.OK
 
