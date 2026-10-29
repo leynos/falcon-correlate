@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # Keep in step with the literal ``--fail-under`` argument below, which stays
@@ -114,3 +116,39 @@ def test_interrogate_result_parser_rejects_semantic_differences(stdout: str) -> 
     """Semantic changes must survive normalisation and fail the gate values."""
     with pytest.raises(AssertionError):
         _assert_interrogate_result_meets_gate(stdout)
+
+
+def test_normalize_interrogate_output_redacts_and_preserves_lines() -> None:
+    """Redact volatile fields while retaining percentage values and line breaks."""
+    output = "  interrogate  v1.8.0rc1\t finished in 1.25s  \n  actual: 100.0%  "
+    assert _normalize_interrogate_output(output) == (
+        "interrogate <version> finished in <duration>\nactual: 100.0%"
+    ), "volatile fields and spacing should be normalised"
+
+
+@given(
+    version=st.tuples(*(st.integers(min_value=0, max_value=999),) * 3),
+    duration=st.tuples(
+        st.integers(min_value=0, max_value=999), st.integers(min_value=0, max_value=999)
+    ),
+    space=st.sampled_from([" ", "  ", "\t", " \t "]),
+    result=st.tuples(
+        st.integers(min_value=0, max_value=5), st.sampled_from(["PASSED", "FAILED"])
+    ),
+)
+def test_interrogate_format_variations_preserve_result(
+    version: tuple[int, int, int],
+    duration: tuple[int, int],
+    space: str,
+    result: tuple[int, str],
+) -> None:
+    """Generated cosmetic changes preserve the status and coverage values."""
+    decimals, status = result
+    version_text = ".".join(map(str, version))
+    percent = "100" + ("." + "0" * decimals if decimals else "")
+    stdout = (
+        f"interrogate v{version_text}\nFinished in {duration[0]}.{duration[1]}s\n"
+        f"RESULT:{space}{status}{space}(minimum:{space}{percent}{space}%,"
+        f"{space}actual:{space}{percent}{space}%)"
+    )
+    assert _parse_interrogate_result(stdout) == (status, 100.0, 100.0), stdout
