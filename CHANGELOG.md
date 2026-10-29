@@ -19,7 +19,6 @@
   GitHub Release has no assets because its former download path did not match
   the uploaded artefact name; it will not be manually back-filled.
 
-
 ### Breaking changes
 
 - Remove `falcon_correlate.hello` and its optional `_falcon_correlate_rs`

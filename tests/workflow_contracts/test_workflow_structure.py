@@ -18,10 +18,27 @@ from tests.workflow_contracts.workflow_documents import (
 )
 
 WORKFLOWS = {
-    "ci.yml": ({"lint": set(), "test": set()}, {"push", "pull_request"}),
+    "ci.yml": (
+        {"lint": set(), "test": set(), "build": set()},
+        {"push", "pull_request"},
+    ),
     "coverage-main.yml": ({"coverage-upload": set()}, {"push", "workflow_dispatch"}),
-    "build-wheels.yml": ({"build": set()}, {"workflow_call"}),
-    "release.yml": ({"pure-wheel": set(), "release": {"pure-wheel"}}, {"push"}),
+    "release.yml": (
+        {
+            "check-version": set(),
+            "pure-wheel": set(),
+            "attest": {"check-version", "pure-wheel"},
+            "publish-pypi": {"check-version", "attest"},
+            "draft-release": {"check-version", "attest"},
+            "publish-release": {
+                "check-version",
+                "attest",
+                "publish-pypi",
+                "draft-release",
+            },
+        },
+        {"push"},
+    ),
     "mutation-testing.yml": ({"mutation": set()}, {"schedule", "workflow_dispatch"}),
     "dependabot-automerge.yml": (
         {"automerge": set()},
