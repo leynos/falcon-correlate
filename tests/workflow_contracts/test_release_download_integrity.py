@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import typing as typ
 
+import pytest
+
 from tests.workflow_contracts.release_payloads import (
     BUNDLE,
     BUNDLE_BYTES,
@@ -12,17 +14,22 @@ from tests.workflow_contracts.release_payloads import (
     WHEEL,
     release_view,
 )
-from tests.workflow_contracts.test_release_reconciliation import _configure_publish
 from tests.workflow_contracts.workflow_step_runner import run_named_workflow_step
 
 if typ.TYPE_CHECKING:
+    import collections.abc as cabc
     from pathlib import Path
-
-    import pytest
 
 
 class TestDownloadIntegrity:
     """Downloaded release assets must match the Simple index digest."""
+
+    @pytest.fixture(autouse=True)
+    def _configure_publish_fixture(
+        self, configure_publish: cabc.Callable[..., None]
+    ) -> None:
+        """Share the release setup with tests in this class."""
+        self.configure_publish = configure_publish
 
     def test_corrupt_pypi_bytes_stop_upload_and_publication(
         self,
@@ -33,7 +40,7 @@ class TestDownloadIntegrity:
     ) -> None:
         """A corrupt download cannot reach a draft release or publish it."""
         pypi_bytes = {WHEEL: b"canonical wheel", SDIST: b"canonical sdist"}
-        _configure_publish(tmp_path, monkeypatch, pypi_bytes)
+        self.configure_publish(pypi_bytes)
         view = release_view({**pypi_bytes, BUNDLE: BUNDLE_BYTES}, (WHEEL, BUNDLE))
         monkeypatch.setenv(
             "GH_RESPONSES", json.dumps([{"stdout": view}, {"stdout": view}])

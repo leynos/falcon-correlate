@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 import typing as typ
 
+import pytest
+
 if typ.TYPE_CHECKING:
+    import collections.abc as cabc
     from pathlib import Path
 
-    import pytest
 
 from tests.workflow_contracts.release_payloads import (
     BUNDLE as _BUNDLE,
@@ -18,12 +20,6 @@ from tests.workflow_contracts.release_payloads import (
 )
 from tests.workflow_contracts.release_payloads import (
     SDIST as _SDIST,
-)
-from tests.workflow_contracts.release_payloads import (
-    SIMPLE_URL as _SIMPLE_URL,
-)
-from tests.workflow_contracts.release_payloads import (
-    TAG as _TAG,
 )
 from tests.workflow_contracts.release_payloads import (
     WHEEL as _WHEEL,
@@ -40,6 +36,13 @@ from tests.workflow_contracts.workflow_step_runner import run_named_workflow_ste
 class TestIndexRetry:
     """Contracts for index retry."""
 
+    @pytest.fixture(autouse=True)
+    def _configure_publish_fixture(
+        self, configure_publish: cabc.Callable[..., None]
+    ) -> None:
+        """Share the release setup with tests in this class."""
+        self.configure_publish = configure_publish
+
     def test_publish_retries_until_pypi_indexes_newly_uploaded_files(
         self,
         tmp_path: Path,
@@ -48,21 +51,8 @@ class TestIndexRetry:
         gh_argv_log: Path,
     ) -> None:
         """The release step waits briefly when PyPI's index initially lags."""
-        distributions = tmp_path / "dist"
-        distributions.mkdir()
         pypi_files = {_WHEEL: b"wheel", _SDIST: b"sdist"}
-        for name, contents in pypi_files.items():
-            (distributions / name).write_bytes(contents)
-
-        bundle_directory = tmp_path / "bundle"
-        bundle_directory.mkdir()
-        (bundle_directory / _BUNDLE).write_bytes(_BUNDLE_BYTES)
-
-        monkeypatch.setenv("DIST_DIR", str(distributions))
-        monkeypatch.setenv("RELEASE_TAG", _TAG)
-        monkeypatch.setenv("SIMPLE_INDEX_URL", _SIMPLE_URL)
-        monkeypatch.setenv("BUNDLE_DIR", str(bundle_directory))
-        monkeypatch.setenv("STAGING_DIR", str(tmp_path / "staging"))
+        self.configure_publish(pypi_files, local_files=pypi_files)
         monkeypatch.setenv("PRERELEASE", "false")
         monkeypatch.setenv(
             "CURL_RESPONSES",

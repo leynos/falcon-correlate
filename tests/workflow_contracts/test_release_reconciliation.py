@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import typing as typ
 from pathlib import Path
 
 import pytest
@@ -11,43 +12,11 @@ from scripts import release_assets_cli
 from tests.workflow_contracts.release_payloads import BUNDLE as _BUNDLE
 from tests.workflow_contracts.release_payloads import BUNDLE_BYTES as _BUNDLE_BYTES
 from tests.workflow_contracts.release_payloads import SDIST as _SDIST
-from tests.workflow_contracts.release_payloads import SIMPLE_URL as _SIMPLE_URL
 from tests.workflow_contracts.release_payloads import TAG as _TAG
 from tests.workflow_contracts.release_payloads import WHEEL as _WHEEL
 from tests.workflow_contracts.release_payloads import release_view as _release_view
 from tests.workflow_contracts.release_payloads import sha256 as _sha256
-from tests.workflow_contracts.release_payloads import simple_body as _simple_body
 from tests.workflow_contracts.workflow_step_runner import run_named_workflow_step
-
-
-def _configure_publish(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    pypi_files: dict[str, bytes],
-    local_files: dict[str, bytes] | None = None,
-) -> None:
-    """Set release inputs and provide a tag-named bundle."""
-    distributions = tmp_path / "dist"
-    distributions.mkdir()
-    if local_files is None:
-        local_files = {
-            _WHEEL: b"local wheel",
-            _SDIST: b"local sdist",
-        }
-    for name, content in local_files.items():
-        (distributions / name).write_bytes(content)
-    bundle_dir = tmp_path / "bundle"
-    bundle_dir.mkdir()
-    bundle = bundle_dir / _BUNDLE
-    bundle.write_bytes(_BUNDLE_BYTES)
-    monkeypatch.setenv("DIST_DIR", str(distributions))
-    monkeypatch.setenv("RELEASE_TAG", _TAG)
-    monkeypatch.setenv("SIMPLE_INDEX_URL", _SIMPLE_URL)
-    monkeypatch.setenv("BUNDLE_DIR", str(bundle_dir))
-    monkeypatch.setenv("STAGING_DIR", str(tmp_path / "staging"))
-    monkeypatch.setenv("PRERELEASE", "true")
-    monkeypatch.setenv("CURL_BODY", _simple_body(pypi_files))
-    monkeypatch.setenv("CURL_STATUS", "200")
 
 
 def _set_gh_responses(
@@ -86,14 +55,27 @@ def _assert_secure_pypi_download(curl_argv_log: Path, upload: list[str]) -> None
     )
 
 
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
+
+
 class TestReleaseReconciliation:
     """Contracts for release reconciliation."""
 
+    @pytest.fixture(autouse=True)
+    def _configure_publish_fixture(
+        self, configure_publish: cabc.Callable[..., None]
+    ) -> None:
+        """Share the release setup with tests in this class."""
+        self.configure_publish = configure_publish
+
     def test_explicit_empty_local_files_are_preserved(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """An explicit empty set does not receive default distributions."""
-        _configure_publish(tmp_path, monkeypatch, {}, local_files={})
+        self.configure_publish({}, local_files={})
         assert not list((tmp_path / "dist").iterdir()), (
             "an explicitly empty distribution set must remain empty"
         )
@@ -111,7 +93,7 @@ class TestReleaseReconciliation:
             _SDIST: b"canonical sdist",
             "falcon_correlate-1.1.0.tar.gz": b"older release sdist",
         }
-        _configure_publish(tmp_path, monkeypatch, pypi_bytes)
+        self.configure_publish(pypi_bytes)
         assets = {**pypi_bytes, _BUNDLE: _BUNDLE_BYTES}
         _set_gh_responses(
             monkeypatch,
@@ -163,7 +145,7 @@ class TestReleaseReconciliation:
     ) -> None:
         """An idempotent rerun performs no upload but still publishes the draft."""
         pypi_bytes = {_WHEEL: b"wheel", _SDIST: b"sdist"}
-        _configure_publish(tmp_path, monkeypatch, pypi_bytes)
+        self.configure_publish(pypi_bytes)
         view = _release_view(
             {**pypi_bytes, _BUNDLE: _BUNDLE_BYTES}, (_WHEEL, _SDIST, _BUNDLE)
         )
@@ -213,7 +195,7 @@ class TestReleaseReconciliation:
         """Existing assets with different or unknown bytes block publication."""
         digest, expected_error = invalid_digest
         pypi_bytes = {_WHEEL: b"canonical wheel", _SDIST: b"canonical sdist"}
-        _configure_publish(tmp_path, monkeypatch, pypi_bytes)
+        self.configure_publish(pypi_bytes)
         assets = json.dumps({
             "assets": [
                 {"name": _WHEEL, "digest": digest},
@@ -254,7 +236,7 @@ class TestReleaseReconciliation:
     ) -> None:
         """Invalid workflow inputs fail before contacting either destination."""
         variable, value, message = invalid_setting
-        _configure_publish(tmp_path, monkeypatch, {_WHEEL: b"wheel", _SDIST: b"sdist"})
+        self.configure_publish({_WHEEL: b"wheel", _SDIST: b"sdist"})
         if value is None:
             monkeypatch.delenv(variable)
         else:
@@ -282,7 +264,7 @@ class TestReleaseReconciliation:
     ) -> None:
         """A first-run bundle is attached when it attests PyPI's exact bytes."""
         pypi_bytes = {_WHEEL: b"canonical wheel", _SDIST: b"canonical sdist"}
-        _configure_publish(tmp_path, monkeypatch, pypi_bytes, local_files=pypi_bytes)
+        self.configure_publish(pypi_bytes, local_files=pypi_bytes)
         _set_gh_responses(
             monkeypatch,
             _release_view(pypi_bytes, (_WHEEL, _SDIST)),
@@ -310,9 +292,7 @@ class TestReleaseReconciliation:
         gh_argv_log: Path,
     ) -> None:
         """A new bundle cannot attest bytes that differ from PyPI's files."""
-        _configure_publish(
-            tmp_path,
-            monkeypatch,
+        self.configure_publish(
             {_WHEEL: b"canonical wheel", _SDIST: b"canonical sdist"},
         )
         monkeypatch.setenv("GH_RESPONSES", json.dumps([{"stdout": '{"assets": []}'}]))
@@ -374,7 +354,7 @@ class TestReleaseReconciliation:
         gh_argv_log: Path,
     ) -> None:
         """A missing provenance bundle stops publication before network calls."""
-        _configure_publish(tmp_path, monkeypatch, {_WHEEL: b"wheel", _SDIST: b"sdist"})
+        self.configure_publish({_WHEEL: b"wheel", _SDIST: b"sdist"})
         (tmp_path / "bundle" / _BUNDLE).unlink()
 
         result = run_named_workflow_step(

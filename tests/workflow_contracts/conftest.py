@@ -8,7 +8,18 @@ import typing as typ
 
 import pytest
 
+from tests.workflow_contracts.release_payloads import (
+    BUNDLE,
+    BUNDLE_BYTES,
+    SDIST,
+    SIMPLE_URL,
+    TAG,
+    WHEEL,
+    simple_body,
+)
+
 if typ.TYPE_CHECKING:
+    import collections.abc as cabc
     from pathlib import Path
 
 
@@ -111,3 +122,33 @@ def pypi_stage_paths(
     monkeypatch.setenv("SIMPLE_INDEX_URL", "https://pypi.org/simple/falcon-correlate/")
     monkeypatch.setenv("GITHUB_OUTPUT", str(output))
     return distributions, staging, output
+
+
+@pytest.fixture
+def configure_publish(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> cabc.Callable[..., None]:
+    """Provide release inputs and a provenance bundle for step tests."""
+
+    def configure(
+        pypi_files: dict[str, bytes], local_files: dict[str, bytes] | None = None
+    ) -> None:
+        distributions = tmp_path / "dist"
+        distributions.mkdir()
+        if local_files is None:
+            local_files = {WHEEL: b"local wheel", SDIST: b"local sdist"}
+        for name, content in local_files.items():
+            (distributions / name).write_bytes(content)
+        bundle_dir = tmp_path / "bundle"
+        bundle_dir.mkdir()
+        (bundle_dir / BUNDLE).write_bytes(BUNDLE_BYTES)
+        monkeypatch.setenv("DIST_DIR", str(distributions))
+        monkeypatch.setenv("RELEASE_TAG", TAG)
+        monkeypatch.setenv("SIMPLE_INDEX_URL", SIMPLE_URL)
+        monkeypatch.setenv("BUNDLE_DIR", str(bundle_dir))
+        monkeypatch.setenv("STAGING_DIR", str(tmp_path / "staging"))
+        monkeypatch.setenv("PRERELEASE", "true")
+        monkeypatch.setenv("CURL_BODY", simple_body(pypi_files))
+        monkeypatch.setenv("CURL_STATUS", "200")
+
+    return configure
