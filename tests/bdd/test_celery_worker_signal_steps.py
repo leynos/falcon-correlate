@@ -61,15 +61,20 @@ def _connect_celery_worker_signals() -> None:
 
 
 @pytest.fixture(autouse=True)
-def _reset_context_variables() -> cabc.Generator[None, None, None]:
-    """Reset context variables around each scenario using token-based reset."""
+def _isolate_celery_context_tokens(
+    _reset_context_variables: None,
+) -> cabc.Generator[None, None, None]:
+    """Discard the Celery token store around each scenario.
+
+    The shared fixture must run first so the scenario starts from a clean
+    public context, and it must tear down last so the scenario's
+    ``task_postrun`` cleanup still restores the values it seeded.
+    """
     celery_tokens_token = _celery_context_tokens.set(None)
-    correlation_token = correlation_id_var.set(None)
     try:
         yield
     finally:
         _celery_context_tokens.reset(celery_tokens_token)
-        correlation_id_var.reset(correlation_token)
 
 
 @given(

@@ -40,16 +40,6 @@ class Context(typ.TypedDict, total=False):
 
 
 @pytest.fixture(autouse=True)
-def _reset_context_variables() -> cabc.Generator[None, None, None]:
-    """Reset context variables before and after each scenario."""
-    correlation_id_var.set(None)
-    user_id_var.set(None)
-    yield
-    correlation_id_var.set(None)
-    user_id_var.set(None)
-
-
-@pytest.fixture(autouse=True)
 def _reset_structlog() -> cabc.Generator[None, None, None]:
     """Reset structlog configuration before and after each scenario."""
     structlog.contextvars.clear_contextvars()

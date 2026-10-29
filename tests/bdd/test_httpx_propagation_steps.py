@@ -12,8 +12,6 @@ import pytest
 httpx = pytest.importorskip("httpx")
 
 if typ.TYPE_CHECKING:
-    import collections.abc as cabc
-
     import falcon.testing
 
 from pytest_bdd import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
@@ -24,9 +22,6 @@ from pytest_bdd import (  # ruff: ignore[module-import-not-at-top-of-file] -- de
     when,
 )
 
-from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
-    correlation_id_var,
-)
 from falcon_correlate.httpx import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     async_request_with_correlation_id,
     request_with_correlation_id,
@@ -123,13 +118,6 @@ def _dispatch_with_httpx_patches(
         context["captured_headers"] = dict(request_call.kwargs.get("headers", {}))
 
     return context
-
-
-@pytest.fixture(autouse=True)
-def _reset_context_variables() -> cabc.Generator[None, None, None]:
-    """Reset request context after each Falcon scenario."""
-    yield
-    correlation_id_var.set(None)
 
 
 @given(
