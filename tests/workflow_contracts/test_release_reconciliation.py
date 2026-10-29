@@ -333,6 +333,9 @@ class TestReleaseReconciliation:
         assert not any(call[:2] == ["release", "upload"] for call in calls), (
             "mismatched distributions must fail before release uploads"
         )
+        assert not any(call[:2] == ["release", "edit"] for call in calls), (
+            "mismatched distributions must leave the release unpublished"
+        )
         assert not any("--output" in call for call in curl_calls), (
             "mismatched distributions must fail before downloading release files"
         )

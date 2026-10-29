@@ -889,8 +889,23 @@ A missing PyPI project (HTTP 404) is treated as an empty index on the first
 release. Index and draft lookup retries report their status, attempt, and delay
 in the workflow log. Other non-success HTTP responses, an empty or malformed
 distribution set, or a digest disagreement fail the run. A digest disagreement
-leaves the GitHub Release as a draft for manual recovery; do not delete or
-overwrite published PyPI files.
+leaves the GitHub Release as a draft. This also protects an interrupted release
+where PyPI publication succeeded but GitHub asset upload did not: if a later
+build differs from PyPI and the draft has no tag-named bundle, the workflow
+fails before uploading assets or publishing the draft. Never attach that
+rebuild's bundle to PyPI's earlier bytes.
+
+For recovery, locate the original successful attestation run and download its
+`release-dist` artefact while it is retained. Confirm that its distributions
+match the filenames and SHA-256 digests currently advertised by PyPI, and that
+its tag-named Sigstore bundle attests those same distributions. If they match,
+use those original distributions and bundle to restore the missing assets to
+the draft, then rerun the release workflow so it checks the GitHub and PyPI
+digests before publishing. The workflow does not accept an artefact from an
+earlier run as input, so this restoration is a manual recovery step. If the
+original artefact is unavailable or its provenance cannot be verified, leave
+the release as a draft and investigate the attestation history. Do not upload
+the rebuilt bundle or delete or overwrite published PyPI files.
 
 ## Roadmap notes
 
