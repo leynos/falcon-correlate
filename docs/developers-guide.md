@@ -308,6 +308,14 @@ token-store cleanup. A local fixture that touches `ContextVar` state must
 request `_reset_context_variables` explicitly so the shared setup runs before
 the feature fixture and the shared teardown runs after it.
 
+`tests/bdd/test_context_isolation_fixture.py` guards the contract. Its
+`pytester` cases run a nested pytest session that re-registers the shared
+fixture, seed ambient values first, and then assert the inner test read `None`
+and that the ambient values returned after both a passing and a failing inner
+test. Coverage that only calls `isolated_context_variables()` cannot detect a
+removed `autouse=True` or a bypassed teardown; keep the `pytester` cases for
+that.
+
 ## Test suite ownership
 
 Give each behaviour one primary test-suite owner:

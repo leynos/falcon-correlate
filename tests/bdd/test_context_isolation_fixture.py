@@ -3,6 +3,12 @@
 The ``_reset_context_variables`` fixture discovered here is the same one every
 BDD scenario uses, so these tests prove the shared behaviour rather than a
 per-step-module copy.
+
+Both the context manager and pytest's execution of the autouse fixture are
+covered. The context manager tests describe the contract, and the ``pytester``
+tests prove pytest actually applies it: they re-register the shared fixture in
+a nested session, seed ambient values before fixture setup, and inspect the
+values after fixture teardown for both normal and failing inner tests.
 """
 
 from __future__ import annotations
@@ -16,6 +22,41 @@ if typ.TYPE_CHECKING:
 
 from falcon_correlate import correlation_id_var, user_id_var
 from tests.bdd.conftest import isolated_context_variables
+
+pytest_plugins = ("pytester",)
+
+# Re-registering the shared fixture under its own name is what makes the nested
+# session apply it. The fixture is autouse, so importing it is enough; the
+# explicit ``__all__`` entry documents the intent and keeps linters quiet.
+_INNER_CONFTEST = """
+from tests.bdd.conftest import _reset_context_variables
+
+__all__ = ["_reset_context_variables"]
+"""
+
+_INNER_CLEAN_BODY = """
+from falcon_correlate import correlation_id_var, user_id_var
+
+
+def test_body():
+    assert correlation_id_var.get() is None
+    assert user_id_var.get() is None
+"""
+
+_INNER_FAILING_SCENARIO = """
+from falcon_correlate import correlation_id_var, user_id_var
+
+
+def test_seeds_context_then_fails():
+    correlation_id_var.set("leaked-correlation-id")
+    user_id_var.set("leaked-user-id")
+    raise AssertionError("deliberate scenario failure")
+
+
+def test_next_test_starts_clean():
+    assert correlation_id_var.get() is None
+    assert user_id_var.get() is None
+"""
 
 
 class _ScenarioFailedError(RuntimeError):
@@ -50,6 +91,58 @@ def test_isolated_context_variables_binds_none_on_entry(
             user_failure = "expected the block to start without a user ID"
             assert correlation_id_var.get() is None, correlation_failure
             assert user_id_var.get() is None, user_failure
+
+    isolated_context(scenario)
+
+
+def test_autouse_fixture_clears_then_restores_context(
+    pytester: pytest.Pytester,
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+) -> None:
+    """Setup clears ambient values for the inner test; teardown restores them.
+
+    The inner test body asserts both variables read as ``None`` even though the
+    outer scope seeded non-``None`` ambient values before pytest ran the
+    fixture, which is what proves setup clearing rather than outer leakage.
+    """
+    pytester.makeconftest(_INNER_CONFTEST)
+    pytester.makepyfile(test_inner=_INNER_CLEAN_BODY)
+
+    def scenario() -> None:
+        correlation_id_var.set("ambient-correlation-id")
+        user_id_var.set("ambient-user-id")
+
+        result = pytester.runpytest("-p", "no:cacheprovider", "-q")
+
+        result.assert_outcomes(passed=1)
+        correlation_failure = "expected teardown to restore the ambient correlation ID"
+        user_failure = "expected teardown to restore the ambient user ID"
+        assert correlation_id_var.get() == "ambient-correlation-id", correlation_failure
+        assert user_id_var.get() == "ambient-user-id", user_failure
+
+    isolated_context(scenario)
+
+
+def test_autouse_fixture_restores_context_after_failing_scenario_exit(
+    pytester: pytest.Pytester,
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+) -> None:
+    """Teardown runs after a failing inner test, so the next one is clean."""
+    pytester.makeconftest(_INNER_CONFTEST)
+    pytester.makepyfile(test_inner=_INNER_FAILING_SCENARIO)
+
+    def scenario() -> None:
+        correlation_id_var.set("ambient-correlation-id")
+        user_id_var.set("ambient-user-id")
+
+        result = pytester.runpytest("-p", "no:cacheprovider", "-q")
+
+        # The failing test is followed by a clean one, which proves teardown ran.
+        result.assert_outcomes(passed=1, failed=1)
+        correlation_failure = "expected teardown to restore the ambient correlation ID"
+        user_failure = "expected teardown to restore the ambient user ID"
+        assert correlation_id_var.get() == "ambient-correlation-id", correlation_failure
+        assert user_id_var.get() == "ambient-user-id", user_failure
 
     isolated_context(scenario)
 
