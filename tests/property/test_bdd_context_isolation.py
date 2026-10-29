@@ -34,6 +34,7 @@ def test_bdd_context_restores_arbitrary_ambient_values(
     """Restore both ambient values after arbitrary writes and either exit path."""
 
     def run_scenario() -> None:
+        """Exercise one generated scenario in its own context."""
         correlation_id_var.set(ambient[0])
         user_id_var.set(ambient[1])
         expected = pytest.raises(_ScenarioError) if fails else nullcontext()
