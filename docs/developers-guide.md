@@ -290,6 +290,24 @@ Follow the existing pattern in `tests/property/test_header_injection.py`:
 - assert on the external behaviour of the property rather than the generated
   example itself.
 
+## BDD context isolation
+
+`tests/bdd/conftest.py` owns `_reset_context_variables`. The fixture is
+autouse, so it applies to every scenario collected under `tests/bdd/` and to
+plain pytest modules in that directory. It binds `correlation_id_var` and
+`user_id_var` to `None` on entry, and restores the ambient values the scenario
+found on exit, including when the scenario raises. That matches the middleware
+and Celery worker teardown semantics: a scenario starts from a known-clean
+public context and cannot leak one into the next.
+
+Do not redefine `_reset_context_variables` in a step module. A local copy
+shadows the shared fixture and re-introduces the drift this arrangement exists
+to remove. Keep genuinely feature-specific cleanup local instead: structlog
+configuration reset, logger handler removal, and Celery signal registration or
+token-store cleanup. A local fixture that touches `ContextVar` state must
+request `_reset_context_variables` explicitly so the shared setup runs before
+the feature fixture and the shared teardown runs after it.
+
 ## Test suite ownership
 
 Give each behaviour one primary test-suite owner:
