@@ -102,6 +102,28 @@ def _has_inline_attribute_docstring(module_name: str, name: str) -> bool:
     return False
 
 
+def test_celery_root_exports_appear_in_users_guide() -> None:
+    """Every Celery name exported from the root is documented for users."""
+    import falcon_correlate
+    import falcon_correlate.celery as celery_adapter
+
+    project_root = Path(__file__).resolve().parents[3]
+    users_guide = (project_root / "docs" / "users-guide.md").read_text(
+        encoding="utf-8",
+    )
+    celery_root_exports = set(celery_adapter.__all__).intersection(
+        falcon_correlate.__all__
+    )
+    undocumented_exports = {
+        name for name in celery_root_exports if name not in users_guide
+    }
+
+    assert not undocumented_exports, (
+        "Celery package-root exports are missing from docs/users-guide.md: "
+        f"{sorted(undocumented_exports)}"
+    )
+
+
 def _assert_public_export_is_documented(name: str, exported: object) -> None:
     """Assert that a public export has documentation appropriate to its kind."""
     if name in ATTRIBUTE_DOCSTRING_EXPORT_MODULES:

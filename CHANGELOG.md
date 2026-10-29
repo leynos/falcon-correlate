@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Documentation
+
+- Document the Celery worker helpers as supported lower-level API and recommend
+  `configure_celery_correlation(app)` for standard activation. There is no
+  behaviour change.
+
 ## 0.2.0 - 2026-08-27
 
 ### Breaking changes

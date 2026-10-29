@@ -63,25 +63,30 @@ a definite per-app verdict is then cached. Inspection failures remain retryable
 and preserve Celery's task ID. Importing `falcon_correlate` or
 `falcon_correlate.celery` does not import Celery or connect signal handlers,
 nor do these imports emit activation diagnostics. Publisher and worker
-bootstrap code must call `configure_celery_correlation(app)` before relying on
-correlation propagation. The helper emits one structured activation record per
-distinct outcome for an app through the `falcon_correlate.celery` logger:
-`INFO` for active setup and `WARNING` for incomplete setup. Its fields are
-`operation`, `registration_state`, `before_task_publish_state`,
-`task_prerun_state`, `task_postrun_state`, `publisher_context_state`, and
-`backend_rpc_verdict`. The activation record reports `unknown` because backend
-inspection is deferred. An eligible publish caches a definite verdict
-internally when inspection succeeds; this does not update the activation
-record. The `operation` value is `configure_celery_correlation`. Signal states
-are `connected`, `celery_signals_unavailable`, `signal_missing`,
-`connect_not_callable`, or `receiver_rejected`; publisher-context states are
-`configured`, `send_task_unavailable`, or `assignment_rejected`. The backend
-verdict is `rpc`, `non_rpc`, or `unknown`; `unknown` is not a registration
-failure. Per-app deduplication uses weak-reference state. Records contain no
-app representation, backend URI, credentials, payload, correlation ID, or user
-ID. The application controls `INFO` visibility, and these records cannot detect
-an omitted configuration call. The full decision and compatibility constraints
-are recorded in
+bootstrap code using package-managed propagation calls
+`configure_celery_correlation(app)`. The `_celery_worker_signals.py` module
+owns the worker receivers and their context-local token stack; it imports no
+Celery symbols and registers no signals. `celery.py` re-exports those callbacks
+as supported lower-level APIs for custom wiring. The configuration helper is
+the recommended package-managed activation path and emits one structured
+activation record per distinct outcome for an app through the
+`falcon_correlate.celery` logger: `INFO` for active setup and `WARNING` for
+incomplete setup. Its fields are `operation`, `registration_state`,
+`before_task_publish_state`, `task_prerun_state`, `task_postrun_state`,
+`publisher_context_state`, and `backend_rpc_verdict`. The activation record
+reports `unknown` because backend inspection is deferred. An eligible publish
+caches a definite verdict internally when inspection succeeds; this does not
+update the activation record. The `operation` value is
+`configure_celery_correlation`. Signal states are `connected`,
+`celery_signals_unavailable`, `signal_missing`, `connect_not_callable`, or
+`receiver_rejected`; publisher-context states are `configured`,
+`send_task_unavailable`, or `assignment_rejected`. The backend verdict is `rpc`,
+`non_rpc`, or `unknown`; `unknown` is not a registration failure. Per-app
+deduplication uses weak-reference state. Records contain no app representation,
+backend URI, credentials, payload, correlation ID, or user ID. The application
+controls `INFO` visibility, and these records cannot detect an omitted
+configuration call. The full decision and compatibility constraints are
+recorded in
 [Appendix A.10 of the middleware design](falcon-correlation-id-middleware-design.md#a10-celery-configuration-helper-task-423).
 
 `middleware_base.py` owns `_CorrelationIDMiddlewareBase`, the private lifecycle
@@ -207,7 +212,7 @@ and implementation history is recorded in the
 Celery signals are process-global, and the integration uses Celery's global
 signal registry. Importing `falcon_correlate` or `falcon_correlate.celery` does
 not import Celery or connect its signals. `configure_celery_correlation(app)`
-is the only activation path and its only caller of
+is the only package-managed activation path and its only caller of
 `_maybe_connect_celery_signals()`, the shared coordinator. The coordinator calls
 `_maybe_connect_celery_publish_signal()` and
 `_maybe_connect_celery_worker_signals()`. Both route registration through
@@ -348,11 +353,12 @@ property. They are not part of the HTTPX consolidation.
 ## Mutation testing
 
 `[tool.mutmut]` in `pyproject.toml` defines the source paths to mutate and the
-test paths copied into mutmut's `mutants/` sandbox. Every repository package
-imported by those tests must also be present there, either through
-`source_paths`, the selected test tree, or `also_copy`. The quickstart BDD
-tests import runnable modules from `examples/`, so that package is copied
-unmutated with `also_copy = ["examples/"]`.
+test paths copied into mutmut's `mutants/` sandbox. Every repository package or
+other source-tree resource used by those tests must also be present there,
+either through `source_paths`, the selected test tree, or `also_copy`. The
+quickstart BDD tests import runnable modules from `examples/`, and the public
+Celery export test reads `docs/users-guide.md`; both directories are copied
+unmutated with `also_copy = ["examples/", "docs/"]`.
 
 `tests/workflow_contracts/test_mutmut_config.py` parses imports throughout the
 selected tests and their local support modules. It fails when a repository

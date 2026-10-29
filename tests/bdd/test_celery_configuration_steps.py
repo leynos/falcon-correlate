@@ -33,11 +33,13 @@ from pytest_bdd import (  # ruff: ignore[module-import-not-at-top-of-file] -- af
 from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- after optional Celery test setup
     correlation_id_var,
 )
+from falcon_correlate._celery_worker_signals import (  # ruff: ignore[module-import-not-at-top-of-file] -- after optional Celery test setup
+    _celery_context_tokens,
+)
 from falcon_correlate.celery import (  # ruff: ignore[module-import-not-at-top-of-file] -- after Celery skip setup
     _BEFORE_TASK_PUBLISH_DISPATCH_UID,
     _TASK_POSTRUN_DISPATCH_UID,
     _TASK_PRERUN_DISPATCH_UID,
-    _celery_context_tokens,
     configure_celery_correlation,
 )
 

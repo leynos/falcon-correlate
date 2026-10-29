@@ -28,9 +28,11 @@ from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file]
     correlation_id_var,
     setup_correlation_id_in_worker,
 )
-from falcon_correlate.celery import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+from falcon_correlate._celery_worker_signals import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     _CORRELATION_ID_CONTEXT_KEY,
     _celery_context_tokens,
+)
+from falcon_correlate.celery import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
     _maybe_connect_celery_worker_signals,
 )
 
@@ -242,21 +244,101 @@ def test_worker_signal_connection_is_idempotent() -> None:
     ), failure_message
 
 
-def test_worker_signal_handlers_are_exported_from_package_root() -> None:
-    """The worker handlers should be re-exported from the package root."""
+def test_worker_helpers_are_supported_public_lower_level_api() -> None:
+    """Worker helpers are supported public exports from both modules."""
     import falcon_correlate
+    import falcon_correlate.celery as celery_adapter
 
     failure_message = "expected condition: 'setup_correlation_id_in_worker' in falco..."
     assert "setup_correlation_id_in_worker" in falcon_correlate.__all__, failure_message
+    assert "setup_correlation_id_in_worker" in celery_adapter.__all__, failure_message
     failure_message = "expected condition: 'clear_correlation_id_in_worker' in falco..."
     assert "clear_correlation_id_in_worker" in falcon_correlate.__all__, failure_message
+    assert "clear_correlation_id_in_worker" in celery_adapter.__all__, failure_message
     failure_message = "expected condition: falcon_correlate.setup_correlation_id_in_..."
     assert (
         falcon_correlate.setup_correlation_id_in_worker
-        is setup_correlation_id_in_worker
+        is celery_adapter.setup_correlation_id_in_worker
     ), failure_message
     failure_message = "expected condition: falcon_correlate.clear_correlation_id_in_..."
     assert (
         falcon_correlate.clear_correlation_id_in_worker
-        is clear_correlation_id_in_worker
+        is celery_adapter.clear_correlation_id_in_worker
     ), failure_message
+
+
+def test_public_worker_helpers_support_manual_lifecycle_and_exception_cleanup(
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+) -> None:
+    """Manual worker use restores ambient context when task work raises."""
+    from falcon_correlate import (
+        clear_correlation_id_in_worker as clear_worker_context,
+    )
+    from falcon_correlate import (
+        setup_correlation_id_in_worker as setup_worker_context,
+    )
+
+    ambient_correlation_id = "ambient-correlation-id"
+    task = _build_task(correlation_id="worker-correlation-id")
+
+    def _logic() -> None:
+        """Exercise direct public helper use around task work."""
+
+        def _run_task_body() -> None:
+            """Read the bound task ID before simulating a task failure."""
+            assert correlation_id_var.get() == "worker-correlation-id", (
+                "expected task correlation ID to be visible during task work"
+            )
+            raise RuntimeError
+
+        correlation_id_var.set(ambient_correlation_id)
+        try:
+            setup_worker_context(task=task)
+            with pytest.raises(RuntimeError):
+                _run_task_body()
+        finally:
+            clear_worker_context(task=task)
+
+        assert correlation_id_var.get() == ambient_correlation_id, (
+            "expected task cleanup to restore the ambient correlation ID"
+        )
+
+    isolated_context(_logic)
+
+
+def test_nested_missing_id_setup_allows_cleanup_to_consume_outer_token(
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+) -> None:
+    """A missing-ID setup adds no token for its following cleanup to pop."""
+    ambient_correlation_id = "ambient-correlation-id"
+    outer_task = _build_task(correlation_id="outer-worker-correlation-id")
+    nested_task_without_id = _build_task()
+
+    def _logic() -> None:
+        """Capture the current nested missing-ID cleanup constraint."""
+        correlation_id_var.set(ambient_correlation_id)
+        setup_correlation_id_in_worker(task=outer_task)
+        setup_correlation_id_in_worker(task=nested_task_without_id)
+
+        assert correlation_id_var.get() == "outer-worker-correlation-id", (
+            "expected missing-ID setup to leave the outer task ID in context"
+        )
+        stored_tokens = _celery_context_tokens.get(None)
+        assert stored_tokens is not None, (
+            "expected the outer setup to retain its reset token"
+        )
+        assert len(stored_tokens[_CORRELATION_ID_CONTEXT_KEY]) == 1, (
+            "expected missing-ID setup to leave the outer token unchanged"
+        )
+
+        clear_correlation_id_in_worker(task=nested_task_without_id)
+        assert correlation_id_var.get() == ambient_correlation_id, (
+            "expected nested cleanup to consume the outer token"
+        )
+
+        clear_correlation_id_in_worker(task=outer_task)
+        assert correlation_id_var.get() == ambient_correlation_id, (
+            "expected cleanup without a token to leave context unchanged"
+        )
+
+    isolated_context(_logic)

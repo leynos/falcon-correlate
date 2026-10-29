@@ -844,10 +844,12 @@ If the Celery extra is not installed, importing `falcon_correlate` and
 stays inactive, and Celery-specific project tests are reported as skipped in
 test environments where the optional dependency is absent.
 
-### Enabling the publish and worker signal handlers
+### Recommended setup with `configure_celery_correlation()`
 
-Call `configure_celery_correlation(celery_app)` during Celery application setup
-in each publisher and worker process:
+Use `configure_celery_correlation(app)` in each publisher and worker process.
+This is the recommended and required activation API for automatic integration.
+
+Call it during Celery application setup:
 
 ```python
 from celery import Celery
@@ -860,20 +862,20 @@ middleware = CorrelationIDMiddleware()
 ```
 
 The helper connects the `before_task_publish`, `task_prerun`, and
-`task_postrun` handlers in one idempotent call and returns the same app
-instance. It also wraps the app's `send_task` method so the publish handler can
-identify the actual publishing app while Celery emits its global signal. The
-helper defers result-backend inspection until an eligible publish has an
-ambient correlation ID and message properties, so it does not freeze Celery's
-lazy backend before application configuration has loaded. The first eligible
-publish attempts inspection, and only a definite verdict is cached for that
-app; failed inspections remain uncached and can be retried on later eligible
-publishes. While the verdict is unknown, Celery's task ID is preserved.
-Configured app instances must be hashable and weak-referenceable for the
-per-app verdict cache; Celery's own application instances satisfy this
-requirement.
+`task_postrun` receivers with stable dispatch UIDs in one idempotent call and
+returns the same app instance. It also wraps the app's `send_task` method so
+the publish handler can identify the actual publishing app while Celery emits
+its global signal. The helper defers result-backend inspection until an
+eligible publish has an ambient correlation ID and message properties, so it
+does not freeze Celery's lazy backend before application configuration has
+loaded. The first eligible publish attempts inspection, and only a definite
+verdict is cached for that app; failed inspections remain uncached and can be
+retried on later eligible publishes. While the verdict is unknown, Celery's
+task ID is preserved. Configured app instances must be hashable and
+weak-referenceable for the per-app verdict cache; Celery's own application
+instances satisfy this requirement.
 
-Calling the helper is required to activate Celery propagation. Importing
+Calling the helper is required for package-managed Celery propagation. Importing
 `falcon_correlate` or `falcon_correlate.celery` does not import Celery or
 connect the handlers, so library consumers can safely read the ambient context
 variable without mutating Celery's process-global signal registry. For workers,
@@ -953,6 +955,62 @@ def send_invoice_email(self, user_id: str) -> None:
   incoming task request correlation ID when one is present.
 - After the task finishes, `falcon-correlate` resets worker context
   automatically so the next task does not inherit stale correlation data.
+
+### Advanced: direct worker lifecycle helpers
+
+The package root also exports these supported lower-level signal receivers:
+
+- `propagate_correlation_id_to_celery` for `before_task_publish` in publisher
+  processes;
+- `setup_correlation_id_in_worker` for `task_prerun` in worker processes; and
+- `clear_correlation_id_in_worker` for `task_postrun` in worker processes.
+
+Use direct connection when custom signal wiring, a non-standard worker
+bootstrap, or a test harness needs to control receiver registration. These
+helpers are public API, and their signatures follow the public API
+compatibility policy. `configure_celery_correlation(app)` remains the
+recommended setup for the standard integration.
+
+Worker setup reads `task.request.correlation_id`. A non-empty string sets
+`correlation_id_var` and adds one reset token to a context-local stack for each
+successful call. The setup helper takes `task` as a keyword-only argument and
+ignores other signal keyword arguments. Setup is not idempotent. A missing,
+empty, or non-string ID adds no token. Cleanup ignores all signal arguments,
+including `task`, and restores the value saved by popping one token in LIFO
+order. Cleanup does nothing when no token exists. If a nested setup has no
+usable ID, its cleanup can consume the most recent earlier successful setup's
+token and restore the value that preceded it.
+
+Pair every successful setup with one cleanup in the same context and in LIFO
+order. Do not manually connect a receiver for a signal already managed by
+`configure_celery_correlation(app)`: duplicate work can unbalance the context
+token stack. Choose one registration approach per process.
+
+The following example uses `SimpleNamespace` as a task stand-in. Celery passes
+the real task to its `task_prerun` receiver:
+
+```python
+from types import SimpleNamespace
+
+from falcon_correlate import (
+    clear_correlation_id_in_worker,
+    correlation_id_var,
+    setup_correlation_id_in_worker,
+)
+
+task = SimpleNamespace(request=SimpleNamespace(correlation_id="task-correlation-id"))
+
+
+def run_task_body() -> None:
+    assert correlation_id_var.get() == "task-correlation-id"
+
+
+try:
+    setup_correlation_id_in_worker(task=task)
+    run_task_body()
+finally:
+    clear_correlation_id_in_worker()
+```
 
 ## Full Configuration Example
 
