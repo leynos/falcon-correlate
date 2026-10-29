@@ -10,8 +10,6 @@ Run with: pytest tests/workflows/ -v
 from __future__ import annotations
 
 import json
-import shutil
-import subprocess
 import typing as typ
 from pathlib import Path
 
@@ -22,22 +20,11 @@ from tests.workflows.act_runner import WORKFLOW_PATH, ActConfig, run_act
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
-def _tool_is_available(tool_name: str, args: list[str]) -> bool:
-    """Check whether a tool is available by running it with given args."""
-    tool_path = shutil.which(tool_name)
-    if tool_path is None:
-        return False
-    result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- resolved tool path and fixed arguments.
-        [tool_path, *args],
-        capture_output=True,
-        check=False,
-    )
-    return result.returncode == 0
-
-
-# Check if act and Docker are available at module load time
-ACT_AVAILABLE = _tool_is_available("act", ["--version"])
-DOCKER_AVAILABLE = _tool_is_available("docker", ["info"])
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.timeout(600),
+    pytest.mark.usefixtures("act_available", "docker_available"),
+]
 
 
 def parse_json_logs(logs: str) -> list[dict[str, typ.Any]]:
@@ -83,14 +70,6 @@ def log_contains_message(logs: str, message: str) -> bool:
     return message in logs
 
 
-@pytest.mark.skipif(
-    not ACT_AVAILABLE,
-    reason="act is not installed",
-)
-@pytest.mark.skipif(
-    not DOCKER_AVAILABLE,
-    reason="Docker is not available",
-)
 class TestCIWorkflowStructure:
     """Tests for CI workflow structure validation."""
 
@@ -115,14 +94,6 @@ class TestCIWorkflowStructure:
         )
 
 
-@pytest.mark.skipif(
-    not ACT_AVAILABLE,
-    reason="act is not installed",
-)
-@pytest.mark.skipif(
-    not DOCKER_AVAILABLE,
-    reason="Docker is not available",
-)
 class TestCIWorkflowLintJob:
     """Tests for the lint job in the CI workflow."""
 
@@ -148,14 +119,6 @@ class TestCIWorkflowLintJob:
         assert code == 0, f"Lint job failed:\n{logs}"
 
 
-@pytest.mark.skipif(
-    not ACT_AVAILABLE,
-    reason="act is not installed",
-)
-@pytest.mark.skipif(
-    not DOCKER_AVAILABLE,
-    reason="Docker is not available",
-)
 class TestCIWorkflowTestJob:
     """Tests for the test job in the CI workflow."""
 
@@ -204,88 +167,3 @@ class TestCIWorkflowTestJob:
         # Check for coverage artefact
         coverage_files = list(artdir.rglob("coverage*.xml"))
         assert coverage_files, f"Coverage artefact missing. Logs:\n{logs}"
-
-
-@pytest.mark.skipif(
-    not ACT_AVAILABLE,
-    reason="act is not installed",
-)
-@pytest.mark.skipif(
-    not DOCKER_AVAILABLE,
-    reason="Docker is not available",
-)
-class TestCIWorkflowMatrixConfiguration:
-    """Tests for matrix configuration in the CI workflow."""
-
-    def test_matrix_includes_all_python_versions(self) -> None:
-        """Verify the workflow matrix includes Python 3.12, 3.13, and 3.14."""
-        import yaml
-
-        with WORKFLOW_PATH.open() as f:
-            workflow = yaml.safe_load(f)
-
-        test_job = workflow["jobs"]["test"]
-        matrix = test_job["strategy"]["matrix"]
-        python_versions = matrix["python-version"]
-
-        expected_versions = ["3.12", "3.13", "3.14"]
-        assert python_versions == expected_versions, (
-            f"Expected {expected_versions}, got {python_versions}"
-        )
-
-    def test_matrix_fail_fast_is_disabled(self) -> None:
-        """Verify fail-fast is disabled so all matrix jobs run."""
-        import yaml
-
-        with WORKFLOW_PATH.open() as f:
-            workflow = yaml.safe_load(f)
-
-        test_job = workflow["jobs"]["test"]
-        strategy = test_job["strategy"]
-
-        assert strategy.get("fail-fast") is False, (
-            "fail-fast should be disabled for matrix testing"
-        )
-
-    def test_lint_job_uses_uv_for_python(self) -> None:
-        """Verify the lint job uses uv to install Python."""
-        import yaml
-
-        with WORKFLOW_PATH.open() as f:
-            workflow = yaml.safe_load(f)
-
-        lint_job = workflow["jobs"]["lint"]
-        steps = lint_job["steps"]
-
-        # Find the Python setup step
-        python_step = next(
-            (s for s in steps if "Set up Python" in s.get("name", "")),
-            None,
-        )
-        assert python_step is not None, "Python setup step not found"
-        assert "uv python install" in python_step.get("run", ""), (
-            "Expected uv python install in Python setup step"
-        )
-
-    def test_test_job_uses_uv_for_python(self) -> None:
-        """Verify the test job uses uv to install Python."""
-        import yaml
-
-        with WORKFLOW_PATH.open() as f:
-            workflow = yaml.safe_load(f)
-
-        test_job = workflow["jobs"]["test"]
-        steps = test_job["steps"]
-
-        # Find the Python setup step
-        python_step = next(
-            (s for s in steps if "Set up Python" in s.get("name", "")),
-            None,
-        )
-        assert python_step is not None, "Python setup step not found"
-        assert "uv python install" in python_step.get("run", ""), (
-            "Expected uv python install in Python setup step"
-        )
-        assert "${{ matrix.python-version }}" in python_step.get("run", ""), (
-            "Expected matrix.python-version in Python setup step"
-        )

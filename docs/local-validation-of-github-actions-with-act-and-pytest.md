@@ -91,6 +91,9 @@ File: `tests/fixtures/pull_request.event.json`.
 
 ## Driving `act` from `pytest` (black-box harness)
 
+Run the repository harness with `make test-integration`, or select it directly
+with `uv run pytest tests/workflows/ -v -m integration`.
+
 The harness runs `act`, captures artefacts under a pytest-managed temporary
 directory, and reads the JSON log stream. It makes **no attempt** to intercept
 commands inside the containers.
@@ -234,7 +237,8 @@ loop:
 
 ## Validation ladder
 
-1. **Local fast loop:** unit tests -> `act` black-box tests via `pytest`.
+1. **Local fast loop:** unit tests and deterministic workflow parser contracts.
+   Opt in to `act` black-box tests with `make test-integration`.
 2. **Authoritative CI:** run the same workflow on GitHub-hosted runners.
 3. **End-to-end (privileged paths):** GH-only with least-privilege tokens; gate
    behind labels/paths.

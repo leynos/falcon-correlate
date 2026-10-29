@@ -1,7 +1,7 @@
 """Pytest configuration for workflow integration tests.
 
-These tests require act and Docker to be available. They are excluded from
-the normal test suite and should be run manually when making workflow changes.
+These tests carry the integration marker and require act and Docker. Both
+make test and CI exclude them; make test-integration runs them.
 """
 
 from __future__ import annotations
@@ -53,7 +53,9 @@ def act_available() -> bool:
         The value produced for the test scenario.
 
     """
-    return _check_tool_available("act", ["--version"])
+    if not _check_tool_available("act", ["--version"]):
+        pytest.skip("act is not installed")
+    return True
 
 
 @pytest.fixture(scope="session")
@@ -66,4 +68,6 @@ def docker_available() -> bool:
         The value produced for the test scenario.
 
     """
-    return _check_tool_available("docker", ["info"])
+    if not _check_tool_available("docker", ["info"]):
+        pytest.skip("Docker is not available")
+    return True

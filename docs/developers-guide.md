@@ -735,8 +735,8 @@ workflow places its own jobs.
 printing `Skipping unsupported platform` and exiting zero. Nothing fails, and
 every later assertion is then about a job that never ran. The mapping lives in
 `tests/workflows/act_platforms.py`, deliberately apart from the act tests:
-those probe for `act` and Docker at import and are excluded from CI, so a guard
-beside them could not run where it is needed.
+those require `act` and Docker and are excluded from CI, so a guard beside them
+could not run where it is needed.
 
 `ubicloud-standard-2` maps to the same image as `ubuntu-latest`, because it is
 an ordinary x86-64 Ubuntu runner. The mapping is about what `act` can run
@@ -751,7 +751,7 @@ so an unmapped Linux label reads as a mapping to add and a Windows or macOS
 lane in `ci.yml` reads as a lane act no longer covers. `run_act` also refuses
 the skip message outright, so a skipped job fails its test rather than passing
 it vacuously. It lives in `tests/workflows/act_runner.py`, apart from the
-integration tests for the same import-time reason, and takes an optional
+integration tests so it can be exercised independently, and takes an optional
 `act_executable`, so `tests/workflow_contracts/test_act_runner.py` proves the
 refusal in CI with a stand-in `act` that prints the skip message and exits
 zero, alongside a job that ran and failed, which it must return untouched.
@@ -877,6 +877,12 @@ make lint 2>&1 | tee /tmp/lint-falcon-correlate-$(git branch --show-current).out
 ```
 
 ## Test and typecheck workflow
+
+Workflow testing has three tiers. Deterministic parser contracts in
+`tests/workflow_contracts/` run in normal pytest sessions without Docker or
+`act`. Run the external CodeScene contracts with
+`make test-workflow-contracts`. The expensive `act` integration tests require
+Docker and `act`; opt in with `make test-integration`.
 
 `make test` requires the pinned `makeutil` parser on `PATH`. It first runs
 `src/falcon_correlate/unittests/test_optional_celery_dependency.py` serially
