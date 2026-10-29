@@ -67,17 +67,20 @@ from tests.workflow_contracts.workflow_documents import (
 PAID_LANES = frozenset({
     "ci.yml:lint",
     "ci.yml:test",
+    "ci.yml:build",
     "coverage-main.yml:coverage-upload",
+    "release.yml:attest",
+    "release.yml:check-version",
+    "release.yml:draft-release",
+    "release.yml:publish-pypi",
+    "release.yml:publish-release",
     "release.yml:pure-wheel",
-    "release.yml:release",
 })
 
 #: Lanes that stay GitHub-hosted, with the reason each one stays. A
 #: scheduled or dispatch-only lane gains nothing from a paid runner, and
 #: public-repository minutes are free on GitHub.
-HOSTED_LANES: typ.Final[dict[str, str]] = {
-    "build-wheels.yml:build": "workflow_call, and its matrix is not Linux-only",
-}
+HOSTED_LANES: typ.Final[dict[str, str]] = {}
 
 #: The longest ceiling any paid lane may declare. Not a limit on what a job
 #: needs, but a bound on what a hang can cost.

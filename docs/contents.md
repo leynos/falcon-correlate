@@ -28,6 +28,9 @@
   and layered completeness checks.
 - [ADR-004: explicit Celery signal registration](adr-004-explicit-celery-signal-registration.md)
   records the opt-in Celery integration boundary introduced in version 0.2.0.
+- [ADR-005: attested, reconciled release pipeline](adr-005-attested-reconciled-release-pipeline.md)
+  records PyPI as the source of truth and GitHub Releases as the reconciled
+  second destination.
 - [Documentation style guide](documentation-style-guide.md) defines spelling,
   Markdown, document-structure, roadmap, Architecture Decision Record (ADR),
   and Request for Comments (RFC) conventions for this repository.

@@ -30,7 +30,14 @@ _PROJECT_PYTEST_EXCLUDE_TOKENS: typ.Final = (
 _TYPECHECK_PREREQUISITES: typ.Final = ("build",)
 _TYPECHECK_RECIPE_TOKENS: typ.Final = (
     ("$(TY)", "--version"),
-    ("$(TY)", "check"),
+    (
+        "$(TY)",
+        "check",
+        "--extra-search-path",
+        ".",
+        "--extra-search-path",
+        "scripts",
+    ),
 )
 _LINT_RECIPE_TOKENS: typ.Final = (
     ("$(RUFF)", "check"),
@@ -322,6 +329,16 @@ def test_pylint_targets_share_the_project_target_list() -> None:
     )
     assert _recipe_tokens("df12-pylint") == _DF12_PYLINT_RECIPE_TOKENS, (
         "DF12 Pylint must analyze the shared PYLINT_TARGETS"
+    )
+
+
+def test_release_build_and_lint_include_scripts() -> None:
+    """Release builds use uv and both Pylint passes cover release scripts."""
+    assert _recipe_tokens("build-release") == (
+        ("$(UV_ENV)", "$(UV)", "build", "--out-dir", "dist"),
+    ), "release builds must use the same uv command as CI"
+    assert "scripts" in _variable_tokens("PYLINT_TARGETS"), (
+        "both Pylint passes must include release scripts"
     )
 
 

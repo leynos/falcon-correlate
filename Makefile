@@ -37,7 +37,7 @@ TYPOS_CONFIG_BUILDER = $(GIT_SOURCE_ENV) $(UV_ENV) $(UV) tool run --python 3.14 
 	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_VERSION)" \
 	typos-config-builder
 INTERROGATE_TARGETS ?= src/falcon_correlate
-PYLINT_TARGETS ?= src tests examples
+PYLINT_TARGETS ?= src tests examples scripts
 PYLINT_PYPY_VERSION ?= 8.0.0
 PYLINT_PYTHON_VERSION ?= 3.12
 PYLINT_PYPY_ARCHIVE = pypy3.12-v$(PYLINT_PYPY_VERSION)-linux64.tar.gz
@@ -106,7 +106,7 @@ build: uv .venv ## Build virtual-env and install deps
 	$(UV_ENV) $(UV) sync --group dev
 
 build-release: ## Build artefacts (sdist & wheel)
-	python -m build --sdist --wheel
+	$(UV_ENV) $(UV) build --out-dir dist
 
 clean: ## Remove build artefacts
 	rm -rf build dist *.egg-info \
@@ -207,7 +207,7 @@ df12-pylint: verify-df12-pylint ## Run df12 Pylint checks under CPython 3.14
 
 typecheck: build ## Run typechecking
 	$(TY) --version
-	$(TY) check
+	$(TY) check --extra-search-path . --extra-search-path scripts
 
 markdownlint: spelling $(MDLINT) ## Lint Markdown files and enforce spelling
 	$(MDLINT) '**/*.md' '#.uv-cache' '#.uv-tools'

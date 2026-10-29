@@ -12,14 +12,10 @@ handwritten assertion that ``ubicloud-standard-2`` is mapped would go stale
 the day a lane moves to a different runner, which is the same class of gap
 the registry contract refuses next door.
 
-The domain is one workflow, not all of them, and writing it the other way
-round was the first version of this file. ``build-wheels.yml`` matrixes over
-Windows and macOS, which act cannot host at any mapping, so a contract over
-every lane in the repository demanded mappings that cannot exist. The
-distinction is kept explicit below: an unmapped Linux label is a mapping to
-add, and a Windows or macOS label in the act workflow is a lane act can no
-longer cover. Those are different problems and the contract names which one
-it found.
+The domain is one workflow, not all of them. The act harness runs the CI
+workflow, whose Linux lanes can all be mapped to local containers. Release
+and scheduled workflows are outside the harness and do not affect this
+contract.
 """
 
 from __future__ import annotations

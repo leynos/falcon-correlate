@@ -119,6 +119,65 @@ jobs:
       - name: Validate Mermaid diagrams
         run: make nixie
 
+  build:
+    runs-on: >-
+      ${{ (github.event.pull_request.head.repo.fork
+      || github.event.pull_request.user.login == 'dependabot[bot]')
+      && 'ubuntu-latest' || 'ubicloud-standard-2' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/pure-python-wheel
+        with:
+          python-version: '3.13'
+          artifact-name: wheels-pure
+
+      - name: Require exactly one sdist and one wheel
+        shell: bash
+        env:
+          DIST_DIR: dist
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          sdists=("${DIST_DIR}"/*.tar.gz)
+          wheels=("${DIST_DIR}"/*.whl)
+          if [ "${#sdists[@]}" -ne 1 ]; then
+            echo "Expected exactly one source distribution." >&2
+            echo "Matched: ${sdists[*]:-<none>}" >&2
+            ls -al "${DIST_DIR}" >&2
+            exit 1
+          fi
+          if [ "${#wheels[@]}" -ne 1 ]; then
+            echo "Expected exactly one pure Python wheel." >&2
+            echo "Matched: ${wheels[*]:-<none>}" >&2
+            ls -al "${DIST_DIR}" >&2
+            exit 1
+          fi
+          if [[ "${wheels[0]}" != *-none-any.whl ]]; then
+            echo "Expected a platform-independent wheel with a none-any tag." >&2
+            echo "Matched: ${wheels[0]}" >&2
+            exit 1
+          fi
+
+      - name: Check the wheel imports without extras
+        shell: bash
+        env:
+          DIST_DIR: dist
+          VENV_DIR: ${{ runner.temp }}/falcon-correlate-wheel-check
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          wheels=("${DIST_DIR}"/*.whl)
+          uv venv --clear --python 3.13 "${VENV_DIR}"
+          uv pip install --python "${VENV_DIR}/bin/python" "${wheels[0]}"
+          "${VENV_DIR}/bin/python" -c 'import sys; import falcon_correlate; assert "celery" not in sys.modules; assert "httpx" not in sys.modules'
+
   test:
     runs-on: >-
       ${{ (github.event.pull_request.head.repo.fork

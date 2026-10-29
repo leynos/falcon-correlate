@@ -8,7 +8,16 @@
   `configure_celery_correlation(app)` for standard activation. There is no
   behaviour change.
 
-## 0.2.0 - 2026-08-27
+## 0.2.0 - 2026-10-26
+
+### Added
+
+- Publish an sdist and pure-Python wheel with Sigstore build provenance through
+  an idempotent Trusted Publishing pipeline. PyPI is the source of truth, and
+  the GitHub Release is reconciled with the same distribution bytes.
+- Version 0.2.0 is the first release with distribution artefacts. The `v0.1.0`
+  GitHub Release has no assets because its former download path did not match
+  the uploaded artefact name; it will not be manually back-filled.
 
 ### Breaking changes
 

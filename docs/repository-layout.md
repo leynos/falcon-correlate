@@ -16,12 +16,14 @@ virtual-environment directories, and build artefacts.
 ├── docs/
 │   ├── debugging/
 │   └── execplans/
+├── scripts/
 ├── src/
 │   └── falcon_correlate/
 │       └── unittests/
 ├── tests/
 │   ├── bdd/
 │   ├── property/
+│   ├── workflow_contracts/
 │   └── workflows/
 ├── AGENTS.md
 ├── Makefile
@@ -45,10 +47,12 @@ paths._
 | `docs/`                           | Contains long-lived user, developer, design, decision, reference, and planning documentation.           |
 | `docs/debugging/`                 | Records evidence-led investigations and follow-up findings for repository issues.                       |
 | `docs/execplans/`                 | Stores task-level execution plans for implementation work.                                              |
+| `scripts/`                        | Contains standard-library helpers used by the release workflow.                                         |
 | `src/falcon_correlate/`           | Contains the installable Python package and public middleware implementation.                           |
 | `src/falcon_correlate/unittests/` | Contains package-local unit tests that exercise implementation units close to the source.               |
 | `tests/bdd/`                      | Contains behavioural tests written from user-observable workflows.                                      |
 | `tests/property/`                 | Contains Hypothesis-based property tests for invariants that benefit from generated inputs.             |
+| `tests/workflow_contracts/`       | Checks workflow structure and runs extracted release steps against command stand-ins.                   |
 | `tests/workflows/`                | Contains workflow-level tests and fixtures that validate repository automation behaviour.               |
 
 _Table 1: Maintained repository paths and their responsibilities._

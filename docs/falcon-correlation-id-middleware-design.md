@@ -1498,6 +1498,26 @@ include:
   to be updated dynamically without application restarts, perhaps by
   integrating with a configuration management system.
 
+### 5.4. Packaging and release
+
+The package is built with `uv_build` as one source distribution and one
+platform-independent wheel. `uv build --out-dir dist` builds the sdist first
+and then builds the wheel from it; pull-request CI verifies both files and
+imports the wheel without optional Celery or HTTPX extras. The composite build
+action follows the repository's `setup-uv` dependency updates and pins the
+selected action to its full commit SHA.
+
+The release workflow attests the distributions with Sigstore provenance and
+publishes them to PyPI through Trusted Publishing. PyPI is the source of truth
+for distribution bytes. The workflow creates or reuses a draft GitHub Release,
+adds only assets it lacks using PyPI's bytes, verifies matching digests, and
+publishes the release after reconciliation. Re-running the tag adds no
+duplicate or replacement assets. The decision and required manual settings are
+recorded in
+[ADR-005: attested, reconciled release pipeline](adr-005-attested-reconciled-release-pipeline.md).
+
+### 5.5. Closing remarks
+
 By implementing a robust correlation ID mechanism as outlined, developers can
 significantly improve the observability, debuggability, and operational
 manageability of Falcon-based applications, especially within complex,
