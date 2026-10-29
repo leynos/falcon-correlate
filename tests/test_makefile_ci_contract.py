@@ -332,6 +332,16 @@ def test_pylint_targets_share_the_project_target_list() -> None:
     )
 
 
+def test_release_build_and_lint_include_scripts() -> None:
+    """Release builds use uv and both Pylint passes cover release scripts."""
+    assert _recipe_tokens("build-release") == (
+        ("$(UV_ENV)", "$(UV)", "build", "--out-dir", "dist"),
+    ), "release builds must use the same uv command as CI"
+    assert "scripts" in _variable_tokens("PYLINT_TARGETS"), (
+        "both Pylint passes must include release scripts"
+    )
+
+
 def test_ci_runs_the_optional_celery_test_serially() -> None:
     """CI must exclude Celery subprocess work from xdist and run it serially."""
     parallel_test_step = _workflow_step(_CI_WORKFLOW_PATH, "test", "Run tests")
