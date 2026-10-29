@@ -102,7 +102,7 @@ def _assert_fixture_applies_to_nested_session(
     pytester.makeconftest(_INNER_CONFTEST)
     pytester.makepyfile(test_inner=module_body)
 
-    result = pytester.runpytest("-p", "no:cacheprovider", "-q")
+    result = pytester.runpytest_inprocess("-p", "no:cacheprovider", "-q")
 
     result.assert_outcomes(passed=passed, failed=failed)
     _assert_ambient_values_restored()
