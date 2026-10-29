@@ -465,9 +465,8 @@ the ceiling it declares.
 | `release.yml` `draft-release`         | `ubicloud-standard-2` | 10 min  |
 | `release.yml` `publish-release`       | `ubicloud-standard-2` | 20 min  |
 
-`get-codescene-sha.yml` is dispatch-only and stays hosted. The
-`mutation-testing` and `dependabot-automerge` jobs call reusable workflows and
-declare no runner at all: the called workflow places its own jobs.
+The `mutation-testing` and `dependabot-automerge` jobs call reusable workflows
+and declare no runner at all: the called workflow places its own jobs.
 
 ### The fork fallback
 
