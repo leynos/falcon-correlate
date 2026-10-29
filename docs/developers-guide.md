@@ -348,11 +348,12 @@ property. They are not part of the HTTPX consolidation.
 ## Mutation testing
 
 `[tool.mutmut]` in `pyproject.toml` defines the source paths to mutate and the
-test paths copied into mutmut's `mutants/` sandbox. Every repository package
-imported by those tests must also be present there, either through
-`source_paths`, the selected test tree, or `also_copy`. The quickstart BDD
-tests import runnable modules from `examples/`, so that package is copied
-unmutated with `also_copy = ["examples/"]`.
+test paths copied into mutmut's `mutants/` sandbox. Every repository package or
+other source-tree resource used by those tests must also be present there,
+either through `source_paths`, the selected test tree, or `also_copy`. The
+quickstart BDD tests import runnable modules from `examples/`, and the public
+Celery export test reads `docs/users-guide.md`; both directories are copied
+unmutated with `also_copy = ["examples/", "docs/"]`.
 
 `tests/workflow_contracts/test_mutmut_config.py` parses imports throughout the
 selected tests and their local support modules. It fails when a repository

@@ -241,7 +241,10 @@ source_paths = ["src/falcon_correlate/"]
 # outside source_paths, so mutmut's mutants/ sandbox would otherwise omit it
 # and the baseline would fail on ModuleNotFoundError before any mutant runs
 # (issue #100); also_copy mirrors it into the sandbox unmutated.
-also_copy = ["examples/"]
+# test_public_exports.py also reads docs/users-guide.md to check that Celery
+# root exports are documented. docs/ sits outside source_paths, so copy it
+# unmutated to keep that contract test working in the mutants/ sandbox.
+also_copy = ["examples/", "docs/"]
 # tests/test_interrogate_docstring_coverage.py and tests/workflow_contracts/
 # are excluded: they audit repository metadata (interrogate over the source
 # tree, .github/ workflow files) that is either rewritten or absent inside

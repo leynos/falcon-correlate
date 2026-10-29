@@ -219,6 +219,21 @@ class TestMutmutConfig:
             "ModuleNotFoundError before any mutant is generated (issue #100)"
         )
 
+    def test_also_copy_mirrors_the_users_guide_for_export_documentation(
+        self,
+    ) -> None:
+        """The Celery export contract needs the guide in the sandbox."""
+        also_copy = _mutmut_config().get("also_copy", [])
+        assert isinstance(also_copy, list), "also_copy must be a list of paths"
+        assert "docs/" in also_copy, (
+            "also_copy must include 'docs/' so mutmut's mutants/ sandbox "
+            "contains docs/users-guide.md for "
+            "test_celery_root_exports_appear_in_users_guide"
+        )
+        assert (REPOSITORY_ROOT / "docs" / "users-guide.md").is_file(), (
+            "docs/users-guide.md must exist for the Celery export contract"
+        )
+
     def test_source_and_copy_paths_exist(self) -> None:
         """Configured source and copied sandbox paths must still exist."""
         config = _mutmut_config()
