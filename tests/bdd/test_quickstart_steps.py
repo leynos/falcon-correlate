@@ -21,7 +21,6 @@ from falcon_correlate import (
     CorrelationIDConfig,
     correlation_id_var,
     default_uuid_validator,
-    user_id_var,
 )
 from tests._quickstart_support import _load_quickstart_module
 
@@ -42,16 +41,6 @@ class Context(typ.TypedDict, total=False):
     stream: io.StringIO
     handlers: list[logging.Handler]
     correlation_id_token: contextvars.Token[str | None]
-
-
-@pytest.fixture(autouse=True)
-def _reset_context_variables() -> cabc.Generator[None, None, None]:
-    """Reset context variables before and after each scenario."""
-    correlation_id_var.set(None)
-    user_id_var.set(None)
-    yield
-    correlation_id_var.set(None)
-    user_id_var.set(None)
 
 
 @pytest.fixture(autouse=True)

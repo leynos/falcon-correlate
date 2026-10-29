@@ -37,9 +37,6 @@ from falcon_correlate.celery import (  # ruff: ignore[module-import-not-at-top-o
     configure_celery_correlation,
 )
 
-if typ.TYPE_CHECKING:
-    import collections.abc as cabc
-
 scenarios("celery_publish_signal.feature")
 
 
@@ -54,13 +51,6 @@ class Context(typ.TypedDict, total=False):
 def _connect_celery_signal() -> None:
     """Connect the Celery publish signal handler once for all BDD scenarios."""
     _maybe_connect_celery_publish_signal()
-
-
-@pytest.fixture(autouse=True)
-def _reset_context_variables() -> cabc.Generator[None, None, None]:
-    """Reset context variables after each scenario."""
-    yield
-    correlation_id_var.set(None)
 
 
 @given(

@@ -7,11 +7,10 @@ import logging
 import logging.config
 import typing as typ
 
-import pytest
-
 if typ.TYPE_CHECKING:
-    import collections.abc as cabc
     import contextvars
+
+    import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from falcon_correlate import (
@@ -54,15 +53,6 @@ def _make_log_record(msg: str = "test message") -> logging.LogRecord:
         args=None,
         exc_info=None,
     )
-
-
-@pytest.fixture(autouse=True)
-def _reset_context_variables() -> cabc.Generator[None, None, None]:
-    """Reset context variables after each scenario to prevent leakage."""
-    yield
-    # Reset to defaults — both variables default to None.
-    correlation_id_var.set(None)
-    user_id_var.set(None)
 
 
 @given("a contextual log filter", target_fixture="context")
