@@ -41,6 +41,21 @@ def _parse_interrogate_result(stdout: str) -> tuple[str, float, float]:
     return match["status"].upper(), float(match["minimum"]), float(match["actual"])
 
 
+def _assert_interrogate_result_meets_gate(stdout: str) -> None:
+    """Assert that the reported result satisfies the coverage gate."""
+    status, minimum, actual = _parse_interrogate_result(stdout)
+    output = _normalize_interrogate_output(stdout)
+    assert status == "PASSED", f"expected status 'PASSED', got {status!r} in:\n{output}"
+    failure_message = (
+        f"expected minimum {_EXPECTED_COVERAGE_PERCENT}, got {minimum} in:\n{output}"
+    )
+    assert minimum == _EXPECTED_COVERAGE_PERCENT, failure_message
+    failure_message = (
+        f"expected actual {_EXPECTED_COVERAGE_PERCENT}, got {actual} in:\n{output}"
+    )
+    assert actual == _EXPECTED_COVERAGE_PERCENT, failure_message
+
+
 def test_interrogate_reports_full_package_docstring_coverage() -> None:
     """Interrogate should enforce the package's 100 percent coverage gate."""
     result = subprocess.run(
@@ -60,17 +75,7 @@ def test_interrogate_reports_full_package_docstring_coverage() -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    status, minimum, actual = _parse_interrogate_result(result.stdout)
-    output = _normalize_interrogate_output(result.stdout)
-    assert status == "PASSED", f"expected status 'PASSED', got {status!r} in:\n{output}"
-    failure_message = (
-        f"expected minimum {_EXPECTED_COVERAGE_PERCENT}, got {minimum} in:\n{output}"
-    )
-    assert minimum == _EXPECTED_COVERAGE_PERCENT, failure_message
-    failure_message = (
-        f"expected actual {_EXPECTED_COVERAGE_PERCENT}, got {actual} in:\n{output}"
-    )
-    assert actual == _EXPECTED_COVERAGE_PERCENT, failure_message
+    _assert_interrogate_result_meets_gate(result.stdout)
 
 
 @pytest.mark.parametrize(
@@ -101,12 +106,11 @@ def test_interrogate_result_parser_tolerates_cosmetic_variation(stdout: str) -> 
     [
         "RESULT: FAILED (minimum: 100.0%, actual: 99.9%)",
         "RESULT: PASSED (minimum: 100.0%, actual: 99.0%)",
+        "RESULT: PASSED (minimum: 99.0%, actual: 100.0%)",
         "RESULT: FAILED (minimum: 100%, actual: 100%)",
     ],
 )
 def test_interrogate_result_parser_rejects_semantic_differences(stdout: str) -> None:
     """Semantic changes must survive normalisation and fail the gate values."""
-    passing_result = ("PASSED", _EXPECTED_COVERAGE_PERCENT, _EXPECTED_COVERAGE_PERCENT)
-    parsed_result = _parse_interrogate_result(stdout)
-    failure_message = f"expected a semantic difference, both sides were {parsed_result}"
-    assert parsed_result != passing_result, failure_message
+    with pytest.raises(AssertionError):
+        _assert_interrogate_result_meets_gate(stdout)
