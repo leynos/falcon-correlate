@@ -972,19 +972,21 @@ compatibility policy. `configure_celery_correlation(app)` remains the
 recommended setup for the standard integration.
 
 Worker setup reads `task.request.correlation_id`. A non-empty string sets
-`correlation_id_var` and adds one reset token to a context-local stack for each
-successful call. The setup helper takes `task` as a keyword-only argument and
-ignores other signal keyword arguments. Setup is not idempotent. A missing,
-empty, or non-string ID adds no token. Cleanup ignores all signal arguments,
-including `task`, and restores the value saved by popping one token in LIFO
-order. Cleanup does nothing when no token exists. If a nested setup has no
-usable ID, its cleanup can consume the most recent earlier successful setup's
-token and restore the value that preceded it.
+`correlation_id_var` and adds one reset token to a context-local stack. A
+missing, empty, or non-string ID adds a placeholder entry instead and leaves
+the correlation context unchanged. The setup helper takes `task` as a
+keyword-only argument and ignores other signal keyword arguments. Setup is not
+idempotent: every call adds one entry. Cleanup ignores all signal arguments,
+including `task`, and pops exactly one entry in LIFO order. A reset token
+restores the value it saved; a placeholder leaves the correlation context
+unchanged. Cleanup does nothing when the store or stack is empty.
 
-Pair every successful setup with one cleanup in the same context and in LIFO
-order. Do not manually connect a receiver for a signal already managed by
-`configure_celery_correlation(app)`: duplicate work can unbalance the context
-token stack. Choose one registration approach per process.
+Pair every setup with one cleanup in the same context and in LIFO order. A
+nested task without an ID therefore retains the enclosing task's correlation ID
+until the enclosing task finishes. Do not manually connect a receiver for a
+signal already managed by `configure_celery_correlation(app)`: duplicate work
+can unbalance the context token stack. Choose one registration approach per
+process.
 
 The following example uses `SimpleNamespace` as a task stand-in. Celery passes
 the real task to its `task_prerun` receiver:
