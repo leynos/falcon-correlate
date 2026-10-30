@@ -19,6 +19,7 @@ from falcon_correlate._celery_worker_signals import (
 )
 
 type _LifecycleOperation = tuple[str, object]
+type _ModelEntry = tuple[bool, str | None]
 
 _AMBIENT_ID = "ambient-correlation-id"
 
@@ -40,6 +41,56 @@ def _lifecycle_operations(draw: st.DrawFn) -> list[_LifecycleOperation]:
     return draw(st.lists(operations, min_size=1, max_size=20))
 
 
+class _TokenStackModel:
+    """Independent model of the paired context-token stack.
+
+    An entry pairs an ``is_placeholder`` flag with the prior value. A real
+    token stores the value to restore; a placeholder stores ``None`` and is
+    discarded without changing the modelled correlation ID.
+    """
+
+    def __init__(self, ambient_id: str) -> None:
+        """Start the model with an ambient correlation ID."""
+        self.value: str | None = ambient_id
+        self.entries: list[_ModelEntry] = []
+
+    def record_setup(self, correlation_id: object) -> None:
+        """Record one setup entry for an accepted or unusable ID."""
+        if isinstance(correlation_id, str) and correlation_id:
+            self.entries.append((False, self.value))
+            self.value = correlation_id
+        else:
+            self.entries.append((True, None))
+
+    def record_cleanup(self) -> None:
+        """Record one cleanup, restoring the prior value only for a real token."""
+        if not self.entries:
+            return
+        is_placeholder, previous = self.entries.pop()
+        if not is_placeholder:
+            self.value = previous
+
+
+def _assert_matches_model(
+    model: _TokenStackModel,
+    operation_index: int,
+    operation: str,
+    value: object,
+) -> None:
+    """Assert the live context and token depth agree with the model."""
+    assert correlation_id_var.get() == model.value, (
+        f"operation {operation_index} ({operation}, {value!r}) "
+        f"should leave correlation ID {model.value!r}, got "
+        f"{correlation_id_var.get()!r}"
+    )
+    stored_tokens = _celery_context_tokens.get(None) or {}
+    actual_depth = len(stored_tokens.get(_CORRELATION_ID_CONTEXT_KEY, []))
+    assert actual_depth == len(model.entries), (
+        f"operation {operation_index} ({operation}, {value!r}) "
+        f"should leave {len(model.entries)} stack entries, got {actual_depth}"
+    )
+
+
 @given(operations=_lifecycle_operations())
 @example(
     operations=[
@@ -58,40 +109,24 @@ def test_worker_setup_and_cleanup_follow_the_token_stack_model(
 
     def exercise_sequence() -> None:
         correlation_id_var.set(_AMBIENT_ID)
-        expected_value: str | None = _AMBIENT_ID
-        previous_values: list[str | None] = []
+        model = _TokenStackModel(_AMBIENT_ID)
 
         for operation_index, (operation, value) in enumerate(operations):
             match operation:
                 case "setup":
-                    if isinstance(value, str) and value:
-                        previous_values.append(expected_value)
-                        expected_value = value
+                    model.record_setup(value)
                     setup_correlation_id_in_worker(
                         task=SimpleNamespace(
                             request=SimpleNamespace(correlation_id=value),
                         ),
                     )
                 case "setup-without-request":
+                    model.record_setup(None)
                     setup_correlation_id_in_worker(task=SimpleNamespace())
                 case "cleanup":
+                    model.record_cleanup()
                     clear_correlation_id_in_worker(task=SimpleNamespace())
-                    if previous_values:
-                        expected_value = previous_values.pop()
 
-            assert correlation_id_var.get() == expected_value, (
-                f"operation {operation_index} ({operation}, {value!r}) "
-                f"should leave correlation ID {expected_value!r}, got "
-                f"{correlation_id_var.get()!r}"
-            )
-            stored_tokens = _celery_context_tokens.get(None) or {}
-            actual_depth = len(
-                stored_tokens.get(_CORRELATION_ID_CONTEXT_KEY, []),
-            )
-            assert actual_depth == len(previous_values), (
-                f"operation {operation_index} ({operation}, {value!r}) "
-                f"should leave {len(previous_values)} reset tokens, got "
-                f"{actual_depth}"
-            )
+            _assert_matches_model(model, operation_index, operation, value)
 
     context.run(exercise_sequence)

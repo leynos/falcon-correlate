@@ -13,7 +13,9 @@ from .middleware_utils import correlation_id_var
 
 _CORRELATION_ID_CONTEXT_KEY = "correlation_id"
 _ContextToken = contextvars.Token[str | None]
-type _CeleryContextTokens = dict[str, list[_ContextToken]]
+# ``None`` is a placeholder for a setup that found no usable correlation ID.
+type _ContextStackEntry = _ContextToken | None
+type _CeleryContextTokens = dict[str, list[_ContextStackEntry]]
 _celery_context_tokens: contextvars.ContextVar[_CeleryContextTokens | None] = (
     contextvars.ContextVar("celery_context_tokens", default=None)
 )
@@ -42,23 +44,23 @@ def setup_correlation_id_in_worker(*, task: object | None = None, **_: object) -
     Notes
     -----
     A non-empty string in ``task.request.correlation_id`` is set on
-    :data:`correlation_id_var`, and one reset token is pushed onto a context-
-    local stack for each successful call. Setup is not idempotent: repeated
-    successful calls each push a token. A missing, empty, or non-string ID
-    pushes no token. A later cleanup still pops the most recent saved token, if
-    one exists, so an unmatched cleanup after a nested missing-ID setup can
-    consume an outer setup's token.
+    :data:`correlation_id_var`, and the returned reset token is pushed onto a
+    context-local stack. A missing, empty, or non-string ID pushes a ``None``
+    placeholder instead and leaves the correlation context unchanged. Every
+    call pushes exactly one stack entry, so setup is not idempotent: repeated
+    calls each push an entry.
 
-    Pair each successful setup with one cleanup in the same context and in
-    LIFO order. Do not connect this receiver manually when
-    :func:`configure_celery_correlation` already manages ``task_prerun``.
+    Pair each setup with one cleanup in the same context and in LIFO order,
+    including when the task has no usable ID. The placeholder keeps a nested
+    task's cleanup paired with its own setup, so an enclosing task's
+    correlation ID remains visible until the enclosing cleanup runs. Do not
+    connect this receiver manually when :func:`configure_celery_correlation`
+    already manages ``task_prerun``.
 
     """  # ruff: ignore[docstring-extraneous-returns] -- public callback documents None.
     correlation_id = _get_task_request_correlation_id(task)
-    if not correlation_id:
-        return
+    token = correlation_id_var.set(correlation_id) if correlation_id else None
 
-    token = correlation_id_var.set(correlation_id)
     stored_tokens = dict(_celery_context_tokens.get() or {})
     correlation_id_tokens = list(stored_tokens.get(_CORRELATION_ID_CONTEXT_KEY, []))
     correlation_id_tokens.append(token)
@@ -86,15 +88,16 @@ def clear_correlation_id_in_worker(**_: object) -> None:
 
     Notes
     -----
-    Cleanup pops one reset token from the current context-local stack and
-    resets :data:`correlation_id_var` to the value saved by that token. Tokens
-    are popped in LIFO order, restoring the preceding value. If no token exists,
-    cleanup does nothing. Because setup with a missing, empty, or non-string ID
-    pushes no token, cleanup can consume the most recent earlier successful
-    setup's token in that context.
+    Cleanup pops exactly one entry from the current context-local stack. A
+    real reset token restores the value saved when its setup called
+    :meth:`~contextvars.ContextVar.set`; a ``None`` placeholder from a setup
+    without a usable ID leaves the correlation context unchanged. Entries are
+    popped in LIFO order, so cleaning up a nested task without an ID preserves
+    the enclosing task's correlation ID until the enclosing cleanup runs.
+    Cleanup does nothing when the store or stack is empty.
 
-    Pair each successful setup with one cleanup in the same context and in
-    LIFO order. Do not connect this receiver manually when
+    Pair each setup with one cleanup in the same context and in LIFO order. Do
+    not connect this receiver manually when
     :func:`configure_celery_correlation` already manages ``task_postrun``.
 
     """  # ruff: ignore[docstring-extraneous-returns] -- public callback documents None.
@@ -106,7 +109,9 @@ def clear_correlation_id_in_worker(**_: object) -> None:
     if not correlation_id_tokens:
         return
 
-    correlation_id_var.reset(correlation_id_tokens.pop())
+    token = correlation_id_tokens.pop()
+    if token is not None:
+        correlation_id_var.reset(token)
     if correlation_id_tokens:
         stored_tokens[_CORRELATION_ID_CONTEXT_KEY] = correlation_id_tokens
     else:
