@@ -228,6 +228,14 @@ Table: Celery signals, integration receivers, and stable dispatch UIDs.
 | `task_prerun`         | `setup_correlation_id_in_worker`     | `_TASK_PRERUN_DISPATCH_UID`         | `falcon_correlate.celery.setup_correlation_id_in_worker`     |
 | `task_postrun`        | `clear_correlation_id_in_worker`     | `_TASK_POSTRUN_DISPATCH_UID`        | `falcon_correlate.celery.clear_correlation_id_in_worker`     |
 
+The worker setup receiver pushes exactly one entry onto the context-local token
+stack for every call: a reset token for an accepted correlation ID, or a `None`
+placeholder for a missing, empty, or non-string ID. The worker cleanup receiver
+pops exactly one entry and resets `correlation_id_var` only for a real reset
+token, so nested cleanup preserves the enclosing task's correlation ID until
+the enclosing cleanup runs. Preserve this one-entry-per-setup pairing when
+changing the worker receivers.
+
 Celery deduplicates receivers by `dispatch_uid`, and its internal
 `threading.Lock` protects receiver mutation. Stable UIDs therefore leave
 exactly one integration receiver per supported signal after successful
