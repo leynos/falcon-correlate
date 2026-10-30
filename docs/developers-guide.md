@@ -401,6 +401,13 @@ file is missing. Pull-request CI also runs `make test-mutmut-sandbox` on Python
 3.13; this checks the real sandbox baseline and a focused set of mutants before
 the scheduled workflow runs the broader mutation suite.
 
+Triage each survivor before suppressing it. Kill real gaps with behavioural
+tests. For a provably equivalent mutation, first check whether the mutated line
+has other killable mutations: `# pragma: no mutate` is line-level, so it also
+removes those mutants from evaluation. When the line has other killable
+mutations, record the equivalence argument in a debugging record instead of
+adding the pragma.
+
 ## Tested documentation examples
 
 Runnable documentation examples live under `examples/`. They are source files,
