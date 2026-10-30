@@ -909,6 +909,32 @@ environment variables:
 - `release_assets_cli.py publish-release`: `DIST_DIR`, `RELEASE_TAG`,
   `SIMPLE_INDEX_URL`, `BUNDLE_DIR`, `STAGING_DIR`, `PRERELEASE`.
 
+### Bounded distribution downloads
+
+The release helper downloads each missing GitHub asset from the URL that
+`SIMPLE_INDEX_URL` advertises for that file. Each `files[].url` is treated as
+one literal HTTPS location: curl runs with `--globoff`, so bracket ranges such
+as `[1-3]` and brace lists such as `{a,b}` in index metadata do not expand into
+additional transfers.
+
+Three limits bound the download:
+
+- `--max-time 300` bounds each transfer attempt.
+- `--retry-max-time 300` bounds the window in which curl may schedule retries.
+- A 330-second Python deadline bounds the whole download subprocess, including
+  every transfer and retry, and sits above both curl limits.
+
+The bounded download and the shared `curl`/`gh` subprocess wrapper live in
+`scripts/release_commands.py`; `scripts/release_assets_cli.py` orchestrates the
+workflow commands.
+
+If the deadline expires, curl exits unsuccessfully, or a downloaded file's
+digest differs from the Simple index, `publish-release` fails with a
+`release-assets` workflow annotation. The release is neither uploaded nor
+published. A terminated download can leave a partial file in the staging
+directory until the next staging pass clears it; re-running the workflow is
+safe.
+
 ### Re-run and recovery behaviour
 
 Re-running a tag is safe. Published PyPI filenames are not uploaded again; if

@@ -1,4 +1,11 @@
-"""Static curl arguments for HTTPS-only release file operations."""
+"""Static curl arguments for HTTPS-only release file operations.
+
+Distribution downloads treat every URL from the Simple index as one literal
+HTTPS location: ``--globoff`` stops curl expanding bracket ranges or brace
+lists into further transfers. Curl still bounds each attempt and its retry
+window, and the caller adds an overall Python-side deadline on the whole
+subprocess.
+"""
 
 SIMPLE_INDEX_CURL_ARGUMENTS = (
     "curl",
@@ -29,6 +36,7 @@ PYPI_DOWNLOAD_CURL_ARGUMENTS = (
     "--silent",
     "--show-error",
     "--location",
+    "--globoff",
     "--proto",
     "=https",
     "--proto-redir",
@@ -39,6 +47,8 @@ PYPI_DOWNLOAD_CURL_ARGUMENTS = (
     "--retry-all-errors",
     "--retry-delay",
     "2",
+    "--retry-max-time",
+    "300",
     "--connect-timeout",
     "10",
     "--max-time",
