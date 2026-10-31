@@ -53,6 +53,9 @@
 - [Optional-Celery subprocess timeout](debugging/debugging-plan-2026-08-21-optional-celery-subprocess-timeout.md)
   records the earlier investigation of child pytest timeouts and its
   falsification results.
+- [Celery backend mutation survivors](debugging/issue-277-celery-backend-mutation-survivors.md)
+  records the scoped rerun of 30 survivors in the Celery result-backend helpers
+  and the disposition of each mutant.
 
 ## Planning documents
 
