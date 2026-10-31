@@ -5,7 +5,7 @@
 - **Branch**: `issue-277-investigate-celery-backend-mutation-survivors`
 - **Base revision**: `f0d96e2c61f1069d0f7b09b8bb8a4d1d63a8b74f`
 - **Historical mutation run**: [40876764226][run]
-- **Historical artifact**: [12898890551][artifact]
+- **Historical artefact**: [12898890551][artefact]
 
 ## Problem statement
 
@@ -31,7 +31,7 @@ evidence from the rerun.
 | Aspect                  | Details                                                     |
 | ----------------------- | ----------------------------------------------------------- |
 | Historical workflow run | [40876764226][run]                                          |
-| Historical artifact     | [12898890551][artifact]                                     |
+| Historical artefact     | [12898890551][artefact]                                     |
 | Historical revision     | `8fe6e33aa4b2681574ec6dd593e8bb794f3d177e`                  |
 | Mutmut version          | 3.6.0                                                       |
 | Historical counts       | 210 killed, 40 survived, 587 not checked                    |
@@ -43,7 +43,7 @@ _Table 1: Revisions, tooling, and scoped counts._
 
 ## Recorded evidence
 
-The historical artifact and workflow logs show Celery installed in the mutation
+The historical artefact and workflow logs show Celery installed in the mutation
 environment. The Celery-dependent tests executed rather than skipping: the
 mutants in `_app_backend_uses_rpc` that another test did cover were reported
 killed, and the recorded durations were non-zero. The "Celery was missing, so
@@ -185,11 +185,11 @@ Shared doubles for the backend inspection tests live in
 
 - [Issue #277](https://github.com/leynos/falcon-correlate/issues/277).
 - [Mutation run 40876764226][run].
-- [Mutation artifact 12898890551][artifact].
+- [Mutation artefact 12898890551][artefact].
 - [Python `typing.cast` documentation][cast].
 - [Mutmut documentation][mutmut].
 
 [run]: https://github.com/leynos/falcon-correlate/actions/runs/40876764226
-[artifact]: https://github.com/leynos/falcon-correlate/actions/runs/40876764226/artifacts/12898890551
+[artefact]: https://github.com/leynos/falcon-correlate/actions/runs/40876764226/artifacts/12898890551
 [cast]: https://docs.python.org/3/library/typing.html#typing.cast
 [mutmut]: https://mutmut.readthedocs.io/
