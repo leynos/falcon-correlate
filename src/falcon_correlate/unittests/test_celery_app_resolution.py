@@ -1,8 +1,10 @@
-"""Tests for configured Celery publishers and backend verdicts."""
+"""Tests for configured Celery publishers and active-app resolution."""
 
 from __future__ import annotations
 
-import logging
+import importlib
+import sys
+import types
 import typing as typ
 from unittest import mock
 
@@ -23,66 +25,111 @@ pytestmark = pytest.mark.skipif(
 )
 
 from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
-    correlation_id_var,
+    celery as falcon_celery,
 )
 from falcon_correlate.celery import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
-    _app_backend_uses_rpc,
+    _current_result_backend_uses_rpc,
     configure_celery_correlation,
+    propagate_correlation_id_to_celery,
+)
+from falcon_correlate.middleware_utils import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    correlation_id_var,
 )
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
 
-class _FailingBackend:
-    """Backend test double whose URI inspection fails."""
-
-    def as_uri(self) -> str:
-        """Raise to model a temporarily unavailable backend inspection."""
-        raise RuntimeError
-
-
-class _MalformedCeleryApp:
-    """Celery-shaped app with a backend that cannot report its URI."""
-
-    def __init__(self) -> None:
-        """Initialize the backend member inspected by the helper."""
-        self.backend = _FailingBackend()
-
-    def send_task(self, *args: object, **kwargs: object) -> object:
-        """Satisfy the configured-app shape without publishing a task."""
-        return None
-
-
-class _AppWithoutBackend:
-    """Malformed app double without an optional backend attribute."""
-
-    def send_task(self, *args: object, **kwargs: object) -> object:
-        """Satisfy the configured-app shape without publishing a task."""
-        return None
-
-
-def test_backend_uri_failure_is_unknown_and_logged(
-    caplog: pytest.LogCaptureFixture,
+def test_current_result_backend_uses_rpc_for_rpc_current_app(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A backend error must not be mistaken for a non-RPC verdict."""
-    with caplog.at_level(logging.DEBUG, logger="falcon_correlate.celery"):
-        backend_uses_rpc = _app_backend_uses_rpc(_MalformedCeleryApp())
-
-    assert backend_uses_rpc is None, (
-        "an inspection exception must remain distinct from a non-RPC verdict"
+    """The fallback detects an RPC backend on Celery's active app."""
+    celery_module = importlib.import_module("celery")
+    rpc_app = Celery(
+        "fallback-rpc-current-app",
+        backend="rpc://",
+        broker="memory://",
+        set_as_current=False,
     )
-    assert any(
-        "Unable to inspect Celery result backend URI" in record.message
-        for record in caplog.records
-    ), "a failed backend lookup should emit a diagnostic"
+    monkeypatch.setattr(celery_module, "current_app", rpc_app)
+
+    assert _current_result_backend_uses_rpc() is True, (
+        "an rpc:// active app should be detected as RPC"
+    )
 
 
-def test_missing_backend_attribute_is_a_non_rpc_verdict() -> None:
-    """Missing optional backend members retain the defensive false result."""
-    app_without_backend = typ.cast("typ.Any", _AppWithoutBackend())
-    assert _app_backend_uses_rpc(app_without_backend) is False, (
-        "an app without backend configuration should be treated as non-RPC"
+def test_current_result_backend_uses_rpc_for_non_rpc_current_app(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The fallback detects a non-RPC backend on Celery's active app."""
+    celery_module = importlib.import_module("celery")
+    non_rpc_app = Celery(
+        "fallback-non-rpc-current-app",
+        backend="cache+memory://",
+        broker="memory://",
+        set_as_current=False,
+    )
+    monkeypatch.setattr(celery_module, "current_app", non_rpc_app)
+
+    assert _current_result_backend_uses_rpc() is False, (
+        "a non-RPC active app should be detected as non-RPC"
+    )
+
+
+def test_current_result_backend_uses_rpc_without_current_app(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A Celery module without an active app is treated as non-RPC."""
+    monkeypatch.setitem(sys.modules, "celery", types.ModuleType("celery"))
+
+    assert _current_result_backend_uses_rpc() is False, (
+        "a Celery module without current_app should be treated as non-RPC"
+    )
+
+
+def test_current_result_backend_uses_rpc_with_none_current_app(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An unset active app is treated as non-RPC."""
+    celery_module = importlib.import_module("celery")
+    monkeypatch.setattr(celery_module, "current_app", None)
+
+    assert _current_result_backend_uses_rpc() is False, (
+        "an unset current_app should be treated as non-RPC"
+    )
+
+
+def test_current_result_backend_uses_rpc_when_celery_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An unavailable Celery import preserves task-ID correlation."""
+    monkeypatch.setitem(sys.modules, "celery", None)
+
+    assert _current_result_backend_uses_rpc() is False, (
+        "an unavailable Celery import should preserve task-ID correlation"
+    )
+
+
+def test_current_result_backend_failure_is_unknown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed active-app inspection remains inconclusive."""
+    celery_module = importlib.import_module("celery")
+    failing_app = Celery(
+        "fallback-failing-current-app",
+        backend="cache+memory://",
+        broker="memory://",
+        set_as_current=False,
+    )
+    monkeypatch.setattr(
+        failing_app.backend,
+        "as_uri",
+        mock.Mock(side_effect=RuntimeError("inspection failed")),
+    )
+    monkeypatch.setattr(celery_module, "current_app", failing_app)
+
+    assert _current_result_backend_uses_rpc() is None, (
+        "an active-app inspection failure should stay inconclusive"
     )
 
 
@@ -95,6 +142,7 @@ def test_publish_retries_failed_backend_inspection_without_losing_task_id(
         "retry-backend-verdict-app",
         backend="cache+memory://",
         broker="memory://",
+        set_as_current=False,
     )
     backend_uri = mock.Mock(
         side_effect=[
@@ -113,19 +161,54 @@ def test_publish_retries_failed_backend_inspection_without_losing_task_id(
     with mock.patch("kombu.Producer.publish", autospec=True) as publish:
 
         def _logic() -> None:
-            """Publish once while unknown and once after RPC is confirmed."""
+            """Publish while unknown, after RPC is confirmed, then reuse it."""
             correlation_id_var.set("request-correlation-id")
             celery_app.send_task("unregistered-task", task_id="first-task-id")
             celery_app.send_task("unregistered-task", task_id="second-task-id")
+            celery_app.send_task("unregistered-task", task_id="third-task-id")
 
         isolated_context(_logic)
 
-    assert publish.call_count == 2, "both task publishes should reach Kombu"
+    assert publish.call_count == 3, "all task publishes should reach Kombu"
     assert [call.kwargs["correlation_id"] for call in publish.call_args_list] == [
         "first-task-id",
         "second-task-id",
+        "third-task-id",
     ], "unknown and RPC verdicts must both preserve Celery task IDs"
     assert backend_uri.call_count == 2, (
         "publish inspection should retry once and cache its definite verdict"
     )
     current_backend_lookup.assert_not_called()
+
+
+def test_fallback_verdict_is_not_cached(
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The active-app fallback must not write into the configured-app cache."""
+    celery_module = importlib.import_module("celery")
+    non_rpc_app = Celery(
+        "fallback-cache-isolation-app",
+        backend="cache+memory://",
+        broker="memory://",
+        set_as_current=False,
+    )
+    monkeypatch.setattr(celery_module, "current_app", non_rpc_app)
+    properties: dict[str, object] = {"correlation_id": "celery-task-id"}
+
+    def _logic() -> None:
+        """Exercise the fallback path with an ambient correlation ID."""
+        correlation_id_var.set("request-correlation-id")
+        propagate_correlation_id_to_celery(
+            sender="fallback-cache-isolation-task",
+            properties=properties,
+        )
+
+    isolated_context(_logic)
+
+    assert properties["correlation_id"] == "request-correlation-id", (
+        "the fallback should still replace the task ID for a non-RPC app"
+    )
+    assert non_rpc_app not in falcon_celery._configured_app_backend_rpc_verdicts, (
+        "the active-app fallback must not populate the configured-app cache"
+    )
