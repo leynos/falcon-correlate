@@ -234,6 +234,42 @@ def test_configured_signals_preserve_outer_context_for_nested_task_without_id(
     isolated_context(_logic)
 
 
+def _accepted_correlation_ids(correlation_ids: list[object]) -> list[str]:
+    """Return the usable correlation IDs from a generated sequence."""
+    return [
+        correlation_id
+        for correlation_id in correlation_ids
+        if isinstance(correlation_id, str) and correlation_id
+    ]
+
+
+def _apply_setups(tasks: list[_TaskLike], correlation_ids: list[object]) -> None:
+    """Run each setup and assert the context follows the most recent usable ID."""
+    current_correlation_id = _AMBIENT_CORRELATION_ID
+    for task, correlation_id in zip(tasks, correlation_ids, strict=True):
+        setup_correlation_id_in_worker(task=task)
+        if isinstance(correlation_id, str) and correlation_id:
+            current_correlation_id = correlation_id
+        assert correlation_id_var.get() == current_correlation_id, (
+            "expected setup to apply the most recent usable correlation ID"
+        )
+
+
+def _expected_id_after_cleanup(correlation_ids: list[object], index: int) -> str:
+    """Return the ID expected after cleanup at the given setup index."""
+    remaining_ids = _accepted_correlation_ids(correlation_ids[:index])
+    return remaining_ids[-1] if remaining_ids else _AMBIENT_CORRELATION_ID
+
+
+def _apply_cleanups(correlation_ids: list[object]) -> None:
+    """Run cleanups in reverse and assert each restores the previous ID."""
+    for index in range(len(correlation_ids) - 1, -1, -1):
+        clear_correlation_id_in_worker()
+        assert correlation_id_var.get() == _expected_id_after_cleanup(
+            correlation_ids, index
+        ), "expected cleanup to restore the most recent remaining usable ID"
+
+
 @given(
     correlation_ids=st.lists(
         st.one_of(_ACCEPTED_CORRELATION_ID, _UNUSABLE_CORRELATION_ID),
@@ -253,26 +289,8 @@ def test_context_token_stack_unwinds_lifo(correlation_ids: list[object]) -> None
 
     correlation_id_var.set(_AMBIENT_CORRELATION_ID)
     try:
-        current_correlation_id = _AMBIENT_CORRELATION_ID
-        for task, correlation_id in zip(tasks, correlation_ids, strict=True):
-            setup_correlation_id_in_worker(task=task)
-            if isinstance(correlation_id, str) and correlation_id:
-                current_correlation_id = correlation_id
-            assert correlation_id_var.get() == current_correlation_id, (
-                "expected setup to apply the most recent usable correlation ID"
-            )
-
-        for index in range(len(tasks) - 1, -1, -1):
-            clear_correlation_id_in_worker()
-            remaining_ids = [
-                correlation_id
-                for correlation_id in correlation_ids[:index]
-                if isinstance(correlation_id, str) and correlation_id
-            ]
-            expected = remaining_ids[-1] if remaining_ids else _AMBIENT_CORRELATION_ID
-            assert correlation_id_var.get() == expected, (
-                "expected cleanup to restore the most recent remaining usable ID"
-            )
+        _apply_setups(tasks, correlation_ids)
+        _apply_cleanups(correlation_ids)
 
         assert correlation_id_var.get() == _AMBIENT_CORRELATION_ID, (
             "expected all cleanups to restore the ambient correlation ID"
