@@ -8,6 +8,7 @@ the enclosing cleanup runs.
 
 from __future__ import annotations
 
+import contextvars
 import typing as typ
 from types import SimpleNamespace
 
@@ -287,16 +288,20 @@ def test_context_token_stack_unwinds_lifo(correlation_ids: list[object]) -> None
     """
     tasks = [_TaskLike(correlation_id=cid) for cid in correlation_ids]
 
-    correlation_id_var.set(_AMBIENT_CORRELATION_ID)
-    try:
-        _apply_setups(tasks, correlation_ids)
-        _apply_cleanups(correlation_ids)
+    def _logic() -> None:
+        """Exercise one generated sequence inside its own context copy."""
+        correlation_id_var.set(_AMBIENT_CORRELATION_ID)
+        try:
+            _apply_setups(tasks, correlation_ids)
+            _apply_cleanups(correlation_ids)
 
-        assert correlation_id_var.get() == _AMBIENT_CORRELATION_ID, (
-            "expected all cleanups to restore the ambient correlation ID"
-        )
-        assert _celery_context_tokens.get(None) is None, (
-            "expected all stack entries to be consumed"
-        )
-    finally:
-        correlation_id_var.set(None)
+            assert correlation_id_var.get() == _AMBIENT_CORRELATION_ID, (
+                "expected all cleanups to restore the ambient correlation ID"
+            )
+            assert _celery_context_tokens.get(None) is None, (
+                "expected all stack entries to be consumed"
+            )
+        finally:
+            correlation_id_var.set(None)
+
+    contextvars.copy_context().run(_logic)
