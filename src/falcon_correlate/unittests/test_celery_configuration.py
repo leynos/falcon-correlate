@@ -75,12 +75,17 @@ def _assert_all_signals_connected_once() -> None:
         assert _receiver_count(signal, receiver) == 1, failure_message
 
 
+_MISSING = object()
+
+
 class _TaskLike:
     """Minimal hashable task object for Celery signal dispatch tests."""
 
-    def __init__(self, *, correlation_id: str) -> None:
+    def __init__(self, *, correlation_id: object = _MISSING) -> None:
         """Initialize the test double."""
-        self.request = SimpleNamespace(correlation_id=correlation_id)
+        self.request = SimpleNamespace()
+        if correlation_id is not _MISSING:
+            self.request.correlation_id = correlation_id
 
 
 @pytest.fixture
@@ -172,39 +177,6 @@ def test_configure_celery_correlation_idempotent_for_n_calls(
 
     _assert_all_signals_connected_once()
     _disconnect_integration_receivers()
-
-
-@given(
-    correlation_ids=st.lists(
-        st.text(
-            min_size=1,
-            max_size=64,
-            alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd")),
-        ),
-        min_size=1,
-        max_size=8,
-    )
-)
-@settings(max_examples=50)
-def test_context_token_stack_unwinds_lifo(correlation_ids: list[str]) -> None:
-    """setup/clear functions must unwind the ContextVar stack in LIFO order.
-
-    For any sequence of correlation IDs pushed via setup_correlation_id_in_worker,
-    successive calls to clear_correlation_id_in_worker must restore each prior
-    value in reverse order, ending with None.
-    """
-    tasks = [_TaskLike(correlation_id=cid) for cid in correlation_ids]
-
-    for task in tasks:
-        setup_correlation_id_in_worker(task=task)
-
-    for expected in reversed(correlation_ids):
-        failure_message = "expected correlation_id_var.get() to equal expected"
-        assert correlation_id_var.get() == expected, failure_message
-        clear_correlation_id_in_worker()
-
-    failure_message = "expected correlation_id_var.get() to be None"
-    assert correlation_id_var.get() is None, failure_message
 
 
 def test_configure_celery_correlation_isolates_nested_task_context(

@@ -40,11 +40,25 @@ if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
 
-def _build_task(*, correlation_id: str | None = None) -> object:
-    """Build a minimal Celery-like task object for signal handler tests."""
-    return SimpleNamespace(
-        request=SimpleNamespace(correlation_id=correlation_id),
-    )
+_MISSING = object()
+
+
+def _build_task(*, correlation_id: object = _MISSING) -> object:
+    """Build a minimal Celery-like task object for signal handler tests.
+
+    Omitting ``correlation_id`` leaves the request without that attribute,
+    modelling a task whose message carried no correlation ID.
+
+    Returns
+    -------
+    object
+        A namespace with a ``request`` attribute carrying the requested value.
+
+    """
+    request = SimpleNamespace()
+    if correlation_id is not _MISSING:
+        request.correlation_id = correlation_id
+    return SimpleNamespace(request=request)
 
 
 def test_setup_handler_exposes_task_request_correlation_id(
@@ -71,30 +85,54 @@ def test_setup_handler_exposes_task_request_correlation_id(
     isolated_context(_logic)
 
 
-@pytest.mark.parametrize(
-    "handler",
-    [
-        pytest.param(setup_correlation_id_in_worker, id="setup"),
-        pytest.param(clear_correlation_id_in_worker, id="clear"),
-    ],
-)
-def test_handler_is_noop_when_no_correlation_state(
+def test_clear_handler_is_noop_when_no_correlation_state(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-    handler: cabc.Callable[..., None],
 ) -> None:
-    """Each handler should leave context unchanged.
-
-    No correlation state is present for either setup or cleanup.
-    """
+    """Repeated unmatched cleanup should leave context unchanged."""
 
     def _logic() -> None:
-        """Exercise the isolated test scenario."""
-        handler(task=_build_task())
+        """Exercise cleanup without any prior setup."""
+        for _ in range(2):
+            clear_correlation_id_in_worker(task=_build_task())
 
-        failure_message = "expected correlation_id_var.get() to be None"
-        assert correlation_id_var.get() is None, failure_message
-        failure_message = "expected _celery_context_tokens.get(None) to be None"
-        assert _celery_context_tokens.get(None) is None, failure_message
+            assert correlation_id_var.get() is None, (
+                "expected unmatched cleanup to leave the correlation context unchanged"
+            )
+            assert _celery_context_tokens.get(None) is None, (
+                "expected unmatched cleanup to leave the token store unset"
+            )
+
+    isolated_context(_logic)
+
+
+def test_setup_handler_without_usable_id_records_placeholder(
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+) -> None:
+    """Skipped setup should record one placeholder without changing context."""
+
+    def _logic() -> None:
+        """Exercise setup for a task without a usable correlation ID."""
+        setup_correlation_id_in_worker(task=_build_task())
+
+        assert correlation_id_var.get() is None, (
+            "expected skipped setup to leave the correlation context unchanged"
+        )
+        stored_tokens = _celery_context_tokens.get(None)
+        assert stored_tokens is not None, (
+            "expected skipped setup to record a stack entry"
+        )
+        assert stored_tokens[_CORRELATION_ID_CONTEXT_KEY] == [None], (
+            "expected skipped setup to record a single placeholder entry"
+        )
+
+        clear_correlation_id_in_worker(task=_build_task())
+
+        assert correlation_id_var.get() is None, (
+            "expected paired cleanup to leave the correlation context unchanged"
+        )
+        assert _celery_context_tokens.get(None) is None, (
+            "expected paired cleanup to clear the token store"
+        )
 
     isolated_context(_logic)
 
@@ -301,44 +339,6 @@ def test_public_worker_helpers_support_manual_lifecycle_and_exception_cleanup(
 
         assert correlation_id_var.get() == ambient_correlation_id, (
             "expected task cleanup to restore the ambient correlation ID"
-        )
-
-    isolated_context(_logic)
-
-
-def test_nested_missing_id_setup_allows_cleanup_to_consume_outer_token(
-    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-) -> None:
-    """A missing-ID setup adds no token for its following cleanup to pop."""
-    ambient_correlation_id = "ambient-correlation-id"
-    outer_task = _build_task(correlation_id="outer-worker-correlation-id")
-    nested_task_without_id = _build_task()
-
-    def _logic() -> None:
-        """Capture the current nested missing-ID cleanup constraint."""
-        correlation_id_var.set(ambient_correlation_id)
-        setup_correlation_id_in_worker(task=outer_task)
-        setup_correlation_id_in_worker(task=nested_task_without_id)
-
-        assert correlation_id_var.get() == "outer-worker-correlation-id", (
-            "expected missing-ID setup to leave the outer task ID in context"
-        )
-        stored_tokens = _celery_context_tokens.get(None)
-        assert stored_tokens is not None, (
-            "expected the outer setup to retain its reset token"
-        )
-        assert len(stored_tokens[_CORRELATION_ID_CONTEXT_KEY]) == 1, (
-            "expected missing-ID setup to leave the outer token unchanged"
-        )
-
-        clear_correlation_id_in_worker(task=nested_task_without_id)
-        assert correlation_id_var.get() == ambient_correlation_id, (
-            "expected nested cleanup to consume the outer token"
-        )
-
-        clear_correlation_id_in_worker(task=outer_task)
-        assert correlation_id_var.get() == ambient_correlation_id, (
-            "expected cleanup without a token to leave context unchanged"
         )
 
     isolated_context(_logic)
