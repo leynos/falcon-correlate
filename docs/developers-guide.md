@@ -486,18 +486,17 @@ runners for fork and Dependabot pull requests.
 Table: every lane that bills for a paid runner, the runner it resolves to, and
 the ceiling it declares.
 
-| Lane                                  | Runner                | Ceiling |
-| ------------------------------------- | --------------------- | ------- |
-| `ci.yml` `build`                      | fork fallback         | 10 min  |
-| `ci.yml` `lint`                       | fork fallback         | 20 min  |
-| `ci.yml` `test`                       | fork fallback         | 10 min  |
-| `coverage-main.yml` `coverage-upload` | `ubicloud-standard-2` | 10 min  |
-| `release.yml` `check-version`         | `ubicloud-standard-2` | 10 min  |
-| `release.yml` `pure-wheel`            | `ubicloud-standard-2` | 15 min  |
-| `release.yml` `attest`                | `ubicloud-standard-2` | 15 min  |
-| `release.yml` `publish-pypi`          | `ubicloud-standard-2` | 20 min  |
-| `release.yml` `draft-release`         | `ubicloud-standard-2` | 10 min  |
-| `release.yml` `publish-release`       | `ubicloud-standard-2` | 20 min  |
+| Lane                            | Runner                | Ceiling |
+| ------------------------------- | --------------------- | ------- |
+| `ci.yml` `build`                | fork fallback         | 10 min  |
+| `ci.yml` `lint`                 | fork fallback         | 20 min  |
+| `ci.yml` `test`                 | fork fallback         | 10 min  |
+| `release.yml` `check-version`   | `ubicloud-standard-2` | 10 min  |
+| `release.yml` `pure-wheel`      | `ubicloud-standard-2` | 15 min  |
+| `release.yml` `attest`          | `ubicloud-standard-2` | 15 min  |
+| `release.yml` `publish-pypi`    | `ubicloud-standard-2` | 20 min  |
+| `release.yml` `draft-release`   | `ubicloud-standard-2` | 10 min  |
+| `release.yml` `publish-release` | `ubicloud-standard-2` | 20 min  |
 
 The `mutation-testing` and `dependabot-automerge` jobs call reusable workflows
 and declare no runner at all: the called workflow places its own jobs.

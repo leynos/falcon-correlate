@@ -68,7 +68,6 @@ PAID_LANES = frozenset({
     "ci.yml:lint",
     "ci.yml:test",
     "ci.yml:build",
-    "coverage-main.yml:coverage-upload",
     "release.yml:attest",
     "release.yml:check-version",
     "release.yml:draft-release",
@@ -80,7 +79,9 @@ PAID_LANES = frozenset({
 #: Lanes that stay GitHub-hosted, with the reason each one stays. A
 #: scheduled or dispatch-only lane gains nothing from a paid runner, and
 #: public-repository minutes are free on GitHub.
-HOSTED_LANES: typ.Final[dict[str, str]] = {}
+HOSTED_LANES: typ.Final[dict[str, str]] = {
+    "coverage-main.yml:coverage-upload": "main coverage upload blocks no work",
+}
 
 #: The longest ceiling any paid lane may declare. Not a limit on what a job
 #: needs, but a bound on what a hang can cost.
