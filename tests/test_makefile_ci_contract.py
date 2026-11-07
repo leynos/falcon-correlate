@@ -41,15 +41,7 @@ _TYPECHECK_RECIPE_TOKENS: typ.Final = (
 )
 _LINT_RECIPE_TOKENS: typ.Final = (
     ("$(RUFF)", "check"),
-    (
-        "$(UV_ENV)",
-        "$(UV)",
-        "run",
-        "interrogate",
-        "--fail-under",
-        "100",
-        "$(INTERROGATE_TARGETS)",
-    ),
+    ("$(MAKE)", "--no-print-directory", "interrogate"),
     ("$(MAKE)", "--no-print-directory", "classic-pylint"),
     ("$(MAKE)", "--no-print-directory", "df12-pylint"),
     ("$(AMBRLEAKS)", "tests"),

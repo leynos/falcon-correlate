@@ -133,6 +133,7 @@ def configure_publish(
     def configure(
         pypi_files: dict[str, bytes], local_files: dict[str, bytes] | None = None
     ) -> None:
+        """Write the local distributions and bundle; point the step's env at them."""
         distributions = tmp_path / "dist"
         distributions.mkdir()
         if local_files is None:

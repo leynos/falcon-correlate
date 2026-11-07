@@ -12,9 +12,9 @@ The Python lint target runs six checks in this order:
 - **Check 1: Ruff.** Ruff runs first through the pinned `$(RUFF)` wrapper. It
   owns formatting-adjacent checks, imports, common correctness, docstring and
   security rules, complexity thresholds, and Ruff's Pylint-compatible rules.
-- **Check 2: Interrogate.** Interrogate runs second through
-  `uv run interrogate --fail-under 100`. It enforces package-level docstring
-  coverage after Ruff has validated docstring style.
+- **Check 2: Interrogate.** The `interrogate` target runs second. It runs
+  Interrogate with `--fail-under 100` over `INTERROGATE_TARGETS` and also fails
+  if the report contains a `MISSED` row.
 - **Check 3: Classic Pylint through PyPy.** Vanilla Pylint 4.1.1 with
   Astroid 4.3.3 runs directly under the checksum-verified PyPy 8.0.0/Python
   3.12 binary on Linux x86_64. This pass focuses on rules that complement Ruff,
@@ -961,7 +961,7 @@ make lint
 
 ```bash
 $(RUFF) check
-$(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
+$(MAKE) --no-print-directory interrogate
 $(MAKE) --no-print-directory classic-pylint
 $(MAKE) --no-print-directory df12-pylint
 $(AMBRLEAKS) tests
@@ -971,8 +971,8 @@ $(SKYLOS) $(SKYLOS_PRODUCTION_TARGETS) \
 ```
 
 Continuous Integration runs the same `make lint` target. Skylos is provisioned
-by that target at the pinned version, while Continuous Integration installs
-Interrogate separately for the 100% package docstring coverage gate.
+by that target at the pinned version. The `interrogate` target runs the
+Interrogate in the project environment through `uv run`.
 
 The target should be run before committing changes that affect Python code,
 tests, or lint configuration. When diagnosing failures, fix Ruff findings
@@ -1117,7 +1117,7 @@ matching version pins and runs the same `make lint` entry point.
 | `DF12_PYLINT_MESSAGES`         | Twelve messages supplied by `v0.3.0`                                                 | Keeps DF12 checks explicit and reviewable.                   |
 | `DF12_PYLINT`                  | Isolated `uv tool run`, one worker, DF12 plug-in plus fatal diagnostics.             | Runs only the DF12 pass under CPython 3.14.                  |
 | `AMBRLEAKS`                    | Isolated `uv tool run` under `$(DF12_PYTHON)`                                        | Scans Syrupy snapshots under CPython 3.14.                   |
-| `INTERROGATE_TARGETS`          | `src/falcon_correlate`                                                               | Defines repo-root-relative Interrogate targets.              |
+| `INTERROGATE_TARGETS`          | `src tests examples scripts show_path_sim.py testdata`                               | Defines repo-root-relative Interrogate targets.              |
 | `SKYLOS_VERSION`               | `4.33.2`                                                                             | Pins the separately provisioned Skylos release.              |
 | `SKYLOS_CLI`                   | `$(UV_ENV) $(UV) tool run --python 3.14 --from 'skylos==$(SKYLOS_VERSION)' skylos`   | Provides Skylos using its Python 3.14 AST runtime.           |
 | `SKYLOS_SCAN_OPTIONS`          | `--config-file pyproject.toml`                                                       | Holds scan-wide options for Skylos.                          |
@@ -1181,9 +1181,9 @@ allows it.
 
 Python docstrings follow the NumPy convention. Ruff's pydocstyle (`D`) rules
 check presence and style, Ruff's pydoclint (`DOC`) rules check that signature
-sections agree with the implementation, and Interrogate enforces 100 percent
-coverage under `src/falcon_correlate`. The rationale and division of
-responsibilities are recorded in
+sections agree with the implementation, and the `interrogate` target checks
+docstring coverage. The rationale and division of responsibilities are recorded
+in
 [ADR-003: docstring completeness and doctest gates](adr-003-docstring-completeness-and-doctest-gates.md).
 
 Runtime functions and methods should use only the sections that apply:
