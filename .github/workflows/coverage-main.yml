@@ -83,7 +83,7 @@ jobs:
             makeutil
 
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@3086643fbcea5bc01ed65cf5aec5a3accf081ab4
+        uses: leynos/shared-actions/.github/actions/generate-coverage@f84a7def5646a6fc7ba77c1f486906f66a0fed96
         with:
           # The shared action exposes the xdist worker count but not its
           # distribution strategy. Run this suite serially so its
@@ -96,6 +96,12 @@ jobs:
           output-path: coverage.xml
           format: cobertura
           with-ratchet: 'true'
+          # This job runs on a GitHub-hosted runner, whose cache store the
+          # Ubicloud pull-request lane never reads, so a ratchet here could
+          # not fail and a save here would never be restored. `never` skips
+          # both and hands the figure to `coverage-baseline` below.
+          publish-baseline: never
+          baseline-artefact-name: coverage-baseline-handover
           # `publish-artefact` is deliberately left unset, so the action
           # keeps its default and archives the report this lane uploads.
           # Setting it here, as the pull-request lane does, would leave
@@ -117,7 +123,7 @@ jobs:
         # uploader is a composite action and hands a step's `env` to its
         # nested upload-artifact and cache steps, which have no use for it.
         if: steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@3086643fbcea5bc01ed65cf5aec5a3accf081ab4
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@f84a7def5646a6fc7ba77c1f486906f66a0fed96
         with:
           format: cobertura
           path: coverage.xml
@@ -133,3 +139,19 @@ jobs:
           # of the manifest archive rather than of the installer script
           # that CODESCENE_CLI_SHA256 holds, so passing that variable to it
           # would fail every run.
+
+  # Ratchets the figure `coverage-upload` handed over and saves the baseline
+  # the Ubicloud pull-request lane restores. It runs only if the coverage job
+  # passed, so the baseline never advances from a failed run, and it compiles
+  # nothing. It carries no `if`: the action publishes only from a push.
+  coverage-baseline:
+    needs: coverage-upload
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Publish the ratchet baseline
+        uses: leynos/shared-actions/.github/actions/publish-coverage-baseline@f84a7def5646a6fc7ba77c1f486906f66a0fed96
+        with:
+          artefact-name: coverage-baseline-handover
