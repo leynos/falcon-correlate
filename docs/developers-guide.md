@@ -13,10 +13,11 @@ The Python lint target runs six checks in this order:
   owns formatting-adjacent checks, imports, common correctness, docstring and
   security rules, complexity thresholds, and Ruff's Pylint-compatible rules.
 - **Check 2: Interrogate.** Interrogate runs second through the
-  `interrogate` target. It enforces complete docstring coverage over
-  `INTERROGATE_TARGETS` (the package, tests, examples and scripts) after Ruff
-  has validated docstring style, and fails on any `MISSED` row because
-  interrogate rounds its percentage to one decimal.
+  `interrogate` target. It enforces complete docstring coverage over the files
+  it scans under `INTERROGATE_TARGETS` (`src`, `tests`, `examples`, `scripts`,
+  `show_path_sim.py` and `testdata`, subject to Interrogate's default
+  exclusions) after Ruff has validated docstring style, and fails on any
+  `MISSED` row because Interrogate rounds its percentage to one decimal.
 - **Check 3: Classic Pylint through PyPy.** Vanilla Pylint 4.1.1 with
   Astroid 4.3.3 runs directly under the checksum-verified PyPy 8.0.0/Python
   3.12 binary on Linux x86_64. This pass focuses on rules that complement Ruff,
@@ -974,7 +975,7 @@ $(SKYLOS) $(SKYLOS_PRODUCTION_TARGETS) \
 
 Continuous Integration runs the same `make lint` target. Skylos is provisioned
 by that target at the pinned version, while Continuous Integration installs
-Interrogate separately for the 100% package docstring coverage gate.
+Interrogate separately for the 100% docstring coverage gate.
 
 The target should be run before committing changes that affect Python code,
 tests, or lint configuration. When diagnosing failures, fix Ruff findings
@@ -1184,8 +1185,8 @@ allows it.
 Python docstrings follow the NumPy convention. Ruff's pydocstyle (`D`) rules
 check presence and style, Ruff's pydoclint (`DOC`) rules check that signature
 sections agree with the implementation, and Interrogate enforces 100 percent
-coverage under `src/falcon_correlate`. The rationale and division of
-responsibilities are recorded in
+coverage over the files it scans under `INTERROGATE_TARGETS`. The rationale and
+division of responsibilities are recorded in
 [ADR-003: docstring completeness and doctest gates](adr-003-docstring-completeness-and-doctest-gates.md).
 
 Runtime functions and methods should use only the sections that apply:
