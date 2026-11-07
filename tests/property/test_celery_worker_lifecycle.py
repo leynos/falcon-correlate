@@ -108,6 +108,7 @@ def test_worker_setup_and_cleanup_follow_the_token_stack_model(
     context = contextvars.Context()
 
     def exercise_sequence() -> None:
+        """Replay the generated operations, checking each against the token model."""
         correlation_id_var.set(_AMBIENT_ID)
         model = _TokenStackModel(_AMBIENT_ID)
 

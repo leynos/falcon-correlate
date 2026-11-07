@@ -36,7 +36,14 @@ TY = $(UV_ENV) $(UV) run --with ty==$(TY_VERSION) ty
 TYPOS_CONFIG_BUILDER = $(GIT_SOURCE_ENV) $(UV_ENV) $(UV) tool run --python 3.14 --from \
 	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_VERSION)" \
 	typos-config-builder
-INTERROGATE_TARGETS ?= src/falcon_correlate
+# Interrogate scans these targets recursively, subject to its default exclusions.
+# The shipped package, its tests, the examples, the release scripts and the
+# stand-alone Python files are all held to complete docstring coverage.
+INTERROGATE_TARGETS ?= src tests examples scripts show_path_sim.py testdata
+# Level 2 prints a MISSED row per undocumented definition, which the
+# `interrogate` target fails on: the rounded percentage alone can pass a lone gap.
+INTERROGATE_FLAGS ?= -vv --fail-under 100
+INTERROGATE ?= $(UV_ENV) $(UV) run interrogate
 PYLINT_TARGETS ?= src tests examples scripts
 PYLINT_PYPY_VERSION ?= 8.0.0
 PYLINT_PYTHON_VERSION ?= 3.12
@@ -84,7 +91,7 @@ DF12_PYLINT = PYLINTHOME=$(DF12_PYLINT_HOME) $(DF12_PYLINT_TOOL) pylint --jobs=1
 	--enable=$(DF12_PYLINT_MESSAGES),$(PYLINT_ANALYSIS_MESSAGES)
 AMBRLEAKS = $(DF12_PYLINT_TOOL) ambrleaks
 
-.PHONY: help all clean build build-release lint classic-pylint df12-pylint \
+.PHONY: help all clean build build-release lint interrogate classic-pylint df12-pylint \
         prepare-pylint-python verify-classic-pylint verify-df12-pylint \
         verify-pylint-toolchains fmt check-fmt doctest \
         markdownlint nixie spelling makeutil skylos-allow test \
@@ -150,9 +157,21 @@ check-fmt: ## Verify formatting
 	$(RUFF) format --check
 	$(MDTABLEFIX) --check $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
 
+# Interrogate rounds its percentage to one decimal, so `--fail-under 100` alone
+# can pass a lone gap in a large repository; fail on any MISSED row as well.
+interrogate: ## Enforce complete Python docstring coverage
+	@report="$$($(INTERROGATE) $(INTERROGATE_FLAGS) $(INTERROGATE_TARGETS))"; \
+	  status=$$?; \
+	  printf '%s\n' "$$report"; \
+	  test "$$status" -eq 0 || exit "$$status"; \
+	  if printf '%s\n' "$$report" | grep -q '| *MISSED *|'; then \
+	    printf '%s\n' 'interrogate: undocumented definitions remain; see the MISSED rows above' >&2; \
+	    exit 1; \
+	  fi
+
 lint: ## Run linters
 	$(RUFF) check
-	$(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
+	$(MAKE) --no-print-directory interrogate
 	$(MAKE) --no-print-directory classic-pylint
 	$(MAKE) --no-print-directory df12-pylint
 	$(AMBRLEAKS) tests

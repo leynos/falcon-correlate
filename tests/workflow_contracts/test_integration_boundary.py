@@ -42,6 +42,7 @@ def test_availability_fixture(
     calls: list[tuple[str, list[str]]] = []
 
     def probe(name: str, options: list[str]) -> bool:
+        """Record the probed tool and report the parametrized availability."""
         calls.append((name, options))
         return available
 

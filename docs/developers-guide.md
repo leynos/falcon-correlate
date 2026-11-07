@@ -12,9 +12,11 @@ The Python lint target runs six checks in this order:
 - **Check 1: Ruff.** Ruff runs first through the pinned `$(RUFF)` wrapper. It
   owns formatting-adjacent checks, imports, common correctness, docstring and
   security rules, complexity thresholds, and Ruff's Pylint-compatible rules.
-- **Check 2: Interrogate.** Interrogate runs second through
-  `uv run interrogate --fail-under 100`. It enforces package-level docstring
-  coverage after Ruff has validated docstring style.
+- **Check 2: Interrogate.** Interrogate runs second through the
+  `interrogate` target. It enforces complete docstring coverage over
+  `INTERROGATE_TARGETS` (the package, tests, examples and scripts) after Ruff
+  has validated docstring style, and fails on any `MISSED` row because
+  interrogate rounds its percentage to one decimal.
 - **Check 3: Classic Pylint through PyPy.** Vanilla Pylint 4.1.1 with
   Astroid 4.3.3 runs directly under the checksum-verified PyPy 8.0.0/Python
   3.12 binary on Linux x86_64. This pass focuses on rules that complement Ruff,
@@ -961,7 +963,7 @@ make lint
 
 ```bash
 $(RUFF) check
-$(UV_ENV) $(UV) run interrogate --fail-under 100 $(INTERROGATE_TARGETS)
+$(MAKE) --no-print-directory interrogate
 $(MAKE) --no-print-directory classic-pylint
 $(MAKE) --no-print-directory df12-pylint
 $(AMBRLEAKS) tests
@@ -1117,7 +1119,7 @@ matching version pins and runs the same `make lint` entry point.
 | `DF12_PYLINT_MESSAGES`         | Twelve messages supplied by `v0.3.0`                                                 | Keeps DF12 checks explicit and reviewable.                   |
 | `DF12_PYLINT`                  | Isolated `uv tool run`, one worker, DF12 plug-in plus fatal diagnostics.             | Runs only the DF12 pass under CPython 3.14.                  |
 | `AMBRLEAKS`                    | Isolated `uv tool run` under `$(DF12_PYTHON)`                                        | Scans Syrupy snapshots under CPython 3.14.                   |
-| `INTERROGATE_TARGETS`          | `src/falcon_correlate`                                                               | Defines repo-root-relative Interrogate targets.              |
+| `INTERROGATE_TARGETS`          | `src tests examples scripts show_path_sim.py testdata`                               | Defines repo-root-relative Interrogate targets.              |
 | `SKYLOS_VERSION`               | `4.33.2`                                                                             | Pins the separately provisioned Skylos release.              |
 | `SKYLOS_CLI`                   | `$(UV_ENV) $(UV) tool run --python 3.14 --from 'skylos==$(SKYLOS_VERSION)' skylos`   | Provides Skylos using its Python 3.14 AST runtime.           |
 | `SKYLOS_SCAN_OPTIONS`          | `--config-file pyproject.toml`                                                       | Holds scan-wide options for Skylos.                          |
