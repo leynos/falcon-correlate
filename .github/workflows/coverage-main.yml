@@ -93,6 +93,10 @@ jobs:
           # baseline this job writes is comparable with what the ratchet
           # checks against.
           language: python
+          # The interpreter the coverage venv is built on, and part of the
+          # baseline's cache key: left to the PATH it was 3.14 here and 3.12
+          # on the pull-request lane, so the two never shared a baseline.
+          python-version: '3.13'
           output-path: coverage.xml
           format: cobertura
           with-ratchet: 'true'

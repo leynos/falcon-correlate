@@ -265,6 +265,9 @@ jobs:
           # repository that acquires a Cargo.toml would silently change
           # what this lane measures and what the baseline below means.
           language: python
+          # The interpreter the coverage venv is built on, and part of the
+          # baseline's cache key; the same value as coverage-main.yml.
+          python-version: '3.13'
           output-path: coverage.xml
           format: cobertura
           # Compare aggregate Python coverage against the baseline written by
