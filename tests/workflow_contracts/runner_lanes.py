@@ -68,6 +68,7 @@ PAID_LANES = frozenset({
     "ci.yml:lint",
     "ci.yml:test",
     "ci.yml:build",
+    "coverage-main.yml:coverage-baseline",
     "release.yml:attest",
     "release.yml:check-version",
     "release.yml:draft-release",

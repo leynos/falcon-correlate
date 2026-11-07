@@ -255,7 +255,7 @@ jobs:
       # wrote.
       - name: Generate coverage
         if: matrix.python-version == '3.13' && github.event_name == 'pull_request'
-        uses: leynos/shared-actions/.github/actions/generate-coverage@3086643fbcea5bc01ed65cf5aec5a3accf081ab4
+        uses: leynos/shared-actions/.github/actions/generate-coverage@f84a7def5646a6fc7ba77c1f486906f66a0fed96
         with:
           # The shared action exposes the xdist worker count but not its
           # distribution strategy. Run this suite serially so its
@@ -265,6 +265,9 @@ jobs:
           # repository that acquires a Cargo.toml would silently change
           # what this lane measures and what the baseline below means.
           language: python
+          # The interpreter the coverage venv is built on, and part of the
+          # baseline's cache key; the same value as coverage-main.yml.
+          python-version: '3.13'
           output-path: coverage.xml
           format: cobertura
           # Compare aggregate Python coverage against the baseline written by

@@ -22,7 +22,10 @@ WORKFLOWS = {
         {"lint": set(), "test": set(), "build": set()},
         {"push", "pull_request"},
     ),
-    "coverage-main.yml": ({"coverage-upload": set()}, {"push", "workflow_dispatch"}),
+    "coverage-main.yml": (
+        {"coverage-upload": set(), "coverage-baseline": {"coverage-upload"}},
+        {"push", "workflow_dispatch"},
+    ),
     "release.yml": (
         {
             "check-version": set(),
