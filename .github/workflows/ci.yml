@@ -70,7 +70,7 @@ jobs:
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.
-        uses: leynos/shared-actions/.github/actions/install-mdtablefix@3086643fbcea5bc01ed65cf5aec5a3accf081ab4
+        uses: leynos/shared-actions/.github/actions/install-mdtablefix@0eabb6bc07148981de5da395e30cd78d83f5c7c2
         with:
           version: "0.6.1"
 
@@ -255,7 +255,7 @@ jobs:
       # wrote.
       - name: Generate coverage
         if: matrix.python-version == '3.13' && github.event_name == 'pull_request'
-        uses: leynos/shared-actions/.github/actions/generate-coverage@f84a7def5646a6fc7ba77c1f486906f66a0fed96
+        uses: leynos/shared-actions/.github/actions/generate-coverage@0eabb6bc07148981de5da395e30cd78d83f5c7c2
         with:
           # The shared action exposes the xdist worker count but not its
           # distribution strategy. Run this suite serially so its
