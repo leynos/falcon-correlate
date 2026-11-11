@@ -591,8 +591,10 @@ formatter = ContextualLogFormatter(LOG_FORMAT)
 This will ensure that the correlation ID and user ID appear in the formatted
 log messages without letting their content break the line structure.[^1] The
 escaping rules and rejected alternatives are recorded in §4.6.10. The
-constructor is identical to `logging.Formatter`, so `dictConfig` can select the
-class with `"class": "falcon_correlate.ContextualLogFormatter"`.
+constructor accepts the same `fmt`, `datefmt`, `validate` and keyword-only
+`defaults` arguments as `logging.Formatter`, and accepts percent or template
+style; brace style is rejected at construction. `dictConfig` can therefore
+select the class with `"class": "falcon_correlate.ContextualLogFormatter"`.
 
 #### 3.4.3. (Optional) Considerations for `structlog`
 
@@ -1426,11 +1428,11 @@ byte-identical to that of a stock `logging.Formatter`.
 The escape is applied to the rendering selected by the format string. Text
 conversions (`%s`, `%r`, `%a`, and template substitutions) escape their text,
 `repr`, or `ascii` output, so a hostile custom `__repr__` cannot carry a line
-break into a `%r` field. Numeric conversions keep their value because they can
-only produce digits, signs, a decimal point, and exponent letters; an integer
-supplied through `extra=` therefore keeps working with `%(user_id)d`. A
-non-text value whose selected rendering contains a control character is escaped
-as text instead. The original object stays on the record either way.
+break into a `%r` field. Numeric conversions keep their value because they
+cannot emit control characters; an integer supplied through `extra=` therefore
+keeps working with `%(user_id)d`. A non-text value whose selected rendering
+contains a control character is escaped as text instead. The original object
+stays on the record either way.
 
 Percent and template styles are supported. The `%c` conversion is rejected at
 construction because it renders an integer as an arbitrary character, including
@@ -1439,10 +1441,16 @@ rejected because its format-spec language, including `:c` and custom
 `__format__` implementations, can render text the formatter cannot intercept.
 Escaped percent signs are skipped while scanning, so a literal `%(...)r` inside
 `%%` cannot select the conversion for an active placeholder. A field with
-repeated placeholders uses the most conservative compatible conversion, and
-mixing text and numeric conversions for one field is rejected because no single
-substituted value can satisfy both. Rejecting a configuration is preferable to
-advertising a boundary it cannot enforce.
+repeated placeholders is accepted when every occurrence uses the same
+conversion, or when all occurrences are numeric: numeric conversions pass the
+original value through, so each placeholder applies its own conversion. Other
+mixes are rejected because a single substituted value cannot render the field
+two different ways. Rejecting a configuration is preferable to advertising a
+boundary it cannot enforce.
+
+Only fields that the format string renders are escaped. An unused metadata
+attribute is left untouched, so an object whose `__str__` raises cannot break a
+record that the stock formatter would emit.
 
 The text that is checked is the text that is emitted. Text and representation
 conversions return the already escaped rendering rather than the original
@@ -1452,8 +1460,8 @@ return hostile text during the format operation.
 The record is copied before fields are replaced. `logging.Formatter.format` sets
 `record.message`, `record.asctime`, and `record.exc_text` in place, so
 formatting a copy prevents one handler's formatter from changing what another
-handler, filter, or test observes. A record without either field is formatted
-directly, avoiding a copy on non-contextual paths.
+handler, filter, or test observes. A record without either field used by the
+format is formatted directly, avoiding a copy on non-contextual paths.
 
 Alternatives considered:
 

@@ -664,28 +664,32 @@ record received them: from the context variables, from `extra=`, or from a
 `LoggerAdapter`. The formatter escapes the rendering selected by the format
 string: text conversions (`%s`, `%r`, `%a`, and template substitutions) escape
 their text, `repr`, or `ascii` output, while numeric conversions such as
-`%(user_id)d` keep working because they can only produce digits, signs, a
-decimal point, and exponent letters. A non-text value whose selected rendering
-contains a control character is escaped as text instead.
+`%(user_id)d` keep working because numeric conversions cannot emit control
+characters. A non-text value whose selected rendering contains a control
+character is escaped as text instead. Only fields that the format string
+renders are escaped, so an unused metadata attribute cannot affect formatting.
 
 Percent (`%`) and template (`$`) styles are supported. The `%c` conversion is
 rejected, including its `%hc`, `%lc` and `%Lc` forms, because it renders an
 integer as an arbitrary character; brace (`{`) style is rejected because its
 format-spec language can render arbitrary text that the formatter cannot
-intercept. A field may appear more than once, but its occurrences must use
-compatible conversions: mixing text and numeric conversions for one field also
-raises `ValueError`. These errors are raised when the formatter is constructed.
-Messages, exception text, other record attributes, and formatter `defaults` are
-outside the formatter's scope.
+intercept. A field may appear more than once when its occurrences use the same
+conversion, or several numeric conversions, which each apply to the original
+value. Mixing conversions that render a field differently, such as `%s` with
+`%r`, raises `ValueError`. These errors are raised when the formatter is
+constructed. Messages, exception text, other record attributes, and formatter
+`defaults` are outside the formatter's scope.
 
 Escaping is a rendering decision. The original record and the context variables
 keep their raw values, so structured handlers still see the original data and
-downstream propagation (HTTP headers, Celery message properties) still forwards
-the exact correlation ID.
+downstream propagation (HTTP headers, Celery message properties) still receives
+the exact correlation ID. Escaping does not make every value valid on every
+transport: HTTPX, for example, can reject a correlation ID containing CR or LF
+when it sends an HTTP/1.1 request.
 
-A record with no correlation fields is formatted directly, preserving the
-standard `logging.Formatter` behaviour, including the `ValueError` raised when
-a format string references a missing field.
+A record with no correlation fields used by the format is formatted directly,
+preserving the standard `logging.Formatter` behaviour, including the
+`ValueError` raised when a format string references a missing field.
 
 ## Structlog integration
 

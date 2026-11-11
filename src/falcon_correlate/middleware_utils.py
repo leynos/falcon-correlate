@@ -198,17 +198,17 @@ class ContextualLogFormatter(logging.Formatter):
     The escape is applied to the rendering selected by the format string, not
     just to ``str(value)``. Text conversions render the escaped text, so a
     ``%r`` or ``%a`` conversion cannot carry control characters through a
-    custom ``__repr__``. Numeric conversions only produce digits, signs, a
-    decimal point, and exponent letters, so their values pass through
-    untouched and specifications like ``%(user_id)d`` keep working.
+    custom ``__repr__``. Numeric conversions cannot emit control characters,
+    so their values pass through untouched and specifications like
+    ``%(user_id)d`` keep working.
 
     Percent (``%``) and template (``$``) styles are supported. The ``%c``
     conversion is rejected because it renders an integer as an arbitrary
     character, and brace (``{``) style is rejected because its format-spec
     language can render arbitrary text that the formatter cannot intercept.
-    Other constructor arguments match :class:`logging.Formatter`: ``fmt``,
-    ``datefmt``, ``validate`` and the keyword-only ``defaults`` argument all
-    work.
+    The ``fmt``, ``datefmt``, ``validate`` and keyword-only ``defaults``
+    arguments follow :class:`logging.Formatter`; ``style`` accepts only ``%``
+    and ``$``.
 
     Notes
     -----

@@ -30,20 +30,26 @@ _LOG_FIELD_ESCAPES: dict[int, str] = {
 _TRANSLATION_TABLE = str.maketrans(_LOG_FIELD_ESCAPES)
 
 # Percent-style conversions whose output must be escaped explicitly, and those
-# whose output is safe by construction because it can only contain digits,
-# signs, a decimal point, and exponent letters. ``%c`` is absent deliberately:
-# it renders an integer as an arbitrary character and is rejected. ``%%`` is a
-# literal percent sign, so it must be consumed before a placeholder is looked
-# for inside it, and the legacy ``h``/``l``/``L`` length modifiers are ignored
-# by Python but still select the conversion that follows them.
+# whose output is safe by construction because numeric conversions cannot emit
+# control characters. ``%c`` is absent deliberately: it renders an integer as
+# an arbitrary character and is rejected. ``%%`` is a literal percent sign, so
+# it must be consumed before a placeholder is looked for inside it, and the
+# legacy ``h``/``l``/``L`` length modifiers are ignored by Python but still
+# select the conversion that follows them.
 _PERCENT_TOKEN_RE = re.compile(
     r"%%|%\((?P<field>correlation_id|user_id)\)"
     r"[#0+ -]*(?:\*|\d+)?(?:\.(?:\*|\d+))?"
     r"(?P<conversion>[hlL]?[diouxXeEfFgGcrsa])"
 )
+
+# The token grammar used by ``string.Template``. Only identifiers that name a
+# correlation field matter, and ``$$`` is an escaped dollar, not a field.
+_TEMPLATE_TOKEN_RE = re.compile(
+    r"\$(?:(?P<escaped>\$)|(?P<named>[_a-z][_a-z0-9]*)|\{(?P<braced>[_a-z][_a-z0-9]*)\})",
+    re.IGNORECASE,
+)
 _REPR_CONVERSIONS = frozenset("ra")
 _NUMERIC_CONVERSIONS = frozenset("diouxXeEfFgG")
-_TEXT_CONVERSIONS = frozenset("sra")
 
 
 class UnsafeLogFormatError(ValueError):
@@ -67,9 +73,9 @@ class UnsafeLogFormatError(ValueError):
 
     @classmethod
     def for_mixed_conversions(cls, field: str) -> UnsafeLogFormatError:
-        """Create an error for text and numeric conversions of *field*."""
+        """Create an error for conversions of *field* that render differently."""
         return cls(
-            f"{field} cannot mix text and numeric conversions; "
+            f"{field} cannot mix conversions that render it differently; "
             "use one conversion per field"
         )
 
@@ -82,11 +88,20 @@ def field_conversions(style: object, fmt: str | None) -> dict[str, str]:
         case logging.StrFormatStyle():
             raise UnsafeLogFormatError.for_brace_style()
         case logging.StringTemplateStyle():
-            return {}
+            return _template_fields(fmt)
         case logging.PercentStyle():
             return _percent_conversions(fmt)
         case _:
             return {}
+
+
+def _template_fields(fmt: str | None) -> dict[str, str]:
+    """Return the correlation fields that a template-style format uses."""
+    used = {
+        found["named"] or found["braced"]
+        for found in _TEMPLATE_TOKEN_RE.finditer(fmt or "")
+    }
+    return {name: "s" for name in LOG_FIELD_NAMES if name in used}
 
 
 def _percent_conversions(fmt: str | None) -> dict[str, str]:
@@ -110,19 +125,15 @@ def _combine_conversions(
     existing: str | None,
     conversion: str,
 ) -> str:
-    """Combine the conversions used for one field into a safe rendering."""
+    """Return the safe rendering shared by every occurrence of *field*."""
     if existing is None or existing == conversion:
         return conversion
-    kinds = {existing, conversion}
-    has_text = bool(kinds & _TEXT_CONVERSIONS)
-    has_numeric = bool(kinds & _NUMERIC_CONVERSIONS)
-    if has_text and has_numeric:
-        raise UnsafeLogFormatError.for_mixed_conversions(field)
-    if "s" in kinds:
-        return "s"
-    if has_text:
-        return "r"
-    return existing
+    # Numeric conversions pass the original value through, so each placeholder
+    # applies its own conversion. Text and representation conversions replace
+    # the value with a single rendering, so different renderings are rejected.
+    if {existing, conversion} <= _NUMERIC_CONVERSIONS:
+        return existing
+    raise UnsafeLogFormatError.for_mixed_conversions(field)
 
 
 class _EscapedRepr(str):  # ruff: ignore[subclass-builtin] - controls ``%r`` output.
@@ -136,9 +147,9 @@ class _EscapedRepr(str):  # ruff: ignore[subclass-builtin] - controls ``%r`` out
 def escape_log_field(value: object, conversion: str) -> object:
     """Escape the rendering that *conversion* selects for a log field."""
     # Text conversions render ``str(value)`` (``%s`` and template style) or
-    # ``repr(value)``/``ascii(value)``. Numeric conversions only ever produce
-    # digits, signs, a decimal point, and exponent letters, so their values are
-    # left untouched and keep working with specifications such as ``%d``.
+    # ``repr(value)``/``ascii(value)``. Numeric conversions cannot emit control
+    # characters, so their values are left untouched and keep working with
+    # specifications such as ``%d``.
     if conversion in _REPR_CONVERSIONS:
         # ``repr`` of an exact string always escapes line boundaries, so it is
         # safe and stays byte-identical to the stock formatter. Any other
@@ -163,7 +174,14 @@ def copy_with_escaped_fields(
     conversions: dict[str, str],
 ) -> logging.LogRecord | None:
     """Return a copy of *record* with escaped correlation fields, if any."""
-    present_fields = [name for name in LOG_FIELD_NAMES if hasattr(record, name)]
+    # Only fields the format string renders are escaped: an unused field is
+    # left alone, so an object whose ``__str__`` raises cannot break a record
+    # that the stock formatter would emit.
+    present_fields = [
+        name
+        for name in LOG_FIELD_NAMES
+        if name in conversions and hasattr(record, name)
+    ]
     if not present_fields:
         return None
 

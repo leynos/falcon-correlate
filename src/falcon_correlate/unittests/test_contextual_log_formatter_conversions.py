@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import collections
 import logging
+import typing as typ
 
 import pytest
 
@@ -95,6 +96,14 @@ class _StatefulRepr:
         """Return a safe representation once, then forge a log line."""
         self.calls += 1
         return "safe" if self.calls == 1 else _HOSTILE_TEXT
+
+
+class _Unrenderable:
+    """Object whose text form raises, like a broken metadata value."""
+
+    def __str__(self) -> str:
+        """Fail rather than produce text."""
+        raise RuntimeError
 
 
 @pytest.mark.parametrize("field", ["correlation_id", "user_id"])
@@ -189,21 +198,59 @@ def test_escaped_character_placeholder_is_not_rejected() -> None:
 
 
 def test_repeated_field_conversions_escape_every_occurrence() -> None:
-    """A later ``%s`` occurrence still sees escaped text."""
+    """Every occurrence of a repeated field sees escaped text."""
     record = _make_record(correlation_id=_HOSTILE_TEXT)
 
-    output = ContextualLogFormatter("%(correlation_id)r|%(correlation_id)s").format(
+    output = ContextualLogFormatter("%(correlation_id)s|%(correlation_id)s").format(
         record
     )
 
     _assert_single_safe_line(output)
-    assert "abc\\r\\n" in output, f"expected escaped CRLF, got {output!r}"
+    assert output.count("abc\\r\\n") == 2, (
+        f"expected escaped CRLF twice, got {output!r}"
+    )
 
 
 def test_mixed_text_and_numeric_conversions_are_rejected() -> None:
     """One field cannot be both escaped text and a numeric rendering."""
-    with pytest.raises(ValueError, match="mix text and numeric"):
+    with pytest.raises(ValueError, match="mix conversions"):
         ContextualLogFormatter("%(user_id)s|%(user_id)d")
+
+
+def test_mixed_text_conversions_are_rejected() -> None:
+    """``%s`` and ``%r`` render one field differently, so they cannot mix."""
+    with pytest.raises(ValueError, match="mix conversions"):
+        ContextualLogFormatter("%(user_id)s|%(user_id)r")
+
+
+def test_numeric_conversion_mix_matches_plain_formatter() -> None:
+    """Numeric conversions pass the value through and each applies itself."""
+    record = _make_record(user_id=42)
+    fmt = "%(user_id)d|%(user_id)x"
+
+    actual = ContextualLogFormatter(fmt).format(record)
+    expected = logging.Formatter(fmt).format(record)
+
+    assert actual == expected, f"expected {expected!r}, got {actual!r}"
+
+
+@pytest.mark.parametrize(
+    ("fmt", "style"),
+    [
+        pytest.param("%(message)s", "%", id="percent"),
+        pytest.param("$message", "$", id="template"),
+    ],
+)
+def test_unused_field_is_not_rendered(
+    fmt: str,
+    style: typ.Literal["%", "$"],
+) -> None:
+    """A field the format does not use cannot break the record."""
+    record = _make_record(user_id=_Unrenderable())
+
+    output = ContextualLogFormatter(fmt, style=style).format(record)
+
+    assert output == "handled request", f"expected the message, got {output!r}"
 
 
 def test_stateful_string_rendering_is_checked_once() -> None:
@@ -244,6 +291,19 @@ def test_template_style_ignores_percent_like_text() -> None:
 
     _assert_single_safe_line(output)
     assert "abc\\r\\n" in output, f"expected escaped CRLF, got {output!r}"
+
+
+def test_escaped_template_dollar_is_not_a_field() -> None:
+    """``$$`` is a literal dollar, so the following text is not a field."""
+    record = _make_record(correlation_id=_HOSTILE_TEXT)
+
+    output = ContextualLogFormatter("$$correlation_id|$message", style="$").format(
+        record
+    )
+
+    assert output == "$correlation_id|handled request", (
+        f"expected a literal dollar, got {output!r}"
+    )
 
 
 def test_template_style_escapes_metadata() -> None:
