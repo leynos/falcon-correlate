@@ -463,9 +463,10 @@ internally, but the response omits the correlation header.
 ## Logging integration
 
 The library provides `ContextualLogFilter`, a `logging.Filter` subclass that
-automatically injects the current correlation ID and user ID into log records.
-This allows standard `logging.Formatter` format strings to include
-`%(correlation_id)s` and `%(user_id)s` without any manual per-call effort.
+automatically injects the current correlation ID and user ID into log records,
+and `ContextualLogFormatter`, a `logging.Formatter` subclass that safely
+renders them. This allows format strings to include `%(correlation_id)s` and
+`%(user_id)s` without any manual per-call effort.
 
 When a context variable is not set (for example, outside a request), the
 placeholder string `"-"` is used instead.  If the record already carries the
@@ -474,16 +475,16 @@ is preserved and the filter does not overwrite it.
 
 ### Basic usage
 
-Attach the filter to a handler or logger:
+Attach the filter and formatter to a handler:
 
 ```python
 import logging
-from falcon_correlate import ContextualLogFilter
+from falcon_correlate import ContextualLogFilter, ContextualLogFormatter
 
 handler = logging.StreamHandler()
 handler.addFilter(ContextualLogFilter())
 handler.setFormatter(
-    logging.Formatter(
+    ContextualLogFormatter(
         "%(asctime)s [%(correlation_id)s] [%(user_id)s] %(name)s - %(message)s"
     )
 )
@@ -517,11 +518,15 @@ Use it with a handler:
 
 ```python
 import logging
-from falcon_correlate import ContextualLogFilter, RECOMMENDED_LOG_FORMAT
+from falcon_correlate import (
+    RECOMMENDED_LOG_FORMAT,
+    ContextualLogFilter,
+    ContextualLogFormatter,
+)
 
 handler = logging.StreamHandler()
 handler.addFilter(ContextualLogFilter())
-handler.setFormatter(logging.Formatter(RECOMMENDED_LOG_FORMAT))
+handler.setFormatter(ContextualLogFormatter(RECOMMENDED_LOG_FORMAT))
 
 logger = logging.getLogger("myapp")
 logger.addHandler(handler)
@@ -529,12 +534,14 @@ logger.setLevel(logging.INFO)
 ```
 
 The constant is provided as a convenience; callers may supply a custom format
-string if the recommended layout does not suit their needs.
+string if the recommended layout does not suit their needs. Use
+`ContextualLogFormatter` rather than `logging.Formatter` so the correlation
+fields are escaped; see [Safe plaintext rendering](#safe-plaintext-rendering).
 
 ### Using `dictConfig`
 
 For applications that configure logging via `logging.config.dictConfig`, the
-filter can be referenced by its dotted path:
+filter and formatter can be referenced by their dotted paths:
 
 ```python
 import logging.config
@@ -549,6 +556,7 @@ LOGGING_CONFIG = {
     },
     "formatters": {
         "standard": {
+            "class": "falcon_correlate.ContextualLogFormatter",
             "format": (
                 "%(asctime)s [%(levelname)s] [%(correlation_id)s] "
                 "[%(user_id)s] %(name)s: %(message)s"
@@ -599,6 +607,71 @@ logger.info(
 # The filter will NOT overwrite "job-abc-123" with the contextvar
 # value (or the "-" placeholder).
 ```
+
+`ContextualLogFormatter` escapes explicit metadata too, because it escapes
+whatever `correlation_id` and `user_id` the record carries at render time.
+
+### Safe plaintext rendering
+
+Correlation metadata can come from outside the application. A Celery task
+producer controls `task.request.correlation_id`, for example, and a trusted
+HTTP peer can supply an incoming ID. Those values may contain line breaks,
+escape sequences, or other control characters. A plain `logging.Formatter`
+renders them verbatim, so a crafted ID could fabricate log records or corrupt a
+terminal.
+
+`ContextualLogFormatter` is the logging-output safety boundary. It copies each
+record before formatting and escapes the `correlation_id` and `user_id` fields
+on the copy:
+
+| Character kind                        | Rendered as        |
+| ------------------------------------- | ------------------ |
+| Backslash                             | `\\`               |
+| Carriage return, line feed, tab       | `\r`, `\n`, `\t`   |
+| Other C0 controls, DEL, C1 controls   | `\xNN`             |
+| Unicode line and paragraph separators | `\u2028`, `\u2029` |
+
+Printable text, including non-ASCII identifiers, is unchanged.
+
+Wire it with the filter:
+
+```python
+import logging
+from falcon_correlate import (
+    RECOMMENDED_LOG_FORMAT,
+    ContextualLogFilter,
+    ContextualLogFormatter,
+)
+
+handler = logging.StreamHandler()
+handler.addFilter(ContextualLogFilter())
+handler.setFormatter(ContextualLogFormatter(RECOMMENDED_LOG_FORMAT))
+```
+
+Or through `dictConfig`:
+
+```python
+"formatters": {
+    "standard": {
+        "class": "falcon_correlate.ContextualLogFormatter",
+        "format": RECOMMENDED_LOG_FORMAT,
+    },
+},
+```
+
+The escaped fields are `correlation_id` and `user_id` only, whichever way the
+record received them: from the context variables, from `extra=`, or from a
+`LoggerAdapter`. Messages, exception text, other record attributes, and
+formatter `defaults` are outside the formatter's scope.
+
+Escaping is a rendering decision. The original record and the context variables
+keep their raw values, so structured handlers still see the original data and
+downstream propagation (HTTP headers, Celery message properties) still forwards
+the exact correlation ID.
+
+A record with no correlation fields is formatted directly, preserving the
+standard `logging.Formatter` behaviour, including the error raised when a
+format string references a missing field.
 
 ## Structlog integration
 
@@ -673,6 +746,12 @@ The processor uses `setdefault` so that values explicitly bound via
 `structlog.contextvars.bind_contextvars()` or passed as keyword arguments to
 the logger are preserved, matching the "fill, don't overwrite" behaviour of
 `ContextualLogFilter`.
+
+This enrichment does not escape values. `structlog.dev.ConsoleRenderer` also
+does not guarantee single-line output for arbitrary field values. When
+correlation metadata can come from an untrusted producer, render with
+`structlog.processors.JSONRenderer` (or another structured renderer) rather than
+`ConsoleRenderer`.
 
 ### Alternative: `bind_contextvars` in middleware
 
@@ -1066,8 +1145,10 @@ The following functionality is now implemented:
 - `ContextualLogFilter` for injecting correlation ID and user ID into standard
   library log records, with `"-"` placeholder when context is not set.
   Pre-existing record attributes (e.g. from `extra=`) are preserved.
+- `ContextualLogFormatter` for escaping correlation ID and user ID control
+  characters in plaintext log output while keeping the raw values intact.
 - `RECOMMENDED_LOG_FORMAT` constant providing a ready-made format string for
-  use with `logging.Formatter` or `dictConfig`.
+  use with `ContextualLogFormatter` or `dictConfig`.
 - Structlog integration documentation with custom processor and
   `bind_contextvars` bridging approaches (task 3.2).
 - httpx propagation wrapper functions (`request_with_correlation_id` and

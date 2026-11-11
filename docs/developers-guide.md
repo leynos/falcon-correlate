@@ -52,8 +52,15 @@ validated configuration, and `__init__.py` re-exports the public config class.
 `middleware_utils.py` owns the request context-variable lifecycle, logging
 integration, and UUID tooling shared by the middleware. It exports
 `correlation_id_var` and `user_id_var` for request-scoped state,
-`ContextualLogFilter` for logging enrichment, and the default UUID generator
-and validator helpers used by middleware configuration.
+`ContextualLogFilter` for logging enrichment, `ContextualLogFormatter` for
+plaintext rendering, `RECOMMENDED_LOG_FORMAT` for the paired format string, and
+the default UUID generator and validator helpers used by middleware
+configuration. The filter and the formatter have separate responsibilities: the
+filter copies raw context values onto the record without escaping them, and the
+formatter escapes the correlation fields on a shallow record copy at the output
+boundary. Keep new logging features on that boundary rather than sanitizing in
+the filter, so propagation code and structured sinks still see the original
+values.
 
 `celery.py` owns the optional Celery signal integration. Its configuration
 helper establishes the publishing app around `send_task()` calls because
@@ -383,6 +390,34 @@ Test-file placement follows the
 future consolidation candidates are real-ASGI integration versus ASGI BDD
 coverage, Celery publish and worker tests, and the finite UUID `sampled_from`
 property. They are not part of the HTTPX consolidation.
+
+### Contextual log formatter coverage
+
+`ContextualLogFormatter` is the plaintext safety boundary for correlation
+metadata, so its suite must keep the following expectations explicit:
+
+- **Control-character matrix:** every escape form is exercised for both
+  `correlation_id` and `user_id`, covering backslash, CR, LF, tab, the
+  remaining C0 controls, DEL, the C1 range, and the Unicode line and paragraph
+  separators. A property test generates arbitrary text and checks the exact
+  escaped output, that the rendered line contains no raw control characters,
+  and that printable input without backslashes is unchanged.
+- **Non-mutation:** after formatting, the original record still holds the raw
+  values, keeps its identity, and produces the same output on a second pass.
+  The suite also checks that `message`, `asctime`, and `exc_text` are not
+  written back to the original, since `logging.Formatter.format` sets them in
+  place.
+- **Multiple handlers:** one plain handler and one safe handler attached to the
+  same logger render the same record differently without the plain handler
+  seeing escaped text. This proves the formatter copies rather than mutates.
+- **Worker regression:** the Celery worker receiver tests drive `task_prerun`
+  and `task_postrun` with a line-breaking correlation ID through a real logger,
+  and assert one escaped line while the context variable and the echoed request
+  keep the raw value. The BDD worker scenario covers the same contract through
+  the public signal wiring.
+
+Keep these cases in the unit suite unless a scenario needs real framework or
+worker dispatch; do not duplicate the matrix in BDD.
 
 ## Mutation testing
 

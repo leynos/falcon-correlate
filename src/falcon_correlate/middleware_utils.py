@@ -1,10 +1,11 @@
 """Runtime helpers for Falcon correlation middleware.
 
-This module owns context-variable management, the contextual logging filter,
-and UUID generation and validation tooling for the correlation middleware. Its
-key exports include ``correlation_id_var``, ``user_id_var``,
+This module owns context-variable management, the contextual logging filter
+and formatter, and UUID generation and validation tooling for the correlation
+middleware. Its key exports include ``correlation_id_var``, ``user_id_var``,
 ``CORRELATION_ID_RESET_TOKEN_ATTR``, ``ContextualLogFilter``,
-``default_uuid7_generator``, and ``default_uuid_validator``.
+``ContextualLogFormatter``, ``default_uuid7_generator``, and
+``default_uuid_validator``.
 
 Both ``middleware.py`` and ``middleware_config.py`` import this module, and it
 does not import from either of them. That boundary keeps the shared runtime
@@ -14,6 +15,7 @@ helpers available without introducing circular imports.
 from __future__ import annotations
 
 import contextvars
+import copy
 import importlib
 import logging
 import uuid
@@ -35,7 +37,12 @@ RECOMMENDED_LOG_FORMAT: str = (
     "%(asctime)s - [%(levelname)s] - [%(correlation_id)s] - "
     "[%(user_id)s] - %(name)s - %(message)s"
 )
-"""Logging format string including correlation and user ID placeholders."""
+"""Logging format string including correlation and user ID placeholders.
+
+Pair this format string with :class:`ContextualLogFormatter` rather than the
+plain :class:`logging.Formatter`, so that correlation metadata cannot inject
+control characters into plaintext log output.
+"""
 
 
 class ContextualLogFilter(logging.Filter):
@@ -52,6 +59,10 @@ class ContextualLogFilter(logging.Filter):
 
     The filter never suppresses records; it always returns ``True``.
 
+    The filter does not escape values. Correlation metadata can be supplied by
+    a task producer and may contain control characters, so pair the filter with
+    :class:`ContextualLogFormatter` for plaintext handlers.
+
     The library provides a recommended format string as the constant
     ``RECOMMENDED_LOG_FORMAT``::
 
@@ -66,12 +77,15 @@ class ContextualLogFilter(logging.Filter):
     Attach to a handler::
 
         import logging
-        from falcon_correlate import ContextualLogFilter
+        from falcon_correlate import (
+            ContextualLogFilter,
+            ContextualLogFormatter,
+        )
 
         handler = logging.StreamHandler()
         handler.addFilter(ContextualLogFilter())
         handler.setFormatter(
-            logging.Formatter(
+            ContextualLogFormatter(
                 "%(asctime)s [%(correlation_id)s] "
                 "[%(user_id)s] %(message)s"
             )
@@ -82,13 +96,14 @@ class ContextualLogFilter(logging.Filter):
         import logging
         from falcon_correlate import (
             ContextualLogFilter,
+            ContextualLogFormatter,
             RECOMMENDED_LOG_FORMAT,
         )
 
         handler = logging.StreamHandler()
         handler.addFilter(ContextualLogFilter())
         handler.setFormatter(
-            logging.Formatter(RECOMMENDED_LOG_FORMAT),
+            ContextualLogFormatter(RECOMMENDED_LOG_FORMAT),
         )
 
     Configure via ``logging.config.dictConfig``::
@@ -106,6 +121,7 @@ class ContextualLogFilter(logging.Filter):
             },
             "formatters": {
                 "standard": {
+                    "class": "falcon_correlate.ContextualLogFormatter",
                     "format": RECOMMENDED_LOG_FORMAT,
                 },
             },
@@ -158,6 +174,111 @@ class ContextualLogFilter(logging.Filter):
             uid = user_id_var.get()
             record.user_id = uid if uid is not None else MISSING_CONTEXT_PLACEHOLDER
         return True
+
+
+_LOG_FIELD_NAMES: tuple[str, ...] = ("correlation_id", "user_id")
+
+# Values arrive from task producers and remote callers, so every character that
+# can start a new line in ``str.splitlines()`` must be escaped. The mapping is
+# built once: generic ``\xNN`` forms first, then the readable short forms and
+# the two Unicode separators override their generic entries.
+_LOG_FIELD_ESCAPES: dict[int, str] = {
+    **{code: f"\\x{code:02x}" for code in (*range(0x20), 0x7F, *range(0x80, 0xA0))},
+    ord("\\"): "\\\\",
+    ord("\r"): "\\r",
+    ord("\n"): "\\n",
+    ord("\t"): "\\t",
+    0x2028: "\\u2028",
+    0x2029: "\\u2029",
+}
+_LOG_FIELD_TRANSLATION_TABLE = str.maketrans(_LOG_FIELD_ESCAPES)
+
+
+def _escape_log_field(value: object) -> str:
+    """Return *value* as text with control characters escaped."""
+    return str(value).translate(_LOG_FIELD_TRANSLATION_TABLE)
+
+
+def _copy_with_escaped_fields(
+    record: logging.LogRecord,
+) -> logging.LogRecord | None:
+    """Return a copy of *record* with escaped correlation fields, if any."""
+    present_fields = [name for name in _LOG_FIELD_NAMES if hasattr(record, name)]
+    if not present_fields:
+        return None
+
+    escaped_record = copy.copy(record)
+    for name in present_fields:
+        setattr(escaped_record, name, _escape_log_field(getattr(record, name)))
+    return escaped_record
+
+
+class ContextualLogFormatter(logging.Formatter):
+    r"""Plaintext logging formatter that escapes correlation metadata.
+
+    :class:`ContextualLogFilter` copies correlation metadata onto a
+    ``LogRecord`` without escaping it, because the filter must preserve the
+    original value for propagation. This formatter closes the rendering gap:
+    before formatting, it escapes the ``correlation_id`` and ``user_id``
+    attributes on a shallow copy of the record.
+
+    Escaped forms are ``\r``, ``\n`` and ``\t`` for carriage return, line feed
+    and tab; ``\xNN`` for other C0 controls, DEL and C1 controls; and
+    ``\u2028``/``\u2029`` for the Unicode line and paragraph separators.
+    Backslashes are doubled so an escaped value cannot be confused with the
+    original. Printable text, including non-ASCII identifiers, is unchanged.
+
+    The constructor matches :class:`logging.Formatter`, so ``fmt``, ``datefmt``,
+    ``style``, ``validate`` and the keyword-only ``defaults`` argument all work.
+
+    Notes
+    -----
+    The formatter expects records enriched by :class:`ContextualLogFilter`, or
+    by a caller that sets ``correlation_id`` and ``user_id`` itself. Fields
+    absent from the record stay absent, so a format string that references a
+    missing field still raises the standard ``KeyError``.
+
+    The original record is never modified: messages, timestamps, exception
+    text, ``extra=`` metadata, defaults and context variables keep their raw
+    values for other handlers and downstream propagation. Escaping belongs to
+    this handler, not to the logging pipeline as a whole; a structured
+    formatter such as JSON serializes the raw value instead.
+
+    Examples
+    --------
+    >>> import logging
+    >>> record = logging.LogRecord(
+    ...     "demo", logging.INFO, __file__, 1, "started", (), None
+    ... )
+    >>> record.correlation_id = "abc\r\n2026-01-01 - [CRITICAL] - forged"
+    >>> ContextualLogFormatter("%(correlation_id)s - %(message)s").format(record)
+    'abc\\r\\n2026-01-01 - [CRITICAL] - forged - started'
+    >>> record.correlation_id
+    'abc\r\n2026-01-01 - [CRITICAL] - forged'
+
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Format *record*, escaping correlation metadata on a copy.
+
+        Parameters
+        ----------
+        record : logging.LogRecord
+            Record to format. When it carries ``correlation_id`` or
+            ``user_id``, the escaped values are applied to a shallow copy so
+            *record* itself is left unchanged.
+
+        Returns
+        -------
+        str
+            The formatted log line, with no control characters contributed by
+            the correlation fields.
+
+        """
+        escaped_record = _copy_with_escaped_fields(record)
+        if escaped_record is None:
+            return super().format(record)
+        return super().format(escaped_record)
 
 
 def default_uuid7_generator() -> str:

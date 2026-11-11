@@ -19,6 +19,7 @@ import falcon.testing
 from falcon_correlate import (
     RECOMMENDED_LOG_FORMAT,
     ContextualLogFilter,
+    ContextualLogFormatter,
     CorrelationIDConfig,
     correlation_id_var,
     default_uuid_validator,
@@ -34,6 +35,9 @@ if typ.TYPE_CHECKING:
 
 
 _ASCTIME_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}")
+_HOSTILE_CORRELATION_ID = (
+    "abc\r\n2026-01-01 - [CRITICAL] - [forged] - forged - injected"
+)
 _LOG_FORMAT_VARIANTS = (
     ("cid-snapshot-1", "uid-snapshot-1"),
     ("cid-snapshot-1", None),
@@ -160,6 +164,47 @@ class TestQuickstartLoggingSetup:
         failure_message = "expected condition: actual_snapshot == snapshot..."
         assert actual_snapshot == snapshot, failure_message
 
+    def test_logging_setup_keeps_hostile_metadata_on_one_line(
+        self,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    ) -> None:
+        """A hostile correlation ID cannot forge records in example output."""
+        module = _load_quickstart_module("logging_setup")
+        configure_logging = typ.cast(
+            "cabc.Callable[[], logging.Logger]",
+            vars(module)["configure_logging"],
+        )
+        stream = io.StringIO()
+        logger = configure_logging()
+        handlers = list(logger.handlers)
+        for handler in handlers:
+            if isinstance(handler, logging.StreamHandler):
+                handler.stream = stream
+
+        try:
+
+            def test_logic() -> None:
+                """Log one request with line-breaking correlation metadata."""
+                correlation_id_var.set(_HOSTILE_CORRELATION_ID)
+                user_id_var.set(None)
+                logger.info("handled request")
+
+            isolated_context(test_logic)
+        finally:
+            for handler in handlers:
+                logger.removeHandler(handler)
+                handler.close()
+
+        lines = stream.getvalue().splitlines()
+        assert len(lines) == 1, f"expected one log line, got {lines!r}"
+        assert "abc\\r\\n2026-01-01" in lines[0], (
+            f"expected escaped CRLF in the log line, got {lines[0]!r}"
+        )
+        assert not any(
+            ord(character) < 0x20 or 0x7F <= ord(character) <= 0x9F
+            for character in lines[0]
+        ), f"expected no raw control characters, got {lines[0]!r}"
+
 
 def _render_log_line(correlation_id: str | None, user_id: str | None) -> str:
     """Render one recommended-format log line with fixed context values."""
@@ -176,7 +221,7 @@ def _render_log_line(correlation_id: str | None, user_id: str | None) -> str:
             exc_info=None,
         )
         ContextualLogFilter().filter(record)
-        formatted = logging.Formatter(RECOMMENDED_LOG_FORMAT).format(record)
+        formatted = ContextualLogFormatter(RECOMMENDED_LOG_FORMAT).format(record)
     finally:
         user_id_var.reset(user_token)
         correlation_id_var.reset(correlation_token)

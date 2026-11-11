@@ -114,19 +114,24 @@ ______________________________________________________________________
 ## Logging
 
 `ContextualLogFilter` copies the active correlation ID, and the user ID when
-`user_id_var` is set, onto every log record. `RECOMMENDED_LOG_FORMAT` renders
-both fields:
+`user_id_var` is set, onto every log record. `ContextualLogFormatter` with
+`RECOMMENDED_LOG_FORMAT` renders both fields, escaping control characters so
+metadata cannot forge extra log lines:
 
 ```python
 import logging
 
-from falcon_correlate import RECOMMENDED_LOG_FORMAT, ContextualLogFilter
+from falcon_correlate import (
+    RECOMMENDED_LOG_FORMAT,
+    ContextualLogFilter,
+    ContextualLogFormatter,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter(RECOMMENDED_LOG_FORMAT))
+handler.setFormatter(ContextualLogFormatter(RECOMMENDED_LOG_FORMAT))
 handler.addFilter(ContextualLogFilter())
 logger.addHandler(handler)
 
@@ -134,7 +139,8 @@ logger.info("handled request")  # the line carries the active correlation ID
 ```
 
 A field with no value in context renders as `-`. The user's guide also covers
-`dictConfig` wiring and a structlog processor pattern.
+`dictConfig` wiring, the safe plaintext rendering rules, and a structlog
+processor pattern.
 
 ______________________________________________________________________
 

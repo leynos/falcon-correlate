@@ -48,3 +48,9 @@ Feature: Contextual log filter
     Then the formatted output should contain "dict-cid-001"
     And the formatted output should contain "dict-uid-001"
     And the formatted output should contain "dictconfig format test"
+
+  Scenario: Safe formatter escapes correlation metadata in plaintext output
+    Given a logger configured via dictConfig with the safe formatter
+    And the correlation ID is set to a value with a line break
+    When a log message "safe format test" is emitted
+    Then the formatted output should be a single escaped line
