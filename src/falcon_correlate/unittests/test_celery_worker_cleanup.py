@@ -61,12 +61,12 @@ def test_clear_handler_is_noop_for_stores_without_reset_tokens(
 
         clear_correlation_id_in_worker(task=build_task())
 
-        assert correlation_id_var.get() == ambient_correlation_id, (
-            "cleanup without a reset token should preserve the ambient ID"
-        )
-        assert _celery_context_tokens.get(None) == expected_state, (
+        failure_message = "cleanup without a reset token should preserve the ambient ID"
+        assert correlation_id_var.get() == ambient_correlation_id, failure_message
+        failure_message = (
             "cleanup without a reset token should leave the store unchanged"
         )
+        assert _celery_context_tokens.get(None) == expected_state, failure_message
 
     isolated_context(_logic)
 
@@ -82,18 +82,17 @@ def test_clear_handler_is_noop_after_exhausting_the_token_stack(
         correlation_id_var.set("ambient-correlation-id")
         setup_correlation_id_in_worker(task=task)
         clear_correlation_id_in_worker(task=task)
-        assert _celery_context_tokens.get(None) is None, (
-            "the final cleanup should remove the exhausted token store"
-        )
+        failure_message = "the final cleanup should remove the exhausted token store"
+        assert _celery_context_tokens.get(None) is None, failure_message
 
         clear_correlation_id_in_worker(task=task)
 
-        assert correlation_id_var.get() == "ambient-correlation-id", (
+        failure_message = (
             "cleanup without a token should preserve the restored ambient ID"
         )
-        assert _celery_context_tokens.get(None) is None, (
-            "cleanup without a token should keep the store exhausted"
-        )
+        assert correlation_id_var.get() == "ambient-correlation-id", failure_message
+        failure_message = "cleanup without a token should keep the store exhausted"
+        assert _celery_context_tokens.get(None) is None, failure_message
 
     isolated_context(_logic)
 
@@ -119,27 +118,30 @@ def test_clear_handler_preserves_unrelated_store_entries_while_unwinding(
 
         stored_tokens = _celery_context_tokens.get(None)
         assert stored_tokens is not None, "expected stored_tokens not to be None"
-        assert set(stored_tokens) == {"unrelated", _CORRELATION_ID_CONTEXT_KEY}, (
+        failure_message = (
             "inner cleanup should retain the outer token and unrelated entry"
         )
-        assert stored_tokens["unrelated"] is unrelated_entry, (
-            "inner cleanup should preserve the unrelated entry object"
-        )
-        assert len(stored_tokens[_CORRELATION_ID_CONTEXT_KEY]) == 1, (
-            "inner cleanup should leave exactly the outer token"
-        )
+        assert set(stored_tokens) == {
+            "unrelated",
+            _CORRELATION_ID_CONTEXT_KEY,
+        }, failure_message
+        failure_message = "inner cleanup should preserve the unrelated entry object"
+        assert stored_tokens["unrelated"] is unrelated_entry, failure_message
+        failure_message = "inner cleanup should leave exactly the outer token"
+        assert len(stored_tokens[_CORRELATION_ID_CONTEXT_KEY]) == 1, failure_message
+        failure_message = "inner cleanup should restore the outer correlation ID"
         assert correlation_id_var.get() == "outer-worker-correlation-id", (
-            "inner cleanup should restore the outer correlation ID"
+            failure_message
         )
 
         clear_correlation_id_in_worker(task=outer_task)
 
-        assert _celery_context_tokens.get(None) == {"unrelated": unrelated_entry}, (
-            "outer cleanup should remove only the correlation stack entry"
-        )
-        assert correlation_id_var.get() == "ambient-correlation-id", (
-            "outer cleanup should restore the ambient correlation ID"
-        )
+        failure_message = "outer cleanup should remove only the correlation stack entry"
+        assert _celery_context_tokens.get(None) == {
+            "unrelated": unrelated_entry,
+        }, failure_message
+        failure_message = "outer cleanup should restore the ambient correlation ID"
+        assert correlation_id_var.get() == "ambient-correlation-id", failure_message
 
     isolated_context(_logic)
 
@@ -157,12 +159,10 @@ def test_clear_handler_resets_context_to_previous_value(
 
         clear_correlation_id_in_worker(task=task)
 
-        assert correlation_id_var.get() == "ambient-correlation-id", (
-            "cleanup should restore the ambient correlation ID"
-        )
-        assert _celery_context_tokens.get(None) is None, (
-            "cleanup should remove the exhausted token store"
-        )
+        failure_message = "cleanup should restore the ambient correlation ID"
+        assert correlation_id_var.get() == "ambient-correlation-id", failure_message
+        failure_message = "cleanup should remove the exhausted token store"
+        assert _celery_context_tokens.get(None) is None, failure_message
 
     isolated_context(_logic)
 
@@ -180,28 +180,27 @@ def test_nested_worker_cleanup_restores_outer_then_ambient_context(
         setup_correlation_id_in_worker(task=outer_task)
         setup_correlation_id_in_worker(task=inner_task)
 
+        failure_message = "inner setup should bind the inner correlation ID"
         assert correlation_id_var.get() == "inner-worker-correlation-id", (
-            "inner setup should bind the inner correlation ID"
+            failure_message
         )
 
         clear_correlation_id_in_worker(task=inner_task)
 
         stored_tokens = _celery_context_tokens.get(None)
+        failure_message = "inner cleanup should restore the outer correlation ID"
         assert correlation_id_var.get() == "outer-worker-correlation-id", (
-            "inner cleanup should restore the outer correlation ID"
+            failure_message
         )
         assert stored_tokens is not None, "expected stored_tokens not to be None"
-        assert len(stored_tokens[_CORRELATION_ID_CONTEXT_KEY]) == 1, (
-            "inner cleanup should leave exactly the outer token"
-        )
+        failure_message = "inner cleanup should leave exactly the outer token"
+        assert len(stored_tokens[_CORRELATION_ID_CONTEXT_KEY]) == 1, failure_message
 
         clear_correlation_id_in_worker(task=outer_task)
 
-        assert correlation_id_var.get() == "ambient-correlation-id", (
-            "outer cleanup should restore the ambient correlation ID"
-        )
-        assert _celery_context_tokens.get(None) is None, (
-            "outer cleanup should remove the exhausted token store"
-        )
+        failure_message = "outer cleanup should restore the ambient correlation ID"
+        assert correlation_id_var.get() == "ambient-correlation-id", failure_message
+        failure_message = "outer cleanup should remove the exhausted token store"
+        assert _celery_context_tokens.get(None) is None, failure_message
 
     isolated_context(_logic)

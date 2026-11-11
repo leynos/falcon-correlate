@@ -79,30 +79,36 @@ def _assert_matches_model(
 ) -> None:
     """Assert the live context and token depth agree with the model."""
     operation_label = f"operation {operation_index} ({operation}, {value!r})"
-    assert correlation_id_var.get() == model.value, (
-        f"{operation_label} should leave correlation ID {model.value!r}, got "
-        f"{correlation_id_var.get()!r}"
+    actual_value = correlation_id_var.get()
+    failure_message = (
+        f"{operation_label} should leave correlation ID {model.value!r}, "
+        f"got {actual_value!r}"
     )
+    assert actual_value == model.value, failure_message
     stored_tokens = _celery_context_tokens.get(None)
     if model.entries:
-        assert stored_tokens is not None, (
+        failure_message = (
             f"{operation_label} should retain {len(model.entries)} stack entries, "
             "got no store"
         )
-        assert set(stored_tokens) == {_CORRELATION_ID_CONTEXT_KEY}, (
+        assert stored_tokens is not None, failure_message
+        failure_message = (
             f"{operation_label} should retain only the correlation stack, got "
             f"{sorted(stored_tokens)}"
         )
+        assert set(stored_tokens) == {_CORRELATION_ID_CONTEXT_KEY}, failure_message
         actual_depth = len(stored_tokens[_CORRELATION_ID_CONTEXT_KEY])
-        assert actual_depth == len(model.entries), (
+        failure_message = (
             f"{operation_label} should leave {len(model.entries)} stack entries, "
             f"got {actual_depth}"
         )
+        assert actual_depth == len(model.entries), failure_message
     else:
-        assert stored_tokens is None, (
+        failure_message = (
             f"{operation_label} should clear the exhausted token store, got "
             f"{stored_tokens!r}"
         )
+        assert stored_tokens is None, failure_message
 
 
 @given(operations=_lifecycle_operations())
@@ -151,11 +157,11 @@ def test_worker_setup_and_cleanup_follow_the_token_stack_model(
             _assert_matches_model(model, unwind_index, "unwind", None)
             unwind_index += 1
 
-        assert correlation_id_var.get() == _AMBIENT_ID, (
+        failure_message = (
             "unwinding every entry should restore the ambient correlation ID"
         )
-        assert _celery_context_tokens.get(None) is None, (
-            "unwinding every entry should exhaust the token store"
-        )
+        assert correlation_id_var.get() == _AMBIENT_ID, failure_message
+        failure_message = "unwinding every entry should exhaust the token store"
+        assert _celery_context_tokens.get(None) is None, failure_message
 
     context.run(exercise_sequence)
