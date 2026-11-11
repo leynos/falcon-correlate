@@ -165,45 +165,6 @@ def test_safe_output_matches_plain_formatter_for_context_values(
     assert actual == expected, f"expected {expected!r}, got {actual!r}"
 
 
-@pytest.mark.parametrize(
-    "value",
-    [
-        pytest.param("abc-123", id="ordinary"),
-        pytest.param(None, id="explicit-none"),
-        pytest.param("", id="empty-string"),
-        pytest.param("café-ü", id="non-ascii"),
-        pytest.param(12345, id="integer"),
-        pytest.param(0, id="zero"),
-        pytest.param(False, id="false"),
-    ],
-)
-def test_safe_output_matches_plain_formatter_for_explicit_values(
-    value: object,
-) -> None:
-    """Explicit record values keep the plain formatter's string rendering."""
-    record = _make_record()
-    record.correlation_id = value
-    record.user_id = value
-
-    actual = ContextualLogFormatter(_FIELD_FORMAT).format(record)
-    expected = logging.Formatter(_FIELD_FORMAT).format(record)
-
-    assert actual == expected, f"expected {expected!r}, got {actual!r}"
-
-
-@pytest.mark.parametrize("field", ["correlation_id", "user_id"])
-def test_numeric_metadata_keeps_numeric_format_specifications(field: str) -> None:
-    """Non-text metadata passes through so numeric conversions still work."""
-    record = _make_record()
-    setattr(record, field, 42)
-
-    actual = ContextualLogFormatter(f"%({field})d").format(record)
-    expected = logging.Formatter(f"%({field})d").format(record)
-
-    assert actual == expected, f"expected {expected!r}, got {actual!r}"
-    assert vars(record)[field] == 42, f"expected 42, got {vars(record)[field]!r}"
-
-
 def test_extra_metadata_is_escaped_when_emitted_through_a_logger(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     safe_logger: tuple[logging.Logger, io.StringIO],

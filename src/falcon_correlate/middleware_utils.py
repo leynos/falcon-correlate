@@ -195,11 +195,15 @@ _LOG_FIELD_TRANSLATION_TABLE = str.maketrans(_LOG_FIELD_ESCAPES)
 
 
 def _escape_log_field(value: object) -> object:
-    """Escape control characters in text, leaving other values unchanged."""
-    # Non-text values (for example an integer for ``%(user_id)d``) must keep
-    # their type so the stock formatter can apply numeric conversions.
-    if isinstance(value, str):
-        return value.translate(_LOG_FIELD_TRANSLATION_TABLE)
+    """Escape control characters in correlation metadata text."""
+    # Values whose text form is already safe keep their type so numeric format
+    # specifications such as ``%(user_id)d`` keep working. Anything whose text
+    # form contains a character that could forge a line is rendered as escaped
+    # text instead.
+    text = value if isinstance(value, str) else str(value)
+    escaped = text.translate(_LOG_FIELD_TRANSLATION_TABLE)
+    if isinstance(value, str) or escaped != text:
+        return escaped
     return value
 
 
@@ -231,9 +235,10 @@ class ContextualLogFormatter(logging.Formatter):
     ``\u2028``/``\u2029`` for the Unicode line and paragraph separators.
     Backslashes are doubled so an escaped value cannot be confused with the
     original. Printable text, including non-ASCII identifiers, is unchanged.
-    Non-text values, such as an integer supplied through ``extra=``, pass
-    through untouched so numeric format specifications like ``%(user_id)d``
-    keep working.
+    Non-text values pass through untouched when their text form is safe, so
+    numeric format specifications like ``%(user_id)d`` keep working. A
+    non-text value whose text form contains a control character is escaped as
+    text instead.
 
     The constructor matches :class:`logging.Formatter`, so ``fmt``, ``datefmt``,
     ``style``, ``validate`` and the keyword-only ``defaults`` argument all work.

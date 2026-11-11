@@ -404,7 +404,9 @@ metadata, so its suite must keep the following expectations explicit:
   and that printable input without backslashes is unchanged.
 - **Non-text metadata:** an integer supplied through `extra=` is left
   unchanged, so numeric format specifications such as `%(user_id)d` produce the
-  same output as the stock formatter instead of raising `TypeError`.
+  same output as the stock formatter instead of raising `TypeError`. An object
+  whose text form contains a line break is escaped as text, and the original
+  object stays on the record.
 - **Non-mutation:** after formatting, the original record still holds the raw
   values, keeps its identity, and produces the same output on a second pass.
   The suite also checks that `message`, `asctime`, and `exc_text` are not
