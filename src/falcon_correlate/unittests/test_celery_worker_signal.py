@@ -5,7 +5,6 @@ from __future__ import annotations
 import concurrent.futures as cf
 import threading
 import typing as typ
-from types import SimpleNamespace
 
 import pytest
 
