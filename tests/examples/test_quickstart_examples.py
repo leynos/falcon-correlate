@@ -15,6 +15,7 @@ from http import HTTPStatus
 
 import falcon
 import falcon.testing
+import pytest
 
 from falcon_correlate import (
     RECOMMENDED_LOG_FORMAT,
@@ -114,11 +115,11 @@ class TestQuickstartConfiguredApp:
 class TestQuickstartLoggingSetup:
     """Tests for the quickstart logging configuration."""
 
-    def test_logging_setup_includes_context_values(
+    @pytest.fixture
+    def quickstart_logger(
         self,
-        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-    ) -> None:
-        """Verify the logging example emits correlation and user IDs."""
+    ) -> cabc.Iterator[tuple[logging.Logger, io.StringIO]]:
+        """Configure the quickstart logger and capture its stream output."""
         module = _load_quickstart_module("logging_setup")
         configure_logging = typ.cast(
             "cabc.Callable[[], logging.Logger]",
@@ -132,18 +133,27 @@ class TestQuickstartLoggingSetup:
                 handler.stream = stream
 
         try:
-
-            def test_logic() -> None:
-                """Set ``cid-log-1``/``uid-log-1``; log ``hello from quickstart``."""
-                correlation_id_var.set("cid-log-1")
-                user_id_var.set("uid-log-1")
-                logger.info("hello from quickstart")
-
-            isolated_context(test_logic)
+            yield logger, stream
         finally:
             for handler in handlers:
                 logger.removeHandler(handler)
                 handler.close()
+
+    def test_logging_setup_includes_context_values(
+        self,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+        quickstart_logger: tuple[logging.Logger, io.StringIO],
+    ) -> None:
+        """Verify the logging example emits correlation and user IDs."""
+        logger, stream = quickstart_logger
+
+        def test_logic() -> None:
+            """Set ``cid-log-1``/``uid-log-1``; log ``hello from quickstart``."""
+            correlation_id_var.set("cid-log-1")
+            user_id_var.set("uid-log-1")
+            logger.info("hello from quickstart")
+
+        isolated_context(test_logic)
 
         output = stream.getvalue()
         assert "cid-log-1" in output, (
@@ -167,33 +177,18 @@ class TestQuickstartLoggingSetup:
     def test_logging_setup_keeps_hostile_metadata_on_one_line(
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+        quickstart_logger: tuple[logging.Logger, io.StringIO],
     ) -> None:
         """A hostile correlation ID cannot forge records in example output."""
-        module = _load_quickstart_module("logging_setup")
-        configure_logging = typ.cast(
-            "cabc.Callable[[], logging.Logger]",
-            vars(module)["configure_logging"],
-        )
-        stream = io.StringIO()
-        logger = configure_logging()
-        handlers = list(logger.handlers)
-        for handler in handlers:
-            if isinstance(handler, logging.StreamHandler):
-                handler.stream = stream
+        logger, stream = quickstart_logger
 
-        try:
+        def test_logic() -> None:
+            """Log one request with line-breaking correlation metadata."""
+            correlation_id_var.set(_HOSTILE_CORRELATION_ID)
+            user_id_var.set(None)
+            logger.info("handled request")
 
-            def test_logic() -> None:
-                """Log one request with line-breaking correlation metadata."""
-                correlation_id_var.set(_HOSTILE_CORRELATION_ID)
-                user_id_var.set(None)
-                logger.info("handled request")
-
-            isolated_context(test_logic)
-        finally:
-            for handler in handlers:
-                logger.removeHandler(handler)
-                handler.close()
+        isolated_context(test_logic)
 
         lines = stream.getvalue().splitlines()
         assert len(lines) == 1, f"expected one log line, got {lines!r}"
