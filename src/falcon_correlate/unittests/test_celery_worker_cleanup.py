@@ -50,6 +50,9 @@ def test_clear_handler_is_noop_for_stores_without_reset_tokens(
     ``get`` default: cleanup must not raise and must leave the store untouched.
     """
     ambient_correlation_id = "ambient-correlation-id"
+    # Snapshot the contents so an in-place edit of ``stored_state`` cannot make
+    # the post-cleanup comparison pass by comparing an object with itself.
+    expected_state = {key: list(tokens) for key, tokens in stored_state.items()}
 
     def _logic() -> None:
         """Exercise the isolated test scenario."""
@@ -61,7 +64,7 @@ def test_clear_handler_is_noop_for_stores_without_reset_tokens(
         assert correlation_id_var.get() == ambient_correlation_id, (
             "cleanup without a reset token should preserve the ambient ID"
         )
-        assert _celery_context_tokens.get(None) == stored_state, (
+        assert _celery_context_tokens.get(None) == expected_state, (
             "cleanup without a reset token should leave the store unchanged"
         )
 
