@@ -1423,6 +1423,12 @@ feed, and separator characters that `str.splitlines()` treats as line
 boundaries. Ordinary IDs contain none of these characters, so their output is
 byte-identical to that of a stock `logging.Formatter`.
 
+Only text values are translated. A non-text value supplied through `extra=`,
+such as an integer user ID, passes through unchanged; converting it to a string
+would break numeric format specifications like `%(user_id)d` that the stock
+formatter accepts. Non-text values have no user-controlled text representation
+at this boundary, so they need no escaping.
+
 The record is copied before fields are replaced. `logging.Formatter.format` sets
 `record.message`, `record.asctime`, and `record.exc_text` in place, so
 formatting a copy prevents one handler's formatter from changing what another

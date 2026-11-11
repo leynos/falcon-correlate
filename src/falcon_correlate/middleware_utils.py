@@ -194,9 +194,13 @@ _LOG_FIELD_ESCAPES: dict[int, str] = {
 _LOG_FIELD_TRANSLATION_TABLE = str.maketrans(_LOG_FIELD_ESCAPES)
 
 
-def _escape_log_field(value: object) -> str:
-    """Return *value* as text with control characters escaped."""
-    return str(value).translate(_LOG_FIELD_TRANSLATION_TABLE)
+def _escape_log_field(value: object) -> object:
+    """Escape control characters in text, leaving other values unchanged."""
+    # Non-text values (for example an integer for ``%(user_id)d``) must keep
+    # their type so the stock formatter can apply numeric conversions.
+    if isinstance(value, str):
+        return value.translate(_LOG_FIELD_TRANSLATION_TABLE)
+    return value
 
 
 def _copy_with_escaped_fields(
@@ -219,14 +223,17 @@ class ContextualLogFormatter(logging.Formatter):
     :class:`ContextualLogFilter` copies correlation metadata onto a
     ``LogRecord`` without escaping it, because the filter must preserve the
     original value for propagation. This formatter closes the rendering gap:
-    before formatting, it escapes the ``correlation_id`` and ``user_id``
-    attributes on a shallow copy of the record.
+    before formatting, it escapes text held in the ``correlation_id`` and
+    ``user_id`` attributes on a shallow copy of the record.
 
     Escaped forms are ``\r``, ``\n`` and ``\t`` for carriage return, line feed
     and tab; ``\xNN`` for other C0 controls, DEL and C1 controls; and
     ``\u2028``/``\u2029`` for the Unicode line and paragraph separators.
     Backslashes are doubled so an escaped value cannot be confused with the
     original. Printable text, including non-ASCII identifiers, is unchanged.
+    Non-text values, such as an integer supplied through ``extra=``, pass
+    through untouched so numeric format specifications like ``%(user_id)d``
+    keep working.
 
     The constructor matches :class:`logging.Formatter`, so ``fmt``, ``datefmt``,
     ``style``, ``validate`` and the keyword-only ``defaults`` argument all work.
@@ -236,7 +243,7 @@ class ContextualLogFormatter(logging.Formatter):
     The formatter expects records enriched by :class:`ContextualLogFilter`, or
     by a caller that sets ``correlation_id`` and ``user_id`` itself. Fields
     absent from the record stay absent, so a format string that references a
-    missing field still raises the standard ``KeyError``.
+    missing field still raises the standard ``ValueError``.
 
     The original record is never modified: messages, timestamps, exception
     text, ``extra=`` metadata, defaults and context variables keep their raw

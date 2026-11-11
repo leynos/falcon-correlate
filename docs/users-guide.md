@@ -661,8 +661,10 @@ Or through `dictConfig`:
 
 The escaped fields are `correlation_id` and `user_id` only, whichever way the
 record received them: from the context variables, from `extra=`, or from a
-`LoggerAdapter`. Messages, exception text, other record attributes, and
-formatter `defaults` are outside the formatter's scope.
+`LoggerAdapter`. Only text values are escaped; a non-text value, such as an
+integer supplied through `extra=`, passes through unchanged so numeric format
+specifications like `%(user_id)d` keep working. Messages, exception text, other
+record attributes, and formatter `defaults` are outside the formatter's scope.
 
 Escaping is a rendering decision. The original record and the context variables
 keep their raw values, so structured handlers still see the original data and
@@ -670,8 +672,8 @@ downstream propagation (HTTP headers, Celery message properties) still forwards
 the exact correlation ID.
 
 A record with no correlation fields is formatted directly, preserving the
-standard `logging.Formatter` behaviour, including the error raised when a
-format string references a missing field.
+standard `logging.Formatter` behaviour, including the `ValueError` raised when
+a format string references a missing field.
 
 ## Structlog integration
 

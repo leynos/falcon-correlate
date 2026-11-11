@@ -402,6 +402,9 @@ metadata, so its suite must keep the following expectations explicit:
   separators. A property test generates arbitrary text and checks the exact
   escaped output, that the rendered line contains no raw control characters,
   and that printable input without backslashes is unchanged.
+- **Non-text metadata:** an integer supplied through `extra=` is left
+  unchanged, so numeric format specifications such as `%(user_id)d` produce the
+  same output as the stock formatter instead of raising `TypeError`.
 - **Non-mutation:** after formatting, the original record still holds the raw
   values, keeps its identity, and produces the same output on a second pass.
   The suite also checks that `message`, `asctime`, and `exc_text` are not

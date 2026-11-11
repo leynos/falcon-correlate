@@ -191,6 +191,19 @@ def test_safe_output_matches_plain_formatter_for_explicit_values(
     assert actual == expected, f"expected {expected!r}, got {actual!r}"
 
 
+@pytest.mark.parametrize("field", ["correlation_id", "user_id"])
+def test_numeric_metadata_keeps_numeric_format_specifications(field: str) -> None:
+    """Non-text metadata passes through so numeric conversions still work."""
+    record = _make_record()
+    setattr(record, field, 42)
+
+    actual = ContextualLogFormatter(f"%({field})d").format(record)
+    expected = logging.Formatter(f"%({field})d").format(record)
+
+    assert actual == expected, f"expected {expected!r}, got {actual!r}"
+    assert vars(record)[field] == 42, f"expected 42, got {vars(record)[field]!r}"
+
+
 def test_extra_metadata_is_escaped_when_emitted_through_a_logger(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     safe_logger: tuple[logging.Logger, io.StringIO],
@@ -231,6 +244,17 @@ def test_formatting_preserves_original_record_and_context_variables() -> None:
         context_value = correlation_id_var.get()
     finally:
         correlation_id_var.reset(cid_token)
+
+    timestamped = ContextualLogFormatter(
+        "%(asctime)s|%(correlation_id)s|%(message)s"
+    ).format(record)
+    assert "abc\\r\\n" in timestamped, f"expected escaped CRLF, got {timestamped!r}"
+    assert "message" not in vars(record), (
+        f"expected message to stay off the record, got {vars(record)!r}"
+    )
+    assert "asctime" not in vars(record), (
+        f"expected asctime to stay off the record, got {vars(record)!r}"
+    )
 
     assert vars(record)["correlation_id"] is hostile, (
         f"expected {hostile!r}, got {vars(record)['correlation_id']!r}"
