@@ -65,6 +65,7 @@ class _RecordingServer(http.server.ThreadingHTTPServer):
         status: int,
         body: bytes,
     ) -> None:
+        """Store the scripted response and start an empty request log."""
         super().__init__(address, handler)
         self.requests: list[str] = []
         self.status = status
@@ -111,6 +112,7 @@ class LocalHttpsServer:
     """
 
     def __init__(self, directory: Path) -> None:
+        """Generate a certificate for ``127.0.0.1`` and start serving TLS."""
         self.certificate = _generate_certificate(directory)
         key = directory / "key.pem"
         self._server = _RecordingServer(
