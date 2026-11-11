@@ -43,8 +43,6 @@ if typ.TYPE_CHECKING:
     import collections.abc as cabc
 
 
-
-
 def test_setup_handler_exposes_task_request_correlation_id(
     isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
 ) -> None:
