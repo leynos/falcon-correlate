@@ -38,10 +38,10 @@ issue text's numbering was not assumed to identify the mutations.
 Issue #264 landed on `main` as commit `2cd9417` (PR #281) while this branch was
 in review. Its paired-placeholder change altered
 `clear_correlation_id_in_worker`, so the branch was rebased onto `1a65a08` and
-the scoped run was repeated at the rebased head, `9b99807`:
+the scoped run was repeated at the rebased head, `7082d20`:
 
 ```plaintext
-Worktree: /home/leynos/.cache/fc-279/rebased (detached HEAD at 9b99807)
+Worktree: /home/leynos/.cache/fc-279/rebased (detached HEAD at 7082d20)
 Command:  uv run --with mutmut==3.6.0 mutmut run \
             'falcon_correlate._celery_worker_signals.x_clear_correlation_id_in_worker*'
 Result:   18 mutants, 17 killed, 1 survived (mutmut_16)
@@ -53,9 +53,9 @@ added with #264: the token-stack tests disconnect the process-global worker
 receivers by dispatch UID, while the BDD worker module connected them once per
 session. A BDD scenario that ran after a token-stack test therefore had no
 setup receiver and observed no correlation ID. Commit `9b99807` connects the
-receivers before every BDD scenario; the rerun then completed. The same commit
-also carries the formatting the rebase required in
-`test_celery_worker_signal.py`.
+receivers before every BDD scenario; the rerun then completed. A later cleanup
+commit, `7082d20`, removes an unused import and the blank lines the rebase
+required in `test_celery_worker_signal.py`.
 
 ### Scheduled artefact cross-check
 
@@ -77,9 +77,9 @@ survivors were not an artefact of a different revision or sandbox state.
 | `8fe6e33` | mutmut_6  | 105         | `.get(_CORRELATION_ID_CONTEXT_KEY, [])` → `.get(_CORRELATION_ID_CONTEXT_KEY, None)` | survived |
 | `8fe6e33` | mutmut_8  | 105         | `.get(_CORRELATION_ID_CONTEXT_KEY, [])` → `.get(_CORRELATION_ID_CONTEXT_KEY)`       | survived |
 | `8fe6e33` | mutmut_14 | 113         | `.pop(_CORRELATION_ID_CONTEXT_KEY, None)` → `.pop(_CORRELATION_ID_CONTEXT_KEY)`     | survived |
-| `9b99807` | mutmut_6  | 108         | `.get(_CORRELATION_ID_CONTEXT_KEY, [])` → `.get(_CORRELATION_ID_CONTEXT_KEY, None)` | survived |
-| `9b99807` | mutmut_8  | 108         | `.get(_CORRELATION_ID_CONTEXT_KEY, [])` → `.get(_CORRELATION_ID_CONTEXT_KEY)`       | survived |
-| `9b99807` | mutmut_16 | 118         | `.pop(_CORRELATION_ID_CONTEXT_KEY, None)` → `.pop(_CORRELATION_ID_CONTEXT_KEY)`     | survived |
+| `7082d20` | mutmut_6  | 108         | `.get(_CORRELATION_ID_CONTEXT_KEY, [])` → `.get(_CORRELATION_ID_CONTEXT_KEY, None)` | survived |
+| `7082d20` | mutmut_8  | 108         | `.get(_CORRELATION_ID_CONTEXT_KEY, [])` → `.get(_CORRELATION_ID_CONTEXT_KEY)`       | survived |
+| `7082d20` | mutmut_16 | 118         | `.pop(_CORRELATION_ID_CONTEXT_KEY, None)` → `.pop(_CORRELATION_ID_CONTEXT_KEY)`     | survived |
 
 `mutmut show` prints an extracted image of the function, so its hunk headers
 refer to lines of that image rather than the module. The mapping above is to
@@ -253,13 +253,14 @@ uv run --with mutmut==3.6.0 mutmut run \
 Result: 16 mutants evaluated, 15 killed, 1 survived (mutmut_14).
 
 After the rebase onto #264, the same command was run in a fresh isolated
-worktree at `9b99807`:
+worktree at `7082d20`:
 
 ```plaintext
-Worktree: /home/leynos/.cache/fc-279/rebased (detached HEAD at 9b99807)
+Worktree: /home/leynos/.cache/fc-279/rebased (detached HEAD at 7082d20)
 Result:   18 mutants evaluated, 17 killed, 1 survived (mutmut_16)
 ```
 
+`7082d20` is the final code commit; commits after it change documentation only.
 The extra two mutants target the new `None` placeholder branch and are both
 killed. Current dispositions:
 
