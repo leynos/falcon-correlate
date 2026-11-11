@@ -57,6 +57,11 @@ receivers before every BDD scenario; the rerun then completed. A later cleanup
 commit, `7082d20`, removes an unused import and the blank lines the rebase
 required in `test_celery_worker_signal.py`.
 
+A third scoped run at `6431ef7`, after the cleanup and lifecycle assertion
+messages were assigned to variables ahead of their assertions, repeated the
+result: 18 mutants, 17 killed, 1 survived (mutmut_16). `6431ef7` is the final
+code commit; later commits change documentation only.
+
 ### Scheduled artefact cross-check
 
 The GitHub Actions mutation artefact for run `40876764226` (artefact
@@ -264,7 +269,7 @@ Worktree: /home/leynos/.cache/fc-279/rebased (detached HEAD at 7082d20)
 Result:   18 mutants evaluated, 17 killed, 1 survived (mutmut_16)
 ```
 
-`7082d20` is the final code commit; commits after it change documentation only.
+The run at `6431ef7` (the final code commit) produced the same 18/17/1 result.
 The extra two mutants target the new `None` placeholder branch and are both
 killed. Current dispositions:
 
