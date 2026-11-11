@@ -1423,12 +1423,21 @@ feed, and separator characters that `str.splitlines()` treats as line
 boundaries. Ordinary IDs contain none of these characters, so their output is
 byte-identical to that of a stock `logging.Formatter`.
 
-A non-text value supplied through `extra=`, such as an integer user ID, passes
-through unchanged when its text form is safe; converting it to a string would
-break numeric format specifications like `%(user_id)d` that the stock formatter
-accepts. A non-text value whose text form contains a control character is
-escaped as text instead, because its rendered output could otherwise forge a
-line. The original object stays on the record either way.
+The escape is applied to the rendering selected by the format string. Text
+conversions (`%s`, `%r`, `%a`, and template substitutions) escape their text,
+`repr`, or `ascii` output, so a hostile custom `__repr__` cannot carry a line
+break into a `%r` field. Numeric conversions keep their value because they can
+only produce digits, signs, a decimal point, and exponent letters; an integer
+supplied through `extra=` therefore keeps working with `%(user_id)d`. A
+non-text value whose selected rendering contains a control character is escaped
+as text instead. The original object stays on the record either way.
+
+Percent and template styles are supported. The `%c` conversion is rejected at
+construction because it renders an integer as an arbitrary character, and brace
+style is rejected because its format-spec language, including `:c` and custom
+`__format__` implementations, can render text the formatter cannot intercept.
+Rejecting a configuration is preferable to advertising a boundary it cannot
+enforce.
 
 The record is copied before fields are replaced. `logging.Formatter.format` sets
 `record.message`, `record.asctime`, and `record.exc_text` in place, so

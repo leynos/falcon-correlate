@@ -661,11 +661,19 @@ Or through `dictConfig`:
 
 The escaped fields are `correlation_id` and `user_id` only, whichever way the
 record received them: from the context variables, from `extra=`, or from a
-`LoggerAdapter`. Text values are escaped. A non-text value passes through
-unchanged when its text form is safe, so numeric format specifications like
-`%(user_id)d` keep working; a non-text value whose text form contains a control
-character is escaped as text instead. Messages, exception text, other record
-attributes, and formatter `defaults` are outside the formatter's scope.
+`LoggerAdapter`. The formatter escapes the rendering selected by the format
+string: text conversions (`%s`, `%r`, `%a`, and template substitutions) escape
+their text, `repr`, or `ascii` output, while numeric conversions such as
+`%(user_id)d` keep working because they can only produce digits, signs, a
+decimal point, and exponent letters. A non-text value whose selected rendering
+contains a control character is escaped as text instead.
+
+Percent (`%`) and template (`$`) styles are supported. The `%c` conversion is
+rejected because it renders an integer as an arbitrary character, and brace
+(`{`) style is rejected because its format-spec language can render arbitrary
+text that the formatter cannot intercept. Both raise `ValueError` when the
+formatter is constructed. Messages, exception text, other record attributes,
+and formatter `defaults` are outside the formatter's scope.
 
 Escaping is a rendering decision. The original record and the context variables
 keep their raw values, so structured handlers still see the original data and

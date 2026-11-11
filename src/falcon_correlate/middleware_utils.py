@@ -15,10 +15,15 @@ helpers available without introducing circular imports.
 from __future__ import annotations
 
 import contextvars
-import copy
 import importlib
 import logging
+import typing as typ
 import uuid
+
+from ._log_safety import copy_with_escaped_fields, field_conversions
+
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
 
 correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "correlation_id", default=None
@@ -176,51 +181,6 @@ class ContextualLogFilter(logging.Filter):
         return True
 
 
-_LOG_FIELD_NAMES: tuple[str, ...] = ("correlation_id", "user_id")
-
-# Values arrive from task producers and remote callers, so every character that
-# can start a new line in ``str.splitlines()`` must be escaped. The mapping is
-# built once: generic ``\xNN`` forms first, then the readable short forms and
-# the two Unicode separators override their generic entries.
-_LOG_FIELD_ESCAPES: dict[int, str] = {
-    **{code: f"\\x{code:02x}" for code in (*range(0x20), 0x7F, *range(0x80, 0xA0))},
-    ord("\\"): "\\\\",
-    ord("\r"): "\\r",
-    ord("\n"): "\\n",
-    ord("\t"): "\\t",
-    0x2028: "\\u2028",
-    0x2029: "\\u2029",
-}
-_LOG_FIELD_TRANSLATION_TABLE = str.maketrans(_LOG_FIELD_ESCAPES)
-
-
-def _escape_log_field(value: object) -> object:
-    """Escape control characters in correlation metadata text."""
-    # Values whose text form is already safe keep their type so numeric format
-    # specifications such as ``%(user_id)d`` keep working. Anything whose text
-    # form contains a character that could forge a line is rendered as escaped
-    # text instead.
-    text = value if isinstance(value, str) else str(value)
-    escaped = text.translate(_LOG_FIELD_TRANSLATION_TABLE)
-    if isinstance(value, str) or escaped != text:
-        return escaped
-    return value
-
-
-def _copy_with_escaped_fields(
-    record: logging.LogRecord,
-) -> logging.LogRecord | None:
-    """Return a copy of *record* with escaped correlation fields, if any."""
-    present_fields = [name for name in _LOG_FIELD_NAMES if hasattr(record, name)]
-    if not present_fields:
-        return None
-
-    escaped_record = copy.copy(record)
-    for name in present_fields:
-        setattr(escaped_record, name, _escape_log_field(getattr(record, name)))
-    return escaped_record
-
-
 class ContextualLogFormatter(logging.Formatter):
     r"""Plaintext logging formatter that escapes correlation metadata.
 
@@ -235,13 +195,20 @@ class ContextualLogFormatter(logging.Formatter):
     ``\u2028``/``\u2029`` for the Unicode line and paragraph separators.
     Backslashes are doubled so an escaped value cannot be confused with the
     original. Printable text, including non-ASCII identifiers, is unchanged.
-    Non-text values pass through untouched when their text form is safe, so
-    numeric format specifications like ``%(user_id)d`` keep working. A
-    non-text value whose text form contains a control character is escaped as
-    text instead.
+    The escape is applied to the rendering selected by the format string, not
+    just to ``str(value)``. Text conversions render the escaped text, so a
+    ``%r`` or ``%a`` conversion cannot carry control characters through a
+    custom ``__repr__``. Numeric conversions only produce digits, signs, a
+    decimal point, and exponent letters, so their values pass through
+    untouched and specifications like ``%(user_id)d`` keep working.
 
-    The constructor matches :class:`logging.Formatter`, so ``fmt``, ``datefmt``,
-    ``style``, ``validate`` and the keyword-only ``defaults`` argument all work.
+    Percent (``%``) and template (``$``) styles are supported. The ``%c``
+    conversion is rejected because it renders an integer as an arbitrary
+    character, and brace (``{``) style is rejected because its format-spec
+    language can render arbitrary text that the formatter cannot intercept.
+    Other constructor arguments match :class:`logging.Formatter`: ``fmt``,
+    ``datefmt``, ``validate`` and the keyword-only ``defaults`` argument all
+    work.
 
     Notes
     -----
@@ -270,6 +237,48 @@ class ContextualLogFormatter(logging.Formatter):
 
     """
 
+    # pylint: disable-next=too-many-arguments  # Mirrors logging.Formatter.
+    def __init__(  # ruff: ignore[too-many-arguments] - mirrors logging.Formatter
+        self,
+        fmt: str | None = None,
+        datefmt: str | None = None,
+        style: typ.Literal["%", "{", "$"] = "%",
+        validate: bool = True,  # ruff: ignore[boolean-type-hint-positional-argument, boolean-default-value-positional-argument] - mirrors logging.Formatter
+        *,
+        defaults: cabc.Mapping[str, object] | None = None,
+    ) -> None:
+        """Create a formatter that escapes correlation metadata.
+
+        Parameters
+        ----------
+        fmt : str | None
+            Format string, using the style selected by *style*.
+        datefmt : str | None
+            Date format passed to :class:`logging.Formatter`.
+        style : Literal["%", "{", "$"]
+            Either ``"%"`` for percent style or ``"$"`` for template style;
+            ``"{"`` is accepted by the signature but rejected at construction.
+        validate : bool
+            Whether the format string is validated by the base class.
+        defaults : collections.abc.Mapping[str, object] | None
+            Default values for fields missing from the record.
+
+        Raises
+        ------
+        ValueError
+            If *style* requests brace formatting, or if the percent format
+            string uses the ``%c`` conversion for a correlation metadata field.
+
+        """  # ruff: ignore[docstring-extraneous-exception] - raised via field_conversions.
+        super().__init__(
+            fmt,
+            datefmt,
+            style,
+            validate,
+            defaults=defaults,
+        )
+        self._field_conversions = field_conversions(self._style, fmt)
+
     def format(self, record: logging.LogRecord) -> str:
         """Format *record*, escaping correlation metadata on a copy.
 
@@ -287,7 +296,7 @@ class ContextualLogFormatter(logging.Formatter):
             the correlation fields.
 
         """
-        escaped_record = _copy_with_escaped_fields(record)
+        escaped_record = copy_with_escaped_fields(record, self._field_conversions)
         if escaped_record is None:
             return super().format(record)
         return super().format(escaped_record)

@@ -62,6 +62,13 @@ boundary. Keep new logging features on that boundary rather than sanitizing in
 the filter, so propagation code and structured sinks still see the original
 values.
 
+The translation table and the conversion-aware rendering rules live in
+`_log_safety.py`, a private helper module imported only by
+`middleware_utils.py`. It is split out to keep the formatter module within the
+repository's file-size budget; do not import it from other modules, because the
+conversion rules only make sense next to the formatter that validates the
+format string.
+
 `celery.py` owns the optional Celery signal integration. Its configuration
 helper establishes the publishing app around `send_task()` calls because
 Celery's publish signal sender is only a task name. Backend inspection is
@@ -402,11 +409,15 @@ metadata, so its suite must keep the following expectations explicit:
   separators. A property test generates arbitrary text and checks the exact
   escaped output, that the rendered line contains no raw control characters,
   and that printable input without backslashes is unchanged.
-- **Non-text metadata:** an integer supplied through `extra=` is left
-  unchanged, so numeric format specifications such as `%(user_id)d` produce the
-  same output as the stock formatter instead of raising `TypeError`. An object
-  whose text form contains a line break is escaped as text, and the original
-  object stays on the record.
+- **Non-text metadata and conversions:** an integer supplied through `extra=`
+  is left unchanged, so numeric format specifications such as `%(user_id)d`
+  produce the same output as the stock formatter instead of raising `TypeError`.
+  `%r` and `%a` escape a hostile custom `__repr__`, an object whose text form
+  contains a line break is escaped as text, and the original object stays on
+  the record. The suite also asserts that `%c` and brace-style format strings
+  are rejected at construction and that template style escapes metadata,
+  because those conversions and styles can render text the formatter cannot
+  intercept.
 - **Non-mutation:** after formatting, the original record still holds the raw
   values, keeps its identity, and produces the same output on a second pass.
   The suite also checks that `message`, `asctime`, and `exc_text` are not
