@@ -124,17 +124,37 @@ class LocalHttpsServer:
 
     @property
     def url(self) -> str:
-        """The server's base HTTPS URL."""
+        """The server's base HTTPS URL.
+
+        Returns
+        -------
+        str
+            Base URL ending in a slash, for example ``https://127.0.0.1:8000/``.
+        """
         host, port = self._server.server_address[:2]
         return f"https://{host}:{port}/"
 
     @property
     def requests(self) -> list[str]:
-        """Request paths seen so far, in arrival order."""
+        """Request paths seen so far, in arrival order.
+
+        Returns
+        -------
+        list of str
+            Raw request targets recorded by the handler.
+        """
         return self._server.requests
 
     def respond(self, *, status: int, body: bytes) -> None:
-        """Serve ``body`` with ``status`` for subsequent requests."""
+        """Serve ``body`` with ``status`` for subsequent requests.
+
+        Parameters
+        ----------
+        status : int
+            HTTP status code to return.
+        body : bytes
+            Response body to write for every subsequent request.
+        """
         self._server.status = status
         self._server.body = body
 

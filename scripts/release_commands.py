@@ -29,7 +29,21 @@ PYPI_DOWNLOAD_DEADLINE_SECONDS = 330
 def run_command(
     arguments: list[str], *, timeout: float | None = None
 ) -> subprocess.CompletedProcess[str]:
-    """Run one external command without a shell and capture both streams."""
+    """Run one external command without a shell and capture both streams.
+
+    Parameters
+    ----------
+    arguments : list of str
+        The fixed argument vector to execute.
+    timeout : float or None, optional
+        Seconds to wait before terminating the process, or ``None`` to wait
+        indefinitely.
+
+    Returns
+    -------
+    subprocess.CompletedProcess[str]
+        The completed process with captured standard output and error.
+    """
     return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - fixed argv keeps PATH stand-ins interceptable without a shell.
         arguments,
         capture_output=True,
@@ -40,7 +54,20 @@ def run_command(
 
 
 def require_success(result: subprocess.CompletedProcess[str], command: str) -> None:
-    """Raise with the command's captured diagnostic on failure."""
+    """Raise with the command's captured diagnostic on failure.
+
+    Parameters
+    ----------
+    result : subprocess.CompletedProcess[str]
+        The completed process to inspect.
+    command : str
+        Human-readable command name used in the error message.
+
+    Raises
+    ------
+    ReleaseAssetError
+        If the command exited with a non-zero status.
+    """
     if result.returncode == 0:
         return
     detail = result.stderr.strip() or result.stdout.strip() or "no diagnostic"
@@ -49,7 +76,21 @@ def require_success(result: subprocess.CompletedProcess[str], command: str) -> N
 
 
 def download_pypi_file(file: PypiFile, destination: Path) -> None:
-    """Download one canonical PyPI file and verify its advertised digest."""
+    """Download one canonical PyPI file and verify its advertised digest.
+
+    Parameters
+    ----------
+    file : PypiFile
+        The index entry naming the URL and expected SHA-256 digest.
+    destination : pathlib.Path
+        Path to write the downloaded bytes to.
+
+    Raises
+    ------
+    ReleaseAssetError
+        If the download exceeds the subprocess deadline, curl fails, or the
+        downloaded bytes do not match the expected digest.
+    """
     try:
         result = run_command(
             [*PYPI_DOWNLOAD_CURL_ARGUMENTS, str(destination), file.url],
