@@ -72,14 +72,18 @@ survivors were not an artefact of a different revision or sandbox state.
 
 ## Exact mutant diffs
 
-| Revision  | Mutant    | Source line | Mutation                                                                            | Baseline |
-| --------- | --------- | ----------- | ----------------------------------------------------------------------------------- | -------- |
-| `8fe6e33` | mutmut_6  | 105         | `.get(_CORRELATION_ID_CONTEXT_KEY, [])` → `.get(_CORRELATION_ID_CONTEXT_KEY, None)` | survived |
-| `8fe6e33` | mutmut_8  | 105         | `.get(_CORRELATION_ID_CONTEXT_KEY, [])` → `.get(_CORRELATION_ID_CONTEXT_KEY)`       | survived |
-| `8fe6e33` | mutmut_14 | 113         | `.pop(_CORRELATION_ID_CONTEXT_KEY, None)` → `.pop(_CORRELATION_ID_CONTEXT_KEY)`     | survived |
-| `7082d20` | mutmut_6  | 108         | `.get(_CORRELATION_ID_CONTEXT_KEY, [])` → `.get(_CORRELATION_ID_CONTEXT_KEY, None)` | survived |
-| `7082d20` | mutmut_8  | 108         | `.get(_CORRELATION_ID_CONTEXT_KEY, [])` → `.get(_CORRELATION_ID_CONTEXT_KEY)`       | survived |
-| `7082d20` | mutmut_16 | 118         | `.pop(_CORRELATION_ID_CONTEXT_KEY, None)` → `.pop(_CORRELATION_ID_CONTEXT_KEY)`     | survived |
+| Revision  | Mutant    | Source line | Mutation                                                                            | Status at revision |
+| --------- | --------- | ----------- | ----------------------------------------------------------------------------------- | ------------------ |
+| `8fe6e33` | mutmut_6  | 105         | `.get(_CORRELATION_ID_CONTEXT_KEY, [])` → `.get(_CORRELATION_ID_CONTEXT_KEY, None)` | survived           |
+| `8fe6e33` | mutmut_8  | 105         | `.get(_CORRELATION_ID_CONTEXT_KEY, [])` → `.get(_CORRELATION_ID_CONTEXT_KEY)`       | survived           |
+| `8fe6e33` | mutmut_14 | 113         | `.pop(_CORRELATION_ID_CONTEXT_KEY, None)` → `.pop(_CORRELATION_ID_CONTEXT_KEY)`     | survived           |
+| `7082d20` | mutmut_6  | 108         | `.get(_CORRELATION_ID_CONTEXT_KEY, [])` → `.get(_CORRELATION_ID_CONTEXT_KEY, None)` | killed             |
+| `7082d20` | mutmut_8  | 108         | `.get(_CORRELATION_ID_CONTEXT_KEY, [])` → `.get(_CORRELATION_ID_CONTEXT_KEY)`       | killed             |
+| `7082d20` | mutmut_16 | 118         | `.pop(_CORRELATION_ID_CONTEXT_KEY, None)` → `.pop(_CORRELATION_ID_CONTEXT_KEY)`     | survived           |
+
+The `7082d20` rows reflect the rebased branch's own test suite, so the two
+`.get` mutants are killed there; the `8fe6e33` rows are the original baseline
+reproduction that motivated the investigation.
 
 `mutmut show` prints an extracted image of the function, so its hunk headers
 refer to lines of that image rather than the module. The mapping above is to
