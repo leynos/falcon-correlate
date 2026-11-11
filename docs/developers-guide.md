@@ -414,10 +414,13 @@ metadata, so its suite must keep the following expectations explicit:
   produce the same output as the stock formatter instead of raising `TypeError`.
   `%r` and `%a` escape a hostile custom `__repr__`, an object whose text form
   contains a line break is escaped as text, and the original object stays on
-  the record. The suite also asserts that `%c` and brace-style format strings
-  are rejected at construction and that template style escapes metadata,
-  because those conversions and styles can render text the formatter cannot
-  intercept.
+  the record. The suite also asserts that `%c` (including `%hc`, `%lc` and
+  `%Lc`), brace-style format strings, and mixed text/numeric conversions for
+  one field are rejected at construction, and that template style escapes
+  metadata, because those conversions and styles can render text the formatter
+  cannot intercept. Escaped `%%` placeholders, repeated fields, and stateful
+  `__str__`/`__repr__` implementations each have a regression test: the text
+  that was checked must be the text that is emitted.
 - **Non-mutation:** after formatting, the original record still holds the raw
   values, keeps its identity, and produces the same output on a second pass.
   The suite also checks that `message`, `asctime`, and `exc_text` are not

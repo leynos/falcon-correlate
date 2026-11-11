@@ -32,14 +32,18 @@ _TRANSLATION_TABLE = str.maketrans(_LOG_FIELD_ESCAPES)
 # Percent-style conversions whose output must be escaped explicitly, and those
 # whose output is safe by construction because it can only contain digits,
 # signs, a decimal point, and exponent letters. ``%c`` is absent deliberately:
-# it renders an integer as an arbitrary character and is rejected.
-_PERCENT_FIELD_RE = re.compile(
-    r"%\((?P<field>correlation_id|user_id)\)"
+# it renders an integer as an arbitrary character and is rejected. ``%%`` is a
+# literal percent sign, so it must be consumed before a placeholder is looked
+# for inside it, and the legacy ``h``/``l``/``L`` length modifiers are ignored
+# by Python but still select the conversion that follows them.
+_PERCENT_TOKEN_RE = re.compile(
+    r"%%|%\((?P<field>correlation_id|user_id)\)"
     r"[#0+ -]*(?:\*|\d+)?(?:\.(?:\*|\d+))?"
-    r"(?P<conversion>[diouxXeEfFgGcrsa])"
+    r"(?P<conversion>[hlL]?[diouxXeEfFgGcrsa])"
 )
 _REPR_CONVERSIONS = frozenset("ra")
 _NUMERIC_CONVERSIONS = frozenset("diouxXeEfFgG")
+_TEXT_CONVERSIONS = frozenset("sra")
 
 
 class UnsafeLogFormatError(ValueError):
@@ -61,12 +65,24 @@ class UnsafeLogFormatError(ValueError):
             "escape the value explicitly or use %s"
         )
 
+    @classmethod
+    def for_mixed_conversions(cls, field: str) -> UnsafeLogFormatError:
+        """Create an error for text and numeric conversions of *field*."""
+        return cls(
+            f"{field} cannot mix text and numeric conversions; "
+            "use one conversion per field"
+        )
+
 
 def field_conversions(style: object, fmt: str | None) -> dict[str, str]:
     """Return the percent conversion used for each correlation metadata field."""
+    # ``StrFormatStyle`` and ``StringTemplateStyle`` both subclass
+    # ``PercentStyle``, so the more specific styles must be matched first.
     match style:
         case logging.StrFormatStyle():
             raise UnsafeLogFormatError.for_brace_style()
+        case logging.StringTemplateStyle():
+            return {}
         case logging.PercentStyle():
             return _percent_conversions(fmt)
         case _:
@@ -76,13 +92,45 @@ def field_conversions(style: object, fmt: str | None) -> dict[str, str]:
 def _percent_conversions(fmt: str | None) -> dict[str, str]:
     """Return the percent conversions used for correlation metadata fields."""
     conversions: dict[str, str] = {}
-    for found in _PERCENT_FIELD_RE.finditer(fmt or ""):
+    for found in _PERCENT_TOKEN_RE.finditer(fmt or ""):
         field = found["field"]
-        conversion = found["conversion"]
+        if field is None:
+            continue
+        conversion = found["conversion"][-1]
         if conversion == "c":
             raise UnsafeLogFormatError.for_character_conversion(field)
-        conversions.setdefault(field, conversion)
+        conversions[field] = _combine_conversions(
+            field, conversions.get(field), conversion
+        )
     return conversions
+
+
+def _combine_conversions(
+    field: str,
+    existing: str | None,
+    conversion: str,
+) -> str:
+    """Combine the conversions used for one field into a safe rendering."""
+    if existing is None or existing == conversion:
+        return conversion
+    kinds = {existing, conversion}
+    has_text = bool(kinds & _TEXT_CONVERSIONS)
+    has_numeric = bool(kinds & _NUMERIC_CONVERSIONS)
+    if has_text and has_numeric:
+        raise UnsafeLogFormatError.for_mixed_conversions(field)
+    if "s" in kinds:
+        return "s"
+    if has_text:
+        return "r"
+    return existing
+
+
+class _EscapedRepr(str):  # ruff: ignore[subclass-builtin] - controls ``%r`` output.
+    """Escaped representation that a ``%r`` conversion emits verbatim."""
+
+    def __repr__(self) -> str:
+        """Return the escaped representation without quotation marks."""
+        return str.__str__(self)
 
 
 def escape_log_field(value: object, conversion: str) -> object:
@@ -92,22 +140,22 @@ def escape_log_field(value: object, conversion: str) -> object:
     # digits, signs, a decimal point, and exponent letters, so their values are
     # left untouched and keep working with specifications such as ``%d``.
     if conversion in _REPR_CONVERSIONS:
-        # ``repr`` of an exact string always escapes line boundaries, so its
-        # output is safe and stays byte-identical to the stock formatter. A
-        # subclass or other object may override ``__repr__``, so its rendered
-        # representation is escaped instead.
+        # ``repr`` of an exact string always escapes line boundaries, so it is
+        # safe and stays byte-identical to the stock formatter. Any other
+        # object may override ``__repr__``, so the rendered representation is
+        # escaped and returned as a value whose own ``repr`` is that text. That
+        # also avoids calling a stateful ``__repr__`` a second time during the
+        # format operation.
         if type(value) is str:
             return value
         text = repr(value) if conversion == "r" else ascii(value)
-        escaped = text.translate(_TRANSLATION_TABLE)
-        return escaped if escaped != text else value
+        return _EscapedRepr(text.translate(_TRANSLATION_TABLE))
     if conversion in _NUMERIC_CONVERSIONS:
         return value
     # ``%s`` and template substitutions render ``str(value)``, including any
-    # subclass override, so escape exactly that rendering.
-    text = str(value)
-    escaped = text.translate(_TRANSLATION_TABLE)
-    return escaped if escaped != text else value
+    # subclass override. Return the checked text so a stateful ``__str__`` is
+    # not called a second time with different output.
+    return str(value).translate(_TRANSLATION_TABLE)
 
 
 def copy_with_escaped_fields(

@@ -669,11 +669,14 @@ decimal point, and exponent letters. A non-text value whose selected rendering
 contains a control character is escaped as text instead.
 
 Percent (`%`) and template (`$`) styles are supported. The `%c` conversion is
-rejected because it renders an integer as an arbitrary character, and brace
-(`{`) style is rejected because its format-spec language can render arbitrary
-text that the formatter cannot intercept. Both raise `ValueError` when the
-formatter is constructed. Messages, exception text, other record attributes,
-and formatter `defaults` are outside the formatter's scope.
+rejected, including its `%hc`, `%lc` and `%Lc` forms, because it renders an
+integer as an arbitrary character; brace (`{`) style is rejected because its
+format-spec language can render arbitrary text that the formatter cannot
+intercept. A field may appear more than once, but its occurrences must use
+compatible conversions: mixing text and numeric conversions for one field also
+raises `ValueError`. These errors are raised when the formatter is constructed.
+Messages, exception text, other record attributes, and formatter `defaults` are
+outside the formatter's scope.
 
 Escaping is a rendering decision. The original record and the context variables
 keep their raw values, so structured handlers still see the original data and

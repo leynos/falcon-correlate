@@ -71,11 +71,46 @@ class _HostileStr(collections.UserString):
         return _HOSTILE_TEXT
 
 
+class _StatefulStr:
+    """Object whose first ``str`` call is safe and whose second is hostile."""
+
+    def __init__(self) -> None:
+        """Start with no recorded ``str`` calls."""
+        self.calls = 0
+
+    def __str__(self) -> str:
+        """Return safe text once, then forge an extra log line."""
+        self.calls += 1
+        return "safe" if self.calls == 1 else _HOSTILE_TEXT
+
+
+class _StatefulRepr:
+    """Object whose first ``repr`` call is safe and whose second is hostile."""
+
+    def __init__(self) -> None:
+        """Start with no recorded ``repr`` calls."""
+        self.calls = 0
+
+    def __repr__(self) -> str:
+        """Return a safe representation once, then forge a log line."""
+        self.calls += 1
+        return "safe" if self.calls == 1 else _HOSTILE_TEXT
+
+
 @pytest.mark.parametrize("field", ["correlation_id", "user_id"])
 def test_character_conversion_is_rejected(field: str) -> None:
     """``%c`` can render an integer as a raw line feed, so it is rejected."""
     with pytest.raises(ValueError, match=r"%c conversion"):
         ContextualLogFormatter(f"%({field})c|%(message)s")
+
+
+@pytest.mark.parametrize("modifier", ["h", "l", "L"])
+def test_character_conversion_with_length_modifier_is_rejected(
+    modifier: str,
+) -> None:
+    """The ignored length modifiers do not hide a ``%c`` conversion."""
+    with pytest.raises(ValueError, match=r"%c conversion"):
+        ContextualLogFormatter(f"%(user_id){modifier}c|%(message)s")
 
 
 def test_brace_style_is_rejected_including_character_specs() -> None:
@@ -126,6 +161,89 @@ def test_string_subclass_override_is_escaped() -> None:
     _assert_single_safe_line(output)
     expected = _HOSTILE_TEXT.replace("\r", "\\r").replace("\n", "\\n")
     assert output == expected, f"expected {expected!r}, got {output!r}"
+
+
+def test_escaped_percent_placeholder_is_not_scanned() -> None:
+    """A literal ``%%`` placeholder cannot select the later conversion."""
+    record = _make_record(correlation_id=_HOSTILE_TEXT)
+
+    output = ContextualLogFormatter("%%(correlation_id)r|%(correlation_id)s").format(
+        record
+    )
+
+    _assert_single_safe_line(output)
+    assert output.startswith("%(correlation_id)r|"), (
+        f"expected the literal placeholder, got {output!r}"
+    )
+
+
+def test_escaped_character_placeholder_is_not_rejected() -> None:
+    """A literal ``%%c`` placeholder is text, not a ``%c`` conversion."""
+    formatter = ContextualLogFormatter("%%(user_id)c|%(message)s")
+
+    output = formatter.format(_make_record(user_id=10))
+
+    assert output == "%(user_id)c|handled request", (
+        f"expected the literal placeholder, got {output!r}"
+    )
+
+
+def test_repeated_field_conversions_escape_every_occurrence() -> None:
+    """A later ``%s`` occurrence still sees escaped text."""
+    record = _make_record(correlation_id=_HOSTILE_TEXT)
+
+    output = ContextualLogFormatter("%(correlation_id)r|%(correlation_id)s").format(
+        record
+    )
+
+    _assert_single_safe_line(output)
+    assert "abc\\r\\n" in output, f"expected escaped CRLF, got {output!r}"
+
+
+def test_mixed_text_and_numeric_conversions_are_rejected() -> None:
+    """One field cannot be both escaped text and a numeric rendering."""
+    with pytest.raises(ValueError, match="mix text and numeric"):
+        ContextualLogFormatter("%(user_id)s|%(user_id)d")
+
+
+def test_stateful_string_rendering_is_checked_once() -> None:
+    """The text that was checked is what ``%s`` emits."""
+    value = _StatefulStr()
+    record = _make_record(user_id=value)
+
+    output = ContextualLogFormatter("%(user_id)s").format(record)
+
+    _assert_single_safe_line(output)
+    assert output == "safe", f"expected the checked text, got {output!r}"
+    assert vars(record)["user_id"] is value, (
+        f"expected the raw object to stay on the record, got {vars(record)!r}"
+    )
+
+
+def test_stateful_repr_rendering_is_checked_once() -> None:
+    """The representation that was checked is what ``%r`` emits."""
+    value = _StatefulRepr()
+    record = _make_record(user_id=value)
+
+    output = ContextualLogFormatter("%(user_id)r").format(record)
+
+    _assert_single_safe_line(output)
+    assert output == "safe", f"expected the checked text, got {output!r}"
+    assert vars(record)["user_id"] is value, (
+        f"expected the raw object to stay on the record, got {vars(record)!r}"
+    )
+
+
+def test_template_style_ignores_percent_like_text() -> None:
+    """Template style escapes substitutions without scanning percent tokens."""
+    record = _make_record(correlation_id=_HOSTILE_TEXT)
+
+    output = ContextualLogFormatter(
+        "%(correlation_id)r|$correlation_id", style="$"
+    ).format(record)
+
+    _assert_single_safe_line(output)
+    assert "abc\\r\\n" in output, f"expected escaped CRLF, got {output!r}"
 
 
 def test_template_style_escapes_metadata() -> None:

@@ -1433,11 +1433,21 @@ non-text value whose selected rendering contains a control character is escaped
 as text instead. The original object stays on the record either way.
 
 Percent and template styles are supported. The `%c` conversion is rejected at
-construction because it renders an integer as an arbitrary character, and brace
-style is rejected because its format-spec language, including `:c` and custom
+construction because it renders an integer as an arbitrary character, including
+when a legacy `h`, `l` or `L` length modifier precedes it. Brace style is
+rejected because its format-spec language, including `:c` and custom
 `__format__` implementations, can render text the formatter cannot intercept.
-Rejecting a configuration is preferable to advertising a boundary it cannot
-enforce.
+Escaped percent signs are skipped while scanning, so a literal `%(...)r` inside
+`%%` cannot select the conversion for an active placeholder. A field with
+repeated placeholders uses the most conservative compatible conversion, and
+mixing text and numeric conversions for one field is rejected because no single
+substituted value can satisfy both. Rejecting a configuration is preferable to
+advertising a boundary it cannot enforce.
+
+The text that is checked is the text that is emitted. Text and representation
+conversions return the already escaped rendering rather than the original
+object, so a stateful `__str__` or `__repr__` cannot pass the check and then
+return hostile text during the format operation.
 
 The record is copied before fields are replaced. `logging.Formatter.format` sets
 `record.message`, `record.asctime`, and `record.exc_text` in place, so
