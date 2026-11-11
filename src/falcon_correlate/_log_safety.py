@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import logging
 import re
+import string
 
 LOG_FIELD_NAMES: tuple[str, ...] = ("correlation_id", "user_id")
 
@@ -42,12 +43,10 @@ _PERCENT_TOKEN_RE = re.compile(
     r"(?P<conversion>[hlL]?[diouxXeEfFgGcrsa])"
 )
 
-# The token grammar used by ``string.Template``. Only identifiers that name a
-# correlation field matter, and ``$$`` is an escaped dollar, not a field.
-_TEMPLATE_TOKEN_RE = re.compile(
-    r"\$(?:(?P<escaped>\$)|(?P<named>[_a-z][_a-z0-9]*)|\{(?P<braced>[_a-z][_a-z0-9]*)\})",
-    re.IGNORECASE,
-)
+# Template fields are scanned with ``string.Template.pattern`` rather than a
+# handwritten copy, so field boundaries match what the formatter will
+# substitute exactly. In particular, the pattern matches identifiers in ASCII
+# mode, so a character such as the Kelvin sign is literal text after a field.
 _REPR_CONVERSIONS = frozenset("ra")
 _NUMERIC_CONVERSIONS = frozenset("diouxXeEfFgG")
 
@@ -99,7 +98,7 @@ def _template_fields(fmt: str | None) -> dict[str, str]:
     """Return the correlation fields that a template-style format uses."""
     used = {
         found["named"] or found["braced"]
-        for found in _TEMPLATE_TOKEN_RE.finditer(fmt or "")
+        for found in string.Template.pattern.finditer(fmt or "")
     }
     return {name: "s" for name in LOG_FIELD_NAMES if name in used}
 

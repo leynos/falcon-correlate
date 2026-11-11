@@ -1396,8 +1396,9 @@ patterns.
 
 **Decision:** `ContextualLogFormatter` escapes control characters in the
 `correlation_id` and `user_id` record attributes while formatting, operating on
-a shallow copy of the `LogRecord`. The raw values stay on the original record,
-in the context variables, and in every propagation path.
+a shallow copy of the `LogRecord` when a correlation field is rendered. The raw
+values stay on the original record, in the context variables, and in every
+propagation path.
 
 Escaping at the output boundary is what makes the guarantee dependable. A
 correlation ID is accepted from a trusted source, but trust applies to the

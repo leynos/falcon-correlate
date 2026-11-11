@@ -680,12 +680,12 @@ value. Mixing conversions that render a field differently, such as `%s` with
 constructed. Messages, exception text, other record attributes, and formatter
 `defaults` are outside the formatter's scope.
 
-Escaping is a rendering decision. The original record and the context variables
-keep their raw values, so structured handlers still see the original data and
-downstream propagation (HTTP headers, Celery message properties) still receives
-the exact correlation ID. Escaping does not make every value valid on every
-transport: HTTPX, for example, can reject a correlation ID containing CR or LF
-when it sends an HTTP/1.1 request.
+Escaping is a rendering decision. When a correlation field is rendered, the
+original record and the context variables keep their raw values, so structured
+handlers still see the original data and downstream propagation (HTTP headers,
+Celery message properties) still receives the exact correlation ID. Escaping
+does not make every value valid on every transport: HTTPX, for example, can
+reject a correlation ID containing CR or LF when it sends an HTTP/1.1 request.
 
 A record with no correlation fields used by the format is formatted directly,
 preserving the standard `logging.Formatter` behaviour, including the

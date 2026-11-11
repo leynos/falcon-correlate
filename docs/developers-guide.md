@@ -422,11 +422,13 @@ metadata, so its suite must keep the following expectations explicit:
   conversion mixes, unused fields, and stateful `__str__`/`__repr__`
   implementations each have a regression test: the text that was checked must
   be the text that is emitted, and an unused field must not be rendered.
-- **Non-mutation:** after formatting, the original record still holds the raw
-  values, keeps its identity, and produces the same output on a second pass.
-  The suite also checks that `message`, `asctime`, and `exc_text` are not
-  written back to the original, since `logging.Formatter.format` sets them in
-  place.
+- **Non-mutation:** when a correlation field is rendered, the original record
+  still holds the raw values, keeps its identity, and produces the same output
+  on a second pass. The suite also checks that `message`, `asctime`, and
+  `exc_text` are not written back to the original, since
+  `logging.Formatter.format` sets them in place. When the format renders no
+  correlation field, the record is formatted directly and the base formatter
+  may set those attributes, exactly as it would without this class.
 - **Multiple handlers:** one plain handler and one safe handler attached to the
   same logger render the same record differently without the plain handler
   seeing escaped text. This proves the formatter copies rather than mutates.

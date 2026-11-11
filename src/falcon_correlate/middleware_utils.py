@@ -206,9 +206,8 @@ class ContextualLogFormatter(logging.Formatter):
     conversion is rejected because it renders an integer as an arbitrary
     character, and brace (``{``) style is rejected because its format-spec
     language can render arbitrary text that the formatter cannot intercept.
-    The ``fmt``, ``datefmt``, ``validate`` and keyword-only ``defaults``
-    arguments follow :class:`logging.Formatter`; ``style`` accepts only ``%``
-    and ``$``.
+    Other constructor arguments follow :class:`logging.Formatter`; ``style``
+    accepts only ``%`` and ``$``.
 
     Notes
     -----
@@ -217,11 +216,14 @@ class ContextualLogFormatter(logging.Formatter):
     absent from the record stay absent, so a format string that references a
     missing field still raises the standard ``ValueError``.
 
-    The original record is never modified: messages, timestamps, exception
-    text, ``extra=`` metadata, defaults and context variables keep their raw
-    values for other handlers and downstream propagation. Escaping belongs to
-    this handler, not to the logging pipeline as a whole; a structured
-    formatter such as JSON serializes the raw value instead.
+    When a correlation field is rendered, the record is formatted on a copy,
+    so messages, timestamps, exception text, ``extra=`` metadata, defaults and
+    context variables keep their raw values for other handlers and downstream
+    propagation. When the format renders no correlation field, the record is
+    formatted directly, as :class:`logging.Formatter` would, so the base
+    formatter may set ``message``, ``asctime`` and ``exc_text`` on it.
+    Escaping belongs to this handler, not to the logging pipeline as a whole;
+    a structured formatter such as JSON serializes the raw value instead.
 
     Examples
     --------

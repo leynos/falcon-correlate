@@ -293,6 +293,20 @@ def test_template_style_ignores_percent_like_text() -> None:
     assert "abc\\r\\n" in output, f"expected escaped CRLF, got {output!r}"
 
 
+def test_template_field_boundary_follows_template_rules() -> None:
+    """A non-ASCII letter after a field is literal, not part of its name."""
+    record = _make_record(correlation_id=_HOSTILE_TEXT)
+
+    output = ContextualLogFormatter(
+        "$correlation_id\\u212a|$message", style="$"
+    ).format(record)
+
+    _assert_single_safe_line(output)
+    assert output.endswith("\\u212a|handled request"), (
+        f"expected the literal Kelvin sign, got {output!r}"
+    )
+
+
 def test_escaped_template_dollar_is_not_a_field() -> None:
     """``$$`` is a literal dollar, so the following text is not a field."""
     record = _make_record(correlation_id=_HOSTILE_TEXT)
