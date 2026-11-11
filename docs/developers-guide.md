@@ -236,6 +236,12 @@ token, so nested cleanup preserves the enclosing task's correlation ID until
 the enclosing cleanup runs. Preserve this one-entry-per-setup pairing when
 changing the worker receivers.
 
+Tests that dispatch worker signals must connect the receivers for each scenario
+rather than once per session. Other tests disconnect the process-global
+receivers by dispatch UID, so a session-scoped connection does not survive
+arbitrary test ordering. Reconnecting per scenario is cheap because the stable
+dispatch UID makes it idempotent.
+
 Celery deduplicates receivers by `dispatch_uid`, and its internal
 `threading.Lock` protects receiver mutation. Stable UIDs therefore leave
 exactly one integration receiver per supported signal after successful
