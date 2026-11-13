@@ -66,16 +66,14 @@ OPTIONAL_CELERY_TEST := src/falcon_correlate/unittests/test_optional_celery_depe
 OBSERVABILITY_SNAPSHOT_TEST := src/falcon_correlate/unittests/test_observability_contracts.py
 PROJECT_PYTEST_EXCLUDES := --ignore=$(OPTIONAL_CELERY_TEST) \
 	--ignore=$(OBSERVABILITY_SNAPSHOT_TEST) -m "not integration"
-SKYLOS_VERSION ?= 4.33.2
-# Skylos parses source with its own runtime AST; pin Python 3.14 so newer
-# project syntax does not produce phantom findings.
-SKYLOS_CLI = $(UV_ENV) $(UV) tool run --python 3.14 \
-	--from 'skylos==$(SKYLOS_VERSION)' skylos
-SKYLOS_SCAN_OPTIONS = --config-file pyproject.toml
-SKYLOS = $(SKYLOS_CLI) $(SKYLOS_SCAN_OPTIONS)
-SKYLOS_PRODUCTION_TARGETS ?= src/falcon_correlate
-SKYLOS_EXCLUDES ?= unittests
-SKYLOS_WHITELIST_LOCK ?= .skylos-whitelist.lock
+# The dead-code gate is the installed df12-skylos command; its `skylos` extra
+# carries the one Skylos pin. Skylos parses source with its own runtime AST, so
+# the tool environment runs Python 3.14 to avoid phantom findings on newer
+# project syntax.
+DF12_GATES_SHA ?= 56ad71721c3f1f2164ec84b69150582488f1a927
+DF12_GATES = git+https://github.com/leynos/df12-python-lints.git@$(DF12_GATES_SHA)
+SKYLOS = $(UV_ENV) $(UV) tool run --python 3.14 --from \
+	'df12-python-lints[skylos] @ $(DF12_GATES)' df12-skylos
 DF12_PYTHON_LINTS_REF ?= v0.3.0
 DF12_PYTHON_LINTS = git+https://github.com/leynos/df12-python-lints.git@$(DF12_PYTHON_LINTS_REF)
 DF12_PYTHON ?= 3.14
@@ -94,7 +92,7 @@ AMBRLEAKS = $(DF12_PYLINT_TOOL) ambrleaks
 .PHONY: help all clean build build-release lint interrogate classic-pylint df12-pylint \
         prepare-pylint-python verify-classic-pylint verify-df12-pylint \
         verify-pylint-toolchains fmt check-fmt doctest \
-        markdownlint nixie spelling makeutil skylos-allow test \
+        markdownlint nixie spelling makeutil skylos skylos-allow test \
         test-optional-celery typecheck \
         $(TOOLS) $(VENV_TOOLS) test-workflow-contracts \
         test-mutmut-sandbox
@@ -175,20 +173,15 @@ lint: ## Run linters
 	$(MAKE) --no-print-directory classic-pylint
 	$(MAKE) --no-print-directory df12-pylint
 	$(AMBRLEAKS) tests
-	$(SKYLOS) $(SKYLOS_PRODUCTION_TARGETS) --exclude $(SKYLOS_EXCLUDES) \
-		--category dead_code --gate --format concise --no-upload --no-provenance \
-		--no-grep-verify
+	$(SKYLOS) check --repository .
+
+skylos: ## Detect dead production code
+	$(SKYLOS) check --repository .
 
 skylos-allow: export SKYLOS_SYMBOL = $(value SYMBOL)
 skylos-allow: export SKYLOS_REASON = $(value REASON)
-skylos-allow: ## Document one named Skylos exception, not an entry point
-	@case "$${SKYLOS_SYMBOL}" in *[![:space:]]*) ;; *) \
-		printf "Error: SYMBOL is required for a named whitelist exception\\n" >&2; \
-		exit 2;; esac
-	@case "$${SKYLOS_REASON}" in *[![:space:]]*) ;; *) \
-		printf "Error: REASON is required for a named whitelist exception\\n" >&2; \
-		exit 2;; esac
-	flock "$(SKYLOS_WHITELIST_LOCK)" env $(SKYLOS_CLI) whitelist "$${SKYLOS_SYMBOL}" --reason "$${SKYLOS_REASON}"
+skylos-allow: ## Document one named Skylos exception (SYMBOL=name REASON=text)
+	$(SKYLOS) allow --repository . --symbol="$${SKYLOS_SYMBOL}" --reason="$${SKYLOS_REASON}"
 
 prepare-pylint-python: $(PYLINT_PYPY_ROOT)/bin/pypy3.12 ## Install the pinned PyPy lint runtime
 

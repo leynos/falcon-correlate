@@ -965,14 +965,15 @@ $(MAKE) --no-print-directory interrogate
 $(MAKE) --no-print-directory classic-pylint
 $(MAKE) --no-print-directory df12-pylint
 $(AMBRLEAKS) tests
-$(SKYLOS) $(SKYLOS_PRODUCTION_TARGETS) \
-  --exclude $(SKYLOS_EXCLUDES) --category dead_code --gate --format concise \
-  --no-upload --no-provenance --no-grep-verify
+$(SKYLOS) check --repository .
 ```
 
-Continuous Integration runs the same `make lint` target. Skylos is provisioned
-by that target at the pinned version. The `interrogate` target runs the
-Interrogate in the project environment through `uv run`.
+Continuous Integration runs the same `make lint` target, then the shared-actions
+`df12-skylos` action. `$(SKYLOS)` runs the installed `df12-skylos` command
+from df12-python-lints, whose `skylos` extra carries the one Skylos pin; the
+production roots live in `[tool.df12_skylos]` and the exclusions in
+`[tool.skylos]`. The `interrogate` target runs the Interrogate in the project
+environment through `uv run`.
 
 The target should be run before committing changes that affect Python code,
 tests, or lint configuration. When diagnosing failures, fix Ruff findings
@@ -990,17 +991,14 @@ For a verified named exception, run
 `make skylos-allow SYMBOL=symbol REASON="Verified runtime caller"`. Both values
 must contain non-whitespace text; missing or whitespace-only inputs produce a
 clear error and exit status 2. `SYMBOL` is intentional: WSL sets `NAME` to the
-host name. Updates are serialized with `flock` on the ignored repository-local
-`.skylos-whitelist.lock` file. Set `SKYLOS_WHITELIST_LOCK` only when an
-alternate lock path is needed.
+host name. `df12-skylos allow` serializes updates under the ignored
+repository-local `.pyproject.toml.df12.lock` file.
 
-The Skylos Makefile contract is parsed from `makeutil parse Makefile` JSON by
-`tests/test_skylos_lint_contract.py`. `make test` checks that the pinned
-Makeutil executable is available before running the full suite. The test and
-coverage jobs independently install the same parser because each runs all
-pytest tests. `tests/test_skylos_allow_contract.py` uses a temporary executable
-recorder to verify exact whitelist argument forwarding without relying on Make
-dry-run output or changing `pyproject.toml`.
+The Makefile contracts are parsed from `makeutil parse Makefile` JSON, for
+example in `tests/test_makefile_ci_contract.py`. `make test` checks that the
+pinned Makeutil executable is available before running the full suite. The test
+and coverage jobs independently install the same parser because each runs all
+pytest tests; `tests/test_makeutil_ci_contract.py` holds that arrangement.
 
 For local full-suite runs, install the exact parser and toolchain first:
 
@@ -1118,12 +1116,8 @@ matching version pins and runs the same `make lint` entry point.
 | `DF12_PYLINT`                  | Isolated `uv tool run`, one worker, DF12 plug-in plus fatal diagnostics.             | Runs only the DF12 pass under CPython 3.14.                  |
 | `AMBRLEAKS`                    | Isolated `uv tool run` under `$(DF12_PYTHON)`                                        | Scans Syrupy snapshots under CPython 3.14.                   |
 | `INTERROGATE_TARGETS`          | `src tests examples scripts show_path_sim.py testdata`                               | Defines repo-root-relative Interrogate targets.              |
-| `SKYLOS_VERSION`               | `4.33.2`                                                                             | Pins the separately provisioned Skylos release.              |
-| `SKYLOS_CLI`                   | `$(UV_ENV) $(UV) tool run --python 3.14 --from 'skylos==$(SKYLOS_VERSION)' skylos`   | Provides Skylos using its Python 3.14 AST runtime.           |
-| `SKYLOS_SCAN_OPTIONS`          | `--config-file pyproject.toml`                                                       | Holds scan-wide options for Skylos.                          |
-| `SKYLOS_PRODUCTION_TARGETS`    | `src/falcon_correlate`                                                               | Defines the production source scanned for dead code.         |
-| `SKYLOS_EXCLUDES`              | `unittests`                                                                          | Excludes test-only package infrastructure from the scan.     |
-| `SKYLOS_WHITELIST_LOCK`        | `.skylos-whitelist.lock`                                                             | Serializes whitelist read-modify-write updates.              |
+| `DF12_GATES_SHA`               | `56ad71721c3f1f2164ec84b69150582488f1a927`                                           | Pins the df12-python-lints commit providing the Skylos gate. |
+| `SKYLOS`                       | `$(UV_ENV) $(UV) tool run --python 3.14 --from 'df12-python-lints[skylos] @ ...'`    | Runs `df12-skylos` under its Python 3.14 AST runtime.        |
 | `MUTMUT_VERSION`               | `3.6.0`                                                                              | Pins the focused mutation sandbox command.                   |
 | `MBAKE_VERSION`                | `1.4.6`                                                                              | Pins the Makefile parser used by the workflow contract gate. |
 | `TYPOS_CONFIG_BUILDER_VERSION` | `v0.1.3`                                                                             | Pins the spelling policy generator.                          |
