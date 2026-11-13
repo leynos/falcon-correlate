@@ -12,7 +12,7 @@ checks, and selective doctest execution for offline examples.
 
 ## Context and problem statement
 
-[ADR-001](adr-001-three-tier-linting.md) established Ruff, Interrogate, and
+[ADR-001](adr-0001-three-tier-linting.md) established Ruff, Interrogate, and
 PyPy-backed Pylint as the lint architecture. Interrogate enforces 100 percent
 docstring coverage, while Ruff's pydocstyle (`D`) rules enforce presence and
 style. Neither mechanism proves that `Parameters`, `Returns`, `Yields`, and

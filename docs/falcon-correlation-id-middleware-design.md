@@ -827,7 +827,7 @@ application for simplicity, but adaptations for ASGI would primarily involve
 The canonical quickstart tutorial is backed by runnable source files under
 `examples/quickstart/`. Its Markdown snippets are compared with those source
 regions by an AST-based drift guard, as recorded in
-[ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md).
+[ADR-002: tested documentation examples](adrs/adr-0002-tested-documentation-examples.md).
 
 ### 4.1. Core middleware code snippet (Falcon WSGI)
 
@@ -1517,7 +1517,7 @@ adds only assets it lacks using PyPI's bytes, verifies matching digests, and
 publishes the release after reconciliation. Re-running the tag adds no
 duplicate or replacement assets. The decision and required manual settings are
 recorded in
-[ADR-005: attested, reconciled release pipeline](adr-005-attested-reconciled-release-pipeline.md).
+[ADR-005: attested, reconciled release pipeline](adrs/adr-0005-attested-reconciled-release-pipeline.md).
 
 ### 5.5. Closing remarks
 
@@ -2315,7 +2315,7 @@ response header is left untouched.
 signature sections are validated by Ruff `DOC`. Exported module-level values
 use inline attribute docstrings, and deterministic offline examples are run as
 doctests through `make test`. The complete convention is recorded in
-[ADR-003: docstring completeness and doctest gates](adr-003-docstring-completeness-and-doctest-gates.md).
+[ADR-003: docstring completeness and doctest gates](adrs/adr-0003-docstring-completeness-and-doctest-gates.md).
 
 **Rationale:**
 
@@ -2345,8 +2345,8 @@ doctests through `make test`. The complete convention is recorded in
   docstrings for the exported context variables and logging format constant.
 - `src/falcon_correlate/unittests/test_public_exports.py` — Added public
   callable and attribute-docstring regression checks.
-- `docs/adr-003-docstring-completeness-and-doctest-gates.md` — Recorded the
-  accepted convention and validation architecture.
+- `docs/adrs/adr-0003-docstring-completeness-and-doctest-gates.md` — Recorded
+  the accepted convention and validation architecture.
 
 ### A.14. Adapter imports from owning modules (Issue #49, 2026-10-23)
 

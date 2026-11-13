@@ -45,8 +45,8 @@ Success is observable when:
   diverge semantically from its source module.
 - `docs/contents.md`, `README.md`, `docs/users-guide.md`,
   `docs/developers-guide.md`, the design document, and `docs/roadmap.md` are
-  updated, and `docs/adr-002-tested-documentation-examples.md` records the
-  tested-examples convention.
+  updated, and `docs/adrs/adr-0002-tested-documentation-examples.md` records
+  the tested-examples convention.
 - All quality gates pass: `make check-fmt`, `make typecheck`, `make lint`,
   `make test`, `make markdownlint`, `make nixie`.
 
@@ -483,9 +483,9 @@ The reader is assumed to know nothing about this repository. Key facts:
 - Documentation conventions: `docs/contents.md` is the index; ADRs follow
   `docs/documentation-style-guide.md` (sections Status, Date, Context,
   Decision, Architectural Rationale, and Known Risks and Limitations) and the
-  `adr-NNN-short-description.md` naming. `docs/adr-001-three-tier-linting.md`
-  records the accepted linting architecture, and `ADR-002` records tested
-  documentation examples.
+  `adr-NNN-short-description.md` naming.
+  `docs/adrs/adr-0001-three-tier-linting.md` records the accepted linting
+  architecture, and `ADR-002` records tested documentation examples.
 
 ### Key files
 
@@ -501,7 +501,7 @@ The reader is assumed to know nothing about this repository. Key facts:
 - `tests/bdd/test_quickstart_steps.py` — Create — step definitions.
 - `tests/docs/test_quickstart_doc_matches_examples.py` — Create — AST drift
   guard.
-- `docs/adr-002-tested-documentation-examples.md` — Create — ADR.
+- `docs/adrs/adr-0002-tested-documentation-examples.md` — Create — ADR.
 - `Makefile` — Edit — `PYLINT_TARGETS = src tests examples`.
 - `pyproject.toml` — Edit — add `syrupy` to the dev group; add `ty`/ruff
   scoping or per-file-ignores for `examples/` and the new test packages if
@@ -672,7 +672,7 @@ followed by `make markdownlint` leaves the guide clean and the markers intact.
   `examples/**` and the new test packages that Stage A/C proved necessary
   (documented in the Decision Log).
 - `docs/contents.md`: add `docs/quickstart.md` under the user-facing docs and
-  `docs/adr-002-tested-documentation-examples.md` under "Architecture and
+  `docs/adrs/adr-0002-tested-documentation-examples.md` under "Architecture and
   decisions"; add the new execplan link under "Planning documents".
 - `README.md`: add a one-line link to the quickstart.
 - `docs/users-guide.md`: replace the tutorial-style `### Basic Usage` and
@@ -685,7 +685,7 @@ followed by `make markdownlint` leaves the guide clean and the markers intact.
   HTML-comment marker).
 - `docs/falcon-correlation-id-middleware-design.md`: add a short subsection
   referencing ADR-002.
-- `docs/adr-002-tested-documentation-examples.md`: write the ADR (Status,
+- `docs/adrs/adr-0002-tested-documentation-examples.md`: write the ADR (Status,
   Date, Context, Decision, Architectural Rationale, and Known Risks and
   Limitations) recording the decision to ship tested, drift-guarded examples
   and the tool survey behind rejecting fence-execution.

@@ -6,7 +6,7 @@ This module keeps ``docs/quickstart.md`` aligned with
 with ``ast.dump`` to catch semantic drift without depending on formatting.
 
 The guard implements the tested-documentation convention described in
-``docs/adr-002-tested-documentation-examples.md``.
+``docs/adrs/adr-0002-tested-documentation-examples.md``.
 """
 
 from __future__ import annotations
