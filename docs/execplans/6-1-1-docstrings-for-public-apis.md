@@ -29,9 +29,9 @@ Success is observable in four ways:
    (`correlation_id_var`, `user_id_var`, `RECOMMENDED_LOG_FORMAT`) carry inline
    attribute docstrings that Sphinx `autodata`/napoleon will pick up.
 4. The convention is written down in
-   `docs/adr-003-docstring-completeness-and-doctest-gates.md`, a "Docstring
-   conventions" section in `docs/developers-guide.md`, and references from the
-   design document and `docs/contents.md`.
+   `docs/adrs/adr-0003-docstring-completeness-and-doctest-gates.md`, a
+   "Docstring conventions" section in `docs/developers-guide.md`, and
+   references from the design document and `docs/contents.md`.
 
 This work is an audit-and-fill exercise, not greenfield writing. Ruff already
 enforces `D` (pydocstyle) with `convention = "numpy"`, so every function,
@@ -147,14 +147,14 @@ Stop and escalate when any of these is reached:
 ## Surprises & discoveries
 
 - Observation: rebasing onto `origin/main` on 2026-06-26 brought in
-  `docs/adr-001-three-tier-linting.md`, `interrogate` in the dev dependency
-  group, and an Interrogate package docstring coverage tier in `make lint`.
-  Evidence: `make lint` now runs
+  `docs/adrs/adr-0001-three-tier-linting.md`, `interrogate` in the dev
+  dependency group, and an Interrogate package docstring coverage tier in
+  `make lint`. Evidence: `make lint` now runs
   `uv run interrogate --fail-under 100 src/falcon_correlate`; the old plan
-  reference `docs/adr-001-three-tier-linting.md` supersedes the old linting ADR
-  template name. Impact: ADR-003 should cite the three-tier linting ADR and
-  describe `DOC` as a content-accuracy complement to Interrogate's coverage
-  threshold.
+  reference `docs/adrs/adr-0001-three-tier-linting.md` supersedes the old
+  linting ADR template name. Impact: ADR-003 should cite the three-tier linting
+  ADR and describe `DOC` as a content-accuracy complement to Interrogate's
+  coverage threshold.
 
 - Observation: a `DOC` baseline over `src/falcon_correlate` reports 99
   violations across runtime modules, package-local unit tests, and test helper
@@ -313,11 +313,11 @@ Stop and escalate when any of these is reached:
   user + planning agent.
 
 - Decision: Record the docstring/verification convention in
-  `docs/adr-003-docstring-completeness-and-doctest-gates.md`, referenced from
-  the design document and `docs/contents.md`, and add a "Docstring conventions"
-  section to `docs/developers-guide.md`. Rationale: user selection during
-  planning; matches the existing `adr-001-three-tier-linting.md` practice.
-  Date/Author: 2026-06-17, user + planning agent.
+  `docs/adrs/adr-0003-docstring-completeness-and-doctest-gates.md`, referenced
+  from the design document and `docs/contents.md`, and add a "Docstring
+  conventions" section to `docs/developers-guide.md`. Rationale: user selection
+  during planning; matches the existing `adr-0001-three-tier-linting.md`
+  practice. Date/Author: 2026-06-17, user + planning agent.
 
 ## Outcomes & retrospective
 
@@ -452,9 +452,9 @@ they pass (Green), and prose, spelling, and cross-references are tidied last
 
 No code changes. Reconfirm the gap analysis against the current tree with
 `leta show <symbol>` and `leta grep`, because line numbers above are
-approximate. Read `docs/adr-001-three-tier-linting.md` as the ADR template and
-`docs/documentation-style-guide.md` for spelling and example conventions. Load
-the `leta`, `python-types-and-apis`, `python-testing`,
+approximate. Read `docs/adrs/adr-0001-three-tier-linting.md` as the ADR
+template and `docs/documentation-style-guide.md` for spelling and example
+conventions. Load the `leta`, `python-types-and-apis`, `python-testing`,
 `python-errors-and-logging`, and `en-gb-oxendict` skills (see Interfaces and
 dependencies).
 
@@ -586,11 +586,11 @@ Surprises & Discoveries.
 
 ### Stage D — refactor and documentation (Milestone 5)
 
-1. Write `docs/adr-003-docstring-completeness-and-doctest-gates.md` in the style
-   of `docs/adr-001-three-tier-linting.md`. Capture: NumPy convention; inline
-   attribute-docstring rule for module variables; repo-wide `DOC` gate with the
-   pinned Ruff version; the doctest gate and the "executable `>>>` only for
-   offline examples" rule; and the rationale.
+1. Write `docs/adrs/adr-0003-docstring-completeness-and-doctest-gates.md` in
+   the style of `docs/adrs/adr-0001-three-tier-linting.md`. Capture: NumPy
+   convention; inline attribute-docstring rule for module variables; repo-wide
+   `DOC` gate with the pinned Ruff version; the doctest gate and the "executable
+   `>>>` only for offline examples" rule; and the rationale.
 2. Add a "Docstring conventions" section to `docs/developers-guide.md`,
    positioned just after the "Episodic lint policy" section, expanding the
    existing "keep docstrings in NumPy style" note with a short template and the
@@ -725,7 +725,8 @@ New artefacts to exist at completion:
 
 - `src/falcon_correlate/unittests/test_public_exports.py` — introspection
   test over `falcon_correlate.__all__` plus AST checks for attribute docstrings.
-- `docs/adr-003-docstring-completeness-and-doctest-gates.md` — convention ADR.
+- `docs/adrs/adr-0003-docstring-completeness-and-doctest-gates.md` — convention
+  ADR.
 - A `doctest` target in `Makefile` (wired into the committed gates).
 - Inline attribute docstrings in `src/falcon_correlate/middleware_utils.py` for
   `correlation_id_var`, `user_id_var`, `RECOMMENDED_LOG_FORMAT`.
@@ -739,7 +740,7 @@ Signposted documentation:
   "Logging integration", "httpx propagation", "Celery propagation".
 - `docs/developers-guide.md` — "Episodic lint policy" / docstring convention.
 - `docs/documentation-style-guide.md` — spelling, examples, formatting.
-- `docs/adr-001-three-tier-linting.md` — ADR template and lint-context
+- `docs/adrs/adr-0001-three-tier-linting.md` — ADR template and lint-context
   reference.
 - `docs/complexity-antipatterns-and-refactoring-strategies.md` — referenced by
   the task brief for refactoring guidance if a module split is forced.

@@ -18,17 +18,17 @@
 - [Falcon correlation ID middleware design](falcon-correlation-id-middleware-design.md)
   explains the middleware architecture, request lifecycle, configuration model,
   and correlation ID propagation rules.
-- [ADR-001: Python linting architecture](adr-001-three-tier-linting.md)
+- [ADR-001: Python linting architecture](adrs/adr-0001-three-tier-linting.md)
   records the original decision and its amendments; the current pipeline has
   six checks, from pinned Ruff through strict Skylos dead-code detection.
-- [ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md)
+- [ADR-002: tested documentation examples](adrs/adr-0002-tested-documentation-examples.md)
   records the convention for runnable examples and AST-guarded guide snippets.
-- [ADR-003: docstring completeness and doctest gates](adr-003-docstring-completeness-and-doctest-gates.md)
+- [ADR-003: docstring completeness and doctest gates](adrs/adr-0003-docstring-completeness-and-doctest-gates.md)
   records the NumPy docstring convention, exported-value documentation form,
   and layered completeness checks.
-- [ADR-004: explicit Celery signal registration](adr-004-explicit-celery-signal-registration.md)
+- [ADR-004: explicit Celery signal registration](adrs/adr-0004-explicit-celery-signal-registration.md)
   records the opt-in Celery integration boundary introduced in version 0.2.0.
-- [ADR-005: attested, reconciled release pipeline](adr-005-attested-reconciled-release-pipeline.md)
+- [ADR-005: attested, reconciled release pipeline](adrs/adr-0005-attested-reconciled-release-pipeline.md)
   records PyPI as the source of truth and GitHub Releases as the reconciled
   second destination.
 - [Documentation style guide](documentation-style-guide.md) defines spelling,

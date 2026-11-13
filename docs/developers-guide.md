@@ -36,7 +36,7 @@ analysis focused on code that has already passed the style, package docstring,
 classic and DF12 lint, and snapshot checks.
 
 The original linting decision is recorded in
-[ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md).
+[ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adrs/adr-0001-three-tier-linting.md).
 DF12 Pylint, Ambrleaks, and Skylos extend that original architecture with
 separate plugin, snapshot, and production dead-code checks.
 
@@ -942,12 +942,12 @@ the rebuilt bundle or delete or overwrite published PyPI files.
 ## Roadmap notes
 
 The linting architecture described in
-[ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adr-001-three-tier-linting.md)
+[ADR-001: three-tier linting with Ruff, Interrogate, and PyPy-backed Pylint](adrs/adr-0001-three-tier-linting.md)
 is complete. The current six-check pipeline above records the subsequent
 additions; keep future changes aligned with it unless a new ADR supersedes it.
 
 The tested quickstart example convention is described in
-[ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md).
+[ADR-002: tested documentation examples](adrs/adr-0002-tested-documentation-examples.md).
 
 ## Running lint checks
 
@@ -1184,7 +1184,7 @@ check presence and style, Ruff's pydoclint (`DOC`) rules check that signature
 sections agree with the implementation, and the `interrogate` target checks
 docstring coverage. The rationale and division of responsibilities are recorded
 in
-[ADR-003: docstring completeness and doctest gates](adr-003-docstring-completeness-and-doctest-gates.md).
+[ADR-003: docstring completeness and doctest gates](adrs/adr-0003-docstring-completeness-and-doctest-gates.md).
 
 Runtime functions and methods should use only the sections that apply:
 `Parameters`, `Returns` or `Yields`, `Raises`, and `Examples`. Document

@@ -225,7 +225,7 @@ Complete documentation, examples, and prepare for initial release.
         by formatting, linting, typechecking, unit tests, BDD scenarios,
         snapshot assertions, and an AST-based Markdown drift guard.
   - [x] Record the tested-documentation convention in
-        [ADR-002: tested documentation examples](adr-002-tested-documentation-examples.md)
+        [ADR-002: tested documentation examples](adrs/adr-0002-tested-documentation-examples.md)
         and link the guide from the README, contents, users' guide, developers'
         guide, and design document.
   - [x] Rebase the completed work onto the three-tier linting baseline from
