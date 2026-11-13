@@ -99,15 +99,17 @@
     for `src/falcon_correlate`, PyPy-backed Pylint, and blocking Skylos
     dead-code detection over production sources. Investigate every Skylos
     finding, remove genuine dead code, and record verified false positives as
-    precise entry points or reasoned named exceptions. CI runs the same target;
-    Skylos is provisioned at its pinned version with Python 3.14 because it
-    parses source with its own runtime AST. The test and coverage CI jobs each
-    install the pinned Makeutil parser before their full pytest suite. Use
+    precise entry points or reasoned named exceptions. CI runs the same target
+    and the shared-actions `df12-skylos` action; Skylos runs through the
+    installed `df12-skylos` command under Python 3.14 because it parses source
+    with its own runtime AST. The test and coverage CI jobs each install the
+    pinned Makeutil parser before their full pytest suite. Use
     `make skylos-allow SYMBOL=symbol REASON="Verified runtime caller"` only when
     an entry-point rule cannot model the runtime boundary. Both values must
-    contain non-whitespace text; otherwise the target exits with status 2.
+    contain non-whitespace text; otherwise the command exits with status 2.
     Skylos records the verified caller-specific reason with the named exception;
-    its updates are serialized through the ignored `.skylos-whitelist.lock` file.
+    its updates are serialized through the ignored `.pyproject.toml.df12.lock`
+    file.
   - **Formatting:** Adheres to formatting standards (`make check-fmt`; use
     `make fmt` to apply fixes).
   - **Typechecking:** Passes type checking (`make typecheck`).

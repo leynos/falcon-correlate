@@ -187,7 +187,7 @@ cython_debug/
 # Ruff stuff:
 .ruff_cache/
 .skylos/
-.skylos-whitelist.lock
+.pyproject.toml.df12.lock
 
 # Local spelling-policy caches and tool directories
 .typos-oxendict-base.json

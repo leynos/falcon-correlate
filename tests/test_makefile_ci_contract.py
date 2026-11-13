@@ -45,20 +45,7 @@ _LINT_RECIPE_TOKENS: typ.Final = (
     ("$(MAKE)", "--no-print-directory", "classic-pylint"),
     ("$(MAKE)", "--no-print-directory", "df12-pylint"),
     ("$(AMBRLEAKS)", "tests"),
-    (
-        "$(SKYLOS)",
-        "$(SKYLOS_PRODUCTION_TARGETS)",
-        "--exclude",
-        "$(SKYLOS_EXCLUDES)",
-        "--category",
-        "dead_code",
-        "--gate",
-        "--format",
-        "concise",
-        "--no-upload",
-        "--no-provenance",
-        "--no-grep-verify",
-    ),
+    ("$(SKYLOS)", "check", "--repository", "."),
 )
 _CLASSIC_PYLINT_PREREQUISITES: typ.Final = ("verify-classic-pylint",)
 _DF12_PYLINT_PREREQUISITES: typ.Final = ("verify-df12-pylint",)

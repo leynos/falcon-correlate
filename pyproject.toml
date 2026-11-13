@@ -261,6 +261,16 @@ do_not_mutate = ["src/falcon_correlate/unittests/*"]
 [tool.uv]
 package = true
 
+# The dead-code gate is the installed `df12-skylos` command from
+# df12-python-lints. `roots` limits liveness analysis to production sources and
+# the exclusion keeps the in-package test modules out of the liveness graph.
+[tool.df12_skylos]
+roots = ["src/falcon_correlate"]
+python = "3.14"
+
+[tool.skylos]
+exclude = ["unittests"]
+
 [tool.skylos.gate]
 strict = true
 
