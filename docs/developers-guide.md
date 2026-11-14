@@ -236,6 +236,12 @@ token, so nested cleanup preserves the enclosing task's correlation ID until
 the enclosing cleanup runs. Preserve this one-entry-per-setup pairing when
 changing the worker receivers.
 
+Tests that dispatch worker signals must connect the receivers for each scenario
+rather than once per session. Other tests disconnect the process-global
+receivers by dispatch UID, so a session-scoped connection does not survive
+arbitrary test ordering. Reconnecting per scenario is cheap because the stable
+dispatch UID makes it idempotent.
+
 Celery deduplicates receivers by `dispatch_uid`, and its internal
 `threading.Lock` protects receiver mutation. Stable UIDs therefore leave
 exactly one integration receiver per supported signal after successful
@@ -400,6 +406,13 @@ package is not covered by the configured sandbox paths or a selected Python
 file is missing. Pull-request CI also runs `make test-mutmut-sandbox` on Python
 3.13; this checks the real sandbox baseline and a focused set of mutants before
 the scheduled workflow runs the broader mutation suite.
+
+Triage each survivor before suppressing it. Kill real gaps with behavioural
+tests. For a provably equivalent mutation, first check whether the mutated line
+has other killable mutations: `# pragma: no mutate` is line-level, so it also
+removes those mutants from evaluation. When the line has other killable
+mutations, record the equivalence argument in a debugging record instead of
+adding the pragma.
 
 ## Tested documentation examples
 
