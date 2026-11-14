@@ -161,6 +161,7 @@ class TestPublicExports:
             "RECOMMENDED_LOG_FORMAT",
             "AsyncCorrelationIDTransport",
             "ContextualLogFilter",
+            "ContextualLogFormatter",
             "CorrelationIDConfig",
             "CorrelationIDMiddleware",
             "CorrelationIDMiddlewareASGI",

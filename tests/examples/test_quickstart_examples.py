@@ -15,10 +15,12 @@ from http import HTTPStatus
 
 import falcon
 import falcon.testing
+import pytest
 
 from falcon_correlate import (
     RECOMMENDED_LOG_FORMAT,
     ContextualLogFilter,
+    ContextualLogFormatter,
     CorrelationIDConfig,
     correlation_id_var,
     default_uuid_validator,
@@ -34,6 +36,9 @@ if typ.TYPE_CHECKING:
 
 
 _ASCTIME_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}")
+_HOSTILE_CORRELATION_ID = (
+    "abc\r\n2026-01-01 - [CRITICAL] - [forged] - forged - injected"
+)
 _LOG_FORMAT_VARIANTS = (
     ("cid-snapshot-1", "uid-snapshot-1"),
     ("cid-snapshot-1", None),
@@ -110,11 +115,11 @@ class TestQuickstartConfiguredApp:
 class TestQuickstartLoggingSetup:
     """Tests for the quickstart logging configuration."""
 
-    def test_logging_setup_includes_context_values(
+    @pytest.fixture
+    def quickstart_logger(
         self,
-        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
-    ) -> None:
-        """Verify the logging example emits correlation and user IDs."""
+    ) -> cabc.Iterator[tuple[logging.Logger, io.StringIO]]:
+        """Configure the quickstart logger and capture its stream output."""
         module = _load_quickstart_module("logging_setup")
         configure_logging = typ.cast(
             "cabc.Callable[[], logging.Logger]",
@@ -128,18 +133,27 @@ class TestQuickstartLoggingSetup:
                 handler.stream = stream
 
         try:
-
-            def test_logic() -> None:
-                """Set ``cid-log-1``/``uid-log-1``; log ``hello from quickstart``."""
-                correlation_id_var.set("cid-log-1")
-                user_id_var.set("uid-log-1")
-                logger.info("hello from quickstart")
-
-            isolated_context(test_logic)
+            yield logger, stream
         finally:
             for handler in handlers:
                 logger.removeHandler(handler)
                 handler.close()
+
+    def test_logging_setup_includes_context_values(
+        self,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+        quickstart_logger: tuple[logging.Logger, io.StringIO],
+    ) -> None:
+        """Verify the logging example emits correlation and user IDs."""
+        logger, stream = quickstart_logger
+
+        def test_logic() -> None:
+            """Set ``cid-log-1``/``uid-log-1``; log ``hello from quickstart``."""
+            correlation_id_var.set("cid-log-1")
+            user_id_var.set("uid-log-1")
+            logger.info("hello from quickstart")
+
+        isolated_context(test_logic)
 
         output = stream.getvalue()
         assert "cid-log-1" in output, (
@@ -160,6 +174,32 @@ class TestQuickstartLoggingSetup:
         failure_message = "expected condition: actual_snapshot == snapshot..."
         assert actual_snapshot == snapshot, failure_message
 
+    def test_logging_setup_keeps_hostile_metadata_on_one_line(
+        self,
+        isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+        quickstart_logger: tuple[logging.Logger, io.StringIO],
+    ) -> None:
+        """A hostile correlation ID cannot forge records in example output."""
+        logger, stream = quickstart_logger
+
+        def test_logic() -> None:
+            """Log one request with line-breaking correlation metadata."""
+            correlation_id_var.set(_HOSTILE_CORRELATION_ID)
+            user_id_var.set(None)
+            logger.info("handled request")
+
+        isolated_context(test_logic)
+
+        lines = stream.getvalue().splitlines()
+        assert len(lines) == 1, f"expected one log line, got {lines!r}"
+        assert "abc\\r\\n2026-01-01" in lines[0], (
+            f"expected escaped CRLF in the log line, got {lines[0]!r}"
+        )
+        assert not any(
+            ord(character) < 0x20 or 0x7F <= ord(character) <= 0x9F
+            for character in lines[0]
+        ), f"expected no raw control characters, got {lines[0]!r}"
+
 
 def _render_log_line(correlation_id: str | None, user_id: str | None) -> str:
     """Render one recommended-format log line with fixed context values."""
@@ -176,7 +216,7 @@ def _render_log_line(correlation_id: str | None, user_id: str | None) -> str:
             exc_info=None,
         )
         ContextualLogFilter().filter(record)
-        formatted = logging.Formatter(RECOMMENDED_LOG_FORMAT).format(record)
+        formatted = ContextualLogFormatter(RECOMMENDED_LOG_FORMAT).format(record)
     finally:
         user_id_var.reset(user_token)
         correlation_id_var.reset(correlation_token)

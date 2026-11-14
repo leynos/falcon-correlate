@@ -2,8 +2,9 @@
 
 This module shows how a Falcon application can add correlation context to
 standard-library log records. `configure_logging()` creates a small isolated
-logger with `ContextualLogFilter` and `RECOMMENDED_LOG_FORMAT` attached, and
-`log_request()` demonstrates using that logger from request-handling code.
+logger with `ContextualLogFilter`, `ContextualLogFormatter` and
+`RECOMMENDED_LOG_FORMAT` attached, and `log_request()` demonstrates using that
+logger from request-handling code.
 """
 
 from __future__ import annotations
@@ -11,7 +12,11 @@ from __future__ import annotations
 # [quickstart:logging-imports]
 import logging
 
-from falcon_correlate import RECOMMENDED_LOG_FORMAT, ContextualLogFilter
+from falcon_correlate import (
+    RECOMMENDED_LOG_FORMAT,
+    ContextualLogFilter,
+    ContextualLogFormatter,
+)
 
 # [/quickstart:logging-imports]
 
@@ -23,8 +28,8 @@ def configure_logging() -> logging.Logger:
     Returns
     -------
     logging.Logger
-        Logger named ``quickstart`` with one stream handler, the recommended
-        formatter, and the contextual logging filter attached.
+        Logger named ``quickstart`` with one stream handler, the safe
+        contextual formatter, and the contextual logging filter attached.
 
     Notes
     -----
@@ -43,7 +48,7 @@ def configure_logging() -> logging.Logger:
     logger.propagate = False
 
     handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter(RECOMMENDED_LOG_FORMAT))
+    handler.setFormatter(ContextualLogFormatter(RECOMMENDED_LOG_FORMAT))
     handler.addFilter(ContextualLogFilter())
     logger.addHandler(handler)
     return logger
