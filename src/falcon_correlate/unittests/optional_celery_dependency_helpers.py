@@ -49,9 +49,15 @@ _CELERY_TEST_GLOBS = (
     "src/falcon_correlate/unittests/test_celery_*.py",
     "tests/bdd/test_celery_*_steps.py",
 )
-# These tests use signal doubles and deliberately remain runnable without the
-# optional Celery package, so they do not belong in the blocked-dependency run.
-_CELERY_INDEPENDENT_TEST_MODULES = frozenset({"test_celery_diagnostics.py"})
+# These tests use signal doubles or direct helper calls and deliberately remain
+# runnable without the optional Celery package, so they do not belong in the
+# blocked-dependency run.
+_CELERY_INDEPENDENT_TEST_MODULES = frozenset(
+    {
+        "test_celery_diagnostics.py",
+        "test_celery_worker_cleanup.py",
+    },
+)
 _MINIMUM_CELERY_TEST_MODULE_COUNT = 6
 _PYTEST_DURATION_PATTERN = re.compile(
     r"\d+\.\d+s(?: \(\d+:\d{2}:\d{2}\))?",
