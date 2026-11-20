@@ -19,6 +19,7 @@ if typ.TYPE_CHECKING:
 from falcon_correlate import (
     RECOMMENDED_LOG_FORMAT,
     ContextualLogFilter,
+    ContextualLogFormatter,
     correlation_id_var,
     user_id_var,
 )
@@ -58,11 +59,11 @@ class TestRecommendedLogFormat:
         self,
         isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
     ) -> None:
-        """Verify the constant works with Formatter and ContextualLogFilter."""
+        """Verify the constant works with ContextualLogFormatter and the filter."""
         stream = io.StringIO()
         handler = logging.StreamHandler(stream)
         handler.setFormatter(
-            logging.Formatter(RECOMMENDED_LOG_FORMAT),
+            ContextualLogFormatter(RECOMMENDED_LOG_FORMAT),
         )
         handler.addFilter(ContextualLogFilter())
 
@@ -109,6 +110,7 @@ class TestRecommendedLogFormat:
             },
             "formatters": {
                 "recommended": {
+                    "class": "falcon_correlate.ContextualLogFormatter",
                     "format": RECOMMENDED_LOG_FORMAT,
                 },
             },

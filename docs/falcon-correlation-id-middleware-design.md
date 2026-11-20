@@ -528,6 +528,13 @@ A primary use of correlation IDs is to enhance logging. The goal is to include
 the correlation ID and the current user's ID in every log message generated
 during the processing of a request.
 
+Logging integration has two distinct responsibilities. The filter *enriches*
+each record with the contextual values; the formatter *renders* those values
+into text. Enrichment must keep the raw value so it can still be propagated to
+downstream services. Rendering is the output boundary where untrusted text has
+to be made safe, because a plaintext sink turns a stray line break into a
+forged log entry (CWE-117).
+
 #### 3.4.1. Injecting correlation ID and user ID via `logging.Filter`
 
 The standard Python `logging` module can be extended using a custom
@@ -557,24 +564,37 @@ class ContextualLogFilter(logging.Filter):
 ```
 
 This filter should then be added to the appropriate handlers in the logging
-configuration.
+configuration. It only enriches records: it neither validates nor escapes the
+values, so the rendering step described in §3.4.2 is what keeps plaintext
+output safe.
 
 #### 3.4.2. Configuring log formatters
 
 Once the custom filter adds these attributes to `LogRecord` objects, the log
-formatters need to be updated to include them in the output. This involves
-modifying the format string used by `logging.Formatter`. For example:
+formatters need to include them in the output and make their values safe for
+plaintext sinks. A stock `logging.Formatter` interpolates the values verbatim,
+so a correlation ID or user ID containing a line break can forge additional log
+lines. `ContextualLogFormatter`, defined in `middleware_utils.py`, subclasses
+`logging.Formatter` and escapes control characters in `correlation_id` and
+`user_id` on a shallow copy of the record before formatting. The original
+record, the context variables and every propagation path keep the raw values.
+For example:
 
 ```python
 LOG_FORMAT = (
     "%(asctime)s - [%(levelname)s] - [%(correlation_id)s] - "
     "[%(user_id)s] - %(name)s - %(message)s"
 )
-formatter = logging.Formatter(LOG_FORMAT)
+formatter = ContextualLogFormatter(LOG_FORMAT)
 ```
 
-This will ensure that the correlation ID and user ID appear in the formatted log
-messages.[^1]
+This will ensure that the correlation ID and user ID appear in the formatted
+log messages without letting their content break the line structure.[^1] The
+escaping rules and rejected alternatives are recorded in §4.6.10. The
+constructor accepts the same `fmt`, `datefmt`, `validate` and keyword-only
+`defaults` arguments as `logging.Formatter`, and accepts percent or template
+style; brace style is rejected at construction. `dictConfig` can therefore
+select the class with `"class": "falcon_correlate.ContextualLogFormatter"`.
 
 #### 3.4.3. (Optional) Considerations for `structlog`
 
@@ -776,6 +796,13 @@ logging the attempted (and rejected) incoming ID might be useful for security
 auditing. Validation can prevent issues like overly long IDs or potentially
 malicious content from being processed or logged if not properly handled by all
 downstream systems.
+
+A trusted source only establishes that the peer is allowed to supply an ID; it
+says nothing about the content of that ID. An accepted value may still contain
+control characters, including line breaks. Rendering is therefore the safety
+boundary: `ContextualLogFormatter` escapes those characters rather than
+depending on the validator to reject them. This keeps the raw value available
+for propagation while ensuring one record produces one plaintext line.
 
 #### 3.6.2. Implications of trusted source logic
 
@@ -1337,29 +1364,122 @@ and other non-request logging paths.  This "fill, don't overwrite" strategy is
 implemented with a `hasattr` guard before each assignment.
 
 The filter always returns `True`. It enriches records with contextual
-attributes but never suppresses them, as specified in §3.4.1.
+attributes but never suppresses them, as specified in §3.4.1. It also leaves
+the values unescaped, because the same record may feed structured sinks or
+propagation code that need the raw text; escaping belongs to the plaintext
+formatter described in §4.6.10.
 
 #### 4.6.9. Recommended format string constant
 
 The recommended format string from §3.4.2 is exposed as a public constant
-`RECOMMENDED_LOG_FORMAT` in `middleware.py`, importable from the package root.
-Its value is:
+`RECOMMENDED_LOG_FORMAT` in `middleware_utils.py` and re-exported through
+`middleware.py` and the package root. Its value is:
 
 ```plaintext
 %(asctime)s - [%(levelname)s] - [%(correlation_id)s] - [%(user_id)s] - %(name)s - %(message)s
 ```
 
 The constant lets users `from falcon_correlate import RECOMMENDED_LOG_FORMAT`
-and pass it directly to `logging.Formatter` or embed it in a `dictConfig`
-dictionary, eliminating copy-paste transcription errors. This follows the
-project's pattern of defining module-level constants for shared values (e.g.
+and pass it directly to `ContextualLogFormatter` or embed it in a `dictConfig`
+dictionary, eliminating copy-paste transcription errors. Pairing it with the
+plain `logging.Formatter` would render the contextual fields verbatim and lose
+the escaping described in §4.6.10. The constant follows the project's pattern
+of defining module-level constants for shared values (e.g.
 `DEFAULT_HEADER_NAME`, `_MISSING_CONTEXT_PLACEHOLDER`).
 
-The `ContextualLogFilter` class docstring includes both a handler-level example
-using the constant and a complete `dictConfig` example, providing
-copy-pasteable configurations for the two most common logging setup patterns.
+The `ContextualLogFilter` and `ContextualLogFormatter` class docstrings include
+handler-level examples using the constant and a complete `dictConfig` example,
+providing copy-pasteable configurations for the two most common logging setup
+patterns.
 
-#### 4.6.10. Configuration factory ownership
+#### 4.6.10. Copy-on-format escaping in `ContextualLogFormatter`
+
+**Decision:** `ContextualLogFormatter` escapes control characters in the
+`correlation_id` and `user_id` record attributes while formatting, operating on
+a shallow copy of the `LogRecord` when a correlation field is rendered. The raw
+values stay on the original record, in the context variables, and in every
+propagation path.
+
+Escaping at the output boundary is what makes the guarantee dependable. A
+correlation ID is accepted from a trusted source, but trust applies to the
+peer, not to the bytes of the header. A value such as
+`abc\r\n2026-01-01 - [CRITICAL] - forged` would otherwise let a task producer
+append fabricated lines to a plaintext log. Escaping when the text is rendered
+covers values that reach the formatter through the context variables or through
+explicit `extra=` metadata, and it does not require every caller to remember to
+sanitize input.
+
+The translation table is applied only to the two correlation fields:
+
+| Input                                   | Rendered as |
+| --------------------------------------- | ----------- |
+| `\`                                     | `\\`        |
+| carriage return                         | `\r`        |
+| line feed                               | `\n`        |
+| tab                                     | `\t`        |
+| other C0 controls, DEL, and C1 controls | `\xNN`      |
+| U+2028 LINE SEPARATOR                   | `\u2028`    |
+| U+2029 PARAGRAPH SEPARATOR              | `\u2029`    |
+
+Escaping the full C0, DEL, and C1 ranges also covers the vertical tab, form
+feed, and separator characters that `str.splitlines()` treats as line
+boundaries. Ordinary IDs contain none of these characters, so their output is
+byte-identical to that of a stock `logging.Formatter`.
+
+The escape is applied to the rendering selected by the format string. Text
+conversions (`%s`, `%r`, `%a`, and template substitutions) escape their text,
+`repr`, or `ascii` output, so a hostile custom `__repr__` cannot carry a line
+break into a `%r` field. Numeric conversions keep their value because they
+cannot emit control characters; an integer supplied through `extra=` therefore
+keeps working with `%(user_id)d`. A non-text value whose selected rendering
+contains a control character is escaped as text instead. The original object
+stays on the record either way.
+
+Percent and template styles are supported. The `%c` conversion is rejected at
+construction because it renders an integer as an arbitrary character, including
+when a legacy `h`, `l` or `L` length modifier precedes it. Brace style is
+rejected because its format-spec language, including `:c` and custom
+`__format__` implementations, can render text the formatter cannot intercept.
+Escaped percent signs are skipped while scanning, so a literal `%(...)r` inside
+`%%` cannot select the conversion for an active placeholder. A field with
+repeated placeholders is accepted when every occurrence uses the same
+conversion, or when all occurrences are numeric: numeric conversions pass the
+original value through, so each placeholder applies its own conversion. Other
+mixes are rejected because a single substituted value cannot render the field
+two different ways. Rejecting a configuration is preferable to advertising a
+boundary it cannot enforce.
+
+Only fields that the format string renders are escaped. An unused metadata
+attribute is left untouched, so an object whose `__str__` raises cannot break a
+record that the stock formatter would emit.
+
+The text that is checked is the text that is emitted. Text and representation
+conversions return the already escaped rendering rather than the original
+object, so a stateful `__str__` or `__repr__` cannot pass the check and then
+return hostile text during the format operation.
+
+The record is copied before fields are replaced. `logging.Formatter.format` sets
+`record.message`, `record.asctime`, and `record.exc_text` in place, so
+formatting a copy prevents one handler's formatter from changing what another
+handler, filter, or test observes. A record without either field used by the
+format is formatted directly, avoiding a copy on non-contextual paths.
+
+Alternatives considered:
+
+- **Validate at input only.** Rejecting control characters in the middleware
+  would leave explicit `extra=` metadata and worker-supplied IDs unprotected,
+  and would reject IDs that are safe in structured sinks.
+- **Mutate the record in place.** Replacing the fields on the live record
+  would work for one handler but leak escaped text to later handlers,
+  propagation code, and any caller inspecting the record.
+- **Escape every record attribute.** Message text and exception tracebacks are
+  application-controlled and may legitimately span lines; escaping them would
+  corrupt multi-line tracebacks and ordinary diagnostics.
+- **Rely on a custom format specifier.** A `%`-style conversion would only
+  protect format strings that opt in. The formatter must protect the
+  recommended format and any user-supplied format string alike.
+
+#### 4.6.11. Configuration factory ownership
 
 The WSGI and ASGI middleware constructors retain their public individual
 keyword options. `_CorrelationIDMiddlewareBase` first rejects a call that
@@ -1370,7 +1490,7 @@ unknown keys, normalizes the values, and returns a validated configuration.
 This keeps runtime keyword validation with the configuration factory while
 preserving the middleware call interface.
 
-#### 4.6.11. Pluggable selection metrics
+#### 4.6.12. Pluggable selection metrics
 
 `metrics_recorder` is an optional keyword-only configuration field that accepts
 a synchronous callback. The shared request path classifies the incoming ID and
@@ -1401,7 +1521,7 @@ Recorder exceptions are isolated from request processing. The middleware logs a
 and continuing to fallback generation or acceptance. This keeps metrics
 optional and prevents backend failures from changing request behaviour.
 
-#### 4.6.12. Falcon's fixed WSGI response-hook signature
+#### 4.6.13. Falcon's fixed WSGI response-hook signature
 
 **Decision:** Preserve Falcon's four-parameter `process_response` callback
 signature, including `resource` and `req_succeeded`, even though this
@@ -1410,7 +1530,7 @@ local to the framework hook and retain their rationale and Issue #38 reference
 beside the method. Falcon requires the full callback signature; observability
 does not change it.
 
-#### 4.6.13. Bound metric header labels
+#### 4.6.14. Bound metric header labels
 
 **Decision:** Keep `header_name` on `CorrelationIDSelectionEvent`, but
 canonicalize it to `X-Correlation-ID` or `X-Request-ID`; map every other
@@ -1420,7 +1540,7 @@ unbounded labels across deployments. This finite mapping preserves the two
 common header distinctions without allowing arbitrary configuration to expand
 metric cardinality. The outcome and trust enums remain the other event labels.
 
-#### 4.6.14. Preserve concurrent response lifecycle coverage
+#### 4.6.15. Preserve concurrent response lifecycle coverage
 
 **Decision:** Retain the concurrent response-header isolation example and
 property test. They exercise the shared middleware's response echo and

@@ -15,3 +15,9 @@ Feature: Celery worker correlation ID propagation
     When the Celery worker lifecycle runs the task
     Then the task body should observe correlation ID "bdd-worker-cid-002"
     And the ambient correlation ID should be restored to "ambient-worker-cid-001" after the task finishes
+
+  Scenario: Hostile worker correlation metadata cannot forge log records
+    Given a Celery worker task request with a line-break correlation ID
+    When the Celery worker lifecycle runs the task
+    Then the worker should emit exactly one escaped log record
+    And the worker should retain the raw correlation ID for propagation

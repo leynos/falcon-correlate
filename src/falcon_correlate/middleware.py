@@ -26,6 +26,7 @@ from .middleware_metrics import (
 from .middleware_utils import (
     RECOMMENDED_LOG_FORMAT,
     ContextualLogFilter,
+    ContextualLogFormatter,
     correlation_id_var,
     default_uuid7_generator,
     default_uuid_validator,
@@ -36,6 +37,7 @@ __all__ = [
     "DEFAULT_HEADER_NAME",
     "RECOMMENDED_LOG_FORMAT",
     "ContextualLogFilter",
+    "ContextualLogFormatter",
     "CorrelationIDConfig",
     "CorrelationIDMiddleware",
     "CorrelationIDMiddlewareASGI",
