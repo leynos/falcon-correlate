@@ -24,7 +24,6 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
-import subprocess  # ruff: ignore[suspicious-subprocess-import] - workflow tests intercept PATH commands.
 import sys
 import time
 import typing as typ
@@ -40,12 +39,13 @@ if __package__:
         parse_pep691_index,
         require_github_release_digests,
         require_local_distribution_digests,
-        sha256_file,
     )
-    from scripts.release_curl import (
-        PYPI_DOWNLOAD_CURL_ARGUMENTS,
-        SIMPLE_INDEX_CURL_ARGUMENTS,
+    from scripts.release_commands import (
+        download_pypi_file,
+        require_success,
+        run_command,
     )
+    from scripts.release_curl import SIMPLE_INDEX_CURL_ARGUMENTS
 else:
     from release_assets import (
         PypiFile,
@@ -56,9 +56,9 @@ else:
         parse_pep691_index,
         require_github_release_digests,
         require_local_distribution_digests,
-        sha256_file,
     )
-    from release_curl import PYPI_DOWNLOAD_CURL_ARGUMENTS, SIMPLE_INDEX_CURL_ARGUMENTS
+    from release_commands import download_pypi_file, require_success, run_command
+    from release_curl import SIMPLE_INDEX_CURL_ARGUMENTS
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -85,25 +85,6 @@ def _escape_workflow_command_data(value: str) -> str:
     return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
 
 
-def _run(arguments: list[str]) -> subprocess.CompletedProcess[str]:
-    """Run one external command without a shell and capture both streams."""
-    return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - fixed argv keeps PATH stand-ins interceptable without a shell.
-        arguments,
-        capture_output=True,
-        check=False,
-        text=True,
-    )
-
-
-def _require_success(result: subprocess.CompletedProcess[str], command: str) -> None:
-    """Raise with the command's captured diagnostic on failure."""
-    if result.returncode == 0:
-        return
-    detail = result.stderr.strip() or result.stdout.strip() or "no diagnostic"
-    msg = f"{command} failed with exit {result.returncode}: {detail}"
-    raise ReleaseAssetError(msg)
-
-
 def _clear_directory(directory: Path) -> None:
     """Create an empty staging directory, refusing nested stale entries."""
     directory.mkdir(parents=True, exist_ok=True)
@@ -128,14 +109,14 @@ def _copy_distributions(source: Path, destination: Path) -> None:
 
 def _fetch_index_once(url: str) -> tuple[int, str]:
     """Fetch one PEP 691 index response and return its status and body."""
-    result = _run([
+    result = run_command([
         *SIMPLE_INDEX_CURL_ARGUMENTS,
         "--header",
         f"Accept: {_SIMPLE_ACCEPT}",
         url,
     ])
     if result.returncode != 0:
-        _require_success(result, "curl Simple index request")
+        require_success(result, "curl Simple index request")
     try:
         body, status_text = result.stdout.rsplit("\n", maxsplit=1)
         status = int(status_text)
@@ -208,13 +189,13 @@ def _ensure_draft() -> None:
     collect_distributions(Path(_required("DIST_DIR")))
     tag = _required("RELEASE_TAG")
     for attempt in range(_DRAFT_LOOKUP_ATTEMPTS):
-        view = _run(["gh", "release", "view", tag, "--json", "tagName"])
+        view = run_command(["gh", "release", "view", tag, "--json", "tagName"])
         if view.returncode == 0:
             print(f"Reusing the existing release for {tag}.")
             return
         diagnostic = f"{view.stdout}\n{view.stderr}".casefold()
         if "not found" not in diagnostic and "404" not in diagnostic:
-            _require_success(view, "gh release view")
+            require_success(view, "gh release view")
         if attempt + 1 < _DRAFT_LOOKUP_ATTEMPTS:
             print(
                 f"GitHub draft not found; retry {attempt + 1}/{_DRAFT_LOOKUP_ATTEMPTS}"
@@ -222,7 +203,7 @@ def _ensure_draft() -> None:
             print(f"Retry delay: {_DRAFT_LOOKUP_DELAY_SECONDS}s")
             time.sleep(_DRAFT_LOOKUP_DELAY_SECONDS)
 
-    create = _run([
+    create = run_command([
         "gh",
         "release",
         "create",
@@ -233,32 +214,15 @@ def _ensure_draft() -> None:
         "--title",
         tag,
     ])
-    _require_success(create, "gh release create")
+    require_success(create, "gh release create")
     print(f"Created a draft release for {tag}.")
 
 
 def _release_assets(tag: str) -> dict[str, str | None]:
     """Read release asset names and digests with the GitHub CLI."""
-    result = _run(["gh", "release", "view", tag, "--json", "assets"])
-    _require_success(result, "gh release view")
+    result = run_command(["gh", "release", "view", tag, "--json", "assets"])
+    require_success(result, "gh release view")
     return parse_github_asset_digests(result.stdout)
-
-
-def _download_pypi_file(file: PypiFile, destination: Path) -> None:
-    """Download one canonical PyPI file and verify its advertised digest."""
-    result = _run([
-        *PYPI_DOWNLOAD_CURL_ARGUMENTS,
-        str(destination),
-        file.url,
-    ])
-    _require_success(result, "curl PyPI file download")
-    actual = sha256_file(destination)
-    if actual != file.sha256:
-        msg = (
-            f"{destination.name} download sha256 {actual} does not match PyPI "
-            f"sha256 {file.sha256}"
-        )
-        raise ReleaseAssetError(msg)
 
 
 def _check_existing_asset_digests(
@@ -304,7 +268,7 @@ def _reconcile_release_assets(
     for name, file in index.items():
         if name in missing:
             downloaded = upload_dir / name
-            _download_pypi_file(file, downloaded)
+            download_pypi_file(file, downloaded)
             upload_paths.append(downloaded)
     if bundle.name not in assets:
         staged_bundle = upload_dir / bundle.name
@@ -312,8 +276,8 @@ def _reconcile_release_assets(
         upload_paths.append(staged_bundle)
 
     if upload_paths:
-        upload = _run(["gh", "release", "upload", tag, *map(str, upload_paths)])
-        _require_success(upload, "gh release upload")
+        upload = run_command(["gh", "release", "upload", tag, *map(str, upload_paths)])
+        require_success(upload, "gh release upload")
     else:
         print("The release already holds every distribution and its bundle.")
     return _release_assets(tag)
@@ -340,8 +304,8 @@ def _publish_release() -> None:
     verified_assets = _reconcile_release_assets(tag, index, bundle, upload_dir)
     require_github_release_digests(names, index, verified_assets, bundle.name)
 
-    _require_success(
-        _run([
+    require_success(
+        run_command([
             "gh",
             "release",
             "edit",

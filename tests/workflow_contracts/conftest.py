@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import os
+import shutil
 import stat
 import typing as typ
 
 import pytest
 
+from tests.workflow_contracts.https_index_server import LocalHttpsServer
 from tests.workflow_contracts.release_payloads import (
     BUNDLE,
     BUNDLE_BYTES,
@@ -34,6 +36,7 @@ def curl_argv_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "import json\n"
         "import os\n"
         "import sys\n"
+        "import time\n"
         "from pathlib import Path\n\n"
         "arguments = sys.argv[1:]\n"
         "record = Path(os.environ['CURL_ARGV_PATH'])\n"
@@ -51,6 +54,14 @@ def curl_argv_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "    responses[min(len(calls) - 1, len(responses) - 1)]\n"
         "    if responses else {}\n"
         ")\n"
+        "sleep_seconds = float(response.get('sleep', 0))\n"
+        "if sleep_seconds:\n"
+        "    pid_path = os.environ.get('CURL_PID_PATH')\n"
+        "    if pid_path:\n"
+        "        with open(pid_path, 'w', encoding='utf-8') as pid_file:\n"
+        "            pid_file.write(str(os.getpid()))\n"
+        "            pid_file.flush()\n"
+        "    time.sleep(sleep_seconds)\n"
         "if '--output' in arguments:\n"
         "    output = Path(arguments[arguments.index('--output') + 1])\n"
         "    downloads = json.loads(os.environ.get('CURL_DOWNLOAD_CONTENTS', '{}'))\n"
@@ -153,3 +164,35 @@ def configure_publish(
         monkeypatch.setenv("CURL_STATUS", "200")
 
     return configure
+
+
+@pytest.fixture
+def https_index_server(tmp_path: Path) -> cabc.Iterator[LocalHttpsServer]:
+    """Provide a real loopback HTTPS server for curl behaviour tests."""
+    for executable in ("curl", "openssl"):
+        if shutil.which(executable) is None:
+            pytest.skip(f"real curl behaviour tests require {executable}")
+    server = LocalHttpsServer(tmp_path / "tls")
+    try:
+        yield server
+    finally:
+        server.stop()
+
+
+@pytest.fixture
+def curl_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    https_index_server: LocalHttpsServer,
+) -> None:
+    """Isolate curl from user settings and trust the test certificate."""
+    home = tmp_path / "curl-home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("CURL_HOME", str(home))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(home / "config"))
+    monkeypatch.setenv("CURL_CA_BUNDLE", str(https_index_server.certificate))
+    for variable in ("HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy"):
+        monkeypatch.delenv(variable, raising=False)
+    for variable in ("NO_PROXY", "no_proxy"):
+        monkeypatch.setenv(variable, "127.0.0.1")
