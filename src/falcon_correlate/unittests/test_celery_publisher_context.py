@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import typing as typ
 from unittest import mock
 
@@ -41,11 +42,13 @@ def test_publish_uses_each_configured_app_backend(
         "configured-rpc-publish-app",
         backend="rpc://",
         broker="memory://",
+        set_as_current=False,
     )
     non_rpc_app = Celery(
         "configured-non-rpc-publish-app",
         backend="cache+memory://",
         broker="memory://",
+        set_as_current=False,
     )
 
     @rpc_app.task(name="configured-rpc-publish-task", shared=False)
@@ -91,11 +94,13 @@ def test_publisher_identity_does_not_depend_on_task_registry_owner(
         "configured-rpc-task-publisher",
         backend="rpc://",
         broker="memory://",
+        set_as_current=False,
     )
     non_rpc_task_owner = Celery(
         "configured-non-rpc-task-owner",
         backend="cache+memory://",
         broker="memory://",
+        set_as_current=False,
     )
 
     @non_rpc_task_owner.task(name="task-owned-by-non-rpc-app", shared=False)
@@ -133,6 +138,7 @@ def test_configured_app_caches_backend_verdict_on_first_publish(
         "configured-cache-publish-app",
         backend="cache+memory://",
         broker="memory://",
+        set_as_current=False,
     )
 
     @celery_app.task(name="configured-cache-publish-task", shared=False)
@@ -170,6 +176,148 @@ def test_configured_app_caches_backend_verdict_on_first_publish(
         "request-correlation-id",
         "request-correlation-id",
     ], "repeated publishing should keep using the first cached verdict"
+
+
+def test_publish_preserves_task_id_and_logs_sender_when_inspection_fails(
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A failed publish-path inspection preserves the task ID and its sender."""
+    celery_app = Celery(
+        "failing-inspection-publish-app",
+        backend="cache+memory://",
+        broker="memory://",
+        set_as_current=False,
+    )
+
+    @celery_app.task(name="failing-inspection-publish-task", shared=False)
+    def failing_inspection_publish_task() -> None:
+        """Provide the task whose publish inspection fails."""
+
+    celery_app.finalize()
+    monkeypatch.setattr(
+        celery_app.backend,
+        "as_uri",
+        mock.Mock(side_effect=RuntimeError("publish inspection failed")),
+    )
+    configure_celery_correlation(celery_app)
+    published_task_ids: list[str] = []
+
+    with (
+        caplog.at_level(logging.DEBUG, logger="falcon_correlate.celery"),
+        mock.patch("kombu.Producer.publish", autospec=True) as publish,
+    ):
+
+        def _logic() -> None:
+            """Publish the task with an ambient request correlation ID."""
+            correlation_id_var.set("request-correlation-id")
+            published_task_ids.append(failing_inspection_publish_task.apply_async().id)
+
+        isolated_context(_logic)
+
+    assert publish.call_count == 1, "the task should be published once"
+    assert publish.call_args.kwargs["correlation_id"] == published_task_ids[0], (
+        "an inconclusive backend inspection must preserve the task ID"
+    )
+    diagnostics = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "falcon_correlate.celery" and record.levelno == logging.DEBUG
+    ]
+    assert diagnostics == [
+        (
+            "Unable to inspect Celery result backend URI for publishing task "
+            "'failing-inspection-publish-task'; preserving task ID."
+        )
+    ], "the publish diagnostic should identify the signal sender"
+
+
+def test_publish_replaces_correlation_id_when_backend_lacks_as_uri(
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A backend without a URI accessor counts as a non-RPC verdict."""
+    celery_app = Celery(
+        "missing-as-uri-publish-app",
+        backend="cache+memory://",
+        broker="memory://",
+        set_as_current=False,
+    )
+
+    @celery_app.task(name="missing-as-uri-publish-task", shared=False)
+    def missing_as_uri_publish_task() -> None:
+        """Provide the task published against a backend without ``as_uri``."""
+
+    celery_app.finalize()
+    backend_type = type(celery_app.backend)
+    uri_owners = [
+        backend_class
+        for backend_class in backend_type.__mro__
+        if "as_uri" in vars(backend_class)
+    ]
+    assert uri_owners, "the test requires a backend class that defines as_uri"
+    for backend_class in uri_owners:
+        monkeypatch.delattr(backend_class, "as_uri")
+    configure_celery_correlation(celery_app)
+
+    with mock.patch("kombu.Producer.publish", autospec=True) as publish:
+
+        def _logic() -> None:
+            """Publish the task with an ambient request correlation ID."""
+            correlation_id_var.set("request-correlation-id")
+            missing_as_uri_publish_task.apply_async()
+
+        isolated_context(_logic)
+
+    assert publish.call_count == 1, "the task should be published once"
+    assert publish.call_args.kwargs["correlation_id"] == "request-correlation-id", (
+        "a backend without as_uri should accept the request correlation ID"
+    )
+
+
+def test_cached_rpc_verdict_is_reused_after_backend_changes(
+    isolated_context: cabc.Callable[[cabc.Callable[[], None]], None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A cached RPC verdict must survive later backend changes."""
+    celery_app = Celery(
+        "cached-rpc-verdict-app",
+        backend="rpc://",
+        broker="memory://",
+        set_as_current=False,
+    )
+
+    @celery_app.task(name="cached-rpc-verdict-task", shared=False)
+    def cached_rpc_verdict_task() -> None:
+        """Provide the task whose RPC verdict is cached on first publish."""
+
+    celery_app.finalize()
+    backend = celery_app.backend
+    original_as_uri = mock.Mock(wraps=backend.as_uri)
+    monkeypatch.setattr(backend, "as_uri", original_as_uri)
+    changed_as_uri = mock.Mock(return_value="cache+memory://")
+    configure_celery_correlation(celery_app)
+    published_task_ids: list[str] = []
+
+    with mock.patch("kombu.Producer.publish", autospec=True) as publish:
+
+        def _logic() -> None:
+            """Publish once for the verdict, then twice after a backend change."""
+            correlation_id_var.set("request-correlation-id")
+            published_task_ids.append(cached_rpc_verdict_task.apply_async().id)
+            monkeypatch.setattr(backend, "as_uri", changed_as_uri)
+            published_task_ids.append(cached_rpc_verdict_task.apply_async().id)
+            published_task_ids.append(cached_rpc_verdict_task.apply_async().id)
+
+        isolated_context(_logic)
+
+    original_as_uri.assert_called_once()
+    changed_as_uri.assert_not_called()
+    assert publish.call_count == 3, "all task publishes should reach Kombu"
+    assert [call.kwargs["correlation_id"] for call in publish.call_args_list] == (
+        published_task_ids
+    ), "the cached RPC verdict should keep preserving every task ID"
 
 
 def test_handler_falls_back_when_no_configured_app_owns_task(
