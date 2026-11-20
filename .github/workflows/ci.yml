@@ -70,7 +70,7 @@ jobs:
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.
-        uses: leynos/shared-actions/.github/actions/install-mdtablefix@1123a35f1cc7810f65bfffa5ea4c8b981d6c0090
+        uses: leynos/shared-actions/.github/actions/install-mdtablefix@cfd51f3d5423cb16155b94e020cdd7eaeebd0833
         with:
           version: "0.6.1"
 
@@ -91,7 +91,7 @@ jobs:
         run: make lint
 
       - name: Dead-code gate
-        uses: leynos/shared-actions/.github/actions/df12-skylos@1123a35f1cc7810f65bfffa5ea4c8b981d6c0090
+        uses: leynos/shared-actions/.github/actions/df12-skylos@cfd51f3d5423cb16155b94e020cdd7eaeebd0833
 
       - name: Run typechecker
         run: make typecheck
@@ -258,7 +258,7 @@ jobs:
       # wrote.
       - name: Generate coverage
         if: matrix.python-version == '3.13' && github.event_name == 'pull_request'
-        uses: leynos/shared-actions/.github/actions/generate-coverage@1123a35f1cc7810f65bfffa5ea4c8b981d6c0090
+        uses: leynos/shared-actions/.github/actions/generate-coverage@cfd51f3d5423cb16155b94e020cdd7eaeebd0833
         with:
           # The shared action exposes the xdist worker count but not its
           # distribution strategy. Run this suite serially so its
