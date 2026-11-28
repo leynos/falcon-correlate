@@ -213,12 +213,26 @@ def test_the_actionlint_registry_matches_the_labels_in_use() -> None:
         "hosted set, so an empty result means the reader is broken rather "
         "than that the repository stopped using paid runners"
     )
-    assert registered == in_use, (
-        "every label actionlint does not know must be registered, and every "
-        "registration must name a label in use; registered but unused: "
-        f"{sorted(registered - in_use)}; used but unregistered: "
-        f"{sorted(in_use - registered)}"
-    )
+    unused = {
+        entry
+        for entry in registered
+        if not any(_covers(entry, label) for label in in_use)
+    }
+    unregistered = {
+        label
+        for label in in_use
+        if not any(_covers(entry, label) for entry in registered)
+    }
+    assert not unused, f"registered but unused: {sorted(unused)}"
+    assert not unregistered, f"used but unregistered: {sorted(unregistered)}"
+
+
+def _covers(entry: str, label: str) -> bool:
+    """Say whether a registry entry names a label, exactly or by a ``*`` suffix."""
+    prefix, star, rest = entry.partition("*")
+    if not star:
+        return entry == label
+    return not rest and label.startswith(prefix)
 
 
 def test_an_unrecognized_label_is_reported_rather_than_excused() -> None:
