@@ -17,6 +17,7 @@ from .httpx import (
 from .middleware import (
     RECOMMENDED_LOG_FORMAT,
     ContextualLogFilter,
+    ContextualLogFormatter,
     CorrelationIDConfig,
     CorrelationIDMiddleware,
     CorrelationIDMiddlewareASGI,
@@ -34,6 +35,7 @@ __all__ = [
     "RECOMMENDED_LOG_FORMAT",
     "AsyncCorrelationIDTransport",
     "ContextualLogFilter",
+    "ContextualLogFormatter",
     "CorrelationIDConfig",
     "CorrelationIDMiddleware",
     "CorrelationIDMiddlewareASGI",

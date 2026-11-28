@@ -159,7 +159,8 @@ curl -i -H 'X-Correlation-ID: cid-quickstart-1' http://127.0.0.1:8000/hello
 
 ## Logging
 
-Configure a logger with `ContextualLogFilter` and `RECOMMENDED_LOG_FORMAT`:
+Configure a logger with `ContextualLogFilter`, `ContextualLogFormatter` and
+`RECOMMENDED_LOG_FORMAT`:
 
 Create `logging_setup.py` with the imports used by the logging example:
 
@@ -168,7 +169,11 @@ Create `logging_setup.py` with the imports used by the logging example:
 ```python
 import logging
 
-from falcon_correlate import RECOMMENDED_LOG_FORMAT, ContextualLogFilter
+from falcon_correlate import (
+    RECOMMENDED_LOG_FORMAT,
+    ContextualLogFilter,
+    ContextualLogFormatter,
+)
 ```
 
 <!-- quickstart:logging-config -->
@@ -180,8 +185,8 @@ def configure_logging() -> logging.Logger:
     Returns
     -------
     logging.Logger
-        Logger named ``quickstart`` with one stream handler, the recommended
-        formatter, and the contextual logging filter attached.
+        Logger named ``quickstart`` with one stream handler, the safe
+        contextual formatter, and the contextual logging filter attached.
 
     Notes
     -----
@@ -200,7 +205,7 @@ def configure_logging() -> logging.Logger:
     logger.propagate = False
 
     handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter(RECOMMENDED_LOG_FORMAT))
+    handler.setFormatter(ContextualLogFormatter(RECOMMENDED_LOG_FORMAT))
     handler.addFilter(ContextualLogFilter())
     logger.addHandler(handler)
     return logger

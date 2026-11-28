@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import io
+import logging
 import typing as typ
 
 import pytest
@@ -30,6 +32,9 @@ from pytest_bdd import (  # ruff: ignore[module-import-not-at-top-of-file] -- de
 )
 
 from falcon_correlate import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
+    RECOMMENDED_LOG_FORMAT,
+    ContextualLogFilter,
+    ContextualLogFormatter,
     correlation_id_var,
 )
 from falcon_correlate._celery_worker_signals import (  # ruff: ignore[module-import-not-at-top-of-file] -- dependency probe first.
@@ -47,13 +52,60 @@ if typ.TYPE_CHECKING:
 scenarios("celery_worker_signal.feature")
 
 
+_LOGGER_NAME = "bdd_celery_worker_signal"
+_HOSTILE_CORRELATION_ID = (
+    "abc\r\n2026-01-01 - [CRITICAL] - [forged] - forged - injected"
+)
+
+
 class Context(typ.TypedDict, total=False):
     """Type definition for per-scenario worker capture state."""
 
     task: celery.Task
     observed: dict[str, str | None]
+    correlation_id: str | None
+    stream: io.StringIO
     task_correlation_id_seen: str | None
+    request_correlation_id_seen: str | None
     correlation_id_after_task: str | None
+
+
+def _build_logger(stream: io.StringIO) -> logging.Logger:
+    """Return the worker logger wired with the filter and safe formatter."""
+    worker_logger = logging.getLogger(_LOGGER_NAME)
+    worker_logger.handlers.clear()
+    worker_logger.setLevel(logging.INFO)
+    worker_logger.propagate = False
+
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(ContextualLogFormatter(RECOMMENDED_LOG_FORMAT))
+    handler.addFilter(ContextualLogFilter())
+    worker_logger.addHandler(handler)
+    return worker_logger
+
+
+def _build_worker_context(value: str | None) -> Context:
+    """Create a real Celery task whose body logs through the safe formatter."""
+    app = Celery("bdd-celery-worker", broker="memory://")
+    observed: dict[str, str | None] = {}
+    stream = io.StringIO()
+    worker_logger = _build_logger(stream)
+
+    @app.task(name="bdd.worker.echo", bind=True)
+    def echo(self: celery.Task, payload: str) -> str:
+        """Record the visible IDs, log one record, and echo the payload."""
+        observed["task_correlation_id_seen"] = correlation_id_var.get()
+        observed["request_correlation_id_seen"] = self.request.correlation_id
+        worker_logger.info("handled task")
+        return payload
+
+    echo.push_request(correlation_id=value)
+    return {
+        "task": echo,
+        "observed": observed,
+        "correlation_id": value,
+        "stream": stream,
+    }
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -92,21 +144,23 @@ def given_task_request_with_correlation_id(value: str) -> Context:
         The value produced for the test scenario.
 
     """
-    app = Celery("bdd-celery-worker", broker="memory://")
-    observed: dict[str, str | None] = {}
+    return _build_worker_context(value)
 
-    @app.task(name="bdd.worker.echo", bind=True)
-    def echo(self: celery.Task, payload: str) -> str:
-        """Record the current correlation ID and return the unchanged payload."""
-        observed["task_correlation_id_seen"] = correlation_id_var.get()
-        return payload
 
-    echo.push_request(correlation_id=value)
-    return {
-        "task": echo,
-        "observed": observed,
-        "task_correlation_id_seen": observed.get("task_correlation_id_seen"),
-    }
+@given(
+    "a Celery worker task request with a line-break correlation ID",
+    target_fixture="context",
+)
+def given_task_request_with_line_break_correlation_id() -> Context:
+    """Create a Celery task whose request ID tries to forge a log record.
+
+    Returns
+    -------
+    Context
+        The value produced for the test scenario.
+
+    """
+    return _build_worker_context(_HOSTILE_CORRELATION_ID)
 
 
 @given(parsers.parse('the ambient correlation ID is set to "{value}"'))
@@ -144,6 +198,9 @@ def when_worker_runs_task(context: Context) -> Context:
     return {
         **context,
         "task_correlation_id_seen": context["observed"].get("task_correlation_id_seen"),
+        "request_correlation_id_seen": context["observed"].get(
+            "request_correlation_id_seen"
+        ),
         "correlation_id_after_task": correlation_id_var.get(),
     }
 
@@ -174,4 +231,30 @@ def then_ambient_correlation_id_is_restored(value: str) -> None:
     """Assert worker cleanup restores a pre-existing ambient correlation ID."""
     assert correlation_id_var.get() == value, (
         "Ambient correlation ID was not restored after task completion"
+    )
+
+
+@then("the worker should emit exactly one escaped log record")
+def then_worker_emits_one_escaped_log_record(context: Context) -> None:
+    """Assert hostile worker metadata cannot add a second log record."""
+    lines = context["stream"].getvalue().splitlines()
+    assert len(lines) == 1, f"expected one log line, got {lines!r}"
+    assert "abc\\r\\n2026-01-01" in lines[0], (
+        f"expected escaped CRLF in the worker log, got {lines[0]!r}"
+    )
+    assert not any(
+        ord(character) < 0x20 or 0x7F <= ord(character) <= 0x9F
+        for character in lines[0]
+    ), f"expected no raw control characters, got {lines[0]!r}"
+
+
+@then("the worker should retain the raw correlation ID for propagation")
+def then_worker_retains_raw_correlation_id(context: Context) -> None:
+    """Assert the raw value survives on the context and the task request."""
+    expected = _HOSTILE_CORRELATION_ID
+    assert context["task_correlation_id_seen"] == expected, (
+        "Task body did not observe the raw correlation ID"
+    )
+    assert context["request_correlation_id_seen"] == expected, (
+        "Task request did not retain the raw correlation ID"
     )

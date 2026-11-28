@@ -16,9 +16,12 @@ from pytest_bdd import given, parsers, scenarios, then, when
 from falcon_correlate import (
     RECOMMENDED_LOG_FORMAT,
     ContextualLogFilter,
+    ContextualLogFormatter,
     correlation_id_var,
     user_id_var,
 )
+
+pytest_plugins = ("tests.bdd.contextual_log_filter_safe_steps",)
 
 scenarios("contextual_log_filter.feature")
 
@@ -256,7 +259,7 @@ def given_logger_with_recommended_format(
     stream = io.StringIO()
     handler = logging.StreamHandler(stream)
     handler.setFormatter(
-        logging.Formatter(RECOMMENDED_LOG_FORMAT),
+        ContextualLogFormatter(RECOMMENDED_LOG_FORMAT),
     )
     handler.addFilter(ContextualLogFilter())
 
@@ -307,6 +310,7 @@ def given_logger_via_dictconfig_with_recommended_format(
         },
         "formatters": {
             "recommended": {
+                "class": "falcon_correlate.ContextualLogFormatter",
                 "format": RECOMMENDED_LOG_FORMAT,
             },
         },
