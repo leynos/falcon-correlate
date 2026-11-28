@@ -175,6 +175,9 @@ def _blocked_celery_environment(
     """Build an isolated pytest environment with the Celery import blocker first."""
     return _child_environment(environ) | {
         "PYTHONPATH": _pythonpath_with_import_blocker(sitecustomize_dir, environ),
+        # Pytest wraps its progress line to the terminal width. A fixed, wide
+        # width keeps the expected skip-count snapshot on a single line.
+        "COLUMNS": "1000",
     }
 
 
