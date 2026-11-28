@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import pytest
 
+from tests.workflow_contracts.registry_comparison import registry_mismatches
 from tests.workflow_contracts.runner_lanes import (
     FORK_FALLBACK,
     GITHUB_HOSTED_LABELS,
@@ -213,12 +214,9 @@ def test_the_actionlint_registry_matches_the_labels_in_use() -> None:
         "hosted set, so an empty result means the reader is broken rather "
         "than that the repository stopped using paid runners"
     )
-    assert registered == in_use, (
-        "every label actionlint does not know must be registered, and every "
-        "registration must name a label in use; registered but unused: "
-        f"{sorted(registered - in_use)}; used but unregistered: "
-        f"{sorted(in_use - registered)}"
-    )
+    unregistered, unused = registry_mismatches(registered, in_use)
+    assert not unused, f"registered but unused: {unused}"
+    assert not unregistered, f"used but unregistered: {unregistered}"
 
 
 def test_an_unrecognized_label_is_reported_rather_than_excused() -> None:
