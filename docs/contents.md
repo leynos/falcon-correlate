@@ -53,6 +53,9 @@
 - [Optional-Celery subprocess timeout](debugging/debugging-plan-2026-08-21-optional-celery-subprocess-timeout.md)
   records the earlier investigation of child pytest timeouts and its
   falsification results.
+- [Worker cleanup mutation survivors](debugging/debugging-plan-2026-10-30-worker-cleanup-mutation-survivors.md)
+  records the #279 classification of surviving cleanup mutants, including the
+  equivalent-mutant proof and the tests that close the real gaps.
 
 ## Planning documents
 

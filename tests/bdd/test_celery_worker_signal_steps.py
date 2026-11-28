@@ -56,9 +56,15 @@ class Context(typ.TypedDict, total=False):
     correlation_id_after_task: str | None
 
 
-@pytest.fixture(autouse=True, scope="session")
+@pytest.fixture(autouse=True)
 def _connect_celery_worker_signals() -> None:
-    """Connect the Celery worker signal handlers once for all scenarios."""
+    """Connect the worker handlers before each scenario.
+
+    Other test modules disconnect the process-global receivers, so a
+    session-scoped connection can be removed before a later scenario runs.
+    Connecting per scenario is cheap because the dispatch UID makes the call
+    idempotent for receivers that are already present.
+    """
     _maybe_connect_celery_worker_signals()
 
 
